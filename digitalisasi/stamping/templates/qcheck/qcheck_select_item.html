@@ -1,0 +1,26 @@
+{% extends "base_template/base.html" %}
+{% block content %}
+<div class="card shadow-sm">
+    <h5 class="card-header">Pilih Item untuk Dicatat Q-Check</h5>
+    <div class="card-body">
+        <div class="alert alert-info">Menampilkan item untuk Line: <strong>{{ selected_line.namaline }}</strong> - Shift: <strong>{{ selected_shift }}</strong> pada tanggal hari ini.</div>
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>ID Detail Job</th><th>Item/Part Number</th><th>Aksi</th></tr></thead>
+                <tbody>
+                    {% for item in items %}
+                    <tr>
+                        <td>{{ item.id_detailjob }}</td>
+                        <td>{{ item.id_itemproduksi.job_number }}</td>
+                        <td><a href="{% url 'list_qcheck' item.id_detailjob %}" class="btn btn-success btn-sm">Catat Waktu Q-Check</a></td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3" class="text-center py-4">Tidak ada item yang aktif untuk Line dan Shift ini.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        <a href="{% url 'qcheck_main' %}" class="btn btn-secondary mt-3"><i class="bx bx-arrow-back"></i> Kembali</a>
+    </div>
+</div>
+{% endblock %}

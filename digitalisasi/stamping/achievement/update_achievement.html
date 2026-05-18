@@ -1,0 +1,14 @@
+{% extends "base_template/base.html" %}
+{% block title %}Edit Achievement{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+  <h3>Edit Achievement - {{ achievement.detail_job.id_detailjob }}</h3>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary">Update</button>
+    <a href="{% url 'rekap_achievement' achievement.detail_job.id_detailjob %}" class="btn btn-secondary">Kembali</a>
+  </form>
+</div>
+{% endblock %}

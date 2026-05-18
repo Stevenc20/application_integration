@@ -14,7 +14,21 @@ class RoleMiddleware
             return redirect('/login');
         }
 
-        if (!in_array(Auth::user()->role, $roles)) {
+        $userRole = Auth::user()->role;
+        $normalizedUserRole = strtolower($userRole);
+        if (str_starts_with($normalizedUserRole, 'leader') || $normalizedUserRole === 'shearing' || $normalizedUserRole === 'handwork') {
+            $normalizedUserRole = 'operator';
+        }
+
+        $normalizedRoles = array_map(function($role) {
+            $r = strtolower($role);
+            if (str_starts_with($r, 'leader') || $r === 'shearing' || $r === 'handwork') {
+                return 'operator';
+            }
+            return $r;
+        }, $roles);
+
+        if (!in_array($normalizedUserRole, $normalizedRoles) && !in_array($userRole, $roles)) {
             abort(403, 'Unauthorized'); 
         }
 

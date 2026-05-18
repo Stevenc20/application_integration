@@ -1,0 +1,45 @@
+{% extends "base_template\base.html" %}
+
+{% block title %}Data Karyawan{% endblock %}
+
+{% block content %}
+
+<!-- Basic Layout & Basic with Icons -->
+<div class="row mb-6 gy-6">
+<!-- Basic Layout -->
+<div class="col-xxl">
+    <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Update Data Karyawan</h5>
+        <small class="text-body-secondary float-end">Data Karyawan</small>
+    </div>
+    <div class="card-body">
+        <form action="" method="post"> 
+        {% csrf_token %}
+        <div class="row mb-6">
+            <label class="col-sm-2 col-form-label" for="basic-default-name">Nama Karyawan</label>
+            <div class="col-sm-10">
+            <input type="text" class="form-control" id="" name = "nama_karyawan" placeholder="Masukkan nama karyawan" value="{{karyawanobj.nama_karyawan}}" required/>
+            </div>
+        </div>
+        <div class="row mb-6">
+            <label class="col-sm-2 col-form-label" for="basic-default-name">NRP Karyawan</label>
+            <div class="col-sm-10">
+            <input type="text" class="form-control" id="" name = "nrp_karyawan" value="{{karyawanobj.nrp_karyawan}}" placeholder="Masukkan NRP Karyawan" required/>
+            </div>
+        </div>
+        <div class="row mb-6">
+            <label class="col-sm-2 col-form-label" for="basic-default-name">Jabatan</label>
+            <div class="col-sm-10">
+            <input type="text" class="form-control" id="" name = "jabatan" value="{{karyawanobj.jabatan}}" placeholder="Masukkan Jabatan Karyawan" required/>
+            </div>
+        </div>
+        
+        <button type="submit" class="btn btn-primary">Update</button>
+        </form>
+    </div>
+    </div>
+</div>
+</div>
+
+{% endblock %}

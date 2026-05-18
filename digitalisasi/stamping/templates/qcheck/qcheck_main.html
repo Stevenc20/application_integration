@@ -1,0 +1,63 @@
+{% extends "base_template/base.html" %}
+
+{% block content %}
+<div class="card shadow-sm mb-4">
+    <h5 class="card-header">Mulai Pencatatan Q-Check</h5>
+    <div class="card-body">
+        <p>Pilih Line dan Shift untuk menampilkan daftar item yang akan di-Q-Check.</p>
+        <form method="GET" action="{% url 'qcheck_select_item' %}" class="row g-3 align-items-end">
+            <div class="col-md-5">
+                <label for="entry_line" class="form-label">Line Produksi</label>
+                <select id="entry_line" name="line" class="form-select" required>
+                    <option value="">Pilih Line</option>
+                    <!-- REVISI 1: Gunakan 'top_dropdown_lines' dan tampilkan nama saja -->
+                    {% for line in top_dropdown_lines %}
+                        <option value="{{ line.id }}">{{ line.namaline }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-5">
+                <label for="entry_shift" class="form-label">Shift</label>
+                <select id="entry_shift" name="shift" class="form-select" required>
+                    <option value="">Pilih Shift</option>
+                    <option value="1">Shift 1</option>
+                    <option value="2">Shift 2</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Tampilkan Item</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+    <h5 class="card-header">History Q-Check</h5>
+    <div class="card-body">
+        <form method="GET" action="{% url 'qcheck_main' %}" class="row g-3 align-items-end mb-4">
+            <div class="col-md-4"><label for="history_date" class="form-label">Tanggal</label><input type="date" class="form-control" id="history_date" name="history_date" value="{{ selected_history_date }}"></div>
+            <div class="col-md-4">
+                <label for="history_line" class="form-label">Line Produksi</label>
+                <select id="history_line" name="history_line" class="form-select">
+                    <option value="">Semua Line</option>
+                    <!-- REVISI 2: Gunakan 'history_dropdown_lines' -->
+                    {% for line in history_dropdown_lines %}
+                    <option value="{{ line.id }}" {% if selected_history_line == line.id %}selected{% endif %}>
+                        {{ line.namaline }} - Shift {{ line.shift }}
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-md-4"><button type="submit" class="btn btn-info w-100">Filter History</button></div>
+        </form>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead><tr><th>Item/Part Number</th><th>Jenis</th><th>Hasil</th><th>Waktu Mulai</th><th>Waktu Selesai</th><th>Durasi (Menit)</th></tr></thead>
+                <tbody>{% for qc in qcheck_history %}<tr><td>{{ qc.id_detailjob.id_itemproduksi.job_number }}</td><td>{{ qc.get_jenis_qcheck_display }}</td><td>{{ qc.hasil_qcheck }}</td><td>{{ qc.start_time|date:"H:i:s" }}</td><td>{{ qc.finish_time|date:"H:i:s"|default:"-" }}</td><td>{{ qc.duration|floatformat:2 }}</td></tr>{% empty %}<tr><td colspan="6" class="text-center py-4">Belum ada history Q-Check untuk filter ini.</td></tr>{% endfor %}</tbody>
+                <tfoot class="table-group-divider"><tr><th colspan="5" class="text-end">Total Durasi:</th><th>{{ total_duration_history|floatformat:2 }} menit</th></tr></tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

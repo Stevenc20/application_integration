@@ -1,0 +1,136 @@
+{% extends "base_template/base.html" %}
+
+{% load static %}
+
+{% block title %}Laporan Kerja Harian{% endblock %}
+
+{% block content %}
+<style>
+    /* Custom styles to match the report */
+    .report-card {
+        border: 2px solid black;
+    }
+    .report-header h1 {
+        font-family: Arial, sans-serif;
+        font-weight: bold;
+    }
+    .report-table th, .report-table td {
+        border: 1px solid black !important;
+        vertical-align: middle;
+        padding: 0.25rem 0.4rem;
+        font-size: 0.75rem;
+    }
+    .summary-table th, .summary-table td {
+        border: 1px solid black !important;
+        vertical-align: middle;
+        padding: 0.4rem;
+    }
+    .bg-plan { background-color: #FFF2CC; }
+    .bg-actual { background-color: #DDEBF7; }
+</style>
+
+<div class="card report-card">
+    <div class="card-body p-4">
+
+        <form method="GET" action="{% url 'laporan' %}" class="row g-3 align-items-center mb-4">
+    
+    <div class="col-auto">
+        <label for="line" class="form-label fw-bold">Production Line:</label>
+        <select name="line" id="line" class="form-select">
+            {% for name in all_line_names %}
+                <option value="{{ name|slugify }}" {% if name == selected_line_name %}selected{% endif %}>
+                    {{ name }} </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
+        <label for="shift" class="form-label fw-bold">Shift:</label>
+        <select name="shift" id="shift" class="form-select">
+            {% for shift_num in all_shift_numbers %}
+                <option value="{{ shift_num }}" {% if shift_num == selected_shift %}selected{% endif %}>
+                    Shift {{ shift_num }}
+                </option>
+            {% endfor %}
+        </select>
+    </div>
+
+    <div class="col-auto">
+        <label for="tanggal" class="form-label fw-bold">Tanggal:</label>
+        <input type="date" name="tanggal" id="tanggal" class="form-control" value="{{ selected_date_str }}">
+    </div>
+
+    <div class="col-auto">
+        <button type="submit" class="btn btn-primary" style="margin-top: 28px;">Tampilkan</button>
+    </div>
+
+    <div class="col-auto ms-auto">
+        <a href="{% url 'export_laporan_excel' %}?line={{ selected_line_name|slugify }}&shift={{ selected_shift }}&tanggal={{ selected_date_str }}" class="btn btn-success">
+            <i class="fas fa-file-excel"></i> Export Excel
+        </a>
+        <a href="{% url 'export_laporan_pdf' %}?line={{ selected_line_name|slugify }}&shift={{ selected_shift }}&tanggal={{ selected_date_str }}" class="btn btn-danger">
+            <i class="fas fa-file-pdf"></i> Export PDF
+        </a>
+    </div>
+</form>
+
+        <div class="row align-items-center mb-3 report-header">
+            <div class="col-4">
+                <div class="d-flex align-items-center">
+                    <img src="{% static 'img/ippi/ippi.png' %}" alt="IPPI Logo" style="height: 50px; margin-right: 15px;">
+                    <div>
+                        <p class="mb-0 fw-bold">PRODUCTION SECTION</p>
+                        <p class="mb-0 fw-bold">INTI PANTJA PRESS INDUSTRI</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-4 text-center">
+                <h1>LAPORAN KERJA HARIAN STAMPING</h1>
+            </div>
+            <div class="col-4">
+                <table class="table table-bordered text-center" style="font-size: 0.8rem;">
+                    <thead><tr><th>Supervisor</th><th>Foreman</th><th>T.Leader</th></tr></thead>
+                    <tbody><tr><td style="height: 150px;"></td><td></td><td></td></tr></tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-9">
+                <div class="row mb-2">
+                    <div class="col-5">
+                         <table class="table report-table">
+                            <tbody>
+                                <tr><th class="bg-plan" style="width: 35%;">SHOP LINE</th><td>{{ shop_line }}</td></tr>
+                                <tr><th class="bg-plan">TANGGAL</th><td>{{ tanggal|date:"d/m/Y" }}</td></tr>
+                                <tr><th class="bg-plan">SHIFT KERJA</th><td>{{ shift_kerja }}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <h6 class="text-center fw-bold">PRODUCTION SCHEDULE</h6>
+                <table class="table report-table text-center">
+                    {% include 'laporan/tabel_1_content.html' %}
+                </table>
+            </div>
+            <div class="col-3 d-flex flex-column justify-content-end">
+                <table class="table summary-table text-center">
+                    {% include 'laporan/tabel_summary_content.html' %}
+                </table>
+            </div>
+        </div>
+
+        <div class="row mt-3">
+            <div class="col-12">
+                <h6 class="text-center fw-bold">ACTUAL PROCESS</h6>
+                <div class="table-responsive">
+                    <table class="table report-table text-center">
+                        {% include 'laporan/tabel_2_content.html' %}
+                    </table>
+                </div>
+            </div>
+        </div>
+        
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,123 @@
+{% extends "base_template/base.html" %}
+{% block content %}
+
+<style>
+    .dashboard-table td, .dashboard-table th {
+        font-size: 0.80rem;
+        padding: 0.5rem 0.4rem;
+        vertical-align: middle;
+    }
+</style>
+<div class="alert alert-info">
+  DEBUG INFO:<br>
+  is_supervisor: {{ is_supervisor }}<br>
+  is_admin: {{ is_admin }}<br>
+  is_foreman: {{ is_foreman }}<br>
+  is_leader: {{ is_leader }}<br>
+  Username: {{ request.user.username }}<br>
+  Groups: 
+  {% for group in request.user.groups.all %}
+    {{ group.name }}{% if not forloop.last %}, {% endif %}
+  {% empty %}
+    (No groups)
+  {% endfor %}
+</div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="mb-0">PRODUCTION ACHIEVEMENT DASHBOARD STAMPING</h2>
+    <h4 class="mb-0">Waktu Sekarang: <span id="liveClock" class="fw-bold text-primary"></span></h4>
+</div>
+<div class="row">
+    {% for line, line_data in data.items %}
+    <div class="col-md-6 col-lg-4 mb-4">
+        <div class="card shadow-sm h-100">
+            <div class="card-header text-center bg-dark text-white">
+                <a href="{% url 'dashboard_detail' line_name=line|slugify %}" class="text-white text-decoration-none">
+                    Press {{ line }} Line
+                </a>
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-bordered mb-0 dashboard-table">
+                    <thead class="table-dark text-center">
+                        <tr>
+                            <th>DESCRIPTION</th>
+                            <th>PLAN</th>
+                            <th>ACTUAL</th>
+                            <th>CURRENT</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for desc, values in line_data.items %}
+                        {% with kpis_in_minutes="IDLE_T,OVERTIME,TOTAL_DT,PROD_T,MAT_T,DIES_T,MACH_T,LOG_T" kpis_to_link="TOTAL_DT,PROD_T,MAT_T,DIES_T,MACH_T,LOG_T" %}
+                        <tr class="text-center">
+                            <td class="text-start {% if desc == 'TOTAL_DT' %}table-danger fw-bold{% endif %}">{{ desc }}</td>
+                            
+                            {% if desc == 'REPAIR' or desc == 'REJECT' %}
+                                <td class="{% if desc == 'TOTAL_DT' %}table-danger{% endif %}">{{ values.plan_qty|floatformat:0 }} pcs | {{ values.plan_percent|floatformat:2 }}%</td>
+                            {% else %}
+                                <td class="{% if desc == 'TOTAL_DT' %}table-danger{% endif %}">{{ values.plan|default:"-" }}</td>
+                            {% endif %}
+
+                            <td class="{% if desc == 'TOTAL_DT' %}table-danger{% endif %}">
+                                {% url 'input_harian' as input_harian_url %}
+                                {% url 'downtime' as data_downtime_url %}
+
+                                {% if desc == 'REPAIR' or desc == 'REJECT' %}
+                                    {{ values.actual_qty }} pcs | {{ values.actual_percent|floatformat:2 }}%
+                                
+                                {% elif desc in kpis_in_minutes %}
+                                    {% if desc in kpis_to_link %}
+                                        <a href="{{ data_downtime_url }}?tanggal={{ today|date:'Y-m-d' }}">
+                                            {{ values.actual|floatformat:2 }} Menit
+                                        </a>
+                                    {% else %}
+                                        {{ values.actual|floatformat:2 }} Menit
+                                    {% endif %}
+
+                                {% elif desc == 'QTY' %}
+                                    <a href="{{ input_harian_url }}?tanggal={{ today|date:'Y-m-d' }}">
+                                        {{ values.actual|default:"-" }}
+                                    </a>
+                                {% else %}
+                                    {{ values.actual|default:"-" }}
+                                {% endif %}
+                            </td>
+
+                            <td class="{% if desc == 'TOTAL_DT' %}table-danger{% endif %}">
+                                {% if desc in kpis_in_minutes %}
+                                    {% if values.current > 0 %}
+                                        {{ values.current|floatformat:2 }} Menit
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                {% elif desc == 'REPAIR' or desc == 'REJECT' %}
+                                    {{ values.current_qty }} pcs | {{ values.current|floatformat:2 }}%
+                                {% else %}
+                                    {{ values.current|default:"-" }}
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endwith %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+function updateClock() {
+    const clockElement = document.getElementById('liveClock');
+    if (clockElement) {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+}
+setInterval(updateClock, 1000);
+updateClock(); 
+</script>
+{% endblock %}

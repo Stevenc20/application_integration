@@ -1,0 +1,56 @@
+{% extends "base_template/base.html" %}
+{% block content %}
+
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Data Item Produksi</h5>
+                <a href="{% url 'create_itemproduksi' %}" class="btn btn-primary">Create Item Produksi</a>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>ID ITEM PRODUKSI</th>
+                                <th>JOB NUMBER</th>
+                                <th>PART NUMBER</th>
+                                <th>CYCLE TIME</th>
+                                <th>CUSTOMER</th>
+                                <th>PRODUCTION LINES</th> 
+                                <th>ACTION</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in itemproduksiobj %}
+                            <tr>
+                                <td>{{ item.id_itemproduksi }}</td>
+                                <td>{{ item.job_number }}</td>
+                                <td>{{ item.part_number }}</td>
+                                <td>{{ item.cycle_time|default:"0.0" }}</td>
+                                <td>{{ item.customer }}</td>
+                                <td>
+                                    {% for line in item.production_lines.all %}
+                                        <span class="badge bg-info-subtle text-info">{{ line.namaline }}</span>
+                                    {% empty %}
+                                        -
+                                    {% endfor %}
+                                </td>
+                                <td>
+                                    <a href="{% url 'update_itemproduksi' item.id_itemproduksi %}" class="btn btn-sm btn-info">Update</a>
+                                    <a href="{% url 'delete_itemproduksi' item.id_itemproduksi %}" class="btn btn-sm btn-danger" onclick="return confirm('Apakah Anda yakin ingin menghapus item ini?');">Delete</a>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="7" class="text-center">Tidak ada data item produksi.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}

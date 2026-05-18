@@ -1,137 +1,134 @@
 @extends('layouts.supervisor')
 
 @section('title', 'Rekap Handwork')
-@section('header_title', 'Rekap Handwork')
 
 @section('content')
-<div class="grid grid-cols-1 md:grid-cols-12 gap-6">
-
-    <!-- Form Input Handwork -->
-    <div class="md:col-span-4">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden sticky top-6">
-            <div class="px-6 py-4 border-b border-gray-200 bg-red-50">
-                <h5 class="text-lg font-bold text-red-900">Catat Hasil Handwork</h5>
+<div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+    <div class="lg:col-span-4">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+                <h5 class="font-bold text-gray-800">Catat Hasil Handwork</h5>
             </div>
-            <div class="p-6">
-                <p class="text-sm text-gray-700 mb-6">Untuk Part Number: <strong class="text-primary-red">{{ $detail_job->id_itemproduksi->part_number ?? 'PART-XYZ' }}</strong></p>
+            <div class="p-5">
+                <p class="text-sm text-gray-600 mb-4">Untuk Part Number: <strong class="text-gray-900">PN-12345 (MOCK)</strong></p>
                 
-                <form method="POST" enctype="multipart/form-data" class="space-y-4">
+                <form method="POST" enctype="multipart/form-data">
                     @csrf
-                    <div>
+                    <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Deskripsi Masalah</label>
-                        <textarea name="problem_hw" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50" rows="3" placeholder="Jelaskan masalah..."></textarea>
+                        <textarea name="problem_hw" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 text-sm" rows="3" placeholder="Deskripsikan masalah pada part..."></textarea>
                     </div>
                     
-                    <div>
+                    <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Foto Sebelum Perbaikan</label>
-                        <input type="file" name="foto_sebelum" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-primary-red hover:file:bg-red-100 border border-gray-300 rounded-md">
+                        <input type="file" name="foto_sebelum" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-primary-red hover:file:bg-red-100 transition-colors">
                     </div>
                     
-                    <div>
+                    <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Foto Sesudah Perbaikan</label>
-                        <input type="file" name="foto_sesudah" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-primary-red hover:file:bg-red-100 border border-gray-300 rounded-md">
+                        <input type="file" name="foto_sesudah" class="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-semibold file:bg-red-50 file:text-primary-red hover:file:bg-red-100 transition-colors">
                     </div>
                     
-                    <div>
+                    <div class="mb-4">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Status Hasil</label>
-                        <select name="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50" required>
+                        <select name="status" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 text-sm" required>
                             <option value="is_ok">OK (Repair Berhasil)</option>
                             <option value="is_reject">NG (Reject)</option>
                         </select>
                     </div>
                     
-                    <div>
+                    <div class="mb-6">
                         <label class="block text-sm font-medium text-gray-700 mb-1">Jumlah</label>
-                        <input type="number" name="quantity" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50" value="1" min="1" required>
+                        <input type="number" name="quantity" class="w-full rounded-md border-gray-300 shadow-sm focus:border-red-500 focus:ring focus:ring-red-200 focus:ring-opacity-50 text-sm" value="1" min="1" required>
                     </div>
                     
-                    <button type="submit" class="w-full mt-2 px-4 py-2 bg-primary-red hover:bg-red-800 text-white text-sm font-medium rounded-md shadow-sm transition-colors">Simpan Catatan</button>
+                    <button type="submit" class="w-full bg-primary-red hover-bg-primary-red text-white font-medium py-2 px-4 rounded-md shadow-sm transition-colors">Simpan Catatan</button>
                 </form>
             </div>
         </div>
     </div>
 
-    <!-- Rekap dan History -->
-    <div class="md:col-span-8">
-        <div class="bg-white rounded-lg shadow-sm border border-gray-200 h-full">
-            <div class="px-6 py-4 border-b border-gray-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <h5 class="text-lg font-bold text-gray-800">Rekap Handwork</h5>
-                <div class="flex flex-col sm:flex-row gap-2">
-                    <a href="{{ route('supervisor.input_harian') ?? '#' }}?tanggal={{ isset($detail_job) ? \Carbon\Carbon::parse($detail_job->id_job->date)->format('Y-m-d') : date('Y-m-d') }}" class="px-3 py-1.5 bg-blue-50 text-blue-700 border border-blue-200 hover:bg-blue-100 text-sm font-medium rounded-md shadow-sm transition-colors flex items-center justify-center">
-                        <i class="bx bx-spreadsheet mr-1"></i> Input Harian
-                    </a>
-                    <a href="{{ route('supervisor.rekap_detailjob', $detail_job->id_job->id_job ?? 1) ?? '#' }}" class="px-3 py-1.5 bg-gray-100 text-gray-700 border border-gray-300 hover:bg-gray-200 text-sm font-medium rounded-md shadow-sm transition-colors flex items-center justify-center">
-                        <i class="bx bx-arrow-back mr-1"></i> Detail Job
+    <div class="lg:col-span-8">
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200">
+            <div class="p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex justify-between items-center">
+                <h5 class="font-bold text-gray-800">Rekap Handwork</h5>
+                <div class="flex gap-2">
+                    <a href="{{ route('supervisor.handwork.index') }}" class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 font-medium py-1 px-3 rounded text-sm shadow-sm transition-colors flex items-center">
+                        <i class="bx bx-arrow-back mr-1"></i> Kembali
                     </a>
                 </div>
             </div>
             
-            <div class="p-6">
-                @if(session('messages'))
-                    <div class="mb-6 p-4 bg-green-50 border border-green-200 text-green-800 rounded-md text-sm">
-                        {{ session('messages') }}
+            <div class="p-5">
+                @if (session('success'))
+                    <div class="bg-green-50 border-l-4 border-green-500 p-4 mb-4">
+                        <p class="text-sm text-green-700">{{ session('success') }}</p>
                     </div>
                 @endif
 
-                <!-- Statistik -->
-                <div class="flex flex-wrap justify-around text-center mb-6 gap-4">
-                    <div class="p-4 bg-green-50 border border-green-200 rounded-lg min-w-[150px]">
-                        <h4 class="text-3xl font-bold text-green-700 mb-1">{{ $total_ok ?? 0 }}</h4>
-                        <span class="inline-block bg-green-100 text-green-800 text-xs font-bold px-2 py-1 rounded">TOTAL REPAIR OK</span>
+                <div class="grid grid-cols-2 gap-4 mb-6 text-center">
+                    <div class="bg-green-50 rounded-lg p-4 border border-green-100 shadow-sm">
+                        <h4 class="text-3xl font-bold text-green-600 mb-1">{{ $total_ok }}</h4>
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800 uppercase tracking-wider">TOTAL REPAIR OK</span>
                     </div>
-                    <div class="p-4 bg-red-50 border border-red-200 rounded-lg min-w-[150px]">
-                        <h4 class="text-3xl font-bold text-red-700 mb-1">{{ $total_reject ?? 0 }}</h4>
-                        <span class="inline-block bg-red-100 text-red-800 text-xs font-bold px-2 py-1 rounded">TOTAL REJECT</span>
+                    <div class="bg-red-50 rounded-lg p-4 border border-red-100 shadow-sm">
+                        <h4 class="text-3xl font-bold text-red-600 mb-1">{{ $total_reject }}</h4>
+                        <span class="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800 uppercase tracking-wider">TOTAL REJECT</span>
                     </div>
                 </div>
                 
-                <hr class="my-6 border-gray-200">
+                <hr class="border-gray-200 my-4">
 
-                <h6 class="font-semibold text-gray-700 mb-4">Detail Catatan:</h6>
-                
-                <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse border border-gray-200">
-                        <thead>
-                            <tr class="bg-gray-100 border-b border-gray-200 text-gray-700">
-                                <th class="py-2 px-3 text-center font-semibold text-sm">Status</th>
-                                <th class="py-2 px-3 font-semibold text-sm">Deskripsi</th>
-                                <th class="py-2 px-3 text-center font-semibold text-sm">Sebelum</th>
-                                <th class="py-2 px-3 text-center font-semibold text-sm">Sesudah</th>
-                                <th class="py-2 px-3 text-center font-semibold text-sm">Aksi</th>
+                <h6 class="font-semibold text-gray-700 mb-3">Detail Catatan:</h6>
+                <div class="overflow-x-auto rounded-lg border border-gray-200">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                                <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Deskripsi</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Sebelum</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Sesudah</th>
+                                <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Aksi</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-gray-200">
-                            @forelse($handwork_items ?? [] as $item)
+                        <tbody class="bg-white divide-y divide-gray-200">
+                            @forelse ($handwork_items as $item)
                             <tr class="hover:bg-gray-50 transition-colors">
-                                <td class="py-2 px-3 text-center">
-                                    @if(isset($item->is_ok) && $item->is_ok)
-                                        <span class="bg-green-100 text-green-800 text-xs font-semibold px-2 py-0.5 rounded border border-green-200">OK</span>
+                                <td class="px-4 py-3 text-center">
+                                    @if ($item->is_ok)
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">OK</span>
                                     @else
-                                        <span class="bg-red-100 text-red-800 text-xs font-semibold px-2 py-0.5 rounded border border-red-200">NG</span>
+                                        <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">NG</span>
                                     @endif
                                 </td>
-                                <td class="py-2 px-3 text-sm text-gray-600">{{ $item->problem_hw ?? "-" }}</td>
-                                <td class="py-2 px-3 text-center">
-                                    @if(isset($item->foto_sebelum) && $item->foto_sebelum)
-                                        <a href="{{ url($item->foto_sebelum) }}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline">Lihat</a>
-                                    @else
-                                        <span class="text-gray-400">-</span>
-                                    @endif
-                                </td>
-                                <td class="py-2 px-3 text-center">
-                                    @if(isset($item->foto_sesudah) && $item->foto_sesudah)
-                                        <a href="{{ url($item->foto_sesudah) }}" target="_blank" class="text-blue-600 hover:text-blue-800 text-sm font-medium hover:underline">Lihat</a>
+                                <td class="px-4 py-3 text-sm text-gray-700">{{ $item->problem_hw ?? '-' }}</td>
+                                <td class="px-4 py-3 text-center text-sm">
+                                    @if ($item->foto_sebelum)
+                                        <a href="{{ $item->foto_sebelum->url }}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">Lihat</a>
                                     @else
                                         <span class="text-gray-400">-</span>
                                     @endif
                                 </td>
-                                <td class="py-2 px-3 text-center">
-                                    <a href="#" class="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 border border-red-200 text-xs font-medium rounded transition-colors inline-block">Hapus</a>
+                                <td class="px-4 py-3 text-center text-sm">
+                                    @if ($item->foto_sesudah)
+                                        <a href="{{ $item->foto_sesudah->url }}" target="_blank" class="text-blue-600 hover:text-blue-800 underline">Lihat</a>
+                                    @else
+                                        <span class="text-gray-400">-</span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-3 text-center">
+                                    <form action="#" method="POST" class="inline" onsubmit="return confirm('Hapus catatan ini?');">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="text-red-500 hover:text-red-700 p-1 rounded hover:bg-red-50 transition-colors">
+                                            <i class="bx bx-trash"></i>
+                                        </button>
+                                    </form>
                                 </td>
                             </tr>
                             @empty
                             <tr>
-                                <td colspan="5" class="py-6 px-4 text-center text-gray-500 italic">Belum ada data catatan handwork.</td>
+                                <td colspan="5" class="px-4 py-8 text-center text-gray-500 bg-gray-50/50">Belum ada data rekapan.</td>
                             </tr>
                             @endforelse
                         </tbody>

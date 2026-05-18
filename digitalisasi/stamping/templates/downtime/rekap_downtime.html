@@ -1,0 +1,240 @@
+{% extends "base_template/base.html" %}
+{% block title %}Rekap Downtime{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Akumulasi Downtime (DetailJob: {{ datadetailjob.id_detailjob }})</h5>
+        <div>
+        <a href="{% url 'input_harian' %}?tanggal={{ detail_job.id_job.date|date:'Y-m-d' }}" class="btn btn-sm btn-info ms-2">
+                        <i class="bx bx-spreadsheet"></i> Kembali ke Input Harian</a>
+        <a href="{% url 'rekap_detailjob' datadetailjob.id_job.id_job %}" class="btn btn-secondary btn-sm">
+            <i class="bx bx-arrow-back"></i> Kembali ke Detail Job
+        </a>
+    </div>
+    </div>
+
+    <table class="table table-sm table-bordered">
+        <thead>
+            <tr class="table-light">
+                <th>Jenis Downtime</th>
+                <th class="text-center">Jumlah</th>
+                <th class="text-center">Total Menit</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for jenis, data in classified_dt.items %}
+            <tr>
+                <td>{{ jenis }}</td>
+                <td class="text-center">{{ data.count }}</td>
+                <td class="text-center">{{ data.total_minutes|floatformat:2 }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="3" class="text-center">Belum ada rekap.</td></tr>
+            {% endfor %}
+        </tbody>
+        <tfoot class="table-group-divider">
+            <tr>
+                <th>Total</th>
+                <th class="text-center">{{ total_all_count }}</th>
+                <th class="text-center">{{ total_all_minutes|floatformat:2 }}</th>
+            </tr>
+        </tfoot>
+    </table>
+</div>
+
+<div class="card p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Data Downtime</h5>
+        <button id="addDowntimeBtn" class="btn btn-sm btn-primary">+ Tambah Downtime</button>
+    </div>
+
+    <div class="table-responsive text-nowrap">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr class="table-primary">
+                    <th class="text-center">Jenis</th>
+                    <th class="text-center">Problem</th>
+                    <th class="text-center">Penyebab</th>
+                    <th class="text-center">Aksi</th>
+                    <th class="text-center">PIC Hambatan</th>
+                    <th class="text-center">Start</th>
+                    <th class="text-center">Finish</th>
+                    <th class="text-center">Durasi (menit)</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody id="downtime-table-body">
+                 {% for dt in filterdt %}
+                <tr class="{% if dt.finish_downtime and not dt.problem_dt %}table-warning{% endif %}">
+                    <td>{{ dt.get_jenisdowntime_display }}</td>
+                    <td>{{ dt.problem_dt|default:"-" }}</td>
+                    <td>{{ dt.penyebab_dt|default:"-" }}</td>
+                    <td>{{ dt.action_dt|default:"-" }}</td>
+                    <td>{{ dt.pic_downtime|default:"-" }}</td>
+                    <td>{{ dt.start_downtime|date:"d M, Y, H:i" }}</td>
+                    <td>
+                        {% if dt.finish_downtime %}
+                            {{ dt.finish_downtime|date:"d M, Y, H:i" }}
+                        {% else %}
+                            <a href="{% url 'stop_downtime' dt.id_detaildt %}" class="btn btn-danger btn-sm">Stop</a>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ dt.duration_downtime|floatformat:2|default:"-" }}</td>
+                    <td class="text-center">
+                        <div class="d-flex flex-column gap-1">
+                            <a href="{% url 'update_downtime' dt.id_detaildt %}" class="btn btn-sm btn-warning">Update</a>
+                            <a href="{% url 'delete_downtime' dt.id_detaildt %}" class="btn btn-sm btn-danger">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr id="no-data-row">
+                    <td colspan="8" class="text-center text-muted">Belum ada data downtime</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{{ jenisdowntime_choices|json_script:"downtime-choices-data" }}
+<div style="display: none;">{% csrf_token %}</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const addBtn = document.getElementById('addDowntimeBtn');
+    const tableBody = document.getElementById('downtime-table-body');
+    const detailJobId = "{{ datadetailjob.id_detailjob }}";
+    const csrfToken = document.querySelector('input[name="csrfmiddlewaretoken"]').value;
+    const downtimeChoices = JSON.parse(document.getElementById('downtime-choices-data').textContent);
+
+    addBtn.addEventListener('click', function() {
+        // ... (fungsi addBtn tidak perlu diubah, biarkan seperti yang sudah ada) ...
+        const noDataRow = document.getElementById('no-data-row');
+        if (noDataRow) noDataRow.remove();
+
+        let optionsHTML = '<option value="" disabled selected>Pilih Jenis</option>';
+        downtimeChoices.forEach(choice => {
+            optionsHTML += `<option value="${choice[0]}">${choice[1]}</option>`;
+        });
+
+        const warningRow = document.createElement('tr');
+        warningRow.classList.add('new-downtime-form-row'); 
+        warningRow.style.display = 'none';
+        warningRow.innerHTML = `<td colspan="9"><div class="alert alert-danger py-2 mb-0"><strong>Error!</strong> Harap pilih 'Jenis Downtime'.</div></td>`;
+
+        const newRow = document.createElement('tr');
+        newRow.classList.add('table-light', 'new-downtime-form-row');
+        
+        newRow.innerHTML = `
+            <td><select name="jenisdowntime" class="form-select form-select-sm">${optionsHTML}</select></td>
+            <td><input type="text" name="problem_dt" class="form-control form-control-sm" placeholder="Problem..."></td>
+            <td><input type="text" name="penyebab_dt" class="form-control form-control-sm" placeholder="Penyebab..."></td>
+            <td><input type="text" name="action_dt" class="form-control form-control-sm" placeholder="Aksi..."></td>
+            <td><input type="text" name="pic_downtime" class="form-control form-control-sm" placeholder="Nama PIC..."></td>
+            <td>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="start_downtime" class="form-control" placeholder="Start" readonly>
+                    <button type="button" class="btn btn-success start-btn">▶</button>
+                </div>
+            </td>
+            <td>
+                <div class="input-group input-group-sm">
+                    <input type="text" name="finish_downtime" class="form-control" placeholder="Finish" readonly>
+                    <button type="button" class="btn btn-danger stop-btn">■</button>
+                </div>
+            </td>
+            <td class="text-center align-middle">-</td>
+            <td>
+                <div class="d-flex flex-column gap-1">
+                    <button class="btn btn-success btn-sm save-row-btn">Simpan</button>
+                    <button class="btn btn-secondary btn-sm cancel-row-btn">Batal</button>
+                </div>
+            </td>
+        `;
+        
+        tableBody.prepend(newRow);
+        tableBody.prepend(warningRow);
+
+        const startInput = newRow.querySelector('[name="start_downtime"]');
+        const finishInput = newRow.querySelector('[name="finish_downtime"]');
+
+        newRow.querySelector('.start-btn').addEventListener('click', () => startInput.value = new Date().toISOString());
+        newRow.querySelector('.stop-btn').addEventListener('click', () => finishInput.value = new Date().toISOString());
+        newRow.querySelector('.cancel-row-btn').addEventListener('click', () => {
+            newRow.remove();
+            warningRow.remove();
+            if (tableBody.children.length === 0) {
+                tableBody.innerHTML = '<tr id="no-data-row"><td colspan="9" class="text-center text-muted">Belum ada data downtime</td></tr>';
+            }
+        });
+        newRow.querySelector('.save-row-btn').addEventListener('click', () => saveNewDowntime(newRow, warningRow));
+    });
+
+    function saveNewDowntime(row, warningRow) {
+        const data = {
+            id_detailjob: detailJobId,
+            jenisdowntime: row.querySelector('[name="jenisdowntime"]').value,
+            problem_dt: row.querySelector('[name="problem_dt"]').value,
+            penyebab_dt: row.querySelector('[name="penyebab_dt"]').value,
+            action_dt: row.querySelector('[name="action_dt"]').value,
+            pic_downtime: row.querySelector('[name="pic_downtime"]').value, 
+            start_downtime: row.querySelector('[name="start_downtime"]').value,
+            finish_downtime: row.querySelector('[name="finish_downtime"]').value,
+        };
+
+        if (!data.jenisdowntime) {
+            warningRow.style.display = 'table-row';
+            return;
+        } else {
+            warningRow.style.display = 'none';
+        }
+
+        fetch("{% url 'create_downtime' %}", {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.status === 'success') {
+                // PERUBAHAN 1: Hapus atau beri komentar pada baris alert ini
+                // alert(result.message); 
+                warningRow.remove();
+
+                const dt = result.new_downtime;
+                
+                // PERUBAHAN 2: Tambahkan logika untuk memberi warna kuning
+                if (dt.finish !== '-' && dt.problem_dt === '-') {
+                    row.classList.add('table-warning');
+                }
+                
+                row.classList.remove('table-light', 'new-downtime-form-row');
+                const updateUrl = `/update_downtime/${dt.id}/`;
+                const deleteUrl = `/delete_downtime/${dt.id}/`;
+
+                row.innerHTML = `
+                    <td>${dt.jenis}</td>
+                    <td>${dt.problem_dt}</td>
+                    <td>${dt.penyebab_dt}</td>
+                    <td>${dt.action_dt}</td>
+                    <td>${dt.pic_downtime}</td>
+                    <td>${dt.start}</td>
+                    <td>${dt.finish}</td>
+                    <td class="text-center">${dt.durasi}</td>
+                    <td class="text-center">
+                        <div class="d-flex flex-column gap-1">
+                            <a href="${updateUrl}" class="btn btn-sm btn-warning">Update</a>
+                            <a href="${deleteUrl}" class="btn btn-sm btn-danger">Delete</a>
+                        </div>
+                    </td>
+                `;
+            } else {
+                alert('Error: ' + result.message);
+            }
+        });
+    }
+});
+</script>
+{% endblock %}

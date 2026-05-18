@@ -1,0 +1,114 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Input Harian{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Input Data Harian</h5>
+        <a href="{% url 'create_job' %}" class="btn btn-success">
+            Buat Job Baru
+        </a>
+    </div>
+    <div class="card-body">
+
+
+
+        <form method="GET" action="{% url 'input_harian' %}" class="mb-4">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label for="tanggal" class="form-label">Pilih Tanggal</label>
+                    <input type="date" id="tanggal" name="tanggal" class="form-control" value="{{ selected_date_str }}">
+                </div>
+                <div class="col-md-4">
+                    <label for="line_filter" class="form-label">Filter Production Line</label>
+                    <select id="line_filter" name="line" class="form-select">
+                        <option value="">Semua Line</option>
+                        {% for line in all_lines %}
+                            <option value="{{ line.namaline }}-{{ line.shift }}" 
+                                {% if line.namaline == selected_line_name and line.shift == selected_shift %}selected{% endif %}>
+                                {{ line.namaline }} - Shift {{ line.shift }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-secondary">Filter</button>
+                </div>
+            </div>
+        </form>
+        <hr>
+
+        <h6 class="mb-3">Item Produksi untuk Tanggal: {{ selected_date|date:"d F Y" }}</h6>
+
+        {% if detail_jobs_on_date %}
+            {% regroup detail_jobs_on_date by id_job.id_productionline as line_list %}
+
+            {% for line in line_list %}
+                <h5 class="mt-4">{{ line.grouper.namaline }} - Shift {{ line.grouper.shift }}</h5> 
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover">
+                        <thead>
+                            <tr>
+                                <th>NAMA ITEM</th>
+                                <th style="width: 12%;">Plan Qty</th>
+                                <th style="width: 12%;">Actual Qty</th>
+                                <th style="width: 12%;">Repair</th>
+                                <th style="width: 12%;">Reject</th>
+                                <th class="text-center" style="width: 10%;">Action</th> 
+                                <th class="text-center">Shortcut Input</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in line.list %}
+                            <tr>
+                                <td><strong>{{ item.id_itemproduksi.job_number }}</strong></td>
+                                <td class="align-middle">{{ item.plan_qty }}</td>
+                                
+                                <td class="align-middle">
+                                    <input type="number" name="actual_qty" form="form-{{ item.id_detailjob }}"
+                                           class="form-control form-control-sm"
+                                           value="{{ item.actual_qty }}">
+                                </td>
+                                <td class="align-middle">
+                                    <input type="number" name="repair_staging" form="form-{{ item.id_detailjob }}"
+                                           class="form-control form-control-sm"
+                                           value="{{ item.repair_staging }}">
+                                </td>
+                                <td class="align-middle">
+                                    <input type="number" name="reject_staging" form="form-{{ item.id_detailjob }}"
+                                           class="form-control form-control-sm"
+                                           value="{{ item.reject_staging }}">
+                                </td>
+
+                                <td class="text-center align-middle">
+                                    <form id="form-{{ item.id_detailjob }}" method="POST" action="{% url 'update_single_item' item.id_detailjob %}">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-success" title="Simpan Baris Ini">
+                                            <i class="bx bx-save"></i>
+                                        </button>
+                                    </form>
+                                </td>
+                                
+                                <td class="text-center align-middle">
+                                    <a href="{% url 'rekap_handwork' item.id_detailjob %}" class="btn btn-sm btn-outline-warning" title="Input Repair/Reject">Handwork</a>
+                                    <a href="{% url 'rekap_downtime' item.id_detailjob %}" class="btn btn-sm btn-outline-danger" title="Input Downtime">Downtime</a>
+                                    <a href="{% url 'rekap_idletime' item.id_detailjob %}" class="btn btn-sm btn-outline-info" title="Input Idle Time">Idle</a>
+                                    <a href="{% url 'list_dandori' item.id_detailjob %}" class="btn btn-sm btn-outline-primary" title="Input Dandori">Dandori</a>
+                                    <a href="{% url 'list_qcheck' item.id_detailjob %}" class="btn btn-sm btn-outline-success" title="Input Q-Check">Q-Check</a>
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+        {% else %}
+            <div class="alert alert-info">
+                Tidak ada item produksi yang dijadwalkan untuk tanggal dan line yang dipilih.
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

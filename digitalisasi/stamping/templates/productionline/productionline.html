@@ -1,0 +1,73 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Data Production Line{% endblock %}
+
+{% block content %}
+<div class="card p-3">
+    <h4 class="mb-0 fw-bold">Data Production Line</h4>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <input type="text" id="searchInput" class="form-control w-25" placeholder="Cari nama line produksi...">
+        <a href="{% url 'create_productionline' %}">
+            <button class="btn btn-primary ms-2">Create Production Line</button>
+        </a>
+    </div>
+
+    <div class="table-responsive text-nowrap">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr class="table-primary">
+                    <th class="text-center sortable">ID Line Produksi</th>
+                    <th class="text-center sortable">Nama Line</th>
+                    <th class="text-center sortable">Shift</th>
+                    <th class="text-center sortable">Kapasitas</th>
+                    <th class="text-center">Action</th>
+                </tr>
+            </thead>
+            <tbody class="table-border-bottom-0" id="productionline-table-body">
+                {% for item in productionlineobj %}
+                <tr>
+                    <td class="text-center">PL{{ item.id }}</td>
+                    <td class="text-center nama-line">{{ item.namaline }}</td>
+                    <td class="text-center">{{ item.shift }}</td>
+                    <td class="text-center">{{ item.kapasitasline }}</td>
+                    
+                    <!-- === BAGIAN INI SUDAH DIHAPUS ===
+                    <td class="text-center">
+                        <div class="align-items-center">
+                            </div>
+                    </td>
+                    -->
+
+                    <td class="text-center">
+                        <div class="align-items-center">
+                            <a href="{% url 'update_productionline' item.id %}" class="btn btn-sm btn-primary w-50">
+                                <i class="icon-base bx bx-edit-alt"></i>Update
+                            </a>
+                            <a href="{% url 'delete_productionline' item.id %}" class="btn btn-sm btn-danger w-50">
+                                <i class="icon-base bx bx-trash"></i>Delete
+                            </a>
+                            </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div id="pagination-info" class="text-muted"></div>
+            <div>
+                <button id="prevBtn" class="btn btn-outline-primary btn-sm me-2">Previous</button>
+                <button id="nextBtn" class="btn btn-outline-primary btn-sm">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    /* ... */
+</style>
+<script>
+    /* ... */
+</script>
+
+{% endblock %}

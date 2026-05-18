@@ -12,7 +12,7 @@ if($role == 'operator'){
 }
 @endphp
 
-@extends('layouts.layouts')
+@extends('layouts.supervisor')
 
 
 @section('content')
@@ -300,3 +300,4 @@ function fillJobData(){
 </script>
 @endsection
    
+

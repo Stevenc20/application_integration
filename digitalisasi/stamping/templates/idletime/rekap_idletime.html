@@ -1,0 +1,143 @@
+{% extends "base_template/base.html" %}
+{% block title %}Rekap Idle{% endblock %}
+
+{% block content %}
+
+<div class="card p-3 mb-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">IDLETIME - Job {{ datadetailjob.id_detailjob }}</h4>
+        <div>
+            <a href="{% url 'input_harian' %}?tanggal={{ datadetailjob.id_job.date|date:'Y-m-d' }}" class="btn btn-sm btn-info ms-2">
+                <i class="bx bx-spreadsheet"></i> Kembali ke Input Harian
+            </a>
+            <a href="{% url 'rekap_detailjob' datadetailjob.id_job.id_job %}" class="btn btn-sm btn-secondary">
+                <i class="bx bx-arrow-back"></i> Kembali ke Detail Job
+            </a>            
+        </div>
+    </div>
+
+    <table style="border-collapse: collapse; width: 100%; text-align: center;">
+        <tbody>
+            <tr>
+                <td style="border: 1px solid #000; padding: 8px;"><b>Total Idle</b></td>
+                <td style="border: 1px solid #000; padding: 8px;">{{ total_idle|floatformat:2 }} menit</td>
+            </tr>
+            <tr>
+                <td style="border: 1px solid #000; padding: 8px;"><b>Jumlah Idle:</b></td>
+                <td style="border: 1px solid #000; padding: 8px;">{{ count_idle }} kali</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="row mb-4">
+    <div class="col-12">
+        <div class="card p-3">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h5>Data Idle Time</h5>
+                <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#addIdleForm">
+                    + Tambah Idle
+                </button>
+            </div>
+
+            <div id="addIdleForm" class="collapse mb-3">
+                <form action="{% url 'create_idletime' datadetailjob.id_detailjob %}" method="post" class="row g-2">
+                    {% csrf_token %}
+                    <div class="col-md-4">
+                        <input type="text" name="reason_idle" class="form-control" placeholder="Alasan Idle">
+                    </div>
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <input type="text" name="start_idle" class="form-control" id="start_idle" placeholder="Start">
+                            <button type="button" class="btn btn-success"
+                                onclick="document.getElementById('start_idle').value=new Date().toISOString()">▶</button>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <input type="text" name="finish_idle" class="form-control" id="finish_idle"
+                                placeholder="Finish">
+                            <button type="button" class="btn btn-danger"
+                                onclick="document.getElementById('finish_idle').value=new Date().toISOString()">■</button>
+                        </div>
+                    </div>
+                    <div class="col-md-1">
+                        <button type="submit" class="btn btn-primary w-100">Simpan</button>
+                    </div>
+                </form>
+            </div>
+
+            <table class="table table-bordered table-hover">
+                <thead>
+                    <tr class="table-primary">
+                        <th class="text-center">Alasan</th>
+                        <th class="text-center">Start</th>
+                        <th class="text-center">Finish</th>
+                        <th class="text-center">Durasi (menit)</th>
+                        <th class="text-center"></th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for idle_item in filteridle %}
+                    <tr>
+                        <td class="text-center">{{ idle_item.reason_idle }}</td>
+                        <td class="text-center">{{ idle_item.start_idle }}</td>
+                        <td class="text-center">{{ idle_item.finish_idle|default:"-" }}</td>
+                        <td class="text-center">{{ idle_item.duration_idle|floatformat:2 }}</td>
+                        <td class="d-flex flex-column gap-2">
+                            {% if not idle_item.finish_idle %}
+                                <a href="{% url 'stop_idle' idle_item.id_detaild %}" class="btn btn-sm btn-warning">Stop</a>
+                            {% else %}
+                                <a href="{% url 'update_idletime' idle_item.id_detaild %}"
+                                    class="btn btn-sm btn-primary w-100">Update</a>
+                                <a href="{% url 'delete_idletime' idle_item.id_detaild %}"
+                                    class="btn btn-sm btn-danger w-100">Delete</a>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center text-muted">Belum ada data idle</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+
+<script>
+function addIdleRow() {
+  const container = document.getElementById("idle-rows");
+  const newRow = document.createElement("div");
+  newRow.classList.add("row", "g-2", "mb-2", "idle-row");
+  newRow.innerHTML = `
+    <div class="col-md-3">
+      <input type="text" name="reason_idle[]" class="form-control" placeholder="Reason">
+    </div>
+    <div class="col-md-3">
+      <div class="input-group">
+        <input type="text" name="start_idle[]" class="form-control start-idle" placeholder="Start">
+        <button type="button" class="btn btn-success btn-sm"
+                onclick="this.parentNode.querySelector('.start-idle').value=new Date().toISOString()">▶</button>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="input-group">
+        <input type="text" name="finish_idle[]" class="form-control finish-idle" placeholder="Finish">
+        <button type="button" class="btn btn-danger btn-sm"
+                onclick="this.parentNode.querySelector('.finish-idle').value=new Date().toISOString()">■</button>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <button type="button" class="btn btn-outline-danger remove-row">Hapus</button>
+    </div>
+  `;
+  container.appendChild(newRow);
+
+  // hapus row
+  newRow.querySelector(".remove-row").onclick = () => newRow.remove();
+}
+</script>
+{% endblock %}

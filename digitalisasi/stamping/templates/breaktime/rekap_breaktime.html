@@ -1,0 +1,132 @@
+{% extends "base_template/base.html" %}
+{% block title %}Rekap Break{% endblock %}
+
+{% block content %}
+
+<!-- Card Ringkasan -->
+<div class="card p-3 mb-3">
+  <h4>BREAKTIME - Job {{ datadetailjob.id_detailjob }}</h4>
+  <table style="border-collapse: collapse; width: 100%; text-align: center;">
+    <tbody>
+      <tr>
+        <td style="border: 1px solid #000; padding: 8px;"><b>Total Break</b></td>
+        <td style="border: 1px solid #000; padding: 8px;">{{ total_break|floatformat:2 }} menit</td>
+      </tr>
+      <tr>
+        <td style="border: 1px solid #000; padding: 8px;"><b>Jumlah Break:</b></td>
+        <td style="border: 1px solid #000; padding: 8px;">{{ count_break }} kali</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Card Detail -->
+<div class="row mb-4">
+  <div class="col-12">
+    <div class="card p-3">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5>Data Break Time</h5>
+        <button class="btn btn-sm btn-primary" data-bs-toggle="collapse" data-bs-target="#addBreakForm">
+          + Tambah Break
+        </button>
+      </div>
+
+      <!-- Collapsible form -->
+      <div id="addBreakForm" class="collapse mb-3">
+        <form action="{% url 'create_breaktime' datadetailjob.id_detailjob %}" method="post" class="row g-2">
+          {% csrf_token %}
+          <div class="col-md-4">
+            <input type="text" name="break_type" class="form-control" placeholder="Jenis Break (contoh: Makan Siang)">
+          </div>
+          <div class="col-md-3">
+            <div class="input-group">
+              <input type="text" name="start_break" class="form-control" id="start_break" placeholder="Start">
+              <button type="button" class="btn btn-success"
+                onclick="document.getElementById('start_break').value=new Date().toISOString()">▶</button>
+            </div>
+          </div>
+          <div class="col-md-3">
+            <div class="input-group">
+              <input type="text" name="finish_break" class="form-control" id="finish_break" placeholder="Finish">
+              <button type="button" class="btn btn-danger"
+                onclick="document.getElementById('finish_break').value=new Date().toISOString()">■</button>
+            </div>
+          </div>
+          <div class="col-md-1">
+            <button type="submit" class="btn btn-primary w-100">Simpan</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Table -->
+      <table class="table table-bordered table-hover">
+        <thead>
+          <tr class="table-primary">
+            <th class="text-center">Jenis Break</th>
+            <th class="text-center">Start</th>
+            <th class="text-center">Finish</th>
+            <th class="text-center">Durasi (menit)</th>
+            <th class="text-center"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for br in filterbreak %}
+          <tr>
+            <td class="text-center">{{ br.break_type }}</td>
+            <td class="text-center">{{ br.start_break }}</td>
+            <td class="text-center">{{ br.finish_break|default:"-" }}</td>
+            <td class="text-center">{{ br.duration_break|floatformat:2 }}</td>
+            <td class="d-flex flex-column gap-2">
+              {% if not br.finish_break %}
+                <a href="{% url 'stop_breaktime' br.id_detailb %}" class="btn btn-sm btn-warning">Stop</a>
+              {% else %}
+                <a href="{% url 'update_breaktime' br.id_detailb %}" class="btn btn-sm btn-primary w-100">Update</a>
+                <a href="{% url 'delete_breaktime' br.id_detailb %}" class="btn btn-sm btn-danger w-100">Delete</a>
+              {% endif %}
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="5" class="text-center text-muted">Belum ada data break</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+function addBreakRow() {
+  const container = document.getElementById("break-rows");
+  const newRow = document.createElement("div");
+  newRow.classList.add("row", "g-2", "mb-2", "break-row");
+  newRow.innerHTML = `
+    <div class="col-md-3">
+      <input type="text" name="break_type[]" class="form-control" placeholder="Jenis Break">
+    </div>
+    <div class="col-md-3">
+      <div class="input-group">
+        <input type="text" name="start_break[]" class="form-control start-break" placeholder="Start">
+        <button type="button" class="btn btn-success btn-sm"
+                onclick="this.parentNode.querySelector('.start-break').value=new Date().toISOString()">▶</button>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="input-group">
+        <input type="text" name="finish_break[]" class="form-control finish-break" placeholder="Finish">
+        <button type="button" class="btn btn-danger btn-sm"
+                onclick="this.parentNode.querySelector('.finish-break').value=new Date().toISOString()">■</button>
+      </div>
+    </div>
+    <div class="col-md-2">
+      <button type="button" class="btn btn-outline-danger remove-row">Hapus</button>
+    </div>
+  `;
+  container.appendChild(newRow);
+
+  // hapus row
+  newRow.querySelector(".remove-row").onclick = () => newRow.remove();
+}
+</script>
+{% endblock %}

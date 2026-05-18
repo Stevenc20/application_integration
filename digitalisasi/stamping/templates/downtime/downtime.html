@@ -1,0 +1,138 @@
+{% extends "base_template\base.html" %}
+
+{% block title %}Data Downtime{% endblock %}
+
+{% block content %}
+<div class="card p-3">
+    <h4 class="mb-0 fw-bold">Data Downtime</h4>
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+        <form method="GET" action="{% url 'downtime' %}">
+            <div class="input-group" style="width: 250px;">
+                <input type="date" name="tanggal" class="form-control" value="{{ selected_date_str }}">
+                <button class="btn btn-secondary" type="submit">Filter</button>
+            </div>
+        </form>
+        
+        <div class="d-flex align-items-center">
+            <div class="input-group">
+                <input type="text" id="searchInput" class="form-control" placeholder="Cari di hasil filter...">
+                <button class="btn btn-info" type="button" id="searchBtn">Cari</button>
+            </div>
+            <a href="{% url 'pilih_job_downtime' %}" class="btn btn-primary ms-2 flex-shrink-0">+ Tambah Downtime</a>
+        </div>
+    </div>
+
+    <div class="table-responsive text-nowrap">
+        <table class="table table-bordered table-hover" id="downtimeTable">
+            <thead>
+                <tr class="table-primary">
+                    <th class="text-center">Detail Job</th>
+                    <th class="text-center">Jenis</th>
+                    <th class="text-center">Problem</th>
+                    <th class="text-center">Penyebab</th>
+                    <th class="text-center">Action</th>
+                    <th class="text-center">PIC Downtime</th>
+                    <th class="text-center">Start</th>
+                    <th class="text-center">Finish</th>
+                    <th class="text-center">Durasi (menit)</th>
+                </tr>
+            </thead>
+            <tbody id="itemproduksi-table-body">
+                {% for dt in filterdt %}
+                <tr>
+                    <td class="text-center">{{ dt.id_downtime.id_detailjob.id_itemproduksi.job_number }}</td>
+                    <td class="text-center">{{ dt.get_jenisdowntime_display }}</td>
+                    <td class="text-center">{{ dt.problem_dt|default:'-' }}</td>
+                    <td class="text-center">{{ dt.penyebab_dt|default:'-' }}</td>
+                    <td class="text-center">{{ dt.action_dt|default:'-' }}</td>
+                    <td class="text-center">{{ dt.pic_downtime|default:'-' }}</td>
+                    <td class="text-center">{{ dt.start_downtime|date:"Y-m-d H:i" }}</td>
+                    <td class="text-center">{{ dt.finish_downtime|date:"Y-m-d H:i"|default:"-" }}</td>
+                    <td class="text-center">{{ dt.duration_downtime|floatformat:2|default:'-' }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div id="pagination-info" class="text-muted"></div>
+            <div>
+                <button id="prevBtn" class="btn btn-outline-primary btn-sm me-2">Previous</button>
+                <button id="nextBtn" class="btn btn-outline-primary btn-sm">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const searchInput = document.getElementById("searchInput");
+    const searchBtn = document.getElementById("searchBtn");
+    const rows = document.querySelectorAll("#downtimeTable tbody tr");
+    const perPage = 10;
+    let currentPage = 1;
+
+    const prevBtn = document.getElementById("prevBtn");
+    const nextBtn = document.getElementById("nextBtn");
+    const info = document.getElementById("pagination-info");
+
+    function filterRows() {
+        const searchValue = searchInput.value.toLowerCase();
+        rows.forEach(row => {
+            const rowText = row.textContent.toLowerCase();
+            row.style.display = rowText.includes(searchValue) ? "" : "none";
+        });
+    }
+
+    function showPage(page) {
+        const visibleRows = [...rows].filter(row => row.style.display !== "none");
+        const totalPages = Math.ceil(visibleRows.length / perPage);
+
+        const start = (page - 1) * perPage;
+        const end = start + perPage;
+
+        visibleRows.forEach((row, index) => {
+            row.style.display = (index >= start && index < end) ? "" : "none";
+        });
+
+        info.textContent = visibleRows.length > 0
+            ? `Menampilkan ${start + 1}-${Math.min(end, visibleRows.length)} dari ${visibleRows.length} data`
+            : "Tidak ada data";
+
+        prevBtn.disabled = page === 1;
+        nextBtn.disabled = page === totalPages || totalPages === 0;
+    }
+
+    function applyFilterAndPagination() {
+        filterRows();
+        currentPage = 1;
+        showPage(currentPage);
+    }
+
+    // --- Event ---
+    searchInput.addEventListener("keyup", applyFilterAndPagination);
+    searchBtn.addEventListener("click", applyFilterAndPagination);
+
+    prevBtn.addEventListener("click", function () {
+        if (currentPage > 1) {
+            currentPage--;
+            showPage(currentPage);
+        }
+    });
+
+    nextBtn.addEventListener("click", function () {
+        const visibleRows = [...rows].filter(row => row.style.display !== "none");
+        const totalPages = Math.ceil(visibleRows.length / perPage);
+        if (currentPage < totalPages) {
+            currentPage++;
+            showPage(currentPage);
+        }
+    });
+
+    // --- Init load ---
+    applyFilterAndPagination();
+});
+</script>
+
+
+{% endblock %}

@@ -1,0 +1,125 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Update Downtime{% endblock %}
+
+{% block content %}
+
+<div class="row mb-6 gy-6">
+    <div class="col-xxl">
+        <div class="card">
+            <div class="card-header d-flex align-items-center justify-content-between">
+                <h5 class="mb-0">Update Downtime</h5>
+                <small class="text-body-secondary float-end">Data Downtime</small>
+            </div>
+            <div class="card-body">
+                <form action="{% url 'update_downtime' id=get_detaildt.id_detaildt %}" method="post" id="update-downtime-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="id_detaildt" value="{{ downtime.id_detaildt }}">
+
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label">Jenis Downtime</label>
+                        <div class="col-sm-10">
+                            <select name="jenisdowntime" class="form-control" required>
+                                {% for code, name in jenisdowntime_choices %}
+                                    <option value="{{ code }}" {% if get_detaildt.jenisdowntime == code %}selected{% endif %}>{{ name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <div id="validation-warning" class="alert alert-danger" role="alert" style="display: none;">
+                        <strong>Error!</strong> Harap lengkapi field Problem, Penyebab, Action, dan PIC Hambatan.
+                    </div>
+
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label" for="problem_dt_input">Problem</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="problem_dt_input" name="problem_dt"
+                                value="{{ get_detaildt.problem_dt|default_if_none:'' }}" placeholder="Masukkan Problem">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label" for="penyebab_dt_input">Penyebab</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="penyebab_dt_input" name="penyebab_dt"
+                                value="{{ get_detaildt.penyebab_dt|default_if_none:'' }}" placeholder="Masukkan Penyebab">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label" for="action_dt_input">Action</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="action_dt_input" name="action_dt"
+                                value="{{ get_detaildt.action_dt|default_if_none:'' }}" placeholder="Masukkan Action">
+                        </div>
+                    </div>
+
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label" for="pic_downtime_input">PIC Hambatan</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" id="pic_downtime_input" name="pic_downtime"
+                                value="{{ get_detaildt.pic_downtime|default_if_none:'' }}" placeholder="Masukkan PIC">
+                        </div>
+                    </div>
+                    
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label">Start</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" value="{{ get_detaildt.start_downtime }}" readonly>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label">Finish</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control" value="{{ get_detaildt.finish_downtime|default:'-' }}" readonly>
+                        </div>
+                    </div>
+                    <div class="row mb-3">
+                        <label class="col-sm-2 col-form-label">Durasi</label>
+                        <div class="col-sm-10">
+                            <input type="text" class="form-control"
+                                value="{{ get_detaildt.duration_downtime|floatformat:2|default:'-' }} menit" readonly>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">Update</button>
+                    <a href="{{ request.META.HTTP_REFERER }}" class="btn btn-secondary">Batal</a>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('update-downtime-form');
+    const warningDiv = document.getElementById('validation-warning');
+    
+    // Ambil input fields berdasarkan ID
+    const problemInput = document.getElementById('problem_dt_input');
+    const penyebabInput = document.getElementById('penyebab_dt_input');
+    const actionInput = document.getElementById('action_dt_input');
+    const picInput = document.getElementById('pic_downtime_input');
+
+    form.addEventListener('submit', function(event) {
+        // Cek jika salah satu field kosong (setelah menghapus spasi di awal/akhir)
+        if (
+            problemInput.value.trim() === '' ||
+            penyebabInput.value.trim() === '' ||
+            actionInput.value.trim() === '' ||
+            picInput.value.trim() === ''
+        ) {
+            // Hentikan proses submit form
+            event.preventDefault();
+            // Tampilkan pesan peringatan
+            warningDiv.style.display = 'block';
+        } else {
+            // Sembunyikan pesan jika semua field sudah terisi
+            warningDiv.style.display = 'none';
+        }
+    });
+});
+</script>
+
+{% endblock %}

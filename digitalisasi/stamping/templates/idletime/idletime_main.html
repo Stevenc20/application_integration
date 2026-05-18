@@ -1,0 +1,139 @@
+{% extends "base_template/base.html" %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header">
+        <h5 class="mb-0">Mulai Pencatatan Idle Time</h5>
+    </div>
+    <div class="card-body">
+        <p>Pilih Line dan Shift untuk menampilkan daftar Job.</p>
+        
+        <form id="select-job-form">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label for="line-select" class="form-label">Line Produksi</label>
+                    <select class="form-select" id="line-select" name="line">
+                        <option value="">Pilih Line</option>
+                        <!-- REVISI 1: Gunakan 'top_dropdown_lines' -->
+                        {% for line in top_dropdown_lines %}
+                            <option value="{{ line.id }}">{{ line.namaline }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="shift-select" class="form-label">Shift</label>
+                    <select class="form-select" id="shift-select" name="shift">
+                        <option value="">Pilih Shift</option>
+                        <option value="1">Shift 1</option>
+                        <option value="2">Shift 2</option>
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <button type="submit" class="btn btn-primary">Tampilkan Item</button>
+                </div>
+            </div>
+        </form>
+
+        <div id="job-list-container" class="mt-4">
+            </div>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-4">
+    <div class="card-header">
+        <h5 class="mb-0">History Idle Time</h5>
+    </div>
+    <div class="card-body">
+        <form method="GET" action="{% url 'idletime_main' %}">
+            <div class="row align-items-end">
+                <div class="col-md-4">
+                    <label class="form-label">Tanggal</label>
+                    <input type="date" name="history_date" class="form-control" value="{{ selected_history_date }}">
+                </div>
+                <div class="col-md-4">
+                    <label class="form-label">Line Produksi</label>
+                    <select name="history_line" class="form-select">
+                        <option value="">Semua Line</option>
+                        <!-- REVISI 2: Gunakan 'history_dropdown_lines' -->
+                        {% for line in history_dropdown_lines %}
+                            <option value="{{ line.id }}" {% if line.id == selected_history_line %}selected{% endif %}>
+                                {{ line.namaline }} - Shift {{ line.shift }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-info">Filter History</button>
+                </div>
+            </div>
+        </form>
+        <hr>
+        <div class="table-responsive mt-3">
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Item / Part Number</th>
+                        <th>Alasan</th>
+                        <th>Waktu Mulai</th>
+                        <th>Waktu Selesai</th>
+                        <th>Durasi (Menit)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in idletime_history %}
+                    <tr>
+                        <td>{{ item.id_idle.id_detailjob.id_itemproduksi.job_number }}</td>
+                        <td>{{ item.reason_idle }}</td>
+                        <td>{{ item.start_idle|date:"d-m-Y H:i" }}</td>
+                        <td>{{ item.finish_idle|date:"d-m-Y H:i"|default:"-" }}</td>
+                        <td>{{ item.duration_idle|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">Tidak ada history untuk filter yang dipilih.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th colspan="4" class="text-end">Total Durasi:</th>
+                        <th>{{ total_duration_history|floatformat:2 }} Menit</th>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% block extra_js %}
+<script>
+document.getElementById('select-job-form').addEventListener('submit', function(e) {
+    e.preventDefault();
+    const lineId = document.getElementById('line-select').value;
+    const shift = document.getElementById('shift-select').value;
+    const url = `{% url 'api_get_jobs' %}?line=${lineId}&shift=${shift}`;
+
+    if (lineId && shift) {
+        fetch(url)
+            .then(response => response.json())
+            .then(data => {
+                let jobListContainer = document.getElementById('job-list-container');
+                if (data.jobs.length > 0) {
+                    let html = '<ul class="list-group">';
+                    data.jobs.forEach(job => {
+                        // DIUBAH: Link sekarang mengarah ke rekap_idletime
+                        let jobUrl = `/idletime/rekap_idletime/${job.id}/`; 
+                        html += `<a href="${jobUrl}" class="list-group-item list-group-item-action">${job.name}</a>`;
+                    });
+                    html += '</ul>';
+                    jobListContainer.innerHTML = html;
+                } else {
+                    jobListContainer.innerHTML = '<div class="alert alert-warning">Tidak ada job yang dijadwalkan untuk line dan shift ini.</div>';
+                }
+            });
+    }
+});
+</script>
+{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,75 @@
+{% extends "base_template\base.html" %}
+
+{% block title %}Data Production Plan{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-4">
+    <h5 class="mb-3">Job Information</h5>
+    <div class="row">
+        <div class="col-md-3"><strong>ID Job:</strong> {{ datajob.id_job }}</div>
+        <div class="col-md-3"><strong>Production Line:</strong> {{ datajob.id_productionline.namaline }}</div>
+        <div class="col-md-3"><strong>Karyawan:</strong> {{ datajob.id_karyawan.nama_karyawan }}</div>
+        <div class="col-md-3"><strong>Tanggal:</strong> {{ datajob.date }}</div>
+    </div>
+</div>
+
+<div class="card p-3">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h5 class="mb-0">Production Plan & Actual</h5>
+
+        <div class="d-flex gap-2"> <!-- 🔑 wrapper tombol -->
+            <a href="{% url 'update_productionplan' filterpl.id_production_plan %}" class="btn btn-primary">
+                <i class="bx bx-edit-alt me-1"></i> Edit Data
+            </a>
+            <a href="{% url 'job' %}" class="btn btn-secondary">
+                Kembali ke Daftar Job
+            </a>
+        </div>
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }}">{{ message }}</div>
+        {% endfor %}
+    {% endif %}
+    
+    <table class="table table-bordered text-center">
+        <thead class="table-dark">
+            <tr>
+                <th>DESCRIPTION</th>
+                <th>PLAN</th>
+                <th>ACTUAL</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td class="text-start">GSPH</td>
+                <td>{{ filterpl.gsph_plan }}</td>
+                <td>{{ filterpl.gsph_actual }}</td>
+            </tr>
+            <tr>
+                <td class="text-start">Stroke</td>
+                <td>{{ filterpl.stroke_plan }}</td>
+                <td>{{ filterpl.stroke_actual }}</td>
+            </tr>
+            <tr>
+                <td class="text-start">Repair (%)</td>
+                <td>{{ filterpl.repair_plan }} %</td>
+                <td>-</td> </tr>
+            <tr>
+                <td class="text-start">Reject (%)</td>
+                <td>{{ filterpl.reject_plan }} %</td>
+                <td>-</td> </tr>
+            <tr>
+                <td class="text-start">Idle (minutes)</td>
+                <td>{{ filterpl.idle_plan }}</td>
+                <td>-</td> </tr>
+            <tr>
+                <td class="text-start">Man Power</td>
+                <td>{{ filterpl.mp }} operator</td>
+                <td>-</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -8,336 +8,428 @@ use App\Models\JobMaster;
 use App\Models\ProductionSession;
 use Carbon\Carbon;
 use App\Models\DailyProduction;
+use App\Models\Downtime;
+use App\Models\ProductionLog;
+use Illuminate\Support\Facades\DB;
+use App\Services\ProductionService;
 
 class InputHarianController extends Controller
 {
-    public function index(Request $request)
-{
-    $query = JobMaster::query();
+    protected $productionService;
 
-    /*
-    ===============================
-    FILTER TANGGAL
-    ===============================
-    */
-    if ($request->filled('date')) {
-        $query->whereDate('created_at', $request->date);
-    }
-
-    /*
-    ===============================
-    FILTER LINE
-    ===============================
-    */
-    if ($request->filled('line')) {
-        $query->where('line', $request->line);
-    }
-
-    /*
-    ===============================
-    FILTER SEARCH
-    ===============================
-    */
-    if ($request->filled('search')) {
-
-        $search = trim($request->search);
-
-        $query->where(function ($q) use ($search) {
-            $q->where('job_number', 'like', "%{$search}%")
-              ->orWhere('job_name', 'like', "%{$search}%");
-        });
-    }
-
-   /*
-    ===============================
-    FILTER STATUS
-    ===============================
-    */
-    $status = trim($request->status ?? '');
-
-    if ($status !== '') {
-
-        // pilih salah satu status
-        $query->where('status', $status);
-
-    }
-
-    /*
-    ===============================
-    SORTING
-    ===============================
-    */
-    $query->orderByRaw("
-        FIELD(
-            status,
-            'running',
-            'paused',
-            'pending',
-            'finished',
-            'closed'
-        )
-    ");
-
-    $query->orderBy('line')
-          ->orderBy('sequence_no')
-          ->orderBy('job_number');
-
-    /*
-    ===============================
-    PAGINATION
-    ===============================
-    */
-    $jobs = $query->paginate(10)->withQueryString();
-
-    /*
-    ===============================
-    DROPDOWN LINE
-    ===============================
-    */
-    $lines = JobMaster::select('line')
-        ->whereNotNull('line')
-        ->distinct()
-        ->orderBy('line')
-        ->pluck('line');
-
-    return view('operational.input_harian', compact(
-        'jobs',
-        'lines'
-    ));
-}
-
-   public function start($id)
+    public function __construct(ProductionService $productionService)
     {
-        $session = ProductionSession::firstOrCreate(
-            [
-                'job_master_id' => $id,
-                'work_date' => now()->toDateString()
-            ]
-        );
+        $this->productionService = $productionService;
+    }
 
-        $session->start_time = now();
-        $session->status = 'running';
-        $session->save();
-
-        JobMaster::where('id', $id)->update([
-            'status' => 'running',
-            'started_at' => now(),
-            'finished_at' => null
-        ]);
+    public function saveProductionLog(Request $request, $id)
+    {
+        $result = $this->productionService->saveProductionLog($id, $request->all());
 
         return response()->json([
-            'success' => true
+            'success' => true,
+            'message' => 'Log input saved',
+            'total_ok' => $result['actualQty'],
+            'efficiency' => $result['efficiency'],
+            'log' => [
+                'time' => $result['log']->created_at->format('H:i'),
+                'ok' => $result['log']->ok_qty,
+                'repair' => $result['log']->repair_qty,
+                'reject' => $result['log']->reject_qty,
+            ]
         ]);
     }
 
-   public function pause($id)
+    public function index(Request $request)
     {
-        $session = ProductionSession::where('job_master_id', $id)
-            ->whereDate('work_date', now())
-            ->first();
-
-        if ($session) {
-
-            $seconds = Carbon::parse($session->start_time)
-                ->diffInSeconds(now());
-
-            $session->total_seconds += $seconds;
-            $session->pause_time = now();
-            $session->status = 'paused';
-            $session->save();
+        $lineFilter = $request->get('line');
+        if (empty($lineFilter) && auth()->check()) {
+            $userRole = strtolower(auth()->user()->role);
+            if ($userRole === 'leader a') {
+                $lineFilter = 'Line A';
+            } elseif ($userRole === 'leader b') {
+                $lineFilter = 'Line B';
+            } elseif ($userRole === 'leader c') {
+                $lineFilter = 'Line C';
+            } elseif ($userRole === 'leader d') {
+                $lineFilter = 'Line D';
+            } elseif ($userRole === 'shearing') {
+                $lineFilter = 'Shearing';
+            } elseif ($userRole === 'handwork') {
+                $lineFilter = 'Handwork';
+            }
+            if ($lineFilter) {
+                $request->merge(['line' => $lineFilter]);
+            }
         }
 
-        JobMaster::where('id', $id)->update([
-            'status' => 'paused'
-        ]);
+        // LOGIKA TANGGAL PRODUKSI (Work Date)
+        $date = $request->get('date');
 
-        return response()->json([
-            'success' => true
+        if (!$date) {
+            // Default ke tanggal terakhir yang ada datanya
+            $date = \App\Models\ProductionPlan::max('plan_date');
+            
+            // Jika benar-benar kosong (DB kosong), baru default ke hari ini
+            if (!$date) {
+                $hour = (int) now()->format('H');
+                $date = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
+            } else {
+                // max() bisa return object Carbon atau string, pastikan string
+                $date = \Carbon\Carbon::parse($date)->toDateString();
+            }
+        }
+        
+        $lineFilter   = $request->get('line');
+        $search       = trim($request->get('search', ''));
+        
+        // Pilih shift: dari request atau auto-detect
+        $currentShift = $request->get('shift', $this->getShift());
+        
+        // SYNC: Pastikan JobMaster terupdate dari Jadwal
+        $this->syncPlanToJobMaster($date, $currentShift);
+
+        // 1. Tentukan SHIFT TERBARU (Revisi Terakhir)
+        $latestShiftName = $currentShift;
+        if ($currentShift !== 'all') {
+            $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->where('shift_name', 'like', "{$currentShift}%")
+                ->orderByDesc('updated_at')
+                ->value('shift_name') ?: $currentShift;
+
+            // FORCE REDIRECT: Pastikan URL di device (HP/Laptop) selalu pake nama shift yang PALING BARU
+            // Ini biar nggak ada "session drift" antara HP dan Laptop.
+            if ($request->get('shift') !== $latestShiftName && !str_contains($currentShift, 'REV')) {
+                return redirect()->route('operational.input_harian', array_merge($request->query(), [
+                    'shift' => $latestShiftName,
+                    'date'  => $date
+                ]));
+            }
+        }
+
+        // 2. QUERY UTAMA: Langsung dari ProductionPlan (Source of Truth)
+        $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'job')
+            ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
+
+        if ($request->filled('status') && $request->status !== '') {
+            $planQuery->where(DB::raw('LOWER(status)'), strtolower($request->status));
+        }
+
+        if ($currentShift !== 'all') {
+            $planQuery->where('shift_name', $latestShiftName);
+        }
+
+        // Filter Line (Flexible & Industrial Grade Normalization)
+        if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
+            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+            
+            $planQuery->whereRaw("
+                REPLACE(
+                    REPLACE(
+                        UPPER(TRIM(press_name)),
+                        'PRESS ',
+                        ''
+                    ),
+                    'LINE ',
+                    ''
+                ) LIKE ?
+            ", ["%{$normalized}%"]);
+        }
+
+        // Filter Search
+        if ($search) {
+            $planQuery->where(function($q) use ($search) {
+                $q->where('job_no', 'like', "%{$search}%")
+                  ->orWhere('job_master', 'like', "%{$search}%");
+            });
+        }
+
+        // 3. Ambil data dengan status realtime (Source of Truth: ProductionPlan status is synchronized by Service)
+        // DISABLE PAGINATION temporarily for MES Stabilization as requested
+        // INDUSTRIAL SORTING: Pin 'Running' to top, others follow original PPC order (row_no)
+        $plans = $planQuery->orderByRaw("
+            CASE 
+                WHEN LOWER(status) = 'running' THEN 0 
+                ELSE 1
+            END
+        ")
+            ->orderBy('row_no', 'asc')
+            ->get();
+
+        // DEBUG POINT (Uncomment to trace missing items)
+        // dd($plans->map(fn($p) => ['job' => $p->job_no, 'status' => $p->status, 'line' => $p->press_name])->toArray());
+
+        // MAPPING: Hubungkan setiap Plan ke JobMaster-nya (Optimized to fix N+1)
+        $jobNumbers = $plans->map(function($p) {
+            $jn = trim($p->job_no ?? '');
+            $jm = trim($p->job_master ?? '');
+            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+        })->toArray();
+
+        $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
+            ->with(['dailyProduction', 'downtimes'])
+            ->get()
+            ->keyBy('job_number');
+
+        $plans->transform(function($plan) use ($jobMasters) {
+            $jn = trim($plan->job_no ?? '');
+            $jm = trim($plan->job_master ?? '');
+            $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+            $plan->job_data = $jobMasters->get($identifier);
+            return $plan;
+        });
+
+        // 4. Cari Job Aktif (RUNNING) untuk Dashboard Header
+        $activeJob = JobMaster::where(DB::raw('LOWER(status)'), 'running');
+        
+        if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
+            $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+            $activeJob->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
+        }
+
+        $activeJob = $activeJob->with(['dailyProduction', 'downtimes'])
+            ->first();
+
+        $productionLogs = collect();
+        $lastInputAt    = null;
+        if ($activeJob) {
+            $productionLogs = \App\Models\ProductionLog::where('job_master_id', $activeJob->id)
+                ->orderBy('created_at', 'desc')
+                ->take(5)
+                ->get();
+            $lastInputAt = $productionLogs->first()?->created_at ?? $activeJob->started_at;
+        }
+
+        // 5. Cari Job Pending untuk Queue Selector (Dropdown Standby)
+        $scheduledJobNumbers = $plans->map(function($p) {
+            $jn = trim($p->job_no ?? '');
+            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($p->job_master) . '-' . $p->id);
+        })->toArray();
+
+        $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running'])
+            ->whereIn('job_number', $scheduledJobNumbers)
+            ->get();
+
+        $scheduleContext = ($lineFilter ?: 'SEMUA LINE') . ' &bull; ' . strtoupper($currentShift === 'all' ? 'SEMUA SHIFT' : $currentShift);
+
+        // DEBUG: Mastiin data yang dibaca beneran dari ProductionPlan terbaru
+        if ($request->has('debug')) {
+            dd([
+                'Target Date' => $date,
+                'Detected Shift' => $latestShiftName,
+                'Plan Items (First 5)' => $plans->map(fn($p) => [
+                    'row_no' => $p->row_no,
+                    'job_no' => $p->job_no,
+                    'job_master' => $p->job_master,
+                    'shift' => $p->shift_name
+                ])->take(5)->toArray()
+            ]);
+        }
+
+        return view('operational.input_harian', [
+            'jobs'            => $plans, 
+            'pendingJobs'     => $pendingJobs,
+            'lines'           => collect([
+                                    'Line A', 'Line B', 'Line C', 'Line D', 'Shearing', 'Handwork'
+                                 ]),
+            'activeJob'       => $activeJob,
+            'productionLogs'  => $productionLogs,
+            'lastInputAt'     => $lastInputAt,
+            'currentShift'    => $currentShift,
+            'date'            => $date,
+            'scheduleContext' => $scheduleContext
         ]);
+    }
+
+    private function syncPlanToJobMaster($date, $shift)
+    {
+        // Tentukan Shift Terbaru (Revisi Terakhir)
+        $latestShiftName = $shift;
+        if ($shift !== 'all') {
+            $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->where('shift_name', 'like', "{$shift}%")
+                ->orderByDesc('updated_at')
+                ->value('shift_name') ?: $shift;
+        }
+
+        $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'job')
+            ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
+        
+        if ($shift !== 'all') {
+            $planQuery->where('shift_name', $latestShiftName);
+        }
+        
+        $plans = $planQuery->orderBy('row_no')->get();
+
+        foreach ($plans as $seq => $plan) {
+            $jn = trim($plan->job_no ?? '');
+            $jm = trim($plan->job_master ?? '');
+            
+            if (blank($jn) && blank($jm)) continue;
+            if ($plan->row_type === 'break') continue;
+            if (in_array($jn, ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) continue;
+
+            // Pastikan identifier UNIK per baris rencana (untuk support split production)
+            $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
+
+            $existing = \App\Models\JobMaster::where('job_number', $identifier)->first();
+
+            $data = [
+                'job_name'    => $plan->job_master ?: ($plan->job_no ?: 'UNKNOWN JOB'),
+                'line'        => $plan->press_name ?? 'PRESS A',
+                'target_qty'  => (int) ($plan->plan ?? 0),
+                'sequence_no' => $plan->row_no ?? ($seq + 1), // Gunakan row_no asli dari Excel
+                'plan_start'  => $plan->start_time ? (str_contains($plan->start_time, '-') ? Carbon::parse($plan->start_time) : Carbon::parse($date . ' ' . $plan->start_time)) : null,
+                'plan_end'    => $plan->finish_time ? (str_contains($plan->finish_time, '-') ? Carbon::parse($plan->finish_time) : Carbon::parse($date . ' ' . $plan->finish_time)) : null,
+                'capacity'    => (int) ($plan->qty_plt ?? 0),
+            ];
+
+            if ($existing) {
+                // Jangan paksa update status jika sudah jalan/selesai (Preserve state)
+                if (!in_array($existing->status, ['running', 'paused', 'complete', 'finished', 'closed'])) {
+                    $existing->update($data);
+                } else {
+                    $existing->update(array_diff_key($data, ['status' => '']));
+                }
+            } else {
+                \App\Models\JobMaster::create(array_merge($data, [
+                    'job_number' => $identifier,
+                    'status'     => 'pending',
+                ]));
+            }
+        }
+    }
+
+    public function start(Request $request, $id)
+    {
+        try {
+            $this->productionService->startJob($id, $request->has('enqueue_only'));
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function startDandori($id)
+    {
+        try {
+            $downtime = $this->productionService->startDandori($id);
+            return response()->json(['success' => true, 'downtime' => $downtime]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function finishDandori($jobId)
+    {
+        try {
+            $success = $this->productionService->finishDandori($jobId);
+            if ($success) {
+                return response()->json(['success' => true]);
+            }
+            return response()->json(['success' => false, 'message' => 'Dandori tidak ditemukan atau sudah selesai']);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function pause($id)
+    {
+        try {
+            $runtime = $this->productionService->pauseJob($id);
+            return response()->json(['success' => true, 'total_seconds' => $runtime]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
     
     public function resume($id)
     {
-        $session = ProductionSession::where('job_master_id', $id)
-            ->whereDate('work_date', now())
-            ->first();
-
-        if ($session) {
-            $session->start_time = now();
-            $session->status = 'running';
-            $session->save();
+        try {
+            $this->productionService->resumeJob($id);
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
-
-        JobMaster::where('id', $id)->update([
-            'status' => 'running'
-        ]);
-
-        return response()->json([
-            'success' => true
-        ]);
     }
 
     public function restart($id)
     {
-        $session = ProductionSession::where('job_master_id',$id)
-            ->whereDate('work_date', now())
-            ->first();
-
-        if($session){
-
-            $session->total_seconds = 0;
-            $session->start_time = now();
-            $session->pause_time = null;
-            $session->finish_time = null;
-            $session->status = 'running';
-            $session->save();
+        try {
+            $this->productionService->restartJob($id);
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
-
-        JobMaster::where('id',$id)->update([
-            'status' => 'running',
-            'started_at' => now(),
-            'finished_at' => null
-        ]);
-
-        return response()->json([
-            'success'=>true
-        ]);
     }
 
-   public function finish($id)
+    public function finish(Request $request, $id)
     {
-        $session = ProductionSession::where('job_master_id', $id)
-            ->whereDate('work_date', now())
-            ->first();
+        try {
+            $runtime = $this->productionService->finishJob($id);
 
-        if ($session) {
-
-            if ($session->status == 'running') {
-
-                $seconds = now()->diffInSeconds($session->start_time);
-
-                $session->total_seconds += $seconds;
-            }
-
-            $session->status = 'finished';
-            $session->finish_time = now();
-            $session->save();
+            return response()->json([
+                'success' => true,
+                'runtime_seconds' => $runtime
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error("Failed to finish job $id: " . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyelesaikan job: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')'
+            ], 500);
         }
-
-        // INI YANG KAMU BELUM ADA
-        JobMaster::where('id', $id)->update([
-            'status' => 'finished',
-            'finished_at' => now()
-        ]);
-
-        return response()->json([
-            'success' => true
-        ]);
     }
 
-   public function status($id)
+    public function status($id)
     {
-        $session = ProductionSession::where('job_master_id', $id)
-            ->whereDate('work_date', now())
-            ->first();
-
         $job = JobMaster::find($id);
-
-        return response()->json([
-            'status'        => $job->status ?? 'pending',
-            'total_seconds' => $session->total_seconds ?? 0,
-            'start_time'    => $session->start_time ?? null,
-        ]);
-    }
-    
- public function saveQty(Request $request, $id)
-    {
+        
         $session = ProductionSession::where('job_master_id', $id)
             ->whereDate('work_date', now()->toDateString())
             ->first();
 
-        $runtime = 0;
-        $downtime = 0;
-
-        if ($session) {
-
-            // ambil total waktu sebelumnya
-            $runtime = (int) $session->total_seconds;
-
-            // jika masih running, tambahkan waktu realtime sejak start terakhir
-            if (
-                $session->status === 'running' &&
-                !empty($session->start_time)
-            ) {
-                $runtime += Carbon::parse($session->start_time)
-                    ->diffInSeconds(now());
-            }
-
-            // optional downtime kalau ada kolomnya
-            $downtime = (int) ($session->downtime_seconds ?? 0);
-        }
-
-        // ambil data job master untuk target + line
-        $job = JobMaster::find($id);
-
-        $targetQty = $job?->capacity ?? 0;
-        $actualQty = (int) $request->actual_qty;
-
-        // hitung efficiency %
-        $efficiency = 0;
-
-        if ($targetQty > 0) {
-            $efficiency = round(($actualQty / $targetQty) * 100, 2);
-        }
-
-        DailyProduction::updateOrCreate(
-            [
-                'job_master_id' => $id,
-                'work_date'     => now()->toDateString()
-            ],
-            [
-                'line'              => $job?->line,
-                'shift'             => $this->getShift(),
-                'target_qty'        => $targetQty,
-
-                'actual_qty'        => $actualQty,
-                'reject_qty'        => (int) $request->reject_qty,
-                'repair_qty'        => (int) $request->repair_qty,
-
-                'runtime_seconds'   => $runtime,
-                'downtime_seconds'  => $downtime,
-                'efficiency'        => $efficiency,
-
-                'remarks'           => $request->remarks,
-                'saved_by'          => auth()->id(),
-                'status'            => 'open',
-            ]
-        );
+        // Use base total_seconds. Javascript will calculate and add the running diff.
+        $baseSeconds = $session ? (int)$session->total_seconds : 0;
 
         return response()->json([
-            'success' => true,
-            'message' => 'Data berhasil disimpan',
-            'runtime_seconds' => $runtime,
-            'efficiency' => $efficiency
+            'status'        => $job->status ?? 'pending',
+            'total_seconds' => $baseSeconds,
+            'start_time'    => ($job->status === 'running' && $session) ? Carbon::parse($session->start_time)->toIso8601String() : null,
         ]);
     }
 
-    /**
-     * AUTO SHIFT
-     */
+    public function saveQty(Request $request, $id)
+    {
+        try {
+            $result = $this->productionService->saveDailyProduction($id, $request->all());
+            return response()->json([
+                'success' => true,
+                'message' => 'Data berhasil disimpan',
+                'runtime_seconds' => $result['runtime'],
+                'efficiency' => $result['efficiency']
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     private function getShift()
     {
-        $hour = now()->format('H');
+        $hour = (int) now()->format('H');
 
-        if ($hour >= 7 && $hour < 15) {
-            return 'Shift 1';
+        // Shift Pagi: 07:00 - 19:00
+        // Shift Malam: 19:00 - 07:00
+        if ($hour >= 7 && $hour < 19) {
+            return 'Shift Pagi';
         }
 
-        if ($hour >= 15 && $hour < 23) {
-            return 'Shift 2';
-        }
-
-        return 'Shift 3';
+        return 'Shift Malam';
     }
 
     public function nextList($id)
@@ -348,90 +440,173 @@ class InputHarianController extends Controller
             return response()->json([]);
         }
 
-        $jobs = JobMaster::where('line', $current->line)
-            ->where('job_number', '>', $current->job_number)
+        $jobs = JobMaster::where('id', '!=', $id)
+            ->whereIn('status', ['pending', 'paused'])
+            ->orderBy('sequence_no')
             ->orderBy('job_number')
-            ->get(['id','job_number','job_name']);
+            ->get();
 
-        return response()->json($jobs);
+        $formatted = $jobs->map(function($j) {
+            return [
+                'id' => $j->id,
+                'job_number' => $j->job_number,
+                'job_name' => $j->job_name,
+                'label' => "{$j->job_name} - {$j->job_number} (" . ($j->target_qty ?: 0) . " pcs)"
+            ];
+        });
+
+        return response()->json($formatted);
     }
     
     public function nextProcess(Request $request, $id)
     {
-        // job selesai
-        JobMaster::where('id', $id)->update([
-            'status' => 'finished',
-            'finished_at' => now()
-        ]);
+        $nextJobId = $request->get('next_job_id');
+        
+        // 1. Finish the current job and optionally start the next one
+        $this->productionService->finishJob($id, $nextJobId);
 
-        $next = null;
+        // 2. Get the next job
+        $next = $this->productionService->getNextJob($id, $request->next_id);
 
-        /*
-        =============================
-        JIKA PILIH MANUAL DROPDOWN
-        =============================
-        */
-        if ($request->filled('next_id')) {
-
-            $next = JobMaster::where('id', $request->next_id)
-                ->where('status', 'pending')
-                ->first();
-        }
-
-        /*
-        =============================
-        JIKA AUTO / TIDAK PILIH
-        =============================
-        */
-        if (!$next) {
-
-            $current = JobMaster::find($id);
-
-            $next = JobMaster::where('status', 'pending')
-                ->where('line', $current->line)
-                ->where('id', '!=', $id)
-                ->orderBy('sequence_no')
-                ->orderBy('id')
-                ->first();
-        }
-
-        /*
-        =============================
-        JIKA ADA NEXT JOB
-        =============================
-        */
         if ($next) {
-
-            $next->update([
-                'status' => 'running',
-                'started_at' => now()
-            ]);
-
-            ProductionSession::updateOrCreate(
-                [
-                    'job_master_id' => $next->id,
-                    'work_date' => now()->toDateString()
-                ],
-                [
-                    'start_time' => now(),
-                    'status' => 'running'
-                ]
-            );
+            $this->productionService->startJob($next->id);
 
             return response()->json([
                 'success' => true,
-                'message' => 'Next process: '.$next->job_number
+                'message' => 'Next process: '.$next->job_number,
+                'next_id' => $next->id
             ]);
         }
 
-        /*
-        =============================
-        TIDAK ADA NEXT JOB
-        =============================
-        */
         return response()->json([
             'success' => true,
             'message' => 'Semua job selesai'
         ]);
+    }
+
+
+    public function activeJob()
+    {
+        $session = ProductionSession::where('status', 'running')
+            ->whereDate('work_date', now()->toDateString())
+            ->with('jobMaster')
+            ->first();
+
+        if (!$session || !$session->jobMaster) {
+            return response()->json(['running' => false]);
+        }
+        $isDandori = \App\Models\Downtime::where('job_master_id', $session->jobMaster->id)
+            ->where('jenis_downtime', 'dandori')
+            ->whereNull('finish_time')
+            ->exists();
+
+        $activeDowntime = \App\Models\Downtime::where('job_master_id', $session->jobMaster->id)
+            ->whereNull('finish_time')
+            ->orderBy('created_at', 'desc')
+            ->first();
+
+        return response()->json([
+            'running' => true,
+            'id' => $session->jobMaster->id,
+            'status' => $session->jobMaster->status,
+            'is_dandori' => $isDandori,
+            'active_downtime_count' => $activeDowntime ? 1 : 0,
+            'active_downtime_type' => $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : null,
+            'job_name' => $session->jobMaster->job_name,
+            'job_number' => $session->jobMaster->job_number,
+            'total_seconds' => $session->total_seconds,
+            'start_time' => \Carbon\Carbon::parse($session->start_time)->toIso8601String(),
+            'url' => route('operational.input_harian') . '#row-' . $session->jobMaster->id
+        ]);
+    }
+
+    /*
+    ====================================================
+    DOWNTIME MANAGEMENT
+    ====================================================
+    */
+    public function getDowntimes($job_id)
+    {
+        $downtimes = Downtime::where('job_master_id', $job_id)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($downtimes);
+    }
+
+    public function startDowntime(Request $request, $job_id)
+    {
+        try {
+            $downtime = $this->productionService->startDowntime($job_id, $request->all());
+            return response()->json([
+                'success' => true,
+                'downtime' => $downtime
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function finishDowntime($id)
+    {
+        try {
+            $downtime = $this->productionService->finishDowntime($id);
+            if (!$downtime) {
+                return response()->json(['success' => false, 'message' => 'Downtime not found']);
+            }
+            return response()->json([
+                'success' => true,
+                'downtime' => $downtime
+            ]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function updateDowntime(Request $request, $id)
+    {
+        $downtime = Downtime::find($id);
+        if (!$downtime) return response()->json(['success' => false, 'message' => 'Downtime not found']);
+
+        $downtime->update($request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']));
+
+        return response()->json([
+            'success' => true,
+            'downtime' => $downtime
+        ]);
+    }
+
+    public function deleteDowntime($id)
+    {
+        try {
+            $success = $this->productionService->deleteDowntime($id);
+            if (!$success) {
+                return response()->json(['success' => false, 'message' => 'Downtime not found']);
+            }
+            return response()->json(['success' => true]);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    public function showLogs($id)
+    {
+        $job = JobMaster::with(['dailyProduction', 'downtimes'])->findOrFail($id);
+        $logs = ProductionLog::where('job_master_id', $id)
+            ->orderBy('created_at', 'desc')
+            ->paginate(50);
+
+        return view('operational.log_detail', compact('job', 'logs'));
+    }
+
+    public function productionAudit()
+    {
+        // Get all jobs that have started (meaning they have production data)
+        $jobs = JobMaster::whereNotNull('started_at')
+            ->with(['dailyProduction', 'productionLogs'])
+            ->orderBy('started_at', 'desc')
+            ->paginate(15);
+
+        return view('operational.production_audit', compact('jobs'));
     }
 }

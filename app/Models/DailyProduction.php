@@ -10,11 +10,20 @@ class DailyProduction extends Model
         'job_master_id',
         'work_date',
         'actual_qty',
+        'actual_ok',
+        'actual_repair',
+        'actual_reject',
         'reject_qty',
         'repair_qty',
-        'remarks'
+        'remarks',
+        'line',
+        'shift',
+        'target_qty',
+        'runtime_seconds',
+        'downtime_seconds',
+        'efficiency',
+        'saved_by'
     ];
-
 
   public function saveQty(Request $request, $id)
 {

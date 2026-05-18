@@ -1,0 +1,102 @@
+{% extends "base_template\base.html" %}
+
+{% block title %}Data Detail Job{% endblock %}
+
+{% block content %}
+
+<div class="row mb-6 gy-6">
+<div class="col-xxl">
+    <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Create Data Item Produksi</h5>
+        <small class="text-body-secondary float-end">Data Item Produksi</small>
+    </div>
+    <div class="card-body">
+        <form action="" method="post"> 
+        {% csrf_token %}
+        <div class="form-group row">
+            <label class="col-sm-3 col-form-label" for="id_item_produksi">Item Produksi</label>
+            <div class="col-sm-9">
+                <select name="id_item_produksi" id="item-produksi-select" class="form-control" required>
+                    <option value="" disabled selected>--- Pilih Item ---</option>
+                    {% for item in dataitemproduksi %}
+                    <option value="{{ item.id_itemproduksi }}">{{ item.job_number }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="form-group row mt-3">
+            <label class="col-sm-3 col-form-label">Machine Used</label>
+            <div class="col-sm-9 machine-container ">
+                {% for m in machines %}
+                    <div class="form-check form-check-inline">
+                        <input 
+                            type="checkbox" 
+                            class="form-check-input" 
+                            name="machine_used"  value="{{ m.id }}">
+                        <label class="form-check-label">{{ m.code }}</label>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="form-group row">
+            <label class="col-sm-3 col-form-label" for="plan_qty">Plan Qty</label>
+            <div class="col-sm-9">
+                <input type="number" name="plan_qty" class="form-control" placeholder="Masukkan Plan Qty" required>
+            </div>
+        </div>
+
+        <div class="form-group row">
+            <label class="col-sm-3 col-form-label" for="plan_ct">Plan CT</label>
+            <div class="col-sm-9">
+                <input type="text" name="plan_ct" id="plan-ct-input" class="form-control" placeholder="Akan terisi otomatis" readonly required>
+            </div>
+        </div>
+        <br>
+        <button type="submit" class="btn btn-primary">Create</button>
+        <br><br>
+        </form>
+    </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const itemSelect = document.getElementById('item-produksi-select');
+    const planCtInput = document.getElementById('plan-ct-input');
+
+    itemSelect.addEventListener('change', function() {
+        const selectedItemId = this.value;
+
+        if (selectedItemId) {
+            // Panggil API yang sudah kita buat
+            fetch(`/api/get-cycle-time/${selectedItemId}/`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.cycle_time) {
+                        // Isi field Plan CT dengan data dari API
+                        planCtInput.value = data.cycle_time;
+                    } else {
+                        planCtInput.value = '';
+                    }
+                })
+                .catch(error => {
+                    console.error('Error fetching cycle time:', error);
+                    planCtInput.value = 'Error';
+                });
+        } else {
+            planCtInput.value = '';
+        }
+    });
+});
+</script>
+{% endblock %}

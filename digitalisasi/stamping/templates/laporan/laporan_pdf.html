@@ -1,0 +1,104 @@
+{% load static %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Laporan Harian Stamping</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css">
+    <style>
+        @page {
+            size: A3 landscape; /* Menggunakan ukuran kertas A3 */
+            margin: 0.5cm;     /* Sedikit memperbesar margin */
+        }
+        body {
+            font-family: 'Helvetica', 'Arial', sans-serif;
+        }
+        .report-card { border: 2px solid black; }
+        .report-header h1 { font-size: 2rem; font-family: Arial, sans-serif; font-weight: bold; }
+        .report-table th, .report-table td { 
+            border: 0.5px solid black !important; 
+            vertical-align: middle; 
+            padding: 0.3rem ; 
+            font-size: 0.7rem; /* Font diperbesar */
+        }
+        .summary-table {
+            width: 60%; /* Lebar tabel summary */
+            margin-bottom: 10px; /* Jarak ke tabel di bawahnya */
+        }
+        .summary-table th, .summary-table td { 
+            border: 0.5px solid black !important; 
+            vertical-align: middle; 
+            padding: 0.3rem; 
+            font-size: 0.7rem; /* Font diperbesar */
+        }
+        .bg-plan { background-color: #FFF2CC !important; -webkit-print-color-adjust: exact; }
+        .bg-actual { background-color: #DDEBF7 !important; -webkit-print-color-adjust: exact; }
+
+        .page-break {
+            page-break-after: always;
+        }
+    </style>
+</head>
+<body>
+<div class="card report-card">
+    <div class="card-body p-4">
+        
+        <div class="page-1">
+            <div class="row align-items-center mb-3 report-header">
+                <div class="col-3">
+                    <div class="d-flex align-items-center">
+                        <img src="http://127.0.0.1:8000{% static 'img/ippi/ippi.png' %}" alt="Logo" style="height: 50px; margin-right: 15px;">
+                        <div>
+                            <p class="mb-0 fw-bold">PRODUCTION SECTION</p>
+                            <p class="mb-0 fw-bold">INTI PANTJA PRESS INDUSTRI</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-4 text-center">
+                    <h1>LAPORAN KERJA HARIAN STAMPING</h1>
+                </div>
+                <div class="col-5">
+                    <table class="table table-bordered text-center" style="font-size: 1rem;">
+                        <thead><tr><th>Supervisor</th><th>Foreman</th><th>T.Leader</th></tr></thead>
+                        <tbody><tr><td style="height: 150px;"></td><td></td><td></td></tr></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="row mb-3">
+                <div class="col-5">
+                     <table class="table report-table">
+                        <tbody>
+                            <tr><th class="bg-plan" style="width: 35%;">SHOP LINE</th><td>{{ shop_line }}</td></tr>
+                            <tr><th class="bg-plan">TANGGAL</th><td>{{ tanggal|date:"d/m/Y" }}</td></tr>
+                            <tr><th class="bg-plan">SHIFT KERJA</th><td>{{ shift_kerja }}</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <h6 class="text-center fw-bold">PRODUCTION SCHEDULE</h6>
+            <table class="table report-table text-center">
+                {% include 'laporan/tabel_1_content.html' %}
+            </table>
+        </div>
+
+        <div class="page-break"></div>
+
+        <div class="page-2">
+            <table class="table summary-table text-center">
+                {% include 'laporan/tabel_summary_content.html' %}
+            </table>
+
+            <h6 class="text-center fw-bold">ACTUAL PROCESS</h6>
+            <div class="table-responsive">
+                <table class="table report-table text-center">
+                    {% include 'laporan/tabel_2_content.html' %}
+                </table>
+            </div>
+        </div>
+        
+    </div>
+</div>
+</body>
+</html>

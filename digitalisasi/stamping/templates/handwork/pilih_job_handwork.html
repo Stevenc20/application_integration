@@ -1,0 +1,77 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Pilih Job untuk Handwork{% endblock %}
+
+{% block content %}
+<div class="card p-3 mb-4">
+    <h4 class="mb-3 fw-bold">Pilih Job untuk Mencatat Handwork</h4>
+
+    <form method="GET" class="mb-3">
+        <div class="input-group" style="width: 300px;">
+            <input type="date" name="tanggal" class="form-control" value="{{ selected_date_str }}">
+            <button class="btn btn-secondary" type="submit">Filter Tanggal</button>
+        </div>
+    </form>
+    <hr>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="detailjob-select" class="form-label">Pilih Item dari Job yang Aktif:</label>
+            <select name="detailjob_id" id="detailjob-select" class="form-select" required>
+                <option value="" disabled selected>--- Pilih salah satu ---</option>
+                {% for dj in semua_detailjob %}
+                    <option value="{{ dj.id_detailjob }}">
+                        JOB{{ dj.id_job.id_job }} - Item: {{ dj.id_itemproduksi.job_number }} (Line: {{ dj.id_job.id_productionline.namaline }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if not semua_detailjob %}
+            <div class="alert alert-warning">Tidak ada job yang aktif pada tanggal yang dipilih.</div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary" {% if not semua_detailjob %}disabled{% endif %}>
+            Lanjutkan ke Form Handwork
+        </button>
+        <a href="{% url 'job' %}" class="btn btn-secondary">Batal</a>
+    </form>
+</div>
+
+<div class="card p-3">
+    <h5 class="mb-3">History Handwork ({{ selected_date_str }})</h5>
+    <div class="table-responsive text-nowrap">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr class="table-light">
+                    <th class="text-center">ID Detail Job</th>
+                    <th class="text-center">Problem</th>
+                    <th class="text-center">Status</th>
+                    <th class="text-center">Waktu Dicatat</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in history_handwork %}
+                <tr>
+                    <td class="text-center">{{ item.id_handwork.id_detailjob.id_detailjob }}</td>
+                    <td>{{ item.problem_hw|default:'-' }}</td>
+                    <td class="text-center">
+                        {% if item.is_ok %}
+                            <span class="badge bg-success">OK</span>
+                        {% else %}
+                            <span class="badge bg-danger">REJECT</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ item.created_at|date:"d-m-Y H:i" }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4" class="text-center text-muted">Tidak ada history handwork untuk tanggal ini.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

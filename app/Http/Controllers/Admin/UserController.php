@@ -24,14 +24,14 @@ class UserController extends Controller
     {
     $request->validate([
         'name' => 'required',
-        'nip' => 'required|unique:users,nip',
+        'nrp' => 'required|unique:users,nrp',
         'password' => 'required|min:6',
         'role' => 'required'
     ]);
 
     User::create([
         'name' => $request->name,
-        'nip' => $request->nip,
+        'nrp' => $request->nrp,
         'password' => Hash::make($request->password),
         'role' => $request->role,
     ]);
@@ -48,13 +48,13 @@ class UserController extends Controller
 {
     $request->validate([
         'name' => 'required',
-        'nip' => 'required|unique:users,nip,' . $user->id,
+        'nrp' => 'required|unique:users,nrp,' . $user->id,
         'role' => 'required'
     ]);
 
     $data = [
         'name' => $request->name,
-        'nip' => $request->nip,
+        'nrp' => $request->nrp,
         'role' => $request->role,
     ];
 

@@ -1,0 +1,36 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Edit Q Check{% endblock %}
+
+{% block content %}
+<div class="card p-4" style="max-width: 600px; margin: auto;">
+    <h4 class="fw-bold mb-3">Edit Q Check - Job {{ qc.id_detailjob.id_itemproduksi.job_number }}</h4>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="jenis_qcheck" class="form-label">Jenis Q Check</label>
+            <select name="jenis_qcheck" id="jenis_qcheck" class="form-select" required>
+                {% for code, label in qc_types %}
+                <option value="{{ code }}" {% if qc.jenis_qcheck == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="mb-3">
+            <label for="hasil_qcheck" class="form-label">Hasil Q Check</label>
+            <input type="text" name="hasil_qcheck" id="hasil_qcheck" class="form-control" value="{{ qc.hasil_qcheck }}" required>
+        </div>
+
+        <div class="mb-3">
+            <label for="keterangan" class="form-label">Keterangan</label>
+            <textarea name="keterangan" id="keterangan" rows="3" class="form-control">{{ qc.keterangan|default:'' }}</textarea>
+        </div>
+
+        <div class="d-flex justify-content-between">
+            <a href="{% url 'list_qcheck' qc.id_detailjob.id_detailjob %}" class="btn btn-secondary">Kembali</a>
+            <button type="submit" class="btn btn-primary">Update</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,45 @@
+<nav class="layout-navbar container-xxl navbar navbar-expand-xl bg-navbar-theme" id="layout-navbar">
+  <div class="layout-menu-toggle navbar-nav d-xl-none me-3">
+    <a class="nav-item nav-link" href="javascript:void(0)"><i class="bx bx-menu"></i></a>
+  </div>
+
+  <div class="navbar-nav-right d-flex align-items-center w-100" id="navbar-collapse">
+    <div class="navbar-nav align-items-center me-auto">
+      <div class="nav-item d-flex align-items-center">
+        <h4 class="mb-0 fw-bold">PT Inti Pantja Press Industri</h4>
+      </div>
+    </div>
+
+    <ul class="navbar-nav ms-auto">
+      {% if user.is_authenticated %}
+      <li class="nav-item dropdown">
+        <a class="nav-link dropdown-toggle" href="#" id="userDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+          {{ user.username|upper }}
+          <!-- Ganti dengan path static jika gambar ada di static -->
+          <img src="/static/img/ippi/logoippi.jpg" class="rounded-circle ms-2" style="height:30px; width:30px;" alt="User Avatar"> 
+        </a>
+        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="userDropdown">
+          <li>
+             <!-- Tambahkan link profile jika ada -->
+             <a class="dropdown-item" href="#">
+                <i class="bx bx-user me-2"></i> My Profile
+             </a>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <li>
+            <!-- FORM LOGOUT TERSEMBUNYI -->
+            <form method="post" action="{% url 'logout' %}" id="logout-form" style="display: none;">
+                {% csrf_token %}
+            </form>
+            <!-- LINK YANG MEMICU FORM LOGOUT -->
+            <a class="dropdown-item" href="javascript:void(0);" onclick="document.getElementById('logout-form').submit();">
+               <i class="bx bx-power-off me-2"></i> Logout
+            </a>
+          </li>
+        </ul>
+      </li>
+      {% endif %}
+    </ul>
+  </div>
+</nav>
+

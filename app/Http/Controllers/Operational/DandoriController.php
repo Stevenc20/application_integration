@@ -15,21 +15,27 @@ class DandoriController extends Controller
     ===================================================== */
     public function index(Request $request)
     {
-        $lines = JobMaster::select('line')
-            ->whereNotNull('line')
+        $lines = \App\Models\LineMaster::where('status', 'active')
+            ->orderBy('line_name')
             ->distinct()
-            ->orderBy('line')
-            ->pluck('line');
+            ->pluck('line_name');
 
         $jobId = $request->job_id;
         $line  = $request->line;
         $shift = $request->shift ?? 'Shift 1';
 
+        $todayStats = [
+            'total_events' => \App\Models\Dandori::whereDate('work_date', now())->distinct('next_job_id')->count(),
+            'avg_duration' => \App\Models\Dandori::whereDate('work_date', now())->avg('duration_minutes') ?? 0,
+            'total_duration' => \App\Models\Dandori::whereDate('work_date', now())->sum('duration_minutes') ?? 0
+        ];
+
         return view('operational.dandori', compact(
             'lines',
             'jobId',
             'line',
-            'shift'
+            'shift',
+            'todayStats'
         ));
     }
 
@@ -42,84 +48,116 @@ class DandoriController extends Controller
         $q = JobMaster::query();
 
         if ($request->line) {
-            $q->where('line', $request->line);
+            $lineSearch = str_replace('Line ', '', $request->line);
+            $q->where('line', $lineSearch);
         }
 
-        /* ==========================================
-           UNTUK TESTING:
-           AMBIL SEMUA STATUS DULU
-        ========================================== */
-        $rows = $q->orderByDesc('updated_at')
-            ->orderBy('sequence_no')
-            ->get();
+        $rows = $q->orderBy('sequence_no')
+            ->paginate(10);
 
         return response()->json($rows);
     }
 
     /* =====================================================
-       OPEN DETAIL JOB
-       KLIK CARD ITEM
+       GET DETAIL JOB (FOR MODAL)
     ===================================================== */
-    public function open($id)
+    public function getDetail($id)
     {
         $job = JobMaster::findOrFail($id);
 
-        $processes = \App\Models\JobProcess::where('job_master_id',$id)
-            ->orderBy('sequence_no')
-            ->get();
+        $activityTypes = [
+            'dandori_process' => 'DANDORI'
+        ];
 
-        return view('operational.dandori_detail', compact(
-            'job',
-            'processes'
-        ));
-    }
-    
+        $dandoriStatus = [];
+        foreach ($activityTypes as $code => $display) {
+            $record = Dandori::where('next_job_id', $id)
+                ->where('activity', $display)
+                ->whereDate('work_date', now()->toDateString())
+                ->latest()
+                ->first();
 
-    /* =====================================================
-       START DANDORI PER AKTIVITAS
-    ===================================================== */
-    public function start(Request $request)
-    {
-        $process = JobProcess::findOrFail($request->job_process_id);
+            $dandoriStatus[] = [
+                'type_code'    => $code,
+                'type_display' => $display,
+                'record'       => $record
+            ];
+        }
 
-        $row = Dandori::create([
-            'job_process_id' => $process->id,
-            'next_job_id' => $process->job_master_id,
-            'activity' => $process->process_name,
-            'line' => $request->line,
-            'shift' => $request->shift,
-            'start_time' => now(),
-            'work_date' => now()->toDateString(),
-            'created_by' => auth()->id()
-        ]);
+        $totalDuration = Dandori::where('next_job_id', $id)
+            ->whereDate('work_date', now()->toDateString())
+            ->sum('duration_minutes');
 
         return response()->json([
-            'success'=>true
+            'job'           => $job,
+            'dandoriStatus' => $dandoriStatus,
+            'totalDuration' => round($totalDuration, 2)
         ]);
     }
 
     /* =====================================================
-       FINISH DANDORI
+       START DANDORI
     ===================================================== */
-    public function finish($id)
+    public function start(Request $request, $id, $type)
+    {
+        $job = JobMaster::findOrFail($id);
+        
+        $activityTypes = [
+            'dandori_process' => 'DANDORI'
+        ];
+
+        $activityName = $activityTypes[$type] ?? 'DANDORI';
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line'        => $job->line,
+            'shift'       => $request->shift ?? 'Shift 1',
+            'activity'    => $activityName,
+            'start_time'  => now(),
+            'work_date'   => now()->toDateString(),
+            'created_by'  => auth()->id()
+        ]);
+
+        if ($request->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'Dandori ' . $activityName . ' dimulai.']);
+        }
+        return redirect()->back()->with('success', 'Dandori ' . $activityName . ' dimulai.');
+    }
+
+    /* =====================================================
+       STOP DANDORI
+    ===================================================== */
+    public function stop($id)
     {
         $row = Dandori::findOrFail($id);
-
         $finish = now();
 
-        $minutes = Carbon::parse($row->start_time)
-            ->diffInSeconds($finish) / 60;
+        $minutes = Carbon::parse($row->start_time)->diffInSeconds($finish) / 60;
 
         $row->update([
             'finish_time'      => $finish,
             'duration_minutes' => round($minutes, 2)
         ]);
 
-        return response()->json([
-            'success' => true,
-            'finish'  => $finish->format('H:i:s'),
-            'minutes' => round($minutes, 2)
-        ]);
+        if (request()->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'Dandori ' . $row->activity . ' selesai.']);
+        }
+        return redirect()->back()->with('success', 'Dandori ' . $row->activity . ' selesai.');
+    }
+
+    /* =====================================================
+       RESTART DANDORI
+    ===================================================== */
+    public function restart($id)
+    {
+        $row = Dandori::findOrFail($id);
+        $activityName = $row->activity;
+        $row->delete();
+
+        if (request()->wantsJson()) {
+            return response()->json(['success' => true, 'message' => 'Dandori ' . $activityName . ' di-reset.']);
+        }
+        return redirect()->back()->with('warning', 'Dandori ' . $activityName . ' di-reset.');
     }
 
     /* =====================================================
@@ -137,50 +175,50 @@ class DandoriController extends Controller
             $q->where('line', $request->line);
         }
 
-        $rows = $q->latest()
-            ->take(100)
-            ->get()
-            ->map(function ($row) {
+        // Group by job, date, line, and shift
+        $paginated = $q->leftJoin('job_masters', 'dandoris.next_job_id', '=', 'job_masters.id')
+            ->select(
+                'dandoris.next_job_id', 
+                'dandoris.work_date', 
+                'dandoris.line', 
+                'dandoris.shift',
+                'job_masters.job_number',
+                'job_masters.job_name'
+            )
+            ->groupBy('dandoris.next_job_id', 'dandoris.work_date', 'dandoris.line', 'dandoris.shift', 'job_masters.job_number', 'job_masters.job_name')
+            ->orderBy('dandoris.work_date', 'desc')
+            ->paginate(10);
 
-                $job = JobMaster::find($row->next_job_id);
+        $paginated->getCollection()->transform(function ($group) {
+            // Fetch all activities belonging to this group
+            $activities = Dandori::where('next_job_id', $group->next_job_id)
+                ->whereDate('work_date', $group->work_date)
+                ->where('line', $group->line)
+                ->where('shift', $group->shift)
+                ->orderBy('created_at', 'asc')
+                ->get();
 
-                return [
-                    'id' => $row->id,
+            return [
+                'job_id'         => $group->next_job_id,
+                'job_number'     => $group->job_number ?? 'N/A',
+                'job_name'       => $group->job_name ?? 'Master Data tidak ditemukan',
+                'line'           => $group->line,
+                'shift'          => $group->shift,
+                'date'           => Carbon::parse($group->work_date)->format('d M Y'),
+                'total_duration' => round($activities->sum('duration_minutes'), 2),
+                'activities'     => $activities->map(function ($a) {
+                    return [
+                        'type'        => $a->activity,
+                        'start'       => $a->start_time ? Carbon::parse($a->start_time)->format('H:i') : '-',
+                        'finish'      => $a->finish_time ? Carbon::parse($a->finish_time)->format('H:i') : '-',
+                        'duration'    => round($a->duration_minutes, 2),
+                        'is_finished' => !is_null($a->finish_time)
+                    ];
+                })
+            ];
+        });
 
-                    'job_number' =>
-                        $job->job_number ?? '-',
-
-                    'job_name' =>
-                        $job->job_name ?? '-',
-
-                    'activity' =>
-                        $row->activity,
-
-                    'line' =>
-                        $row->line,
-
-                    'shift' =>
-                        $row->shift,
-
-                    'start_time' =>
-                        $row->start_time
-                        ? Carbon::parse($row->start_time)->format('H:i:s')
-                        : '-',
-
-                    'finish_time' =>
-                        $row->finish_time
-                        ? Carbon::parse($row->finish_time)->format('H:i:s')
-                        : '-',
-
-                    'duration_minutes' =>
-                        number_format(
-                            $row->duration_minutes ?? 0,
-                            2
-                        )
-                ];
-            });
-
-        return response()->json($rows);
+        return response()->json($paginated);
     }
 
     /* =====================================================
@@ -230,11 +268,7 @@ class DandoriController extends Controller
     */
 
     $activities = [
-        'Persiapan Material',
-        'Setup Mesin',
-        'Trial Produksi',
-        'Fine Tuning',
-        'Cleaning / 5S'
+        'DANDORI'
     ];
 
     foreach ($activities as $activity) {

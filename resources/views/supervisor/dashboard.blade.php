@@ -1,590 +1,622 @@
-@extends('layouts.layouts')
+@extends('layouts.supervisor')
+
+@section('title', 'Production Achievement Dashboard')
 
 @section('content')
+<div class="space-y-5 min-w-0 space-wrapper">
 
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
-
-* { box-sizing: border-box; }
-
-.db {
-    font-family: 'Plus Jakarta Sans', sans-serif;
-    background: #f5f6fa;
-    min-height: 100vh;
-    padding: 28px 24px;
-    color: #1a1d23;
-}
-
-.card {
-    background: #fff;
-    border-radius: 14px;
-    padding: 22px 24px;
-    border: 1px solid #eaecf0;
-    margin-bottom: 20px;
-}
-
-.sec-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: #9298a4;
-    text-transform: uppercase;
-    letter-spacing: 0.06em;
-    margin-bottom: 16px;
-}
-
-.kpi { background: #f9fafb; border: 1px solid #eaecf0; border-radius: 12px; padding: 18px; }
-.kpi-label { font-size: 12px; color: #9298a4; font-weight: 500; margin-bottom: 8px; }
-.kpi-value { font-size: 26px; font-weight: 700; line-height: 1; }
-.kpi-sub   { font-size: 11px; color: #b0b5c0; margin-top: 5px; }
-
-.c-blue   { color: #3b7bff; }
-.c-green  { color: #22c55e; }
-.c-red    { color: #f04438; }
-.c-amber  { color: #f79009; }
-.c-purple { color: #7c3aed; }
-.c-gray   { color: #6b7280; }
-
-.track { background: #f0f1f5; border-radius: 99px; height: 5px; margin-top: 10px; overflow: hidden; }
-.track-fill { height: 100%; border-radius: 99px; }
-
-.pill { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 99px; font-size: 12px; font-weight: 600; }
-.pill-green  { background: #dcfce7; color: #16a34a; }
-.pill-red    { background: #fee2e2; color: #dc2626; }
-.pill-amber  { background: #fef3c7; color: #d97706; }
-.pill-blue   { background: #dbeafe; color: #2563eb; }
-.pill-gray   { background: #f3f4f6; color: #6b7280; }
-
-.alert { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 10px; font-size: 13px; font-weight: 500; margin-bottom: 8px; }
-.alert-warn { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
-.alert-ok   { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
-
-.line-grid { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-@media(max-width:640px){ .line-grid { grid-template-columns: repeat(2,1fr); } }
-
-.line-card { border-radius: 12px; padding: 18px 14px; text-align: center; border: 1px solid #eaecf0; }
-.lc-green { background: #f0fdf4; border-color: #bbf7d0; }
-.lc-red   { background: #fff5f5; border-color: #fecaca; }
-.lc-amber { background: #fffbeb; border-color: #fde68a; }
-
-.dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 4px; vertical-align: middle; }
-.dot-green { background: #22c55e; }
-.dot-red   { background: #f04438; }
-.dot-amber { background: #f79009; }
-
-.filter-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; align-items: end; }
-.f-label { font-size: 12px; font-weight: 500; color: #6b7280; margin-bottom: 5px; display: block; }
-.f-input { width: 100%; border: 1px solid #d1d5db; border-radius: 8px; padding: 9px 12px; font-size: 13px; font-family: 'Plus Jakarta Sans', sans-serif; background: #fff; color: #1a1d23; transition: border-color .2s; }
-.f-input:focus { outline: none; border-color: #3b7bff; box-shadow: 0 0 0 3px rgba(59,123,255,.1); }
-
-.btn-apply { background: #1a1d23; color: #fff; border: none; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; transition: background .2s; width: 100%; }
-.btn-apply:hover { background: #374151; }
-.btn-reset { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; border-radius: 8px; padding: 9px 18px; font-size: 13px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; text-align: center; display: block; text-decoration: none; transition: background .2s; width: 100%; }
-.btn-reset:hover { background: #e5e7eb; }
-
-.col2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-@media(max-width:640px){ .col2 { grid-template-columns: 1fr; } }
-
-.g3 { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-.g4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; }
-@media(max-width:700px){ .g3 { grid-template-columns: repeat(2,1fr); } .g4 { grid-template-columns: repeat(2,1fr); } }
-
-.big-track { background: #f0f1f5; border-radius: 99px; height: 20px; overflow: hidden; }
-.big-fill { height: 100%; border-radius: 99px; background: linear-gradient(90deg, #3b7bff, #22c55e); display: flex; align-items: center; padding-left: 10px; transition: width 1s ease; }
-
-.tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
-.tbl th { text-align: left; padding: 10px 14px; font-size: 11px; font-weight: 600; color: #9298a4; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid #eaecf0; white-space: nowrap; background: #fafafa; }
-.tbl td { padding: 11px 14px; border-bottom: 1px solid #f3f4f6; color: #374151; white-space: nowrap; }
-.tbl tr:last-child td { border-bottom: none; }
-.tbl tr:hover td { background: #fafafa; }
-
-.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.25); backdrop-filter: blur(4px); align-items: center; justify-content: center; z-index: 50; }
-.modal-box { background: #fff; border-radius: 18px; padding: 28px; width: 480px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,.1); }
-
-.btn-detail { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; border-radius: 8px; padding: 6px 14px; font-size: 12px; font-weight: 600; font-family: 'Plus Jakarta Sans', sans-serif; cursor: pointer; transition: all .2s; }
-.btn-detail:hover { background: #e5e7eb; }
-</style>
-
-<div class="db">
-
-    {{-- HEADER --}}
-    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:24px;">
+    <!-- ===== HEADER ===== -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white border border-gray-200 rounded-2xl px-5 py-4 sm:px-8 sm:py-5 shadow-sm border-l-4 border-l-red-400">
         <div>
-            <h1 style="font-size:22px; font-weight:700; margin:0 0 4px;">Production Overview</h1>
-            <p style="font-size:13px; color:#9298a4; margin:0;">{{ now()->format('l, d F Y') }}</p>
+            <h1 class="dash-h1 text-base sm:text-xl lg:text-2xl 2xl:text-3xl font-black text-gray-800 uppercase tracking-wide leading-tight">Production Achievement Dashboard</h1>
+            <p class="dash-subtitle text-xs sm:text-sm text-gray-500 mt-0.5 font-medium">Stamping Department &mdash; {{ $selectedLine ?? 'All Lines' }}</p>
         </div>
-        <div style="text-align:right;">
-            <p style="font-size:11px; color:#9298a4; margin:0 0 2px;">Live Time</p>
-            <p id="liveClock" style="font-size:22px; font-weight:700; color:#3b7bff; margin:0;"></p>
-        </div>
-    </div>
-
-    {{-- SHIFT + ALERTS --}}
-    <div class="col2">
-        <div class="card" style="margin-bottom:0;">
-            <p class="sec-title">Shift Status</p>
-            @php $nowTime = now()->format('H:i'); @endphp
-            <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
-                <div>
-                    <p style="font-size:12px; color:#9298a4; margin:0 0 6px;">Summary</p>
-                    @if($isOvertime && $shift == 1)
-                        <span class="pill pill-red">Shift 1 Selesai</span>
-                    @elseif($shift == 2 && $nowTime < $shiftStart)
-                        <span class="pill pill-red">Shift 1 Selesai</span>
-                    @else
-                        <span class="pill pill-green">⚙ Shift {{ $shift }} Berjalan</span>
-                    @endif
-                </div>
-                <div style="text-align:right;">
-                    <p style="font-size:12px; color:#9298a4; margin:0 0 6px;">Realtime</p>
-                    @if($isBreak)
-                        <span class="pill pill-blue">☕ Break {{ $breakStart }}–{{ $breakEnd }}</span>
-                    @elseif($isOvertime)
-                        <span class="pill pill-amber">⚠ Overtime</span>
-                    @elseif($nowTime >= $shiftStart && $nowTime <= $shiftEnd)
-                        <span class="pill pill-green">Normal Operation</span>
-                    @else
-                        <span class="pill pill-gray">Waiting Shift</span>
-                    @endif
-                    <p id="shiftRealtimeStatus" style="font-size:12px; font-weight:600; color:#3b7bff; margin:8px 0 0;"></p>
-                    <p id="remainingTime" style="font-size:12px; color:#9298a4; margin:2px 0 0;"></p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom:0;">
-            <p class="sec-title">Production Alerts</p>
-            @if($achievementPercent < 80)
-                <div class="alert alert-warn">⚠ Production behind target ({{ $achievementPercent }}%)</div>
-            @endif
-            @if($rejectRate > 5)
-                <div class="alert alert-warn">⚠ Reject rate tinggi — {{ $rejectRate }}%</div>
-            @endif
-            @if($activeDowntime > 0)
-                <div class="alert alert-warn">⚠ Machine downtime aktif</div>
-            @endif
-            @if($openAbnormality > 0)
-                <div class="alert alert-warn">⚠ {{ $openAbnormality }} abnormality belum ditutup</div>
-            @endif
-            @if($achievementPercent >= 80 && $rejectRate <= 5 && $activeDowntime == 0 && $openAbnormality == 0)
-                <div class="alert alert-ok">✔ Semua sistem berjalan normal</div>
-            @endif
+        <div class="flex flex-row sm:flex-col items-center sm:items-end gap-4 sm:gap-1 shrink-0">
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wider">Tgl: <strong id="hdrDate" class="text-gray-700 font-black ml-1"></strong></div>
+            <div class="text-2xl sm:text-3xl 2xl:text-5xl font-black text-red-500 tracking-widest tabular-nums" id="liveClock">--:--:--</div>
         </div>
     </div>
 
-    {{-- LINE MONITORING --}}
-    <div class="card">
-        <p class="sec-title">Line Monitoring</p>
-        <div class="line-grid">
-            <div class="line-card lc-green">
-                <p style="font-size:11px; font-weight:600; color:#9298a4; margin:0 0 6px;">Line A</p>
-                <p style="font-size:16px; font-weight:700;" class="c-green"><span class="dot dot-green"></span>Running</p>
-            </div>
-            <div class="line-card lc-red">
-                <p style="font-size:11px; font-weight:600; color:#9298a4; margin:0 0 6px;">Line B</p>
-                <p style="font-size:16px; font-weight:700;" class="c-red"><span class="dot dot-red"></span>Stop</p>
-            </div>
-            <div class="line-card lc-amber">
-                <p style="font-size:11px; font-weight:600; color:#9298a4; margin:0 0 6px;">Line C</p>
-                <p style="font-size:16px; font-weight:700;" class="c-amber"><span class="dot dot-amber"></span>Setup</p>
-            </div>
-            <div class="line-card lc-green">
-                <p style="font-size:11px; font-weight:600; color:#9298a4; margin:0 0 6px;">Line D</p>
-                <p style="font-size:16px; font-weight:700;" class="c-green"><span class="dot dot-green"></span>Running</p>
-            </div>
+    <!-- ===== FILTER BAR ===== -->
+    <div class="flex flex-wrap items-center gap-3 bg-white border border-gray-200 rounded-2xl px-5 py-3 shadow-sm">
+        <div class="flex items-center gap-2">
+            <svg class="w-4 h-4 text-gray-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+            <input type="date" id="dateInput" onchange="onDateChange()" class="filter-input border border-gray-200 rounded-xl px-3 py-2 text-sm font-semibold text-gray-700 focus:ring-2 focus:ring-red-300 focus:border-red-500 outline-none transition bg-gray-50">
+        </div>
+        <div class="flex bg-gray-100 rounded-xl p-1 border border-gray-200 gap-1" role="group">
+            <button id="s1btn" onclick="setShift(1)" class="filter-btn px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm">Shift 1</button>
+            <button id="s2btn" onclick="setShift(2)" class="filter-btn px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">Shift 2</button>
+        </div>
+        <div class="ml-auto">
+            <span class="live-badge inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-50 border border-green-200 text-green-700 text-xs font-bold">
+                <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block"></span>LIVE
+            </span>
         </div>
     </div>
 
-    {{-- FILTER --}}
-    <div class="card">
-        <p class="sec-title">Filter</p>
-        <form method="GET" action="{{ route('supervisor.dashboard') }}">
-            <div class="filter-grid">
-                <div>
-                    <label class="f-label">Date From</label>
-                    <input type="date" name="date_from" class="f-input" value="{{ request('date_from', now()->toDateString()) }}">
-                </div>
-                <div>
-                    <label class="f-label">Date To</label>
-                    <input type="date" name="date_to" class="f-input" value="{{ request('date_to', now()->toDateString()) }}">
-                </div>
-                <div>
-                    <label class="f-label">Process</label>
-                    <select name="process_type" class="f-input">
-                        <option value="">All</option>
-                        <option value="Stamping"    {{ request('process_type')=='Stamping'?'selected':'' }}>Stamping</option>
-                        <option value="Sub Assy"    {{ request('process_type')=='Sub Assy'?'selected':'' }}>Sub Assy</option>
-                        <option value="Shearing"    {{ request('process_type')=='Shearing'?'selected':'' }}>Shearing</option>
-                        <option value="Metal Finish" {{ request('process_type')=='Metal Finish'?'selected':'' }}>Metal Finish</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="f-label">Shift</label>
-                    <select name="shift" class="f-input">
-                        <option value="">All</option>
-                        <option value="Shift 1" {{ request('shift')=='Shift 1'?'selected':'' }}>Shift 1</option>
-                        <option value="Shift 2" {{ request('shift')=='Shift 2'?'selected':'' }}>Shift 2</option>
-                        <option value="Shift 3" {{ request('shift')=='Shift 3'?'selected':'' }}>Shift 3</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="f-label">Order</label>
-                    <input type="text" name="order" class="f-input" value="{{ request('order') }}" placeholder="Search order...">
-                </div>
-                <div style="display:flex; gap:8px;">
-                    <button type="submit" class="btn-apply" style="flex:1;">Apply</button>
-                    <a href="{{ route('supervisor.dashboard') }}" class="btn-reset" style="flex:1;">Reset</a>
-                </div>
-            </div>
-        </form>
-    </div>
+    <!-- ===== LINE CARDS ===== -->
+    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6" id="linesGrid"></div>
 
-    {{-- PERFORMANCE + OUTPUT --}}
-    <div class="col2">
-        <div class="card" style="margin-bottom:0;">
-            <p class="sec-title">Production Performance</p>
-            <div class="g3">
-                <div class="kpi">
-                    <p class="kpi-label">Target</p>
-                    <p class="kpi-value c-blue">{{ number_format($targetQty ?? 0) }}</p>
-                    <p class="kpi-sub">pcs</p>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Achievement</p>
-                    <p class="kpi-value {{ ($achievementPercent??0) >= 80 ? 'c-green' : 'c-red' }}">{{ $achievementPercent ?? 0 }}%</p>
-                    <p class="kpi-sub">rate</p>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Gap</p>
-                    <p class="kpi-value c-amber">{{ number_format($gap ?? 0) }}</p>
-                    <p class="kpi-sub">pcs</p>
-                </div>
-            </div>
-        </div>
-
-        <div class="card" style="margin-bottom:0;">
-            <p class="sec-title">Production Output</p>
-            <div class="g4">
-                <div class="kpi">
-                    <p class="kpi-label">OK</p>
-                    <p class="kpi-value c-green">{{ number_format($totalOk) }}</p>
-                    <p class="kpi-sub">{{ $okPercent }}%</p>
-                    <div class="track"><div class="track-fill" style="width:{{ $okPercent }}%;background:#22c55e;"></div></div>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Repair</p>
-                    <p class="kpi-value c-amber">{{ number_format($totalRepair) }}</p>
-                    <p class="kpi-sub">{{ $repairPercent }}%</p>
-                    <div class="track"><div class="track-fill" style="width:{{ $repairPercent }}%;background:#f79009;"></div></div>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Reject</p>
-                    <p class="kpi-value c-red">{{ number_format($totalReject) }}</p>
-                    <p class="kpi-sub">{{ $rejectPercent }}%</p>
-                    <div class="track"><div class="track-fill" style="width:{{ $rejectPercent }}%;background:#f04438;"></div></div>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Reject Rate</p>
-                    <p class="kpi-value c-purple">{{ $rejectRate ?? 0 }}%</p>
-                    <p class="kpi-sub">KPI</p>
-                    <div class="track"><div class="track-fill" style="width:{{ $rejectRate ?? 0 }}%;background:#7c3aed;"></div></div>
-                </div>
-            </div>
+    <!-- ===== DAY RANGE ===== -->
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
+    <p class="day-label text-xs font-bold text-gray-400 uppercase tracking-widest">Grafik Analisis</p>
+        <div class="flex bg-gray-100 rounded-xl p-1 border border-gray-200 gap-1" role="group">
+            <button id="d1btn" onclick="setDays(1)" class="filter-btn px-5 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm">Hari Ini</button>
+            <button id="d7btn" onclick="setDays(7)" class="filter-btn px-5 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">7 Hari</button>
+            <button id="d30btn" onclick="setDays(30)" class="filter-btn px-5 py-2 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">30 Hari</button>
         </div>
     </div>
 
-    {{-- CONTROL + MONITORING --}}
-    <div class="col2">
-        <div class="card" style="margin-bottom:0;">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:16px;">
-                <p class="sec-title" style="margin-bottom:0;">Production Control</p>
-                <button onclick="openControlModal()" class="btn-detail">Detail</button>
+    <!-- ===== CHARTS TODAY ===== -->
+    <div id="todayCharts" class="chart-grid grid grid-cols-1 sm:grid-cols-2 gap-4 2xl:gap-6">
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>Pencapaian Produksi (Pcs)
             </div>
-            <div class="g3">
-                <div class="kpi">
-                    <p class="kpi-label">Remaining</p>
-                    <p class="kpi-value c-blue">{{ $remainingHours ?? 0 }}h</p>
-                    <p class="kpi-sub">eff. time</p>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Current</p>
-                    <p class="kpi-value c-green">{{ $currentSpeed ?? 0 }}/h</p>
-                    <p class="kpi-sub">speed</p>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Required</p>
-                    <p class="kpi-value c-red">{{ $requiredSpeed ?? 0 }}/h</p>
-                    <p class="kpi-sub">min speed</p>
-                </div>
-            </div>
+            <div class="p-4 flex-1 chart-min-h min-h-[220px] 2xl:min-h-[320px]"><canvas id="cQty"></canvas></div>
         </div>
-
-        <div class="card" style="margin-bottom:0;">
-            <p class="sec-title">Monitoring</p>
-            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
-                <div class="kpi">
-                    <p class="kpi-label">Abnormality</p>
-                    <p class="kpi-value c-purple">{{ $openAbnormality ?? 0 }}</p>
-                    <p class="kpi-sub">{{ ($openAbnormality??0) > 0 ? 'Open' : 'Clear' }}</p>
-                </div>
-                <div class="kpi">
-                    <p class="kpi-label">Downtime</p>
-                    <p class="kpi-value c-red">{{ $activeDowntime ?? 0 }}</p>
-                    <p class="kpi-sub">{{ ($activeDowntime??0) > 0 ? 'Active' : 'None' }}</p>
-                </div>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>Total Downtime (Menit)
             </div>
+            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cDt"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>Repair &amp; Reject (Pcs)
+            </div>
+            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cRr"></canvas></div>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+            <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>Pencapaian GSPH
+            </div>
+            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cGsph"></canvas></div>
         </div>
     </div>
 
-    {{-- PROGRESS --}}
-    @php
-        $progress = $targetQty > 0 ? ($totalOk / $targetQty) * 100 : 0;
-        $progText = match(true) {
-            $progress >= 100 => "Target tercapai",
-            $progress >= 80  => "Produksi on track",
-            $progress >= 50  => "Produksi berjalan",
-            default          => "Di bawah target",
-        };
-    @endphp
-
-    <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-            <p class="sec-title" style="margin-bottom:0;">Production Progress</p>
-            <span style="font-size:15px; font-weight:700;">{{ round($progress,1) }}%</span>
-        </div>
-        <div class="big-track">
-            <div class="big-fill" style="width:{{ min($progress,100) }}%;">
-                @if($progress > 10)
-                    <span style="font-size:11px; font-weight:700; color:#fff;">{{ round($progress,1) }}%</span>
-                @endif
+    <!-- ===== CHARTS TREND ===== -->
+    <div id="trendCharts" class="hidden space-y-4">
+        <div class="text-center font-black text-gray-600 text-sm sm:text-lg uppercase tracking-widest" id="trendLabel"></div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 2xl:gap-6">
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                    <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>Tren Pencapaian Produksi (Pcs)
+                </div>
+                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTQty"></canvas></div>
             </div>
-        </div>
-        <div style="display:flex; justify-content:space-between; margin-top:10px; font-size:12px; color:#9298a4;">
-            <span>{{ $progText }}</span>
-            <span>Target: {{ number_format($targetQty??0) }} &nbsp;|&nbsp; Actual: {{ number_format($totalOk??0) }}</span>
-        </div>
-    </div>
-
-    {{-- CHART --}}
-    <div class="card">
-        <p class="sec-title">Production Trend</p>
-        <div style="height:280px; position:relative;">
-            <canvas id="productionChart"></canvas>
-        </div>
-    </div>
-
-    {{-- TABLE --}}
-    <div class="card">
-        <p class="sec-title">Recent Production</p>
-        <div style="overflow-x:auto;">
-            <table class="tbl">
-                <thead>
-                    <tr>
-                        <th>Time</th><th>Pro Number</th><th>Job Number</th><th>Part Name</th>
-                        <th>Process</th><th>Shift</th><th>OK</th><th>Repair</th><th>Reject</th><th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @forelse($latestProductions as $p)
-                    <tr>
-                        <td style="color:#9298a4;">{{ $p->created_at->format('H:i') }}</td>
-                        <td>{{ $p->production_order_number }}</td>
-                        <td style="color:#9298a4;">{{ $p->job->job_number ?? '-' }}</td>
-                        <td style="font-weight:600;">{{ $p->job->job_name ?? '-' }}</td>
-                        <td>{{ $p->process_type }}</td>
-                        <td style="color:#9298a4;">{{ $p->shift }}</td>
-                        <td style="font-weight:600;" class="c-green">{{ $p->qty_ok }}</td>
-                        <td style="font-weight:600;" class="c-amber">{{ $p->qty_repair }}</td>
-                        <td style="font-weight:600;" class="c-red">{{ $p->qty_reject }}</td>
-                        <td>
-                            @if($p->status == 'approved')
-                                <span class="pill pill-green">Approved</span>
-                            @elseif($p->status == 'rejected')
-                                <span class="pill pill-red">Rejected</span>
-                            @else
-                                <span class="pill pill-amber">Pending</span>
-                            @endif
-                        </td>
-                    </tr>
-                    @empty
-                    <tr>
-                        <td colspan="10" style="text-align:center; padding:32px; color:#9298a4;">Tidak ada data produksi</td>
-                    </tr>
-                    @endforelse
-                </tbody>
-            </table>
-        </div>
-        @if($latestProductions->hasPages())
-            <div style="margin-top:16px; display:flex; justify-content:center;">{{ $latestProductions->links() }}</div>
-        @endif
-    </div>
-
-    {{-- MODAL --}}
-    <div id="controlModal" class="modal-bg">
-        <div class="modal-box">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
-                <h3 style="font-size:17px; font-weight:700; margin:0;">Production Control Detail</h3>
-                <button onclick="closeControlModal()" style="background:none; border:none; font-size:20px; color:#9298a4; cursor:pointer; line-height:1;">✕</button>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                    <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>Tren Total Downtime (Menit)
+                </div>
+                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTDt"></canvas></div>
             </div>
-
-            <div style="background:#f9fafb; border:1px solid #eaecf0; border-radius:10px; padding:16px; margin-bottom:16px;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <div>
-                        <p style="font-size:12px; color:#9298a4; margin:0 0 6px;">Status</p>
-                        @if($status == 'on_track')
-                            <span class="pill pill-green">● On Track</span>
-                        @elseif($status == 'behind')
-                            <span class="pill pill-red">● Behind Speed</span>
-                        @else
-                            <span class="pill pill-gray">● Waiting Data</span>
-                        @endif
-                    </div>
-                    <div style="text-align:right;">
-                        <p style="font-size:12px; color:#9298a4; margin:0 0 4px;">Current Speed</p>
-                        <p style="font-size:22px; font-weight:700; margin:0;">{{ $currentSpeed ?? '-' }}/h</p>
-                    </div>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                    <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>Tren Repair &amp; Reject (Pcs)
                 </div>
+                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTRr"></canvas></div>
             </div>
-
-            <div class="g3" style="margin-bottom:14px;">
-                <div class="kpi" style="text-align:center;">
-                    <p class="kpi-label">Target</p>
-                    <p class="kpi-value c-blue">{{ number_format($targetQty ?? 0) }}</p>
+            <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
+                <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
+                    <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>Tren Pencapaian GSPH
                 </div>
-                <div class="kpi" style="text-align:center;">
-                    <p class="kpi-label">Actual</p>
-                    <p class="kpi-value c-green">{{ number_format($totalOk ?? 0) }}</p>
-                </div>
-                <div class="kpi" style="text-align:center;">
-                    <p class="kpi-label">Remaining</p>
-                    <p class="kpi-value c-amber">{{ max(($targetQty??0)-($totalOk??0),0) }}</p>
-                </div>
-            </div>
-
-            <div class="g3">
-                <div class="kpi" style="text-align:center;">
-                    <p class="kpi-label">Time Left</p>
-                    <p class="kpi-value c-blue">{{ $remainingHours ?? 0 }}h</p>
-                </div>
-                <div class="kpi" style="text-align:center;">
-                    <p class="kpi-label">Current</p>
-                    <p class="kpi-value c-green">{{ $currentSpeed ?? 0 }}/h</p>
-                </div>
-                <div class="kpi" style="text-align:center;">
-                    <p class="kpi-label">Required</p>
-                    <p class="kpi-value c-red">{{ $requiredSpeed ?? 0 }}/h</p>
-                </div>
+                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTGsph"></canvas></div>
             </div>
         </div>
     </div>
 
 </div>
+
+<!-- ===== MODAL ===== -->
+<div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeKpiDetailModal()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
+        <div class="px-5 py-4 border-b border-red-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
+            <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
+            <button onclick="closeKpiDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+        <div class="p-5 overflow-y-auto flex-1 text-sm" id="modalBody">
+            <div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
+                <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                <span class="text-sm font-semibold">Mengambil data...</span>
+            </div>
+        </div>
+        <div class="px-5 py-3 border-t border-gray-100 text-right bg-gray-50 rounded-b-2xl">
+            <button onclick="closeKpiDetailModal()" class="flex-1 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl transition-all">Tutup</button>
+        </div>
+    </div>
+</div>
+
+
+{{-- ===== LARGE SCREEN SCALING (1920px / 2560px / 3840px) ===== --}}
+<style>
+/* ── 1080p / Large Monitor ≥1920px ─────────────────────────── */
+@media (min-width: 1920px) {
+  .kpi-table-cell          { font-size: 0.95rem !important; padding: 10px 14px !important; }
+  .kpi-table-header        { font-size: 0.75rem !important; padding: 9px 14px !important; }
+  .card-line-title         { font-size: 1.05rem !important; padding: 12px 16px !important; }
+  .chart-min-h             { min-height: 380px !important; }
+  .filter-input            { font-size: 0.95rem !important; padding: 10px 16px !important; }
+  .filter-btn              { font-size: 0.9rem !important; padding: 10px 20px !important; }
+  #liveClock               { font-size: 3.5rem !important; }
+  .dash-h1                 { font-size: 2rem !important; }
+  .linesGrid               { gap: 1.25rem !important; }
+  .space-wrapper           { gap: 1.5rem !important; }
+}
+
+/* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
+@media (min-width: 2560px) {
+  .kpi-table-cell          { font-size: 1.15rem !important; padding: 13px 18px !important; }
+  .kpi-table-header        { font-size: 0.9rem !important; padding: 12px 18px !important; }
+  .card-line-title         { font-size: 1.3rem !important; padding: 15px 20px !important; letter-spacing: 0.15em !important; }
+  .chart-min-h             { min-height: 500px !important; }
+  .filter-input            { font-size: 1.1rem !important; padding: 12px 20px !important; }
+  .filter-btn              { font-size: 1.05rem !important; padding: 12px 28px !important; }
+  #liveClock               { font-size: 5rem !important; }
+  .dash-h1                 { font-size: 2.6rem !important; }
+  .linesGrid               { gap: 1.75rem !important; grid-template-columns: repeat(4, 1fr) !important; }
+  .space-wrapper           { gap: 2rem !important; }
+  .chart-grid              { gap: 1.75rem !important; }
+  .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
+}
+
+/* ── 4K ≥3840px ─────────────────────────────────────────────── */
+@media (min-width: 3840px) {
+  .kpi-table-cell          { font-size: 1.65rem !important; padding: 20px 28px !important; }
+  .kpi-table-header        { font-size: 1.25rem !important; padding: 18px 28px !important; }
+  .card-line-title         { font-size: 1.9rem !important; padding: 22px 28px !important; letter-spacing: 0.2em !important; }
+  .chart-min-h             { min-height: 720px !important; }
+  .filter-input            { font-size: 1.5rem !important; padding: 18px 28px !important; border-radius: 1rem !important; }
+  .filter-btn              { font-size: 1.45rem !important; padding: 18px 40px !important; border-radius: 1rem !important; }
+  #liveClock               { font-size: 7.5rem !important; }
+  .dash-h1                 { font-size: 3.75rem !important; }
+  .dash-subtitle           { font-size: 1.4rem !important; }
+  .linesGrid               { gap: 2.5rem !important; grid-template-columns: repeat(4, 1fr) !important; }
+  .space-wrapper           { gap: 3rem !important; }
+  .chart-grid              { gap: 2.5rem !important; }
+  .section-card            { border-radius: 1.5rem !important; padding: 2rem !important; }
+  .modal-dialog-inner      { max-width: 1400px !important; font-size: 1.6rem !important; }
+  .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
+  .day-label               { font-size: 1.2rem !important; }
+  #linesGrid               { grid-template-columns: repeat(2, 1fr) !important; gap: 2.5rem !important; }
+}
+</style>
+
 @endsection
 
 @section('scripts')
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    function tick() {
-        document.getElementById("liveClock").innerText =
-            new Date().toLocaleTimeString('id-ID', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+const LINES = @json($lines);
+const SELECTED_LINE = @json($selectedLine);
+
+let selectedShift = 1;
+let selectedDays  = 1;
+let charts = {};
+let LINE_KPI = {};
+let DETAIL_DATA = {};
+
+/**
+ * FUNGSI UTAMA PENARIKAN DATA (REAL-TIME API)
+ * Fungsi ini memanggil endpoint backend untuk mendapatkan data Qty, Downtime, 
+ * dan rincian kualitas secara asli dari database.
+ */
+async function fetchDashboardData() {
+    const date = document.getElementById('dateInput').value;
+    const shift = selectedShift;
+    
+    try {
+        let url = `{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`;
+        if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
+
+        // Mengirim request ke Laravel Controller (SupervisorDashboardController@getApiData)
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        // Memasukkan hasil hitungan database ke dalam variabel dashboard
+        LINE_KPI = data.line_kpi;
+        DETAIL_DATA = data.detail_data;
+        
+        // Memperbarui tampilan kartu per Line dan grafik secara otomatis
+        renderLineCards();
+        if(selectedDays === 1) renderTodayCharts();
+    } catch (error) {
+        console.error("Error fetching dashboard data:", error);
     }
-    setInterval(tick, 1000); tick();
-
-    const ctx = document.getElementById('productionChart');
-    if (ctx) {
-        new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: @json($chartLabels),
-                datasets: [
-                    {
-                        label: 'Expected',
-                        data: @json($expectedProduction),
-                        borderColor: '#3b7bff',
-                        backgroundColor: 'rgba(59,123,255,0.07)',
-                        borderWidth: 2, tension: 0.4, pointRadius: 3,
-                        pointBackgroundColor: '#3b7bff', fill: true,
-                    },
-                    {
-                        label: 'Actual',
-                        data: @json($actualProduction),
-                        borderColor: '#22c55e',
-                        backgroundColor: 'rgba(34,197,94,0.07)',
-                        borderWidth: 2, tension: 0.4, pointRadius: 3,
-                        pointBackgroundColor: '#22c55e', fill: true,
-                    }
-                ]
-            },
-            options: {
-                responsive: true, maintainAspectRatio: false,
-                plugins: {
-                    legend: { labels: { color:'#9298a4', font:{ size:12 }, boxWidth:10 } },
-                    tooltip: {
-                        backgroundColor:'#fff', borderColor:'#eaecf0', borderWidth:1,
-                        titleColor:'#1a1d23', bodyColor:'#6b7280', padding:10,
-                        displayColors: false,
-                    }
-                },
-                scales: {
-                    x: { ticks:{ color:'#b0b5c0', font:{size:11} }, grid:{ color:'#f3f4f6' } },
-                    y: { ticks:{ color:'#b0b5c0', font:{size:11} }, grid:{ color:'#f3f4f6' } }
-                }
-            }
-        });
-    }
-});
-
-function openControlModal() {
-    document.getElementById('controlModal').style.display = 'flex';
-    document.body.style.overflow = 'hidden';
-}
-function closeControlModal() {
-    document.getElementById('controlModal').style.display = 'none';
-    document.body.style.overflow = '';
 }
 
-const bellSound = new Audio("https://www.soundjay.com/buttons/sounds/beep-07.mp3");
-let lastState = "";
+// Menjalankan penarikan data pertama kali saat halaman dibuka
+fetchDashboardData();
 
-function parseDate(str) {
-    if (!str) return new Date();
-    return new Date(str.replace(' ', 'T'));
-}
-function fmt(ms) {
-    if (ms <= 0) return "0h 0m 0s";
-    const s = Math.floor(ms/1000);
-    return `${Math.floor(s/3600)}h ${Math.floor((s%3600)/60)}m ${s%60}s`;
-}
-function updateRealtime() {
-    const now = new Date();
-    let s = parseDate("{{ $shiftStartFull ?? now() }}");
-    let e = parseDate("{{ $shiftEndFull ?? now() }}");
-    if (e < s) e.setDate(e.getDate() + 1);
+// AUTO-REFRESH: Mengupdate data dashboard setiap 30 detik secara otomatis
+setInterval(fetchDashboardData, 30000);
 
-    let status = "", remaining = 0;
-    if (now < s) { status = "⏳ Menunggu shift"; remaining = s - now; }
-    else if (now <= e) {
-        @if($isOvertime)
-            status = "⚠ Overtime Shift {{ $shift }}";
-        @else
-            status = "⚙ Shift {{ $shift }} berjalan";
-        @endif
-        remaining = e - now;
+function pad(n){ return String(n).padStart(2,'0'); }
+
+function updateClock(){
+  const now = new Date();
+  document.getElementById('liveClock').textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  const opts = {day:'2-digit', month:'2-digit', year:'numeric'};
+  document.getElementById('hdrDate').textContent = now.toLocaleDateString('id-ID', opts);
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+(function(){
+  const now = new Date();
+  document.getElementById('dateInput').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+})();
+
+function setShift(s){
+  selectedShift = s;
+  
+  const s1 = document.getElementById('s1btn');
+  const s2 = document.getElementById('s2btn');
+  
+  if(s === 1){
+      s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
+      s2.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+  } else {
+      s2.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
+      s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+  }
+  
+  fetchDashboardData();
+}
+
+function onDateChange(){
+  fetchDashboardData();
+}
+
+function setDays(d){
+  selectedDays = d;
+  
+  [1,7,30].forEach(x => {
+    const btn = document.getElementById('d'+x+'btn');
+    if(x === d){
+        btn.className = "px-6 py-2 text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
     } else {
-        @if($shift == 2)
-            status = "⚙ Shift 2 berjalan"; remaining = e - now;
-        @else
-            status = "⏱ Shift selesai";
-        @endif
+        btn.className = "px-6 py-2 text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+    }
+  });
+  
+  if(d === 1){
+      document.getElementById('todayCharts').classList.remove('hidden');
+      document.getElementById('todayCharts').classList.add('grid');
+      document.getElementById('trendCharts').classList.add('hidden');
+      renderTodayCharts();
+  } else {
+      document.getElementById('todayCharts').classList.add('hidden');
+      document.getElementById('todayCharts').classList.remove('grid');
+      document.getElementById('trendCharts').classList.remove('hidden');
+      document.getElementById('trendLabel').textContent = `Grafik Tren ${d} Hari — Semua Line`;
+      renderTrendCharts(d);
+  }
+}
+
+function buildLineCard(line){
+  const rows = LINE_KPI[line] || [];
+  const trs = rows.map(kpi => {
+    const dangerRowCls = kpi.danger ? 'bg-red-50' : 'hover:bg-gray-50/70';
+    const textDescCls  = kpi.danger ? 'text-red-700 font-extrabold' : 'text-gray-700 font-bold';
+    const borderCls    = kpi.danger ? 'border-l-[4px] border-red-500' : 'border-l-[4px] border-transparent';
+
+    let actualCell = '';
+    let clickAttr = kpi.popup || kpi.actualLink ? `onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+    let cursorCls = kpi.popup || kpi.actualLink ? 'cursor-pointer hover:bg-red-50 transition-colors' : '';
+    let underlineCls = kpi.popup || kpi.actualLink ? 'underline decoration-dotted decoration-red-300 underline-offset-4' : '';
+
+    if(kpi.popup && (kpi.desc==='REPAIR' || kpi.desc==='REJECT')){
+      actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
+    } else {
+      actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span>`;
     }
 
-    const el = document.getElementById("shiftRealtimeStatus");
-    const rm = document.getElementById("remainingTime");
-    if (el) el.innerText = status;
-    if (rm) rm.innerText = "Sisa: " + fmt(remaining);
-    if (status !== lastState) { bellSound.play().catch(()=>{}); lastState = status; }
+    return `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
+      <td class="kpi-table-cell px-4 py-3 text-left ${textDescCls} ${borderCls} text-xs sm:text-sm lg:text-base">${kpi.desc}</td>
+      <td class="kpi-table-cell px-4 py-3 text-center text-gray-500 text-xs sm:text-sm lg:text-base">${kpi.plan}</td>
+      <td class="kpi-table-cell px-4 py-3 text-center text-xs sm:text-sm lg:text-base ${cursorCls}" ${clickAttr}>${actualCell}</td>
+      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.current}</td>
+    </tr>`;
+  }).join('');
+
+  return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
+    <div class="card-line-title bg-red-50 border-b border-red-100 px-5 py-4 text-center text-red-700 font-black tracking-[0.2em] text-sm sm:text-base lg:text-lg uppercase">
+      ${line}
+    </div>
+    <div class="overflow-x-auto flex-1">
+      <table class="w-full border-collapse">
+        <thead>
+          <tr class="bg-gray-100 border-b-2 border-gray-200 text-gray-500">
+            <th class="kpi-table-header px-4 py-3 text-left text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest w-[35%]">DESC</th>
+            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">PLAN</th>
+            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">ACTUAL</th>
+            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">CURR</th>
+          </tr>
+        </thead>
+        <tbody>${trs}</tbody>
+      </table>
+    </div>
+  </div>`;
 }
-setInterval(updateRealtime, 1000);
-updateRealtime();
+
+function renderLineCards(){
+  document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
+}
+
+function openKpiDetailModal(type, line){
+  console.log(`Attempting to open modal: Type=${type}, Line=${line}`);
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  const body = document.getElementById('modalBody');
+  
+  document.getElementById('modalTitle').textContent = `Rincian ${type} — ${line}`;
+  body.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
+        <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <span class="text-sm font-semibold">Memuat rincian...</span>
+    </div>`;
+  
+  backdrop.classList.remove('hidden');
+  backdrop.classList.add('flex');
+  setTimeout(() => { dialog.classList.add('scale-100', 'opacity-100'); dialog.classList.remove('scale-95', 'opacity-0'); }, 10);
+
+  try {
+    const typeData = DETAIL_DATA[type];
+    if(!typeData) { 
+        console.warn(`No data found for type: ${type}`);
+        showKpiModalEmpty(); return; 
+    }
+    const lineData = typeData[line];
+    if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
+        console.warn(`No rows found for line: ${line} in type: ${type}`);
+        showKpiModalEmpty(); return; 
+    }
+
+    let html = '';
+    if(typeData.type === 'quality'){
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Countermeasure</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200">Qty</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+          <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50">
+          <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
+        </tr>
+        </tbody></table></div>`;
+
+    } else if(typeData.type === 'dt_summary'){
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+          <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
+          <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+          <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+          <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50 font-black">
+          <td colspan="4" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+          <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
+        </tr>
+        </tbody></table></div>`;
+
+    } else {
+      // dt_detail
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+          <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+          <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+          <td class="px-4 py-3 text-gray-600">${r.action}</td>
+          <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50">
+          <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td>
+        </tr>
+        </tbody></table></div>`;
+    }
+    body.innerHTML = html;
+    } catch (e) {
+    console.error("Error in openModal:", e);
+    body.innerHTML = `<div class="text-center py-10 text-red-500 font-medium">Error: ${e.message}</div>`;
+  }
+}
+
+function showKpiModalEmpty(){
+  document.getElementById('modalBody').innerHTML =
+    '<div class="text-center py-10 text-gray-400 font-medium flex flex-col items-center gap-2">' +
+    '<svg class="w-12 h-12 text-gray-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+    '<span>Tidak ada rincian data untuk saat ini.</span>' +
+    '</div>';
+}
+
+function closeKpiDetailModal(){
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  
+  dialog.classList.remove('scale-100', 'opacity-100');
+  dialog.classList.add('scale-95', 'opacity-0');
+  
+  setTimeout(() => {
+      backdrop.classList.add('hidden');
+      backdrop.classList.remove('flex');
+  }, 200);
+}
+function onBackdropClick(e){
+  if(e.target === document.getElementById('modalBackdrop')) closeModal();
+}
+
+function destroyChart(id){
+  if(charts[id]){ charts[id].destroy(); delete charts[id]; }
+}
+
+const CHART_TEXT  = '#6b7280';
+const CHART_GRID  = '#f3f4f6';
+const FONT_SZ     = 11;
+
+function baseOpts(yLabel){
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: { labels: { color: CHART_TEXT, font:{size: FONT_SZ, family: "'Inter', sans-serif"} } }
+    },
+    scales: {
+      x: {
+        ticks: { color: CHART_TEXT, font:{size: FONT_SZ} },
+        grid:  { color: CHART_GRID }
+      },
+      y: {
+        beginAtZero: true,
+        ticks: { color: CHART_TEXT, font:{size: FONT_SZ} },
+        grid:  { color: CHART_GRID },
+        title: { display: true, text: yLabel, color: '#9ca3af', font:{size: FONT_SZ, weight: 'bold'} }
+      }
+    }
+  };
+}
+
+function renderTodayCharts(){
+  const labels_src = Object.keys(LINE_KPI);
+  if(labels_src.length === 0) return;
+  const labels     = labels_src;
+  const qty_plan   = labels_src.map(l => parseInt((LINE_KPI[l]?.find(r=>r.desc==='QTY')||{}).plan||'0'));
+  const qty_actual = labels_src.map(l => parseInt((LINE_KPI[l]?.find(r=>r.desc==='QTY')||{}).actual||'0'));
+  const downtime   = labels_src.map(l => parseFloat((LINE_KPI[l]?.find(r=>r.desc==='TOTAL_DT')||{}).actual||'0'));
+  const repair     = labels_src.map(l => parseInt((LINE_KPI[l]?.find(r=>r.desc==='REPAIR')||{}).actual||'0'));
+  const reject     = labels_src.map(l => parseInt((LINE_KPI[l]?.find(r=>r.desc==='REJECT')||{}).actual||'0'));
+  const gsph_plan  = labels_src.map(l => parseFloat((LINE_KPI[l]?.find(r=>r.desc==='GSPH')||{}).plan||'0'));
+  const gsph_act   = labels_src.map(l => parseFloat((LINE_KPI[l]?.find(r=>r.desc==='GSPH')||{}).actual||'0'));
+
+  destroyChart('cQty');
+  charts['cQty'] = new Chart(document.getElementById('cQty'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Plan',   data: qty_plan,   backgroundColor:'#e5e7eb', borderRadius: 4 },
+      { label:'Actual', data: qty_actual, backgroundColor:'#10b981', borderRadius: 4 }
+    ]},
+    options: baseOpts('Pcs')
+  });
+
+  destroyChart('cDt');
+  charts['cDt'] = new Chart(document.getElementById('cDt'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Total DT', data: downtime, backgroundColor:'#ef4444', borderRadius: 4 }
+    ]},
+    options: baseOpts('Menit')
+  });
+
+  destroyChart('cRr');
+  charts['cRr'] = new Chart(document.getElementById('cRr'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Repair', data: repair, backgroundColor:'#f59e0b', borderRadius: 4 },
+      { label:'Reject', data: reject, backgroundColor:'#ef4444', borderRadius: 4 }
+    ]},
+    options: baseOpts('Pcs')
+  });
+
+  destroyChart('cGsph');
+  charts['cGsph'] = new Chart(document.getElementById('cGsph'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Plan',   data: gsph_plan, backgroundColor:'#e5e7eb', borderRadius: 4 },
+      { label:'Actual', data: gsph_act,  backgroundColor:'#3b82f6', borderRadius: 4 }
+    ]},
+    options: baseOpts('GSPH')
+  });
+}
+
+function renderTrendCharts(d){
+  const labels = Array.from({length:d}, (_,i)=>{
+    const dt = new Date();
+    dt.setDate(dt.getDate() - (d - 1 - i));
+    return `${pad(dt.getDate())}/${pad(dt.getMonth()+1)}`;
+  });
+
+  const seed = (i, base, amp, freq) => Math.max(0, Math.round(base + Math.sin(i * freq) * amp + (Math.random()-0.5)*amp*0.4));
+
+  const qty  = labels.map((_,i) => seed(i, 1650, 120, 0.5));
+  const dt   = labels.map((_,i) => seed(i, 60, 20, 0.7));
+  const rp   = labels.map((_,i) => seed(i, 26, 10, 0.4));
+  const rj   = labels.map((_,i) => seed(i, 10, 5, 0.6));
+  const gs   = labels.map((_,i) => parseFloat((82 + Math.sin(i*0.3)*5).toFixed(1)));
+
+  ['cTQty','cTDt','cTRr','cTGsph'].forEach(id => destroyChart(id));
+
+  charts['cTQty'] = new Chart(document.getElementById('cTQty'), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Good',   data:qty, backgroundColor:'#10b981', borderRadius: 2 },
+      { label:'Repair', data:rp,  backgroundColor:'#f59e0b', borderRadius: 2 },
+      { label:'Reject', data:rj,  backgroundColor:'#ef4444', borderRadius: 2 }
+    ]},
+    options: { ...baseOpts('Pcs'), scales: { x: { stacked: true }, y: { stacked: true } } }
+  });
+
+  charts['cTDt'] = new Chart(document.getElementById('cTDt'), {
+    type:'line',
+    data:{ labels, datasets:[{
+      label:'Downtime', data:dt, borderColor:'#ef4444', backgroundColor:'rgba(239, 68, 68, 0.1)', fill:true, tension:0.4, borderWidth: 2
+    }]},
+    options: baseOpts('Menit')
+  });
+
+  charts['cTRr'] = new Chart(document.getElementById('cTRr'), {
+    type:'line',
+    data:{ labels, datasets:[
+      { label:'Repair', data:rp, borderColor:'#f59e0b', fill:false, tension:0.4, borderWidth: 2 },
+      { label:'Reject', data:rj, borderColor:'#ef4444', fill:false, tension:0.4, borderWidth: 2 }
+    ]},
+    options: baseOpts('Pcs')
+  });
+
+  charts['cTGsph'] = new Chart(document.getElementById('cTGsph'), {
+    type:'line',
+    data:{ labels, datasets:[{
+      label:'GSPH', data:gs, borderColor:'#3b82f6', backgroundColor:'rgba(59, 130, 246, 0.1)', fill:true, tension:0.4, borderWidth: 2
+    }]},
+    options: baseOpts('GSPH')
+  });
+}
+
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderLineCards();
+  renderTodayCharts();
+});
 </script>
 @endsection

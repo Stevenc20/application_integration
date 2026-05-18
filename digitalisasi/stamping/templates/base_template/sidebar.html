@@ -1,0 +1,145 @@
+<aside id="layout-menu" class="layout-menu menu-vertical menu bg-menu-theme">
+    <div class="app-brand demo">
+        <a class="app-brand-link gap-2">
+            <span class="app-brand-logo demo">
+                <img src="/static/img/ippi/logoippi.jpg" alt="Logo IPPI" style="height: 40px;" />
+            </span>
+        </a>
+        <a href="javascript:void(0);" class="layout-menu-toggle menu-link text-large ms-auto">
+            <i class="bx bx-chevron-left d-block d-xl-none align-middle"></i>
+        </a>
+    </div>
+
+    <div class="menu-divider mt-0"></div>
+    <div class="menu-inner-shadow"></div>
+
+    <ul class="menu-inner py-1">
+
+        <!-- 1. Menu Dashboards: Hanya untuk Supervisor, Foreman, Leader -->
+        {% if is_supervisor or is_foreman or is_leader %}
+        <li class="menu-item open">
+            <a class="menu-link">
+                <i class="menu-icon tf-icons bx bx-home-smile"></i>
+                <div class="text-truncate">Dashboards</div>
+            </a>
+            <ul class="menu-sub">
+                {% url 'dashboard' as dashboard_overview_url %}
+                <li class="menu-item {% if request.path == dashboard_overview_url %}active{% endif %}">
+                    <a href="{{ dashboard_overview_url }}" class="menu-link">
+                        <div class="text-truncate">Dashboard Overview</div>
+                    </a>
+                </li>
+                {% for line in sidebar_lines %}
+                <li class="menu-item {% if line.namaline|slugify in request.path %}active{% endif %}">
+                    <a href="{% url 'dashboard_detail' line_name=line.namaline|slugify %}" class="menu-link">
+                        <div class="text-truncate">Dashboard {{ line.namaline }}</div>
+                    </a>
+                </li>
+                {% endfor %}
+            </ul>
+        </li>
+        {% endif %}
+        
+        <!-- 2. Menu Input Harian: Hanya untuk Supervisor, Foreman, Leader -->
+        {% if is_supervisor or is_foreman or is_leader %}
+        <li class="menu-item {% if 'input-harian' in request.path %}active{% endif %}">
+            <a href="{% url 'input_harian' %}" class="menu-link">
+                <i class="menu-icon tf-icons bx bx-calendar-edit"></i>
+                <div class="text-truncate">Input Harian</div>
+            </a>
+        </li>
+        {% endif %}
+
+        <!-- 3. Menu Data Master: Hanya untuk Supervisor dan Admin -->
+        {% if is_supervisor or is_admin %}
+        <li class="menu-item open">
+            <a class="menu-link">
+                <i class="menu-icon tf-icons bx bx-data"></i>
+                <div class="text-truncate">Data Master</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item {% if 'karyawan' in request.path %}active{% endif %}">
+                    <a href="{% url 'karyawan' %}" class="menu-link">
+                        <div class="text-truncate">Data Karyawan</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'productionline' in request.path %}active{% endif %}">
+                    <a href="{% url 'productionline' %}" class="menu-link">
+                        <div class="text-truncate">Data Production Line</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'itemproduksi' in request.path %}active{% endif %}">
+                    <a href="{% url 'itemproduksi' %}" class="menu-link">
+                        <div class="text-truncate">Data Item Produksi</div>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        {% endif %}
+
+        <!-- 4. Menu Data Operasional: Hanya untuk Supervisor, Foreman, Leader -->
+        {% if is_supervisor or is_foreman or is_leader %}
+        <li class="menu-item open">
+            <a class="menu-link">
+                <i class="menu-icon tf-icons bx bx-cog"></i>
+                <div class="text-truncate">Data Operasional</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item {% if 'job' in request.path %}active{% endif %}">
+                    <a href="{% url 'job' %}" class="menu-link">
+                        <div class="text-truncate">Data Job</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'downtime' in request.path %}active{% endif %}">
+                    <a href="{% url 'downtime' %}" class="menu-link">
+                        <div class="text-truncate">Data Downtime</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'dandori' in request.path %}active{% endif %}">
+                    <a href="{% url 'dandori_main' %}" class="menu-link">
+                        <div class="text-truncate">Data Dandori</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'idletime' in request.path %}active{% endif %}">
+                    <a href="{% url 'idletime_main' %}" class="menu-link">
+                        <div class="text-truncate">Data IdleTime</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'breaktime' in request.path %}active{% endif %}">
+                    <a href="{% url 'break_time_list' %}" class="menu-link">
+                        <div class="text-truncate">Data BreakTime</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'handwork' in request.path %}active{% endif %}">
+                    <a href="{% url 'handwork_main' %}" class="menu-link">
+                        <div class="text-truncate">Data Handwork</div>
+                    </a>
+                </li>
+                <li class="menu-item {% if 'qcheck' in request.path %}active{% endif %}">
+                    <a href="{% url 'qcheck_main' %}" class="menu-link">
+                        <div class="text-truncate">Data Q-Check</div>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        {% endif %}
+
+        <!-- 5. Menu Laporan: Hanya untuk Supervisor, Foreman, Leader -->
+        {% if is_supervisor or is_foreman or is_leader %}
+        <li class="menu-item open">
+            <a class="menu-link">
+                <i class="menu-icon tf-icons bx bx-file"></i>
+                <div class="text-truncate">Laporan</div>
+            </a>
+            <ul class="menu-sub">
+                <li class="menu-item {% if 'laporan' in request.path %}active{% endif %}">
+                    <a href="{% url 'laporan' %}" class="menu-link">
+                        <div class="text-truncate">Laporan Kerja Harian</div>
+                    </a>
+                </li>
+            </ul>
+        </li>
+        {% endif %}
+    </ul>
+</aside>
+

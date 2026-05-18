@@ -1,0 +1,80 @@
+<thead class="bg-plan">
+    <tr>
+        <th rowspan="2">NO</th>
+        <th rowspan="2">Jobs No</th>
+        <th colspan="2">Qty (Pcs)</th>
+        <th rowspan="2">Plan Cycle Time (detik)</th>
+        <th colspan="2">Schedule</th>
+        <th rowspan="2">Press Time (menit)</th>
+        <th colspan="3">Uchi Dandori (menit)</th>
+        <th rowspan="2">Total Uchi (menit)</th>
+        <th rowspan="2">TPT (menit)</th>
+        <th rowspan="2">Idle Time (menit)</th>
+        <th rowspan="2">Break Time (menit)</th>
+        <th rowspan="2">Work Time (menit)</th>
+        <th rowspan="2">GSPH</th>
+        <th rowspan="2" style="width: 15%;">NOTE</th>
+    </tr>
+    <tr>
+        <th>Plan</th>
+        <th>Act</th>
+        <th>Start</th>
+        <th>Finish</th>
+        <th>Dies Change</th>
+        <th>Variant</th>
+        <th>1st - Q check</th>
+    </tr>
+</thead>
+<tbody>
+    {% for job in jobs_data %}
+        <tr {% if forloop.counter|divisibleby:2 %}class="bg-actual"{% endif %}>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ job.job_no }}</td>
+            <td>{{ job.plan_qty }}</td>
+            <td>{{ job.actual_good }}</td>
+            <td>{{ job.plan_ct }}</td>
+            <td>{{ job.schedule_start|date:"H:i" }}</td>
+            <td>{{ job.schedule_finish|date:"H:i" }}</td>
+            <td>{{ job.press_time|floatformat:1 }}</td>
+            <td>{{ job.uchi_dies_change|floatformat:1 }}</td>
+            <td>{{ job.uchi_variant_change|floatformat:1 }}</td>
+            <td>{{ job.uchi_qcheck|floatformat:1 }}</td>
+            <td>{{ job.total_uchi|floatformat:1 }}</td>
+            <td>{{ job.report_tpt|floatformat:1 }}</td>
+            <td>{{ job.idle_time|floatformat:1 }}</td>
+            <td>{{ job.break_time_duration|floatformat:1 }}</td>
+            <td>{{ job.work_time_duration|floatformat:1 }}</td>
+            <td>{{ job.gsph|floatformat:0 }}</td>
+            <td>{{ job.note }}</td>
+        </tr>
+    {% endfor %}
+    {% for i in ""|center:15 %}
+        {% if forloop.counter > jobs_data|length %}
+        <tr {% if forloop.counter|divisibleby:2 %}class="bg-actual"{% endif %}>
+            <td>{{ forloop.counter }}</td>
+            <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        {% endif %}
+    {% endfor %}
+</tbody>
+<tfoot>
+    <tr class="fw-bold bg-plan">
+        <td colspan="2">TOTAL PLAN</td>
+        <td>{{ totals.plan_qty }}</td>
+        <td>{{ totals.actual_good }}</td>
+        <td>{{ totals.avg_plan_ct|floatformat:1 }}</td>
+        <td>{{ totals.total_schedule_start|date:"H:i" }}</td>
+        <td>{{ totals.total_schedule_finish|date:"H:i" }}</td>
+        <td>{{ totals.press_time|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi_dies|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi_variant|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi_qcheck|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi|floatformat:1 }}</td>
+        <td>{{ totals.total_report_tpt|floatformat:1 }}</td>
+        <td>{{ totals.idle_time|floatformat:1 }}</td>
+        <td>{{ totals.total_break_time|floatformat:1 }}</td>
+        <td>{{ totals.total_work_time|floatformat:1 }}</td>
+        <td>{{ totals.gsph|floatformat:2 }}</td>
+        <td></td>
+    </tr>
+</tfoot>

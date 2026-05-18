@@ -1,0 +1,151 @@
+{% extends "base_template/base.html" %}
+{% load stamping_extras %}
+{% block content %}
+
+<style>
+    .merged-table th, .merged-table td { 
+        white-space: nowrap; 
+        vertical-align: middle;
+        font-size: 0.85rem;
+        padding: 0.5rem;
+    }
+</style>
+
+<div class="d-flex justify-content-between align-items-center">
+    <div>
+        <h2 class="mb-0">PRODUCTION ACHIEVEMENT DASHBOARD {{ line_name | upper }}</h2>
+        <h5 class="text-muted">PT INTI PANTJA PRESS INDUSTRI</h5>
+    </div>
+    <div class="text-end">
+        <h4 class="mb-0">{{ today|date:"d F Y" }}</h4>
+        <h5 class="mb-0 fw-bold text-primary"><span id="liveClock"></span></h5>
+    </div>
+</div>
+
+<div class="card shadow-sm mt-3">
+    <div class="table-responsive">
+        <table class="table table-bordered merged-table text-center mb-0">
+            <thead class="table-dark">
+                <tr>
+                    <th rowspan="2">DESCRIPTION</th>
+                    <th rowspan="2">PLAN</th>
+                    <th rowspan="2">ACTUAL</th>
+                    <th rowspan="2">CURRENT</th>
+                    <th rowspan="2">NO</th>
+                    <th rowspan="2">JOB NUMBER</th>
+                    <th colspan="4">Machine Used</th>
+                    <th rowspan="2">Plan Qty</th>
+                    <th colspan="3">Actual Qty (pieces)</th>
+                    <th colspan="5">Timing Control (Menit)</th>
+                    <th colspan="2">Finish Time</th>
+                </tr>
+                <tr>
+                    <th>P1</th><th>P2</th><th>P3</th><th>P4</th>
+                    <th>Good</th><th>Repair</th><th>Reject</th>
+                    <th>Press Time</th><th>Dandori</th><th>IQ Check</th><th>Downtime</th><th>TPT</th>
+                    <th>Plan</th><th>Actual</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for row in table_rows %}
+            <tr>
+                {% with kpi_desc=row.kpi_desc kpi_values=row.kpi_data kpis_in_minutes="IDLE_T,OVERTIME,TOTAL_DT,PROD_T,MAT_T,DIES_T,MACH_T,LOG_T" kpis_to_link="TOTAL_DT,PROD_T,MAT_T,DIES_T,MACH_T,LOG_T" %}
+                    <td class="text-start {% if kpi_desc == 'TOTAL_DT' %}table-danger fw-bold{% endif %}">{{ kpi_desc|default:"" }}</td>
+                    
+                    {% if kpi_desc == 'REPAIR' or kpi_desc == 'REJECT' %}
+                        <td class="{% if kpi_desc == 'TOTAL_DT' %}table-danger{% endif %}">{{ kpi_values.plan_qty|floatformat:0 }} pcs | {{ kpi_values.plan_percent|floatformat:2 }}%</td>
+                    {% else %}
+                        <td class="{% if kpi_desc == 'TOTAL_DT' %}table-danger{% endif %}">{{ kpi_values.plan|default:"-" }}</td>
+                    {% endif %}
+
+                    <td class="{% if kpi_desc == 'TOTAL_DT' %}table-danger{% endif %}">
+                        {% url 'input_harian' as input_harian_url %}
+                        {% url 'downtime' as data_downtime_url %}
+
+                        {% if kpi_desc == 'REPAIR' or kpi_desc == 'REJECT' %}
+                            {{ kpi_values.actual_qty }} pcs | {{ kpi_values.actual_percent|floatformat:2 }}%
+                        
+                        {% elif kpi_desc in kpis_in_minutes %}
+                            {% if kpi_desc in kpis_to_link %}
+                                <a href="{{ data_downtime_url }}?tanggal={{ today|date:'Y-m-d' }}">
+                                    {{ kpi_values.actual|floatformat:2 }} Menit
+                                </a>
+                            {% else %}
+                                {{ kpi_values.actual|floatformat:2 }} Menit
+                            {% endif %}
+
+                        {% elif kpi_desc == 'QTY' %}
+                            <a href="{{ input_harian_url }}?tanggal={{ today|date:'Y-m-d' }}">
+                                {{ kpi_values.actual|default:"-" }}
+                            </a>
+                        {% else %}
+                            {{ kpi_values.actual|default:"-" }}
+                        {% endif %}
+                    </td>
+
+                    <td class="{% if kpi_desc == 'TOTAL_DT' %}table-danger{% endif %}">
+                        {% if kpi_desc in kpis_in_minutes %}
+                            {% if kpi_values.current > 0 %}
+                                {{ kpi_values.current|floatformat:2 }} Menit
+                            {% else %}
+                                -
+                            {% endif %}
+                        {% elif kpi_desc == 'REPAIR' or kpi_desc == 'REJECT' %}
+                            {{ kpi_values.current_qty }} pcs | {{ kpi_values.current|floatformat:2 }}%
+                        {% else %}
+                            {{ kpi_values.current|default:"-" }}
+                        {% endif %}
+                    </td>
+                {% endwith %}
+
+                {% if row.item_data %}
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ row.item_data.job_number }}</td>
+                    <td>{% if 'P1' in row.item_data.machine_used %}✓{% endif %}</td>
+                    <td>{% if 'P2' in row.item_data.machine_used %}✓{% endif %}</td>
+                    <td>{% if 'P3' in row.item_data.machine_used %}✓{% endif %}</td>
+                    <td>{% if 'P4' in row.item_data.machine_used %}✓{% endif %}</td>
+                    <td>{{ row.item_data.plan_qty }}</td>
+                    <td>{{ row.item_data.actual_good }}</td>
+                    <td>{{ row.item_data.actual_repair }}</td>
+                    <td>{{ row.item_data.actual_reject }}</td>
+                    
+                    <td>{{ row.item_data.press_time|floatformat:2 }}</td>
+                    <td>{{ row.item_data.dandori_time|floatformat:2 }}</td>
+                    <td>{{ row.item_data.iq_check_time|floatformat:2 }}</td>
+                    <td>{{ row.item_data.downtime_time|floatformat:2 }}</td>
+                    <td>{{ row.item_data.tpt|floatformat:2 }}</td>
+                    
+                    <td>{{ row.item_data.finish_time_plan|date:"H:i:s"|default:"-" }}</td>
+                    <td>{{ row.item_data.finish_time_actual|date:"H:i:s"|default:"-" }}</td>
+                {% else %}
+                    <td colspan="18"></td>
+                {% endif %}
+            </tr>
+            {% endfor %}
+
+            {% if not table_rows %}
+            <tr>
+                <td colspan="22" class="text-center py-4">Tidak ada job yang dijadwalkan.</td>
+            </tr>
+            {% endif %}
+        </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+function updateClock() {
+    const clockElement = document.getElementById('liveClock');
+    if (clockElement) {
+        const now = new Date();
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+    }
+}
+setInterval(updateClock, 1000);
+updateClock(); 
+</script>
+{% endblock %}

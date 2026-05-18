@@ -1,0 +1,41 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Pilih Job untuk Downtime{% endblock %}
+
+{% block content %}
+<div class="card p-3">
+    <h4 class="mb-3 fw-bold">Pilih Job untuk Mencatat Downtime</h4>
+
+    <form method="GET" class="mb-3">
+        <div class="input-group" style="width: 300px;">
+            <input type="date" name="tanggal" class="form-control" value="{{ selected_date_str }}">
+            <button class="btn btn-secondary" type="submit">Filter Tanggal</button>
+        </div>
+    </form>
+    <hr>
+
+    <form method="POST">
+        {% csrf_token %}
+        <div class="mb-3">
+            <label for="detailjob-select" class="form-label">Pilih Item dari Job yang Aktif:</label>
+            <select name="detailjob_id" id="detailjob-select" class="form-select" required>
+                <option value="" disabled selected>--- Pilih salah satu ---</option>
+                {% for dj in semua_detailjob %}
+                    <option value="{{ dj.id_detailjob }}">
+                        JOB{{ dj.id_job.id_job }} - Item: {{ dj.id_itemproduksi.job_number }} (Line: {{ dj.id_job.id_productionline.namaline }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        {% if not semua_detailjob %}
+            <div class="alert alert-warning">Tidak ada job yang aktif pada tanggal yang dipilih.</div>
+        {% endif %}
+
+        <button type="submit" class="btn btn-primary" {% if not semua_detailjob %}disabled{% endif %}>
+            Lanjutkan ke Form Downtime
+        </button>
+        <a href="{% url 'downtime' %}" class="btn btn-secondary">Batal</a>
+    </form>
+</div>
+{% endblock %}

@@ -12,10 +12,10 @@ return new class extends Migration
         $table->id();
 
         $table->string('name');
-        $table->string('nip')->unique(); 
+        $table->string('nrp')->unique(); 
         $table->string('password');
 
-        $table->string('role'); // operator, supervisor, dll
+        $table->string('role'); // admin, supervisor, foreman, operator, leader a/b/c/d, shearing, handwork
         $table->boolean('is_active')->default(true);
 
         $table->timestamps();

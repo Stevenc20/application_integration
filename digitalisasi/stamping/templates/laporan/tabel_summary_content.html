@@ -1,0 +1,55 @@
+<thead class="bg-plan">
+    <tr>
+        <th colspan="4">SUMMARY ACHIEVEMENT</th>
+    </tr>
+    <tr>
+        <th></th>
+        <th>Plan</th>
+        <th>Act</th>
+        <th>%</th>
+    </tr>
+</thead>
+<tbody>
+    <tr>
+        <th class="bg-plan">ITEM PROCESS</th>
+        <td class="bg-plan">{{ summary.item_plan }}</td>
+        <td class="bg-actual">{{ summary.item_act }}</td>
+        <td class="bg-actual">{{ summary.item_percent|floatformat:1 }}%</td>
+    </tr>
+    <tr>
+        <th class="bg-plan">QTY PROCESS</th>
+        <td class="bg-plan">{{ summary.qty_plan }}</td>
+        <td class="bg-actual">{{ summary.qty_act }}</td>
+        <td class="bg-actual">{{ summary.qty_percent|floatformat:1 }}%</td>
+    </tr>
+    <tr>
+        <th class="bg-plan">TPT PROCESS</th>
+        <td class="bg-plan">{{ summary.tpt_plan|floatformat:0 }}</td>
+        <td class="bg-actual">{{ summary.tpt_act|floatformat:0 }}</td>
+        <td class="bg-actual">{{ summary.tpt_percent|floatformat:1 }}%</td>
+    </tr>
+    <tr>
+        <th class="bg-plan">GSPH</th>
+        <td class="bg-plan">{{ summary.gsph_plan|floatformat:0 }}</td>
+        <td class="bg-actual">{{ summary.gsph_act|floatformat:0 }}</td>
+        <td class="bg-actual">{{ summary.gsph_percent|floatformat:1 }}%</td>
+    </tr>
+     <tr>
+        <th class="bg-plan">PASS RATE</th>
+        <td class="bg-plan">{{ summary.pass_rate_plan|floatformat:2 }}%</td>
+        <td class="bg-actual">{{ summary.pass_rate_act|floatformat:2 }}%</td>
+        <td></td>
+    </tr>
+    <tr>
+        <th class="bg-plan">REJECT RATE</th>
+        <td class="bg-plan">{{ summary.reject_rate_plan|floatformat:2 }}%</td>
+        <td class="bg-actual">{{ summary.reject_rate_act|floatformat:2 }}%</td>
+        <td></td>
+    </tr>
+    <tr>
+        <th class="bg-plan">REPAIR RATE</th>
+        <td class="bg-plan">{{ summary.repair_rate_plan|floatformat:2 }}%</td>
+        <td class="bg-actual">{{ summary.repair_rate_act|floatformat:2 }}%</td>
+        <td></td>
+    </tr>
+</tbody>

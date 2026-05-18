@@ -1,0 +1,76 @@
+{% extends "base_template/base.html" %}
+
+{% block content %}
+<div class="card shadow-sm">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Pencatatan Dandori untuk Job: {{ detail_job.id_itemproduksi.job_number }}</h5>
+        <div>
+            <a href="{% url 'dandori_main' %}" class="btn btn-secondary">
+                <i class="bx bx-arrow-back"></i> Kembali
+            </a>
+            <a href="{% url 'input_harian' %}" class="btn btn-info">
+                <i class="bx bx-spreadsheet"></i> Ke Input Harian
+            </a>
+        </div>
+    </div>
+    <div class="table-responsive">
+        <table class="table">
+            <thead class="table-light">
+                <tr>
+                    <th>Jenis Aktivitas Dandori</th>
+                    <th class="text-center">Start</th>
+                    <th class="text-center">Finish</th>
+                    <th class="text-center">Durasi (Menit)</th>
+                    <th class="text-center">Kontrol</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dandori_status %}
+                <tr>
+                    <td>{{ item.type_display }}</td>
+                    
+                    {% if item.record %}
+                        <td class="text-center">{{ item.record.start_time|date:"H:i:s" }}</td>
+                        <td class="text-center">{{ item.record.finish_time|date:"H:i:s"|default:"-" }}</td>
+                        <td class="text-center">{{ item.record.duration|floatformat:2 }}</td>
+                        <td class="text-center">
+                            {% if item.record.finish_time %}
+                                <!-- Tombol RESTART sekarang pakai form POST -->
+                                <form action="{% url 'restart_dandori' item.record.id_dandori %}" method="post" style="display: inline;">
+                                     {% csrf_token %}
+                                     <button type="submit" class="btn btn-sm btn-warning" title="Reset Timer">Restart</button>
+                                </form>
+                            {% else %}
+                                <!-- Tombol STOP sekarang pakai form POST -->
+                                <form action="{% url 'stop_dandori' item.record.id_dandori %}" method="post" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger">Stop</button>
+                                </form>
+                            {% endif %}
+                        </td>
+                    {% else %}
+                        <td class="text-center">-</td>
+                        <td class="text-center">-</td>
+                        <td class="text-center">0.00</td>
+                        <td class="text-center">
+                            <!-- Tombol START sekarang pakai form POST -->
+                            <form action="{% url 'start_dandori' id=detail_job.id_detailjob dandori_type=item.type_code %}" method="post" style="display: inline;">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-success btn-sm">Start</button>
+                            </form>
+                        </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot class="table-group-divider">
+                <tr>
+                    <th colspan="3">Total Durasi</th>
+                    <th class="text-center">{{ total_duration|floatformat:2 }} menit</th>
+                    <th></th>
+                </tr>
+            </tfoot>
+        </table>
+    </div>
+</div>
+{% endblock %}

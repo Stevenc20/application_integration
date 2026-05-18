@@ -1,4 +1,4 @@
-@extends('layouts.layouts')
+@extends('layouts.supervisor')
 
 @vite(['resources/css/app.css', 'resources/js/app.js'])
 

@@ -1,0 +1,109 @@
+{% extends "base_template/base.html" %}
+{% block content %}
+
+<div class="row">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Catat Hasil Handwork</h5>
+            </div>
+            <div class="card-body">
+                <p>Untuk Part Number: <strong>{{ detail_job.id_itemproduksi.part_number }}</strong></p>
+                
+                <form method="POST" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label">Deskripsi Masalah</label>
+                        <textarea name="problem_hw" class="form-control" rows="2"></textarea>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Foto Sebelum Perbaikan</label>
+                        <input type="file" name="foto_sebelum" class="form-control">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Foto Sesudah Perbaikan</label>
+                        <input type="file" name="foto_sesudah" class="form-control">
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label">Status Hasil</label>
+                        <select name="status" class="form-select" required>
+                            <option value="is_ok">OK (Repair Berhasil)</option>
+                            <option value="is_reject">NG (Reject)</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Jumlah</label>
+                        <input type="number" name="quantity" class="form-control" value="1" min="1" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">Simpan Catatan</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Rekap Handwork</h5>
+                <div>
+                    <a href="{% url 'input_harian' %}?tanggal={{ detail_job.id_job.date|date:'Y-m-d' }}" class="btn btn-sm btn-info ms-2">
+                        <i class="bx bx-spreadsheet"></i> Kembali ke Input Harian
+                    </a>
+                    <a href="{% url 'rekap_detailjob' detail_job.id_job.id_job %}" class="btn btn-sm btn-secondary">
+                        <i class="bx bx-arrow-back"></i> Kembali ke Detail Job
+                    </a>
+                </div>
+            </div>
+            <div class="card-body">
+                {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }}">{{ message }}</div>{% endfor %}{% endif %}
+
+                <div class="d-flex justify-content-around text-center mb-3">
+                    <div><h4>{{ total_ok }}</h4><span class="badge bg-success">TOTAL REPAIR OK</span></div>
+                    <div><h4>{{ total_reject }}</h4><span class="badge bg-danger">TOTAL REJECT</span></div>
+                </div>
+                <hr>
+
+                <h6>Detail Catatan:</h6>
+                <div class="table-responsive">
+                    <table class="table table-sm">
+                        <thead>
+                            <tr>
+                                <th>Status</th>
+                                <th>Deskripsi</th>
+                                <th>Sebelum</th>
+                                <th>Sesudah</th>
+                                <th>Aksi</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for item in handwork_items %}
+                            <tr>
+                                <td>
+                                    {% if item.is_ok %}<span class="badge bg-light-success">OK</span>{% else %}<span class="badge bg-light-danger">NG</span>{% endif %}
+                                </td>
+                                <td>{{ item.problem_hw|default:"-" }}</td>
+                                <td>
+                                    {% if item.foto_sebelum %}
+                                        <a href="{{ item.foto_sebelum.url }}" target="_blank">Lihat</a>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td>
+                                    {% if item.foto_sesudah %}
+                                        <a href="{{ item.foto_sesudah.url }}" target="_blank">Lihat</a>
+                                    {% else %}-{% endif %}
+                                </td>
+                                <td><a href="{% url 'delete_handwork_item' item.id_detailhw %}" class="btn btn-xs btn-danger">Hapus</a></td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="5" class="text-center">Belum ada data.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

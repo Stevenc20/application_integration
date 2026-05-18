@@ -1,0 +1,60 @@
+{% extends "base_template\base.html" %}
+
+{% block title %}Update Production Plan{% endblock %}
+
+{% block content %}
+<div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Update Production Plan</h5>
+        <small class="text-body-secondary float-end">Data untuk JOB{{ productionplanobj.id_job.id_job }}</small>
+    </div>
+    <div class="card-body">
+        <form method="post">
+            {% csrf_token %}
+            <div class="row">
+                <div class="col-md-12">
+                    <h6 class="text-muted">PLANNING</h6>
+                    <hr class="mt-0">
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">GSPH Plan</label>
+                                <input type="number" class="form-control" name="gsph_plan" value="{{productionplanobj.gsph_plan}}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Stroke Plan</label>
+                                <input type="number" class="form-control" name="stroke_plan" value="{{productionplanobj.stroke_plan}}" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Repair (%)</label>
+                                <input type="number" step="0.01" class="form-control" name="repair_plan" value="{{productionplanobj.repair_plan}}">
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label class="form-label">Reject (%)</label>
+                                <input type="number" step="0.01" class="form-control" name="reject_plan" value="{{productionplanobj.reject_plan}}">
+                            </div>
+                             <div class="mb-3">
+                                <label class="form-label">Idle (minutes)</label>
+                                <input type="number" class="form-control" name="idle_plan" value="{{productionplanobj.idle_plan}}">
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">Man Power</label>
+                                <input type="number" class="form-control" name="mp" value="{{productionplanobj.mp}}">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                </div>
+
+            <div class="mt-3">
+                <button type="submit" class="btn btn-primary">Update Data</button>
+                <a href="{% url 'rekap_productionplan' productionplanobj.id_job.id_job %}" class="btn btn-secondary">Batal</a>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

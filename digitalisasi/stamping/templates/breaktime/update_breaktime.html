@@ -1,0 +1,62 @@
+{% extends "base_template/base.html" %}
+{% block title %}Update Break{% endblock %}
+
+{% block content %}
+<div class="row mb-6 gy-6">
+  <div class="col-xxl">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Update Break Time</h5>
+        <small class="text-body-secondary float-end">Data Break</small>
+      </div>
+      <div class="card-body">
+        <form action="{% url 'update_breaktime' getbreak.id_detailb %}" method="post">
+          {% csrf_token %}
+          <input type="hidden" name="id_detailb" value="{{ getbreak.id_detailb }}">
+
+          <!-- Jenis Break -->
+          <div class="row mb-6">
+            <label class="col-sm-2 col-form-label">Jenis Break</label>
+            <div class="col-sm-10">
+              <input type="text" name="break_type" class="form-control" 
+                     value="{{ getbreak.break_type|default_if_none:'' }}" 
+                     placeholder="Masukkan jenis break">
+            </div>
+          </div>
+
+          <!-- Start Break -->
+          <div class="row mb-6">
+            <label class="col-sm-2 col-form-label">Start</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" 
+                     value="{{ getbreak.start_break }}" readonly>
+            </div>
+          </div>
+
+          <!-- Finish Break -->
+          <div class="row mb-6">
+            <label class="col-sm-2 col-form-label">Finish</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" 
+                     value="{{ getbreak.finish_break|default:"-" }}" readonly>
+            </div>
+          </div>
+
+          <!-- Durasi -->
+          <div class="row mb-6">
+            <label class="col-sm-2 col-form-label">Durasi</label>
+            <div class="col-sm-10">
+              <input type="text" class="form-control" 
+                     value="{{ getbreak.duration_break|floatformat:2 }} menit" readonly>
+            </div>
+          </div>
+
+          <button type="submit" class="btn btn-primary">Update</button>
+          <a href="{% url 'rekap_breaktime' getbreak.id_break.id_detailjob.id_detailjob %}" 
+             class="btn btn-secondary">Kembali</a>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

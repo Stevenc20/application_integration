@@ -1,0 +1,244 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Data Detail Job{% endblock %}
+
+{% block content %}
+<div class="card p-3 w-100" style="max-width: 100%;">
+    <div class="d-flex justify-content-between align-items-center">
+        <h4 class="mb-0 fw-bold">Data Detail Job: JOB{{datajob.id_job}}</h4>
+    </div>
+    
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show mt-3" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
+    <div class="d-flex justify-content-between align-items-center mb-3 mt-3">
+        <input type="text" id="searchInput" class="form-control w-25" placeholder="Cari Item Produksi...">
+
+        <div>
+            <a href="{% url 'job' %}" class="btn btn-secondary">
+                <i class="bx bx-arrow-back"></i> Kembali ke Daftar Job
+            </a>
+            <a href="{% url 'create_detailjob' datajob.id_job %}" class="btn btn-primary ms-2">
+                Add Item
+            </a>
+        </div>
+    </div>
+    <div class="table-responsive text-nowrap">
+        <table class="table table-bordered table-hover">
+            <thead>
+                <tr class="table-primary">
+                    <th class="text-center align-middle" rowspan="2">ID DetailJob</th>
+                    <th class="text-center align-middle" rowspan="2">Item</th>
+                    <th class="text-center align-middle" rowspan="2">Machine Used</th>
+                    <th class="text-center" colspan="2">Planning</th>
+                    <th class="text-center" colspan="3">Actual Qty</th>
+                    <th class="text-center" colspan="5">Times</th> <th class="text-center align-middle" rowspan="2">Problems</th>
+                    <th class="text-center align-middle" rowspan="2">Handwork</th>
+                    <th class="text-center align-middle" rowspan="2">Action</th>
+                </tr>
+                <tr class="table-primary">
+                    <th class="text-center">Qty</th>
+                    <th class="text-center">Cycle Time</th>
+                    <th class="text-center">Good</th>
+                    <th class="text-center">Repair</th>
+                    <th class="text-center">Reject</th>
+                    <th class="text-center">Downtime</th>
+                    <th class="text-center">Dandori</th>
+                    <th class="text-center">Idletime</th>
+                    <th class="text-center">Q-Check</th> <th class="text-center">Breaktime</th>
+                </tr>
+            </thead>
+            <tbody class="table-border-bottom-0" id="detailj-table-body">
+                {% for item in filterdetailj %}
+                <tr>
+                    <td class="text-center id-detailj">{{ item.id_detailjob }}</td>
+                    <td class="text-center item-name">{{ item.id_itemproduksi.job_number }}</td>
+                    <td class="text-center">
+                        {% if item.machine_used.all %}
+                            {{ item.machine_used.all|join:", " }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td class="text-center">{{ item.plan_qty }}</td>
+                    <td class="text-center">{{ item.plan_ct }}</td>
+                    <td class="text-center">{{ item.actual_good }}</td>
+                    <td class="text-center">{{ item.actual_repair | default:"0" }}</td>
+                    <td class="text-center">{{ item.actual_reject | default:"0" }}</td>
+                    <td class="p-0">
+                        <a href="{% url 'rekap_downtime' item.id_detailjob %}" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-edit-alt"></i> {{ item.total_downtime_minutes|default_if_none:"0"|floatformat:2 }} min
+                        </a>
+                    </td>
+                    <td class="p-0">
+                        <a href="{% url 'list_dandori' item.id_detailjob %}" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-edit-alt"></i> {{ item.total_dandori_minutes|default_if_none:"0"|floatformat:2 }} min
+                        </a>
+                    </td>
+                    <td class="p-0">
+                        <a href="{% url 'rekap_idletime' item.id_detailjob %}" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-edit-alt"></i> {{ item.total_idle_minutes|default_if_none:"0"|floatformat:2 }} min
+                        </a>
+                    </td>
+                    <td class="p-0">
+                        <a href="{% url 'list_qcheck' item.id_detailjob %}" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-check-square"></i> Lihat Data
+                        </a>
+                    </td>
+                    <td class="p-0">
+                        <a href="{% url 'break_time_list' %}" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-calendar"></i> Lihat Jadwal
+                        </a>
+                    </td>
+                    <td class="p-0">
+                        <a href="#" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-edit-alt"></i> {{ item.total_problems |default:"0"}}
+                        </a>
+                    </td>
+                    <td class="p-0">
+                        <a href="{% url 'rekap_handwork' item.id_detailjob %}" 
+                        class="w-100 h-100 d-flex justify-content-center align-items-center text-decoration-underline text-dark"
+                        style="padding: 10px;">
+                            <i class="icon-base bx bx-edit-alt"></i> {{ item.actual_repair |default:"0"}}
+                        </a>
+                    </td>
+                    <td class="text-center">
+                        <div class="d-flex flex-column align-items-center gap-2">
+                            <a href="{% url 'update_detailjob' item.id_detailjob %}" class="btn btn-sm btn-primary w-100">
+                                <i class="icon-base bx bx-edit-alt"></i> Update
+                            </a>
+                            <a href="{% url 'delete_detailjob' item.id_detailjob %}" class="btn btn-sm btn-danger w-100">
+                                <i class="icon-base bx bx-trash"></i> Delete
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+            <div id="pagination-info" class="text-muted"></div>
+            <div>
+                <button id="prevBtn" class="btn btn-outline-primary btn-sm me-2">Previous</button>
+                <button id="nextBtn" class="btn btn-outline-primary btn-sm">Next</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<style>
+    .sortable {
+        position: relative;
+    }
+    .sort-indicator {
+        margin-left: 6px;
+        font-size: 12px;
+        opacity: 0.6;
+    }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // --- Search ---
+    const searchInput = document.getElementById("searchInput");
+    const rows = Array.from(document.querySelectorAll("#detailj-table-body tr")); 
+
+    searchInput.addEventListener("keyup", function () {
+        const value = this.value.toLowerCase();
+
+        rows.forEach(row => {
+            const namaCell = row.querySelector(".item-name"); 
+            
+            if (namaCell) {
+                const text = namaCell.textContent.toLowerCase();
+                if (text.includes(value)) {
+                    row.style.display = "";
+                } else {
+                    row.style.display = "none";
+                }
+            }
+        });
+    });
+
+        // --- Sorting ---
+        document.querySelectorAll("th.sortable").forEach((header, index) => {
+            let asc = true;
+            const indicator = document.createElement("span");
+            indicator.className = "sort-indicator";
+            header.appendChild(indicator);
+
+            header.style.cursor = "pointer";
+            header.addEventListener("click", () => {
+                const sorted = [...rows].sort((a, b) => {
+                    const aText = a.cells[index].innerText.trim().toLowerCase();
+                    const bText = b.cells[index].innerText.trim().toLowerCase();
+                    return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                });
+                asc = !asc;
+
+                document.querySelectorAll(".sort-indicator").forEach(el => el.textContent = "");
+                indicator.textContent = asc ? "▲" : "▼";
+
+                const tbody = document.getElementById("detailj-table-body");
+                sorted.forEach(row => tbody.appendChild(row));
+            });
+        });
+
+        // --- Pagination ---
+        const perPage = 10;
+        let currentPage = 1;
+        const totalPages = Math.ceil(rows.length / perPage);
+        const prevBtn = document.getElementById("prevBtn");
+        const nextBtn = document.getElementById("nextBtn");
+        const info = document.getElementById("pagination-info");
+
+        function showPage(page) {
+            const start = (page - 1) * perPage;
+            const end = start + perPage;
+
+            rows.forEach((row, index) => {
+                row.style.display = index >= start && index < end ? "" : "none";
+            });
+
+            info.textContent = ` Menampilkan ${start + 1}-${Math.min(end, rows.length)} dari ${rows.length} data`;
+            prevBtn.disabled = page === 1;
+            nextBtn.disabled = page === totalPages;
+        }
+
+        prevBtn.addEventListener("click", function () {
+            if (currentPage > 1) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        });
+
+        nextBtn.addEventListener("click", function () {
+            if (currentPage < totalPages) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        });
+
+        showPage(currentPage);
+    });
+</script>
+
+{% endblock %}

@@ -23,11 +23,11 @@ class AuthController extends Controller
     public function loginProcess(Request $request)
     {
         $request->validate([
-            'nip' => 'required',
+            'nrp' => 'required',
             'password' => 'required'
         ]);
 
-        $user = User::where('nip', $request->nip)
+        $user = User::where('nrp', $request->nrp)
                     ->where('is_active', 1)
                     ->first();
 
@@ -53,9 +53,9 @@ class AuthController extends Controller
 
             'foreman' => redirect()->route('foreman.dashboard'),
 
-            'operator' => redirect()->route('operator.dashboard'),
+            'operator', 'leader a', 'leader b', 'leader c', 'leader d', 'shearing', 'handwork' => redirect()->route('operator.dashboard'),
 
-            'ppic' => redirect()->route('ppic.dashboard'),
+            'ppc' => redirect()->route('ppc.dashboard'),
 
             'quality' => redirect()->route('quality.dashboard'),
 

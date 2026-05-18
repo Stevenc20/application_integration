@@ -11,7 +11,7 @@ class JobController extends Controller
     public function index()
     {
         $jobs = JobMaster::latest()->paginate(10);
-        return view('admin.master_data.job', compact('jobs'));
+        return view('ppc.job_master', compact('jobs'));
     }
 
     public function store(Request $request)

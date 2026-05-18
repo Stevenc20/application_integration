@@ -606,20 +606,20 @@
 
             <div class="form-eyebrow">Masuk ke Sistem</div>
             <h2 class="form-title">Selamat Datang</h2>
-            <p class="form-desc">Masukkan NIP dan password Anda untuk mengakses dashboard produksi.</p>
+            <p class="form-desc">Masukkan NRP dan password Anda untuk mengakses dashboard produksi.</p>
 
             <form method="POST" action="{{ route('login.process') }}">
                 @csrf
 
                 <div class="form-group">
-                    <label class="form-label" for="nip">NIP</label>
+                    <label class="form-label" for="nrp">NRP</label>
                     <input
                         type="text"
-                        id="nip"
-                        name="nip"
+                        id="nrp"
+                        name="nrp"
                         required
                         autocomplete="username"
-                        placeholder="Masukkan NIP Anda"
+                        placeholder="Masukkan NRP Anda"
                         class="form-input"
                     >
                 </div>

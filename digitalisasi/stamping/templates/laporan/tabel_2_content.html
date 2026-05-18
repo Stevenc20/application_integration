@@ -1,0 +1,114 @@
+<thead class="bg-plan">
+    <tr>
+        <th rowspan="2">NO</th>
+        <th rowspan="2">Jobs No</th>
+        <th colspan="2">Plan Qty (Pcs)</th>
+        <th colspan="4">Actual Qty (Pcs)</th>
+        <th colspan="2">Plan Schedule</th>
+        <th colspan="2">Actual Process</th>
+        <th rowspan="2">CT Actual (detik)</th>
+        <th colspan="5">Uchi Dandori (menit)</th>
+        <th colspan="6">Down Time (menit)</th>
+        <th colspan="2">TPT (menit)</th>
+        <th colspan="2">Idle Time (menit)</th>
+        <th colspan="2">Break Time (menit)</th>
+        <th rowspan="2">Work Time (menit)</th>
+        <th colspan="3">Quality Rate</th>
+        <th rowspan="2">OEE</th>
+        <th rowspan="2">GSPH</th>
+    </tr>
+    <tr>
+        <th>Plan</th><th>Actual</th>
+        <th>Good</th><th>Repair</th><th>Reject</th><th>Total</th>
+        <th>Start</th><th>Finish</th>
+        <th>Start</th><th>Finish</th>
+        <th>Press Time</th><th>Dies Change</th><th>Variant</th><th>1st - Q check</th><th>Total</th>
+        <th>Dies</th><th>Mach</th><th>Matl</th><th>Log</th><th>Prod/ Handling</th><th>Total</th>
+        <th>Plan</th><th>Act</th>
+        <th>Type</th><th>Time</th>
+        <th>Type</th><th>Time</th>
+        <th>Pass Rate</th><th>Repair Rate</th><th>Reject Rate</th>
+    </tr>
+</thead>
+<tbody>
+    {% for job in jobs_data %}
+        <tr {% if forloop.counter|divisibleby:2 %}class="bg-actual"{% endif %}>
+            <td>{{ forloop.counter }}</td>
+            <td>{{ job.job_no }}</td>
+            <td>{{ job.plan_qty }}</td>
+            <td>{{ job.actual_good }}</td>
+            <td>{{ job.actual_good }}</td>
+            <td>{{ job.actual_repair }}</td>
+            <td>{{ job.actual_reject }}</td>
+            <td>{{ job.total_pieces }}</td>
+            <td>{{ job.schedule_start|date:"H:i" }}</td>
+            <td>{{ job.schedule_finish|date:"H:i" }}</td>
+            <td>{{ job.actual_start|date:"H:i" }}</td>
+            <td>{{ job.actual_finish|date:"H:i" }}</td>
+            <td>{{ job.panel_record_ct|floatformat:1 }}</td>
+            <td>{{ job.press_time|floatformat:1 }}</td>
+            <td>{{ job.uchi_dies_change|floatformat:1 }}</td>
+            <td>{{ job.uchi_variant_change|floatformat:1 }}</td>
+            <td>{{ job.uchi_qcheck|floatformat:1 }}</td>
+            <td>{{ job.total_uchi|floatformat:1 }}</td>
+            <td>{{ job.dt_breakdown.dies_t|floatformat:1 }}</td>
+            <td>{{ job.dt_breakdown.mach_t|floatformat:1 }}</td>
+            <td>{{ job.dt_breakdown.mat_t|floatformat:1 }}</td>
+            <td>{{ job.dt_breakdown.log_t|floatformat:1 }}</td>
+            <td>{{ job.dt_breakdown.prod_t|floatformat:1 }}</td>
+            <td>{{ job.dt_total|floatformat:1 }}</td>
+            <td>{{ job.tpt_plan|floatformat:1 }}</td>
+            <td>{{ job.tpt_act|floatformat:1 }}</td>
+            <td>{{ job.idle_time_type }}</td>
+            <td>{{ job.idle_time|floatformat:1 }}</td>
+            <td>{% if job.break_time_duration > 0 %}Istirahat{% else %}-{% endif %}</td>
+            <td>{{ job.break_time_duration|floatformat:1 }}</td>
+            <td>{{ job.work_time_duration|floatformat:1 }}</td>
+            <td>{{ job.pass_rate|floatformat:2 }}%</td>
+            <td>{{ job.repair_rate|floatformat:2 }}%</td>
+            <td>{{ job.reject_rate|floatformat:2 }}%</td>
+            <td>{{ job.oee|floatformat:2 }}%</td>
+            <td>{{ job.gsph|floatformat:0 }}</td>
+        </tr>
+    {% endfor %}
+     {% for i in ""|center:15 %}
+        {% if forloop.counter > jobs_data|length %}
+        <tr {% if forloop.counter|divisibleby:2 %}class="bg-actual"{% endif %}>
+            <td>{{ forloop.counter }}</td>
+            <td>&nbsp;</td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td>
+        </tr>
+        {% endif %}
+    {% endfor %}
+</tbody>
+<tfoot>
+    <tr class="fw-bold bg-plan">
+        <td colspan="2">TOTAL</td>
+        <td>{{ totals.plan_qty }}</td>
+        <td>{{ totals.actual_good }}</td>
+        <td>{{ totals.actual_good }}</td>
+        <td>{{ totals.actual_repair }}</td>
+        <td>{{ totals.actual_reject }}</td>
+        <td>{{ totals.actual_good|add:totals.actual_repair|add:totals.actual_reject }}</td>
+        <td colspan="4"></td>
+        <td>{{ totals.total_panel_record_ct|floatformat:1 }}</td>
+        <td>{{ totals.press_time|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi_dies|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi_variant|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi_qcheck|floatformat:1 }}</td>
+        <td>{{ totals.total_uchi|floatformat:1 }}</td>
+        <td>{{ totals.downtime_dies|floatformat:1 }}</td>
+        <td>{{ totals.downtime_mach|floatformat:1 }}</td>
+        <td>{{ totals.downtime_matl|floatformat:1 }}</td>
+        <td>{{ totals.downtime_log|floatformat:1 }}</td>
+        <td>{{ totals.downtime_prod|floatformat:1 }}</td>
+        <td>{{ totals.downtime_total|floatformat:1 }}</td>
+        <td>{{ totals.tpt_plan|floatformat:1 }}</td> 
+        <td>{{ totals.tpt_act|floatformat:1 }}</td>
+        <td colspan="2">{{ totals.idle_time|floatformat:1 }}</td>
+        <td colspan="2">{{ totals.total_break_time|floatformat:1 }}</td>
+        <td>{{ totals.total_work_time|floatformat:1 }}</td>
+        <td>{{ totals.pass_rate|floatformat:2 }}%</td>
+        <td>{{ totals.repair_rate|floatformat:2 }}%</td>
+        <td>{{ totals.reject_rate|floatformat:2 }}%</td>
+        <td>{{ totals.oee|floatformat:2 }}%</td> <td>{{ totals.gsph|floatformat:2 }}</td> </tr>
+</tfoot>

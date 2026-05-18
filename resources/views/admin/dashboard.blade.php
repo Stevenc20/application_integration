@@ -1,4 +1,4 @@
-@extends('layouts.layouts')
+@extends('layouts.supervisor')
 
 @section('content')
 <div class="p-3 sm:p-4 md:p-6 bg-gray-50 min-h-screen">

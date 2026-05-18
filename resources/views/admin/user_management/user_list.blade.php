@@ -1,4 +1,4 @@
-@extends('layouts.layouts')
+@extends('layouts.supervisor')
 
  @vite(['resources/css/app.css', 'resources/js/app.js'])
 
@@ -48,7 +48,7 @@
                 <thead class="bg-gray-100 text-gray-700">
                     <tr>
                         <th class="px-4 py-3 text-left">Name</th>
-                        <th class="px-4 py-3 text-left">NIP</th>
+                        <th class="px-4 py-3 text-left">NRP</th>
                         <th class="px-4 py-3 text-left">Role</th>
                         <th class="px-4 py-3 text-center">Action</th>
                     </tr>
@@ -65,9 +65,9 @@
                             {{ $user->name }}
                         </td>
 
-                        {{-- NIP --}}
+                        {{-- NRP --}}
                         <td class="px-4 py-3 whitespace-nowrap">
-                            {{ $user->nip ?? '-' }}
+                            {{ $user->nrp ?? '-' }}
                         </td>
 
                         {{-- ROLE --}}
@@ -75,9 +75,10 @@
                             <span class="px-2 py-1 rounded text-xs
                                 @if($user->role == 'admin') bg-red-100 text-red-600
                                 @elseif($user->role == 'supervisor') bg-blue-100 text-blue-600
+                                @elseif($user->role == 'ppc') bg-amber-100 text-amber-600
                                 @else bg-green-100 text-green-600
                                 @endif">
-                                {{ ucfirst($user->role) }}
+                                {{ $user->role == 'ppc' ? 'PPC' : ucfirst($user->role) }}
                             </span>
                         </td>
 
@@ -89,7 +90,7 @@
                                <button onclick="openEditModal(
                                 '{{ $user->id }}',
                                 '{{ $user->name }}',
-                                '{{ $user->nip }}',
+                                '{{ $user->nrp }}',
                                 '{{ $user->role }}'
                                     )"
                                     class="px-3 py-1 text-xs bg-blue-500 text-white rounded hover:bg-blue-600">
@@ -167,8 +168,8 @@ class="fixed inset-0 z-50 hidden items-center justify-center">
             </div>
 
             <div>
-                <label class="text-sm font-medium">NIP</label>
-                <input type="text" name="nip"
+                <label class="text-sm font-medium">NRP</label>
+                <input type="text" name="nrp"
                     class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring focus:ring-red-200"
                     required>
             </div>
@@ -188,7 +189,15 @@ class="fixed inset-0 z-50 hidden items-center justify-center">
                     <option value="">Select Role</option>
                     <option value="admin">Admin</option>
                     <option value="supervisor">Supervisor</option>
+                    <option value="ppc">PPC</option>
+                    <option value="foreman">Foreman</option>
                     <option value="operator">Operator</option>
+                    <option value="leader a">Leader A</option>
+                    <option value="leader b">Leader B</option>
+                    <option value="leader c">Leader C</option>
+                    <option value="leader d">Leader D</option>
+                    <option value="shearing">Shearing</option>
+                    <option value="handwork">Handwork</option>
                 </select>
             </div>
 
@@ -230,8 +239,8 @@ class="fixed inset-0 z-50 hidden items-center justify-center">
             </div>
 
             <div>
-                <label>NIP</label>
-                <input type="text" name="nip" id="edit_nip"
+                <label>NRP</label>
+                <input type="text" name="nrp" id="edit_nrp"
                     class="w-full border rounded px-3 py-2">
             </div>
 
@@ -247,7 +256,15 @@ class="fixed inset-0 z-50 hidden items-center justify-center">
                     class="w-full border rounded px-3 py-2">
                     <option value="admin">Admin</option>
                     <option value="supervisor">Supervisor</option>
+                    <option value="ppc">PPC</option>
+                    <option value="foreman">Foreman</option>
                     <option value="operator">Operator</option>
+                    <option value="leader a">Leader A</option>
+                    <option value="leader b">Leader B</option>
+                    <option value="leader c">Leader C</option>
+                    <option value="leader d">Leader D</option>
+                    <option value="shearing">Shearing</option>
+                    <option value="handwork">Handwork</option>
                 </select>
             </div>
 

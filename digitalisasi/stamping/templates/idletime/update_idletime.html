@@ -1,0 +1,37 @@
+{% extends "base_template/base.html" %}
+{% block title %}Update Idle Reason{% endblock %}
+
+{% block content %}
+<div class="card p-3">
+  <h5>Edit Reason - Idle {{ idle_detail.id_detaild }}</h5>
+  <form method="post">
+    {% csrf_token %}
+
+    <div class="row mb-6">
+        <label class="col-sm-2 col-form-label">Start</label>
+        <div class="col-sm-10">
+            <input type="text" class="form-control" value="{{ getidle.start_idle }}" readonly>
+        </div>
+    </div>
+    <div class="row mb-6">
+        <label class="col-sm-2 col-form-label">Finish</label>
+        <div class="col-sm-10">
+            <input type="text" class="form-control" value="{{ getidle.finish_idle|default:'-' }}" readonly>
+        </div>
+    </div>
+    <div class="row mb-6">
+        <label class="col-sm-2 col-form-label">Durasi (menit)</label>
+        <div class="col-sm-10">
+            <input type="text" class="form-control" value="{{ getidle.duration_idle|floatformat:2 }}" readonly>
+        </div>
+    </div>
+    <div class="row mb-6">
+        <label class="col-sm-2 col-form-label">Alasan</label>
+        <div class="col-sm-10">
+            <input type="text" class="form-control" name="reason_idle" value="{{ getidle.reason_idle }}">
+        </div>
+    </div>
+    <button type="submit" class="btn btn-primary">Update</button>
+  </form>
+</div>
+{% endblock %}

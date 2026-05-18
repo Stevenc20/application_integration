@@ -1,0 +1,157 @@
+{% extends "base_template\base.html" %}
+
+{% block title %}Data Karyawan{% endblock %}
+
+{% block content %}
+<div class="card p-3">
+    <h4 class="mb-0 fw-bold">Data Karyawan</h4>
+
+    <div class="d-flex justify-content-between align-items-center mb-3">
+    <input type="text" id="searchInput" class="form-control w-25" placeholder="Cari nama karyawan...">
+    <a href="/karyawan/create_karyawan">
+      <button class="btn btn-primary ms-2">Create Karyawan</button>
+    </a>
+    </div>
+
+    <div class="table-responsive text-nowrap">
+        <table class="table table-bordered table-hover">
+        <thead>
+            <tr class="table-primary">
+            <th class="text-center sortable">ID Karyawan</th>
+            <th class="text-center sortable">Nama Karyawan</th>
+            <th class="text-center sortable">NRP Karyawan</th>
+            <th class="text-center sortable">Jabatan</th>
+            <th class="text-center sortable">Action</th>
+            </tr>
+        </thead>
+        <tbody class="table-border-bottom-0" id="karyawan-table-body">
+            {% for item in karyawanobj %}
+            <tr>
+            <td class="text-center">KR{{ item.id_karyawan }}</td>
+            <td class="text-center nama-karyawan">{{ item.nama_karyawan }}</td>
+            <td class="text-center">{{ item.nrp_karyawan }}</td>
+            <td class="text-center">{{ item.jabatan }}</td>
+            <td class="text-center">
+                <div class="align-items-center">
+                    <a href="{% url 'update_karyawan' item.id_karyawan %}" class="btn btn-sm btn-primary w-50">
+                        <i class="icon-base bx bx-edit-alt"></i>Update
+                    </a>
+                    <a href="{% url 'delete_karyawan' item.id_karyawan %}" class="btn btn-sm btn-danger w-50">
+                        <i class="icon-base bx bx-trash"></i>Delete
+                    </a>
+                </div>
+            </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+        </table>
+        <div class="d-flex justify-content-between align-items-center mt-3">
+        <div id="pagination-info" class="text-muted"></div>
+        <div>
+            <button id="prevBtn" class="btn btn-outline-primary btn-sm me-2">Previous</button>
+            <button id="nextBtn" class="btn btn-outline-primary btn-sm">Next</button>
+        </div>
+        </div>
+    </div>
+    </div>
+</div>
+
+<style>
+    .sortable {
+        position: relative;
+    }
+    .sort-indicator {
+        margin-left: 6px;
+        font-size: 12px;
+        opacity: 0.6;
+    }
+</style>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // --- Search ---
+        const searchInput = document.getElementById("searchInput");
+        const rows = Array.from(document.querySelectorAll("#karyawan-table-body tr")); // 🔁 ubah jadi array asli
+
+        searchInput.addEventListener("keyup", function () {
+            const value = this.value.toLowerCase();
+
+            rows.forEach(row => {
+                const namaCell = row.querySelector(".nama-karyawan");
+                if (namaCell) {
+                    const text = namaCell.textContent.toLowerCase();
+                    if (text.includes(value)) {
+                        row.style.display = ""; // tampilkan
+                        namaCell.classList.add("text-primary", "fw-bold");
+                    } else {
+                        row.style.display = "none"; // sembunyikan
+                        namaCell.classList.remove("text-primary", "fw-bold");
+                    }
+                }
+            });
+        });
+
+        // --- Sorting ---
+        document.querySelectorAll("th.sortable").forEach((header, index) => {
+            let asc = true;
+            const indicator = document.createElement("span");
+            indicator.className = "sort-indicator";
+            header.appendChild(indicator);
+
+            header.style.cursor = "pointer";
+            header.addEventListener("click", () => {
+                const sorted = [...rows].sort((a, b) => {
+                    const aText = a.cells[index].innerText.trim().toLowerCase();
+                    const bText = b.cells[index].innerText.trim().toLowerCase();
+                    return asc ? aText.localeCompare(bText) : bText.localeCompare(aText);
+                });
+                asc = !asc;
+
+                document.querySelectorAll(".sort-indicator").forEach(el => el.textContent = "");
+                indicator.textContent = asc ? "▲" : "▼";
+
+                const tbody = document.getElementById("karyawan-table-body");
+                sorted.forEach(row => tbody.appendChild(row));
+            });
+        });
+
+        // --- Pagination ---
+        const perPage = 10;
+        let currentPage = 1;
+        const totalPages = Math.ceil(rows.length / perPage);
+        const prevBtn = document.getElementById("prevBtn");
+        const nextBtn = document.getElementById("nextBtn");
+        const info = document.getElementById("pagination-info");
+
+        function showPage(page) {
+            const start = (page - 1) * perPage;
+            const end = start + perPage;
+
+            rows.forEach((row, index) => {
+                row.style.display = index >= start && index < end ? "" : "none";
+            });
+
+            info.textContent = ` Menampilkan ${start + 1}-${Math.min(end, rows.length)} dari ${rows.length} data`;
+            prevBtn.disabled = page === 1;
+            nextBtn.disabled = page === totalPages;
+        }
+
+        prevBtn.addEventListener("click", function () {
+            if (currentPage > 1) {
+                currentPage--;
+                showPage(currentPage);
+            }
+        });
+
+        nextBtn.addEventListener("click", function () {
+            if (currentPage < totalPages) {
+                currentPage++;
+                showPage(currentPage);
+            }
+        });
+
+        showPage(currentPage);
+    });
+</script>
+
+{% endblock %}

@@ -1,4 +1,4 @@
-@extends('layouts.layouts')
+@extends('layouts.supervisor')
 
 @section('content')
 <div class="p-6">
@@ -14,3 +14,7 @@
 
 
 @endsection
+
+</div>
+</div>
+

@@ -13,6 +13,8 @@ use App\Http\Controllers\Operator\OperatorDashboardController;
 use App\Http\Controllers\Admin\JobController;
 Use App\Http\Controllers\Operational\InputHarianController;
 use App\Http\Controllers\Operational\DandoriController;
+use App\Http\Controllers\Planning\ProductionPlanController;
+use App\Http\Controllers\Planning\ProductionLineController;
 
 // tessting create user
 
@@ -129,7 +131,7 @@ v
 
 
 // ADMIN
-Route::middleware(['auth','role:admin'])->prefix('admin')->group(function(){
+Route::middleware(['auth','role:admin,supervisor,ppc'])->prefix('admin')->group(function(){
 
     Route::get('/dashboard', [AdminDashboardController::class,'index'])
         ->name('admin.dashboard');
@@ -139,7 +141,7 @@ Route::middleware(['auth','role:admin'])->prefix('admin')->group(function(){
 });
 
 // master
-Route::prefix('master/job')->group(function () {
+Route::middleware(['auth','role:admin,ppc,supervisor'])->prefix('master/job')->group(function () {
 
     Route::get('/', [JobController::class, 'index'])->name('master.job');
 
@@ -153,15 +155,95 @@ Route::prefix('master/job')->group(function () {
 
 });
 
-// SUPERVISOR
-Route::middleware(['auth','role:supervisor'])
+// SHARED SUPERVISOR ROUTES FOR DASHBOARDS, DOWNTIME, AND REPORTS
+Route::middleware(['auth','role:supervisor,ppc,operator,foreman'])
 ->prefix('supervisor')
+->name('supervisor.')
 ->group(function(){
 
-    Route::get('/dashboard', [SupervisorDashboard::class, 'index'])
-        ->name('supervisor.dashboard');
+    Route::get('/dashboard', [SupervisorDashboard::class, 'index'])->name('dashboard');
+    Route::get('/dashboard/api-data', [SupervisorDashboard::class, 'getApiData'])->name('dashboard.api');
+    Route::get('/overview', [SupervisorDashboard::class, 'overview'])->name('overview');
 
+    // Downtime Control
+    Route::prefix('downtime')->name('downtime.')->group(function() {
+        Route::get('/dashboard', [SupervisorDashboard::class, 'index'])->name('dashboard');
+        Route::get('/monitoring', function() { return view('supervisor.downtime.monitoring'); })->name('monitoring');
+        Route::get('/tren', function() { return view('supervisor.downtime.tren'); })->name('tren');
+        Route::get('/history', function() { return view('supervisor.downtime.history'); })->name('history');
+    });
+
+    // Reports
+    Route::prefix('reports')->name('reports.')->group(function() {
+        Route::get('/daily-production', function() { return view('supervisor.reports.daily_production'); })->name('daily_production');
+        Route::get('/performance', function() { return view('supervisor.reports.performance'); })->name('performance');
+    });
 });
+
+// SUPERVISOR & PPC RESTRICTED FEATURES
+Route::middleware(['auth','role:supervisor,ppc'])
+->prefix('supervisor')
+->name('supervisor.')
+->group(function(){
+
+    // Data Job
+    Route::get('/job', [\App\Http\Controllers\Supervisor\JobController::class, 'index'])->name('job.index');
+    Route::get('/job/create', [\App\Http\Controllers\Supervisor\JobController::class, 'create'])->name('job.create');
+    Route::get('/job/update/{id?}', [\App\Http\Controllers\Supervisor\JobController::class, 'edit'])->name('job.update');
+    
+    // Idle Time
+    Route::get('/idletime', [\App\Http\Controllers\Supervisor\IdleTimeController::class, 'index'])->name('idletime.index');
+    
+    // Breaktime
+    Route::get('/breaktime', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'index'])->name('breaktime.index');
+    Route::get('/breaktime/create', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'create'])->name('breaktime.create');
+    Route::get('/breaktime/rekap', function() { return view('supervisor.breaktime.rekap'); })->name('breaktime.rekap');
+    
+    // Handwork
+    Route::get('/handwork', [\App\Http\Controllers\Supervisor\HandworkController::class, 'index'])->name('handwork.index');
+    Route::get('/handwork/select', [\App\Http\Controllers\Supervisor\HandworkController::class, 'select'])->name('handwork.select');
+    Route::get('/handwork/rekap/{id?}', [\App\Http\Controllers\Supervisor\HandworkController::class, 'rekap'])->name('handwork.rekap');
+    
+    // Quality Check (Q-Check)
+    Route::get('/qcheck', [\App\Http\Controllers\Supervisor\QCheckController::class, 'index'])->name('qcheck.index');
+    Route::get('/qcheck/select', [\App\Http\Controllers\Supervisor\QCheckController::class, 'select'])->name('qcheck.select');
+    Route::get('/qcheck/list/{id?}', [\App\Http\Controllers\Supervisor\QCheckController::class, 'list'])->name('qcheck.list');
+    Route::get('/qcheck/form/{id?}', [\App\Http\Controllers\Supervisor\QCheckController::class, 'form'])->name('qcheck.form');
+    
+    // Grafik
+    Route::prefix('grafik')->name('grafik.')->group(function() {
+        Route::get('/downtime-item', function() { return view('supervisor.grafik.downtime_item'); })->name('downtime_item');
+        Route::get('/downtime-machine', function() { return view('supervisor.grafik.downtime_machine'); })->name('downtime_machine');
+        Route::get('/downtime-type', function() { return view('supervisor.grafik.downtime_type'); })->name('downtime_type');
+        Route::get('/output-line', function() { return view('supervisor.grafik.output_line'); })->name('output_line');
+    });
+    
+    // Planning
+    Route::prefix('planning')->name('planning.')->group(function() {
+        // Production Line CRUD
+        Route::get('/production-line',                    [ProductionLineController::class, 'index']       )->name('production_line');
+        Route::post('/production-line',                   [ProductionLineController::class, 'store']       )->name('production_line.store');
+        Route::get('/production-line/active',             [ProductionLineController::class, 'activeLines'] )->name('production_line.active');
+        Route::get('/production-line/{id}',               [ProductionLineController::class, 'show']        )->name('production_line.show');
+        Route::put('/production-line/{id}',               [ProductionLineController::class, 'update']      )->name('production_line.update');
+        Route::patch('/production-line/{id}/status',      [ProductionLineController::class, 'toggleStatus'])->name('production_line.status');
+        Route::delete('/production-line/{id}',            [ProductionLineController::class, 'destroy']     )->name('production_line.destroy');
+    });
+
+    // Approval
+    Route::prefix('approval')->name('approval.')->group(function() {
+        Route::get('/production', function() { return view('supervisor.approval.production'); })->name('production');
+        Route::get('/quality', function() { return view('supervisor.approval.quality'); })->name('quality');
+    });
+
+    // Quality Control
+    Route::prefix('quality')->name('quality.')->group(function() {
+        Route::get('/dashboard', [SupervisorDashboard::class, 'index'])->name('dashboard');
+        Route::get('/defect-monitoring', function() { return view('supervisor.quality.defect_monitoring'); })->name('defect_monitoring');
+        Route::get('/reject-analysis', function() { return view('supervisor.quality.reject_analysis'); })->name('reject_analysis');
+    });
+});
+
 
 // landing 
 Route::get('/', function(){
@@ -179,8 +261,8 @@ Route::prefix('monitoring')
 ->middleware(['auth'])
 ->group(function(){
 
-    // Supervisor only
-    Route::middleware('role:supervisor')->group(function(){
+    // Supervisor & PPC
+    Route::middleware('role:supervisor,ppc')->group(function(){
         Route::get('/line', 'line')->name('line');
         Route::get('/machine_status','machine_status')->name('machine_status');
     });
@@ -194,6 +276,15 @@ Route::prefix('monitoring')
 
         Route::get('/dashboard', [OperatorDashboardController::class, 'index'])
             ->name('operator.dashboard');
+
+    });
+
+ Route::middleware(['auth','role:foreman'])
+        ->prefix('foreman')
+        ->group(function(){
+
+        Route::get('/dashboard', [OperatorDashboardController::class, 'index'])
+            ->name('foreman.dashboard');
 
     });
 
@@ -278,9 +369,7 @@ Route::middleware(['auth','role:supervisor'])->group(function () {
             return view('downtime.tren_downtime');
         })->name('tren_downtime');
 
-        Route::get('/history', function(){
-            return view('downtime.trouble_history');
-        })->name('history');
+        Route::get('/history', [\App\Http\Controllers\Supervisor\DashboardController::class, 'troubleHistory'])->name('history');
 
     });
 
@@ -322,6 +411,18 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'saveQty']
     )->name('job.save');
 
+    Route::post('/job/{id}/save-log',
+        [InputHarianController::class, 'saveProductionLog']
+    )->name('job.save_log');
+
+    Route::get('/job/{id}/logs',
+        [InputHarianController::class, 'showLogs']
+    )->name('job.logs.detail');
+
+    Route::get('/audit-trail',
+        [InputHarianController::class, 'productionAudit']
+    )->name('audit_trail');
+
     /*
     ====================================================
     NEXT PROCESS
@@ -344,6 +445,14 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'start']
     )->name('job.start');
 
+    Route::post('/job/{id}/dandori/start',
+        [InputHarianController::class, 'startDandori']
+    )->name('job.dandori.start');
+
+    Route::post('/job/{id}/dandori/finish',
+        [InputHarianController::class, 'finishDandori']
+    )->name('job.dandori.finish');
+
     Route::post('/job/{id}/pause',
         [InputHarianController::class, 'pause']
     )->name('job.pause');
@@ -356,6 +465,10 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'restart']
     )->name('job.restart');
 
+    Route::post('/job/{id}/start',
+        [InputHarianController::class, 'start']
+    )->name('job.start');
+
     Route::post('/job/{id}/finish',
         [InputHarianController::class, 'finish']
     )->name('job.finish');
@@ -363,6 +476,20 @@ Route::middleware(['auth'])
     Route::get('/job/{id}/status',
         [InputHarianController::class, 'status']
     )->name('job.status');
+
+    // Global active job
+    Route::get('/active-job', [InputHarianController::class, 'activeJob'])->name('active-job');
+
+    /*
+    ====================================================
+    DOWNTIME
+    ====================================================
+    */
+    Route::get('/job/{job_id}/downtimes', [InputHarianController::class, 'getDowntimes'])->name('job.downtimes');
+    Route::post('/job/{job_id}/downtime/start', [InputHarianController::class, 'startDowntime'])->name('job.downtime.start');
+    Route::post('/downtime/{id}/finish', [InputHarianController::class, 'finishDowntime'])->name('downtime.finish');
+    Route::put('/downtime/{id}/update', [InputHarianController::class, 'updateDowntime'])->name('downtime.update');
+    Route::delete('/downtime/{id}/delete', [InputHarianController::class, 'deleteDowntime'])->name('downtime.delete');
 
     /*
     ====================================================
@@ -382,7 +509,7 @@ Route::middleware(['auth'])
 
     // halaman detail dandori parent-child
     Route::get('/dandori/show/{id}',
-        [DandoriController::class, 'show']
+        [DandoriController::class, 'open']
     )->name('dandori.show');
 
     // load card atas
@@ -390,20 +517,25 @@ Route::middleware(['auth'])
         [DandoriController::class, 'loadJobs']
     )->name('dandori.loadJobs');
 
-    // buka item
-    Route::get('/dandori/open/{id}',
-        [DandoriController::class, 'open']
-    )->name('dandori.open');
+    // get detail for modal
+    Route::get('/dandori/get-detail/{id}',
+        [DandoriController::class, 'getDetail']
+    )->name('dandori.getDetail');
 
     // start activity
-    Route::post('/dandori/start',
+    Route::post('/dandori/start/{id}/{type}',
         [DandoriController::class, 'start']
     )->name('dandori.start');
 
-    // finish activity
-    Route::post('/dandori/finish/{id}',
-        [DandoriController::class, 'finish']
-    )->name('dandori.finish');
+    // stop activity
+    Route::post('/dandori/stop/{id}',
+        [DandoriController::class, 'stop']
+    )->name('dandori.stop');
+
+    // restart activity
+    Route::post('/dandori/restart/{id}',
+        [DandoriController::class, 'restart']
+    )->name('dandori.restart');
 
     // history
     Route::get('/dandori/history',
@@ -461,13 +593,6 @@ Route::get('/production_recap', [ProductionController::class, 'recap'])
 Route::get('/production_recap/export', [ProductionController::class, 'export'])
     ->name('production_recap.export');
 
-Route::get('/production_line', function(){   
-    return view('planning.production_line');
-})->name('production_line');
-
-Route::get('/production_plan', function(){   
-    return view('planning.production_plan');
-})->name('production_plan');
 
 
 // quality
@@ -503,4 +628,22 @@ Route::middleware(['auth'])->group(function () {
 
     });
 
+});
+
+// ======================
+// PPC
+// ======================
+Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\Ppc\DashboardController::class, 'index'])->name('dashboard');
+
+    // Production Planning
+    Route::prefix('planning')->name('planning.')->group(function() {
+        Route::get('/production-plan',                 [ProductionPlanController::class, 'index']  )->name('production_plan');
+        Route::post('/production-plan',                [ProductionPlanController::class, 'store']  )->name('production_plan.store');
+        Route::post('/production-plan/import',         [ProductionPlanController::class, 'import'] )->name('production_plan.import');
+        Route::post('/production-plan/update-inline',  [ProductionPlanController::class, 'updateInline'])->name('production_plan.inline');
+        Route::get('/production-plan/{id}',            [ProductionPlanController::class, 'show']   )->name('production_plan.show');
+        Route::put('/production-plan/{id}',            [ProductionPlanController::class, 'update'] )->name('production_plan.update');
+        Route::delete('/production-plan/{id}',         [ProductionPlanController::class, 'destroy'])->name('production_plan.destroy');
+    });
 });

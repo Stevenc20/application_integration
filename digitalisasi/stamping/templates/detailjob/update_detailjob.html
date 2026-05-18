@@ -1,0 +1,80 @@
+{% extends "base_template/base.html" %}
+
+{% block title %}Update Detail Job{% endblock %}
+
+{% block content %}
+<div class="row mb-6 gy-6">
+  <div class="col-xxl">
+    <div class="card">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <h5 class="mb-0">Update Detail Job (ID: {{ detail_job.id_detailjob }})</h5>
+        <small class="text-body-secondary float-end">Edit Data</small>
+      </div>
+      <div class="card-body">
+        <form action="" method="post">
+          {% csrf_token %}
+
+          <!-- Item Produksi -->
+          <div class="form-group row mb-3">
+            <label class="col-sm-3 col-form-label" for="id_itemproduksi">Item Produksi</label>
+            <div class="col-sm-9">
+              <select name="id_itemproduksi" class="form-select" required>
+                {% for item in all_items %}
+                  <option value="{{ item.id_itemproduksi }}"
+                    {% if item.id_itemproduksi == detail_job.id_itemproduksi_id %}selected{% endif %}>
+                    {{ item.job_number }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+          </div>
+
+          <!-- Machine Used -->
+          <div class="form-group row mb-3">
+            <label class="col-sm-3 col-form-label">Machine Used</label>
+            <div class="col-sm-9 machine-container">
+              {% for m in all_machines %}
+                <div class="form-check form-check-inline">
+                  <input
+                    type="checkbox"
+                    class="form-check-input"
+                    name="machine_used"
+                    value="{{ m.id }}"
+                    {% if m in detail_job.machine_used.all %}checked{% endif %}>
+                  <label class="form-check-label">{{ m.code }}</label>
+                </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Plan Qty -->
+          <div class="form-group row mb-3">
+            <label class="col-sm-3 col-form-label" for="plan_qty">Plan Qty</label>
+            <div class="col-sm-9">
+              <input type="number" name="plan_qty" class="form-control"
+                value="{{ detail_job.plan_qty }}" required>
+            </div>
+          </div>
+
+          <!-- Urutan -->
+          <div class="form-group row mb-3">
+            <label class="col-sm-3 col-form-label" for="urutan">Urutan</label>
+            <div class="col-sm-9">
+              <input type="number" name="urutan" class="form-control"
+                value="{{ detail_job.urutan }}" required>
+            </div>
+          </div>
+
+          <!-- Tombol -->
+          <div class="row">
+            <div class="col-sm-9 offset-sm-3">
+              <button type="submit" class="btn btn-primary">Update</button>
+              <a href="{% url 'rekap_detailjob' detail_job.id_job.id_job %}" class="btn btn-secondary">Batal</a>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
