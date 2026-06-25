@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\MasterBreakTime;
 use App\Models\ProductionPlan;
+use App\Models\RecoveryItem;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -110,7 +111,10 @@ class TimelineGenerationService
         }
         $resetTiming->update(['start_time' => null, 'finish_time' => null]);
 
-        // 2. Re-fetch all clean job plans for processing
+        // 2a. Insert approved recovery items into production_plans (source_type='recovery')
+        $this->insertApprovedRecoveryForSection($date, $shiftName, $resolvedPressName, $lineMasterId, $hari);
+
+        // 2b. Re-fetch all clean job plans for processing
         $query = ProductionPlan::query()
             ->whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
@@ -637,6 +641,23 @@ foreach ($breakWindows as $idx => $b) {
             }
         }
 
+        // 2e. Revert recovery items that didn't fit (start_time is null)
+        $unusedRecovery = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('press_name', $resolvedPressName)
+            ->where('source_type', 'recovery')
+            ->whereNull('start_time')
+            ->get();
+
+        foreach ($unusedRecovery as $ur) {
+            if ($ur->recovery_id) {
+                RecoveryItem::where('id', $ur->recovery_id)
+                    ->where('status', 'scheduled')
+                    ->update(['status' => 'approved']);
+            }
+            $ur->delete();
+        }
+
         // 3. Database transaction persist
         $updated = 0;
         DB::transaction(function () use ($outputSequence, $date, $shiftName, $resolvedPressName, $lineMasterId, $hari, &$updated) {
@@ -763,6 +784,66 @@ foreach ($breakWindows as $idx => $b) {
                 
                 $this->insertBreakRow($date, $shiftName, $pressName, $lineMasterId, $hari, $b, $rowNo);
             }
+        }
+    }
+
+    /**
+     * Load approved recovery items for this press and insert them into production_plans
+     * as source_type='recovery' entries. Items that don't fit capacity will be reverted
+     * by revertUnusedRecoveryItems() after the main processing loop.
+     */
+    private function insertApprovedRecoveryForSection(string $date, string $shiftName, string $pressName, int $lineMasterId, ?string $hari): void
+    {
+        $approvedRecovery = RecoveryItem::approved()
+            ->where('press_name', $pressName)
+            ->orderBy('source_date', 'asc')
+            ->orderBy('source_shift', 'asc')
+            ->orderBy('original_row_no', 'asc')
+            ->get();
+
+        if ($approvedRecovery->isEmpty()) {
+            return;
+        }
+
+        $existingRecoveryNo = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('press_name', $pressName)
+            ->where('source_type', 'recovery')
+            ->max('row_no') ?? 0;
+
+        $rowNo = $existingRecoveryNo > 0 ? $existingRecoveryNo + 1 : 1;
+
+        foreach ($approvedRecovery as $ri) {
+            $planQty = $ri->recovery_qty > 0 ? (float)$ri->recovery_qty : (float)($ri->plan_qty ?? 0);
+            $ctDetik = (float)($ri->ct_detik ?? 0);
+            $dct = (float)($ri->dct ?? 0);
+            $processTime = $ctDetik > 0 ? (int)ceil(($ctDetik * $planQty) / 60.0) : 0;
+
+            ProductionPlan::create([
+                'line_master_id' => $lineMasterId,
+                'plan_date'      => $date,
+                'shift_name'     => $shiftName,
+                'press_name'     => $pressName,
+                'hari'           => $hari,
+                'row_no'         => $rowNo++,
+                'row_type'       => 'job',
+                'job_master'     => $ri->job_master,
+                'job_no'         => $ri->job_no,
+                'plan'           => $planQty,
+                'ok'             => (float)($ri->ok ?? 0),
+                'repair'         => (float)($ri->repair ?? 0),
+                'reject'         => (float)($ri->reject ?? 0),
+                'ct_detik'       => $ctDetik,
+                'dct'            => $dct,
+                'reg_active'     => (float)($ri->reg_active ?? 0),
+                'total_mesin'    => (int)($ri->total_mesin ?? 1),
+                'process_time'   => $processTime,
+                'recovery_id'    => $ri->id,
+                'source_type'    => 'recovery',
+                'status'         => 'pending',
+            ]);
+
+            $ri->update(['status' => 'scheduled']);
         }
     }
 
@@ -960,6 +1041,24 @@ foreach ($breakWindows as $idx => $b) {
         }
 
         return MasterBreakTime::minutesToTime($current);
+    }
+
+    /**
+     * Estimate finish time for a production duration, considering break windows.
+     * Returns the finish time string if within shift end, or null if it exceeds capacity.
+     */
+    public function simulateFinishTime(string $startTime, int $durationMinutes, array $breakWindows, string $shiftEndTime): ?string
+    {
+        $finish = $this->calculateFinishWithBreaks($startTime, $durationMinutes, $breakWindows);
+
+        $finishMins = MasterBreakTime::timeToMinutes($finish);
+        $shiftEndMins = MasterBreakTime::timeToMinutes($shiftEndTime);
+
+        if ($finishMins <= $shiftEndMins) {
+            return $finish;
+        }
+
+        return null;
     }
 
     public function pushIfInBreak(string $timeStr, array $breakWindows): string
