@@ -8,8 +8,10 @@ use App\Models\DailyProduction;
 use App\Models\Downtime;
 use App\Models\Dandori;
 use App\Models\ProductionLog;
+use App\Models\HambatanJalur;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Services\DashboardRealtimeService;
 
 class ProductionService
 {
@@ -34,13 +36,26 @@ class ProductionService
             if ($enqueueOnly) {
                 $updateData['started_at'] = null;
             } else {
-                $updateData['started_at'] = now();
-                $session->start_time = now();
+                $now = now();
+                $updateData['started_at'] = $now;
                 $session->save();
+
+                // Close any existing open downtime before starting
+                $openDowntime = Downtime::where('job_master_id', $jobId)
+                    ->whereNull('finish_time')
+                    ->first();
+                if ($openDowntime) {
+                    $openDowntime->update([
+                        'finish_time' => $now,
+                        'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($openDowntime->start_time)))
+                    ]);
+                }
             }
 
             JobMaster::where('id', $jobId)->update($updateData);
             $this->syncPlanStatus($jobId, 'running');
+
+            $this->signalDashboard($jobId);
 
             return true;
         });
@@ -49,9 +64,10 @@ class ProductionService
     /**
      * Start Dandori process for a job.
      */
-    public function startDandori($jobId)
+    public function startDandori($jobId, $workDate = null)
     {
-        return DB::transaction(function () use ($jobId) {
+        return DB::transaction(function () use ($jobId, $workDate) {
+            $workDate = $workDate ?: now()->toDateString();
             $job = JobMaster::findOrFail($jobId);
             $job->update(['status' => 'running']);
             $this->syncPlanStatus($jobId, 'running');
@@ -59,7 +75,7 @@ class ProductionService
             ProductionSession::firstOrCreate(
                 [
                     'job_master_id' => $jobId,
-                    'work_date' => now()->toDateString()
+                    'work_date' => $workDate
                 ],
                 [
                     'status' => 'running',
@@ -68,6 +84,17 @@ class ProductionService
             );
             
             $now = now();
+
+            // Close any existing open downtime (e.g. auto-idle time) before starting Dandori
+            $openDowntime = Downtime::where('job_master_id', $jobId)
+                ->whereNull('finish_time')
+                ->first();
+            if ($openDowntime) {
+                $openDowntime->update([
+                    'finish_time' => $now,
+                    'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($openDowntime->start_time)))
+                ]);
+            }
             
             $downtime = Downtime::create([
                 'job_master_id' => $jobId,
@@ -85,9 +112,11 @@ class ProductionService
                 'shift'       => $this->getShift(),
                 'activity'    => 'DANDORI',
                 'start_time'  => $now,
-                'work_date'   => $now->toDateString(),
+                'work_date'   => $workDate,
                 'created_by'  => auth()->id()
             ]);
+
+            $this->signalDashboard($jobId);
 
             return $downtime;
         });
@@ -106,7 +135,11 @@ class ProductionService
 
             if ($downtime) {
                 $now = now();
-                $downtime->update(['finish_time' => $now]);
+                $durationSeconds = abs($now->diffInSeconds(Carbon::parse($downtime->start_time)));
+                $downtime->update([
+                    'finish_time' => $now,
+                    'duration_seconds' => $durationSeconds
+                ]);
                 
                 $dandori = Dandori::where('next_job_id', $jobId)
                     ->whereNull('finish_time')
@@ -129,6 +162,59 @@ class ProductionService
                 );
                 $session->update(['start_time' => $now, 'status' => 'running']);
 
+                $this->signalDashboard($jobId);
+
+                return true;
+            }
+            return false;
+        });
+    }
+
+    /**
+     * Start 1st Check process for a job (during dandori).
+     */
+    public function startFirstCheck($jobId, $workDate = null)
+    {
+        return DB::transaction(function () use ($jobId, $workDate) {
+            $workDate = $workDate ?: now()->toDateString();
+            $job = JobMaster::findOrFail($jobId);
+            $now = now();
+
+            $dandori = Dandori::create([
+                'next_job_id'   => $jobId,
+                'line'          => $job->line,
+                'shift'         => $this->getShift(),
+                'activity'      => '1ST CHECK',
+                'jenis_dandori' => '1st_check',
+                'start_time'    => $now,
+                'work_date'     => $workDate,
+                'created_by'    => auth()->id()
+            ]);
+
+            $this->signalDashboard($jobId);
+
+            return $dandori;
+        });
+    }
+
+    /**
+     * Finish 1st Check process.
+     */
+    public function finishFirstCheck($jobId)
+    {
+        return DB::transaction(function () use ($jobId) {
+            $dandori = Dandori::where('next_job_id', $jobId)
+                ->where('jenis_dandori', '1st_check')
+                ->whereNull('finish_time')
+                ->first();
+
+            if ($dandori) {
+                $now = now();
+                $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
+                $dandori->update([
+                    'finish_time'     => $now,
+                    'duration_minutes' => round($duration, 2)
+                ]);
                 return true;
             }
             return false;
@@ -138,9 +224,11 @@ class ProductionService
     /**
      * Save production log and update daily metrics.
      */
-    public function saveProductionLog($jobId, array $data)
+    public function saveProductionLog($jobId, array $data, $workDate = null)
     {
-        return DB::transaction(function () use ($jobId, $data) {
+        return DB::transaction(function () use ($jobId, $data, $workDate) {
+            $workDate = $workDate ?: now()->toDateString();
+            
             $log = ProductionLog::create([
                 'job_master_id' => $jobId,
                 'ok_qty' => $data['ok_qty'] ?? 0,
@@ -150,15 +238,16 @@ class ProductionService
 
             $daily = DailyProduction::firstOrCreate([
                 'job_master_id' => $jobId,
-                'work_date' => now()->toDateString()
+                'work_date' => $workDate
             ]);
             
-            $daily->increment('actual_ok', $data['ok_qty'] ?? 0);
-            $daily->increment('actual_qty', $data['ok_qty'] ?? 0);
-            $daily->increment('actual_repair', $data['repair_qty'] ?? 0);
-            $daily->increment('actual_reject', $data['reject_qty'] ?? 0);
-            
-            $actualQty = ProductionLog::where('job_master_id', $jobId)->sum('ok_qty');
+            $actualQty = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())->sum('ok_qty');
+            $actualRepair = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())->sum('repair_qty');
+            $actualReject = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())->sum('reject_qty');
+
             $job = JobMaster::find($jobId);
             $targetQty = $job?->capacity ?? 0;
             
@@ -166,16 +255,43 @@ class ProductionService
             if ($targetQty > 0) {
                 $efficiency = round(($actualQty / $targetQty) * 100, 2);
             }
-            
+
+            $runtimeSeconds = $this->calculateRuntime($jobId);
+
             $daily->update([
+                'line' => $job?->line,
+                'shift' => $this->getShift(),
+                'actual_ok' => $actualQty,
                 'actual_qty' => $actualQty,
+                'actual_repair' => $actualRepair,
+                'actual_reject' => $actualReject,
+                'runtime_seconds' => $runtimeSeconds,
+                'downtime_seconds' => Downtime::where('job_master_id', $jobId)
+                    ->whereDate('created_at', now())->sum('duration_seconds'),
                 'efficiency' => $efficiency
             ]);
+
+            // Sync quantities to PPC Production Plan
+            $this->syncPlan($jobId, null, $actualQty, $actualRepair, $actualReject);
+
+            $this->signalDashboard($jobId);
+
+            // Hanya simpan 5 record log terbaru per job, hapus yang lama
+            $logIds = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())
+                ->orderBy('created_at', 'desc')
+                ->pluck('id')
+                ->take(5);
+            ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())
+                ->whereNotIn('id', $logIds)
+                ->delete();
 
             return [
                 'log' => $log,
                 'actualQty' => $actualQty,
-                'efficiency' => $efficiency
+                'efficiency' => $efficiency,
+                'runtime_seconds' => $runtimeSeconds
             ];
         });
     }
@@ -207,6 +323,8 @@ class ProductionService
                 ['runtime_seconds' => $runtime]
             );
 
+            $this->signalDashboard($jobId);
+
             return $runtime;
         });
     }
@@ -229,6 +347,8 @@ class ProductionService
 
             JobMaster::where('id', $jobId)->update(['status' => 'running']);
             $this->syncPlanStatus($jobId, 'running');
+
+            $this->signalDashboard($jobId);
 
             return true;
         });
@@ -262,6 +382,8 @@ class ProductionService
                 ->whereDate('work_date', now()->toDateString())
                 ->update(['runtime_seconds' => 0]);
 
+            $this->signalDashboard($jobId);
+
             return true;
         });
     }
@@ -269,9 +391,14 @@ class ProductionService
     /**
      * Finish a job and sync metrics.
      */
-    public function finishJob($jobId, $nextJobId = null)
+    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null)
     {
-        return DB::transaction(function () use ($jobId, $nextJobId) {
+        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject) {
+            // Auto-close any active downtimes for this job
+            Downtime::where('job_master_id', $jobId)
+                ->whereNull('finish_time')
+                ->update(['finish_time' => now()]);
+
             $runtime = $this->calculateRuntime($jobId);
 
             $session = ProductionSession::where('job_master_id', $jobId)
@@ -280,7 +407,7 @@ class ProductionService
 
             if ($session) {
                 $session->total_seconds = (int) $runtime;
-                $session->status = 'complete';
+                $session->status = 'finished';
                 $session->finish_time = now();
                 $session->save();
             }
@@ -292,9 +419,25 @@ class ProductionService
             ]);
             $this->syncPlanStatus($jobId, 'complete');
 
-            $totalOk = ProductionLog::where('job_master_id', $jobId)->sum('ok_qty');
-            $totalRepair = ProductionLog::where('job_master_id', $jobId)->sum('repair_qty');
-            $totalReject = ProductionLog::where('job_master_id', $jobId)->sum('reject_qty');
+            if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
+                // Finalisasi: replace semua log dengan nilai final
+                ProductionLog::where('job_master_id', $jobId)
+                    ->whereDate('created_at', now())
+                    ->delete();
+                ProductionLog::create([
+                    'job_master_id' => $jobId,
+                    'ok_qty'        => $finalOk ?? 0,
+                    'repair_qty'    => $finalRepair ?? 0,
+                    'reject_qty'    => $finalReject ?? 0,
+                ]);
+                $totalOk     = $finalOk ?? 0;
+                $totalRepair = $finalRepair ?? 0;
+                $totalReject = $finalReject ?? 0;
+            } else {
+                $totalOk     = ProductionLog::where('job_master_id', $jobId)->sum('ok_qty');
+                $totalRepair = ProductionLog::where('job_master_id', $jobId)->sum('repair_qty');
+                $totalReject = ProductionLog::where('job_master_id', $jobId)->sum('reject_qty');
+            }
 
             DailyProduction::updateOrCreate(
                 ['job_master_id' => $jobId, 'work_date' => now()->toDateString()],
@@ -308,29 +451,98 @@ class ProductionService
                 ]
             );
 
-            // AUTO-START NEXT JOB IF SPECIFIED
-            if ($nextJobId) {
-                $this->startDandori($nextJobId);
+            // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
+            if ($nextJobId === 'STOP_SESSION') {
+                $resolvedNextJobId = null;
+            } else {
+                $resolvedNextJobId = $nextJobId;
+                if (empty($resolvedNextJobId)) {
+                    $nextJob = $this->getNextJob($jobId);
+                    if ($nextJob) {
+                        $resolvedNextJobId = $nextJob->id;
+                    }
+                }
             }
+
+            if ($resolvedNextJobId) {
+                $this->startDandori($resolvedNextJobId);
+            }
+
+            $this->signalDashboard($jobId);
 
             return $runtime;
         });
     }
+
+    // autoStartNextJobAsIdle removed — flow langsung Dandori
 
     /**
      * Start a downtime event.
      */
     public function startDowntime($jobId, array $data)
     {
-        return Downtime::create([
-            'job_master_id' => $jobId,
-            'jenis_downtime' => $data['jenis_downtime'],
-            'problem' => $data['problem'],
-            'penyebab' => $data['penyebab'],
-            'action' => $data['action'],
-            'pic' => $data['pic'],
-            'start_time' => now()
-        ]);
+        return DB::transaction(function () use ($jobId, $data) {
+            $downtime = Downtime::create([
+                'job_master_id' => $jobId,
+                'jenis_downtime' => $data['jenis_downtime'],
+                'problem' => $data['problem'],
+                'penyebab' => $data['penyebab'],
+                'action' => $data['action'],
+                'pic' => $data['pic'],
+                'start_time' => now()
+            ]);
+
+            $this->syncHambatanJalur($downtime);
+
+            $this->signalDashboard($jobId);
+
+            return $downtime;
+        });
+    }
+
+    public function syncHambatanJalur(Downtime $downtime): void
+    {
+        $map = [
+            'mesin' => 'MT',
+            'dies' => 'DT',
+            'material' => 'MST',
+            'logistic' => 'LOGT',
+            'produksi' => 'Prot',
+        ];
+
+        $jenisHambatan = $map[strtolower($downtime->jenis_downtime)] ?? null;
+        if (!$jenisHambatan) {
+            return;
+        }
+
+        $jobMaster = $downtime->jobMaster;
+        $lineName = $jobMaster->line ?? null;
+        $jobNo = $jobMaster->job_number ?? null;
+        $namaPart = $jobMaster->job_name ?? null;
+
+        $hj = HambatanJalur::where('downtime_id', $downtime->id)->first();
+
+        $attrs = [
+            'line_name' => $lineName,
+            'mesin' => $lineName,
+            'job_no' => $jobNo,
+            'nama_part' => $namaPart,
+            'jenis_hambatan' => $jenisHambatan,
+            'problem' => $downtime->problem,
+            'penyebab' => $downtime->penyebab,
+            'penanggulangan' => $downtime->action,
+            'pic_hambatan' => $downtime->pic,
+            'waktu' => $downtime->start_time,
+        ];
+
+        if ($hj) {
+            $hj->update($attrs);
+        } else {
+            $attrs['downtime_id'] = $downtime->id;
+            $attrs['sub_jenis'] = null;
+            $attrs['status'] = 'open';
+            HambatanJalur::create($attrs);
+        }
     }
 
     /**
@@ -360,6 +572,8 @@ class ProductionService
                 ['downtime_seconds' => $totalDowntime]
             );
 
+            $this->signalDashboard($downtime->job_master_id);
+
             return $downtime;
         });
     }
@@ -384,6 +598,8 @@ class ProductionService
                 ->whereDate('work_date', now()->toDateString())
                 ->update(['downtime_seconds' => $totalDowntime]);
 
+            $this->signalDashboard($jobId);
+
             return true;
         });
     }
@@ -402,7 +618,7 @@ class ProductionService
         $total = (int)$session->total_seconds;
         if ($session->status == 'running' && $session->start_time) {
             $startTime = Carbon::parse($session->start_time);
-            $total += abs(now()->diffInSeconds($startTime));
+            $total += max(0, (int)round(abs(now()->floatDiffInSeconds($startTime))));
         }
 
         return $total;
@@ -440,6 +656,9 @@ class ProductionService
                     'shift'             => $this->getShift(),
                     'target_qty'        => $targetQty,
                     'actual_qty'        => $actualQty,
+                    'actual_ok'         => $actualQty,
+                    'actual_repair'     => (int) ($data['repair_qty'] ?? 0),
+                    'actual_reject'     => (int) ($data['reject_qty'] ?? 0),
                     'reject_qty'        => (int) ($data['reject_qty'] ?? 0),
                     'repair_qty'        => (int) ($data['repair_qty'] ?? 0),
                     'runtime_seconds'   => $runtime,
@@ -450,6 +669,11 @@ class ProductionService
                     'status'            => 'complete',
                 ]
             );
+
+            // Sync status and quantities to PPC Production Plan
+            $this->syncPlan($jobId, 'complete', $actualQty, (int) ($data['repair_qty'] ?? 0), (int) ($data['reject_qty'] ?? 0));
+
+            $this->signalDashboard($jobId);
 
             return [
                 'runtime' => $runtime,
@@ -465,7 +689,7 @@ class ProductionService
     {
         $hour = (int) now()->format('H');
 
-        if ($hour >= 7 && $hour < 19) {
+        if ($hour >= 7 && $hour < 21) {
             return 'Shift Pagi';
         }
 
@@ -486,6 +710,35 @@ class ProductionService
         $current = JobMaster::find($currentJobId);
         if (!$current) return null;
 
+        // Try resolving the next job using the planned sequence sheet
+        $parts = explode('-', $current->job_number);
+        $planId = end($parts);
+
+        if (is_numeric($planId)) {
+            $currentPlan = \App\Models\ProductionPlan::find($planId);
+            if ($currentPlan) {
+                $nextPlan = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
+                    ->where('shift_name', $currentPlan->shift_name)
+                    ->where('press_name', $currentPlan->press_name)
+                    ->where('row_type', 'job')
+                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                    ->where('row_no', '>', $currentPlan->row_no)
+                    ->orderBy('row_no', 'asc')
+                    ->first();
+
+                if ($nextPlan) {
+                    $nextIdentifier = $nextPlan->job_no ? ($nextPlan->job_no . '-' . $nextPlan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($nextPlan->job_master) . '-' . $nextPlan->id);
+                    $nextJob = JobMaster::where('job_number', $nextIdentifier)
+                        ->whereNotIn(DB::raw('LOWER(status)'), ['complete'])
+                        ->first();
+                    if ($nextJob) {
+                        return $nextJob;
+                    }
+                }
+            }
+        }
+
+        // Fallback to old query
         return JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
             ->where('line', $current->line)
             ->where('id', '!=', $currentJobId)
@@ -495,9 +748,9 @@ class ProductionService
     }
 
     /**
-     * Sync ProductionPlan status based on JobMaster
+     * Sync ProductionPlan status and quantities based on JobMaster
      */
-    private function syncPlanStatus($jobId, $status)
+    private function syncPlan($jobId, $status = null, $ok = null, $repair = null, $reject = null)
     {
         $jobMaster = \App\Models\JobMaster::find($jobId);
         if (!$jobMaster) return;
@@ -507,16 +760,80 @@ class ProductionService
         $planId = end($parts);
 
         if (is_numeric($planId)) {
-            $mappedStatus = strtolower($status);
-            if ($mappedStatus === 'running' || $mappedStatus === 'paused') {
-                $mappedStatus = 'approved';
-            } elseif ($mappedStatus === 'complete') {
-                $mappedStatus = 'completed';
+            $updateData = [];
+
+            if ($status !== null) {
+                $mappedStatus = strtolower($status);
+                if ($mappedStatus === 'running' || $mappedStatus === 'paused') {
+                    $mappedStatus = 'approved';
+                } elseif ($mappedStatus === 'complete') {
+                    $mappedStatus = 'completed';
+                }
+
+                if (in_array($mappedStatus, ['pending', 'approved', 'completed'])) {
+                    $updateData['status'] = $mappedStatus;
+                }
             }
 
-            if (in_array($mappedStatus, ['pending', 'approved', 'completed'])) {
-                \App\Models\ProductionPlan::where('id', $planId)->update(['status' => $mappedStatus]);
+            // Jika salah satu kuantitas bernilai null, ambil secara dinamis dari database harian
+            if ($ok === null || $repair === null || $reject === null) {
+                $daily = \App\Models\DailyProduction::where('job_master_id', $jobId)
+                    ->whereDate('work_date', now()->toDateString())
+                    ->first();
+                if ($daily) {
+                    $ok = $ok ?? $daily->actual_qty;
+                    $repair = $repair ?? ($daily->actual_repair ?: $daily->repair_qty);
+                    $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
+                } else {
+                    $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                        ->whereDate('created_at', now())->sum('ok_qty');
+                    $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                        ->whereDate('created_at', now())->sum('repair_qty');
+                    $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                        ->whereDate('created_at', now())->sum('reject_qty');
+                }
             }
+
+            $updateData['ok'] = (float) ($ok ?? 0);
+            $updateData['repair'] = (float) ($repair ?? 0);
+            $updateData['reject'] = (float) ($reject ?? 0);
+
+            // Sync actual times to PPC
+            if ($jobMaster->started_at) {
+                $updateData['act_start'] = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+            }
+            if ($jobMaster->finished_at) {
+                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
+            } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
+                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
+            }
+
+            \App\Models\ProductionPlan::where('id', $planId)->update($updateData);
+
+            // Recovery Lock: if this plan has a recovery_id and ok > 0,
+            // set the RecoveryItem status to in_production automatically
+            $plan = \App\Models\ProductionPlan::find($planId);
+            if ($plan && $plan->recovery_id && (float)($plan->ok ?? 0) > 0) {
+                \App\Models\RecoveryItem::where('id', $plan->recovery_id)
+                    ->where('status', 'scheduled')
+                    ->update(['status' => 'in_production']);
+            }
+        }
+    }
+
+    /**
+     * Sync ProductionPlan status based on JobMaster
+     */
+    private function syncPlanStatus($jobId, $status)
+    {
+        $this->syncPlan($jobId, $status);
+    }
+
+    private function signalDashboard($jobId): void
+    {
+        $job = JobMaster::find($jobId);
+        if ($job && $job->line) {
+            DashboardRealtimeService::signalUpdate($job->line);
         }
     }
 }
