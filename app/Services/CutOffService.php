@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Models\ProductionPlan;
 use App\Models\RecoveryItem;
 use App\Models\RecoverySchedule;
-use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -97,52 +96,4 @@ class CutOffService
         return $stats;
     }
 
-    /**
-     * Determine which shift should be cut off based on current time.
-     * Reads shift end times from config/shift.php.
-     */
-    public function getShiftToCutOff(): ?array
-    {
-        $now = Carbon::now();
-        $current = $now->format('H:i');
-
-        $shifts = ['Shift Pagi', 'Shift Malam'];
-        foreach ($shifts as $shiftName) {
-            $config = config("shift.{$shiftName}");
-            if (!$config) continue;
-
-            $endTime = $config['end'];
-            $endCarbon = Carbon::createFromTimeString($endTime);
-            $windowEnd = $endCarbon->copy()->addMinutes(15)->format('H:i');
-
-            if ($current >= $endTime && $current < $windowEnd) {
-                $date = $shiftName === 'Shift Malam'
-                    ? $now->copy()->subDay()->format('Y-m-d')
-                    : $now->format('Y-m-d');
-                return [
-                    'date'  => $date,
-                    'shift' => $shiftName,
-                ];
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Check if there are pending recovery items for a given press.
-     */
-    public function getPendingRecoveryForPress(string $pressName, ?string $date = null): int
-    {
-        $query = RecoveryItem::pending()->where('press_name', $pressName);
-
-        if ($date) {
-            $query->where(function ($q) use ($date) {
-                $q->whereDate('source_date', $date)
-                  ->orWhereDate('original_date', $date);
-            });
-        }
-
-        return $query->count();
-    }
 }

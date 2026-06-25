@@ -53,41 +53,6 @@ class RecoveryController extends Controller
     }
 
     /**
-     * Approve selected recovery items.
-     */
-    public function approveItems(Request $request)
-    {
-        $request->validate([
-            'item_ids' => 'required|array',
-            'item_ids.*' => 'exists:recovery_items,id',
-        ]);
-
-        $itemIds = $request->input('item_ids', []);
-
-        $items = RecoveryItem::whereIn('id', $itemIds)
-            ->where('status', 'waiting_approval')
-            ->get();
-
-        if ($items->isEmpty()) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Item tidak ditemukan atau sudah diproses.',
-            ]);
-        }
-
-        RecoveryItem::whereIn('id', $items->pluck('id'))
-            ->update([
-                'status'     => 'approved',
-                'updated_at' => now(),
-            ]);
-
-        return response()->json([
-            'success' => true,
-            'message' => count($items) . ' item berhasil di-approve.',
-        ]);
-    }
-
-    /**
      * Reject a single recovery item.
      */
     public function rejectItem(Request $request, $id)

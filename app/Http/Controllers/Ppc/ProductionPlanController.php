@@ -677,17 +677,6 @@ class ProductionPlanController extends Controller
 
 
 
-    public function recoveryHistory()
-    {
-        $rejectedItems = RecoveryItem::rejected()
-            ->with('schedule')
-            ->orderBy('original_date', 'desc')
-            ->orderBy('press_name')
-            ->get();
-
-        return view('ppc.planning.recovery_history', compact('rejectedItems'));
-    }
-
     private function findPython(): ?string
     {
         $candidates = [
