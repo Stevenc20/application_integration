@@ -346,12 +346,21 @@ class ProductionPlanController extends Controller
                     if ($shiftName) $uniqueShifts[$shiftName] = true;
                 }
 
-                // CLEANUP PER DATE+SHIFT (bukan per press) — jangan hapus recovery items
-                foreach (array_keys($uniqueShifts) as $shiftToDelete) {
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->whereNull('recovery_id')
-                        ->delete();
+                // Skip cleanup if there are IN_PRODUCTION recovery items on this date
+                $hasInProduction = ProductionPlan::whereDate('plan_date', $parsedDate)
+                    ->where('source_type', 'recovery')
+                    ->whereHas('recoveryItem', function ($q) {
+                        $q->where('status', 'in_production');
+                    })
+                    ->exists();
+
+                if (!$hasInProduction) {
+                    foreach (array_keys($uniqueShifts) as $shiftToDelete) {
+                        ProductionPlan::whereDate('plan_date', $parsedDate)
+                            ->where('shift_name', $shiftToDelete)
+                            ->where('source_type', 'ppc')
+                            ->delete();
+                    }
                 }
 
                 // PRE-PASS: deteksi grup (cleanShift||press) yang punya sheet REV
@@ -392,68 +401,7 @@ class ProductionPlanController extends Controller
                     }
                     if (!$lineId) $lineId = array_values($lineMap)[0] ?? 1;
 
-                    // 1. INSERT RECOVERY ITEMS FIRST (top of timeline)
-                    $existingRecoveryCount = ProductionPlan::where('plan_date', $parsedDate)
-                        ->where('press_name', $pressName)
-                        ->whereNotNull('recovery_id')
-                        ->max('row_no') ?? 0;
-                    $recoveryRowNo = $existingRecoveryCount;
-                    $approvedRecoveryItems = RecoveryItem::approved()
-                        ->where('press_name', $pressName)
-                        ->whereNotExists(function ($q) use ($parsedDate, $pressName) {
-                            $q->selectRaw(1)
-                              ->from('production_plans')
-                              ->whereColumn('production_plans.recovery_id', 'recovery_items.id')
-                              ->whereDate('production_plans.plan_date', $parsedDate)
-                              ->where('production_plans.press_name', $pressName);
-                        })
-                        ->orderBy('source_date', 'asc')
-                        ->orderBy('created_at', 'asc')
-                        ->get();
-
-                    foreach ($approvedRecoveryItems as $ri) {
-                        // Skip if already exists in production_plans (already approved & imported)
-                        $alreadyImported = ProductionPlan::where('plan_date', $parsedDate)
-                            ->where('press_name', $pressName)
-                            ->where('recovery_id', $ri->id)
-                            ->exists();
-                        if ($alreadyImported) {
-                            continue;
-                        }
-
-                        $recoveryRowNo++;
-                        $recoveryProcessTime = $ri->ct_detik > 0
-                            ? (int) ceil(($ri->ct_detik * $ri->plan_qty) / 60.0)
-                            : 0;
-
-                        ProductionPlan::create([
-                            'line_master_id' => $lineId,
-                            'plan_date'      => $parsedDate,
-                            'shift_name'     => $shiftName,
-                            'press_name'     => $pressName,
-                            'row_no'         => $recoveryRowNo,
-                            'row_type'       => 'job',
-                            'job_master'     => $ri->job_master,
-                            'job_no'         => $ri->job_no,
-                            'plan'           => $ri->plan_qty,
-                            'ok'             => 0,
-                            'repair'         => 0,
-                            'reject'         => 0,
-                            'ct_detik'       => $ri->ct_detik ?? 0,
-                            'dct'            => $ri->dct ?? 0,
-                            'reg_active'     => $ri->reg_active ?? 0,
-                            'total_mesin'    => $ri->total_mesin ?? 1,
-                            'process_time'   => $recoveryProcessTime,
-                            'recovery_id'    => $ri->id,
-                            'status'         => 'pending',
-                            'created_at'     => now(),
-                            'updated_at'     => now(),
-                        ]);
-
-                        $imported++;
-                    }
-
-                    // 2. INSERT EXCEL ITEMS (after recovery items)
+                    // INSERT EXCEL ITEMS
                     $excelRowNos = [];
 
                     foreach ($sheetData['rows'] as $item) {
@@ -564,17 +512,6 @@ class ProductionPlanController extends Controller
                     }
 
                     $imported += count($rows);
-
-                    // 3. MARK SCHEDULED RECOVERY ITEMS (so they don't re-import next time)
-                    if ($approvedRecoveryItems->isNotEmpty()) {
-                        RecoveryItem::whereIn('id', $approvedRecoveryItems->pluck('id'))
-                            ->update(['status' => 'scheduled']);
-                        // Also update parent schedules if all their items are done
-                        $scheduleIds = $approvedRecoveryItems->pluck('recovery_schedule_id')->unique();
-                        RecoverySchedule::whereIn('id', $scheduleIds)
-                            ->where('status', 'approved')
-                            ->update(['status' => 'scheduled']);
-                    }
                 }
  
             });
@@ -597,15 +534,13 @@ class ProductionPlanController extends Controller
                 \Log::warning("Failed to log schedule revision: " . $e->getMessage());
             }
 
-            // CLEANUP DATA LAMA: Hapus production plan untuk tanggal sebelum yang diimport
-            // agar Input Harian tidak menampilkan data dari tanggal sebelumnya
-            // Hapus dulu recovery_items yang reference production_plans lama (FK constraint)
-            \App\Models\RecoveryItem::whereIn('production_plan_id', function ($q) use ($parsedDate) {
-                $q->select('id')->from('production_plans')->whereDate('plan_date', '<', $parsedDate);
-            })->delete();
-            $oldPlansCount = ProductionPlan::whereDate('plan_date', '<', $parsedDate)->delete();
+            // CLEANUP DATA LAMA: Hapus PPC production plan untuk tanggal sebelum yang diimport
+            // Hanya source_type='ppc' — jangan sentuh recovery items
+            $oldPlansCount = ProductionPlan::whereDate('plan_date', '<', $parsedDate)
+                ->where('source_type', 'ppc')
+                ->delete();
             if ($oldPlansCount > 0) {
-                \Log::info("Import cleanup: {$oldPlansCount} old production plans deleted (before {$parsedDate})");
+                \Log::info("Import cleanup: {$oldPlansCount} old PPC plans deleted (before {$parsedDate})");
             }
 
             @unlink($dataPath);
