@@ -12,6 +12,7 @@ use App\Models\JobMaster;
 use App\Models\MasterStamping;
 use App\Models\RecoveryItem;
 use App\Models\RecoverySchedule;
+use App\Services\ExcelScheduleParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
@@ -251,17 +252,42 @@ class ProductionPlanController extends Controller
             ->orderBy('job_master')
             ->get();
 
+        // QUERY OVERFLOW: items that went through timeline engine but couldn't fit
+        $overflowQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'job')
+            ->whereNull('start_time')
+            ->whereNull('finish_time')
+            ->where('source_type', 'ppc')
+            ->whereNotNull('job_no')
+            ->where('job_no', '!=', '')
+            ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
+
+        if ($currentPress !== 'ALL') $overflowQuery->where('press_name', $currentPress);
+        if ($currentShift !== 'ALL') $overflowQuery->where('shift_name', $currentShift);
+
+        $overflowItems = $overflowQuery->get();
+        $overflowByPress = $overflowItems->groupBy('press_name');
+        $overflowCount = $overflowItems->count();
+
+        // Press config for production boundaries (extended shift, jebol alert)
+        $pressMeta = null;
+        if ($currentPress !== 'ALL') {
+            $pressMeta = \App\Models\LineMaster::where(DB::raw('REPLACE(REPLACE(UPPER(line_name), " ", ""), "-", "")'), 'LIKE', '%' . str_replace([' ', '-', 'LINE'], '', $currentPress) . '%')
+                ->select('line_name', 'production_start', 'production_end')
+                ->first();
+        }
+
         return view(
             'ppc.planning.production_plan',
-            compact('plans', 'lines', 'date', 'currentPress', 'totalFinishRow', 'cardSummaries', 'currentShift', 'availableShifts', 'totalJobs', 'activeFilters', 'pendingRecoveries', 'pendingRecoveryItems')
+            compact('plans', 'lines', 'date', 'currentPress', 'totalFinishRow', 'cardSummaries', 'currentShift', 'availableShifts', 'totalJobs', 'activeFilters', 'pendingRecoveries', 'pendingRecoveryItems', 'overflowItems', 'overflowByPress', 'overflowCount', 'pressMeta')
         );
     }
 
     public function import(Request $request)
     {
-        \Log::info("--- PRODUCTION PLAN IMPORT (PYTHON ENGINE) STARTED ---");
+        \Log::info("--- PRODUCTION PLAN IMPORT STARTED ---");
         $request->validate([
-            'excel_file' => 'required|mimes:xlsx,xls,xlsm|max:51200',
+            'excel_file' => 'required|file|max:51200|extensions:xlsx,xls,xlsm',
         ]);
 
         try {
@@ -274,39 +300,64 @@ class ProductionPlanController extends Controller
             if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
             $file->move($uploadDir, 'prod_plan_temp.' . $extension);
 
+            $result = null;
+            $parserSource = null;
+
+            // ATTEMPT 1: Python engine
             $python = $this->findPython();
-            if (!$python) {
-                @unlink($dataPath);
-                return back()->with('error', 'Python tidak ditemukan di server.');
+            if ($python) {
+                $scriptPath = base_path('scripts/read_schedule_stamping.py');
+                if (file_exists($scriptPath)) {
+                    $output = $this->runPythonScript($python, $scriptPath, $dataPath, $originalName);
+                    if ($output) {
+                        $output = trim($output);
+                        $jsonStart = strpos($output, '{');
+                        if ($jsonStart !== false) $output = substr($output, $jsonStart);
+                        $parsed = json_decode($output, true);
+                        if ($parsed && !isset($parsed['error'])) {
+                            $result = $parsed;
+                            $parserSource = 'python';
+                            \Log::info('[IMPORT] Python engine succeeded.');
+                        } else {
+                            \Log::warning("Python engine failed, falling back to PHP: " . ($parsed['error'] ?? 'Invalid JSON'));
+                        }
+                    } else {
+                        \Log::warning("Python engine produced no output, falling back to PHP.");
+                    }
+                }
+            } else {
+                \Log::info('[IMPORT] Python not found, using PHP fallback.');
             }
 
-            $scriptPath = base_path('scripts/read_schedule_stamping.py');
-            if (!file_exists($scriptPath)) {
-                @unlink($dataPath);
-                return back()->with('error', 'Script Python tidak ditemukan.');
+            // ATTEMPT 2: PHP PhpSpreadsheet fallback
+            if (!$result) {
+                try {
+                    $parser = app(ExcelScheduleParser::class);
+                    $result = $parser->parse($dataPath, $originalName);
+                    $parserSource = 'php';
+                    if (isset($result['error'])) {
+                        \Log::error("PHP Excel Parser Error: " . $result['error']);
+                        @unlink($dataPath);
+                        return back()->with('error', 'Error Parsing Excel: ' . $result['error']);
+                    }
+                    \Log::info('[IMPORT] PHP ExcelParser succeeded.');
+                } catch (\Throwable $e) {
+                    \Log::error("PHP ExcelParser crashed: " . $e->getMessage());
+                    @unlink($dataPath);
+                    return back()->with('error', 'Gagal membaca Excel: ' . $e->getMessage());
+                }
             }
 
-            $output = $this->runPythonScript($python, $scriptPath, $dataPath, $originalName);
-            
-            if (!$output) {
+            if (!$result) {
                 @unlink($dataPath);
-                return back()->with('error', 'Gagal mendapatkan output dari engine Python.');
+                return back()->with('error', 'Gagal mendapatkan output dari engine Python maupun PHP fallback.');
             }
 
-            // Clean output from any potential leading/trailing whitespace or debug text
-            $output = trim($output);
-            $jsonStart = strpos($output, '{');
-            if ($jsonStart !== false) {
-                $output = substr($output, $jsonStart);
-            }
-
-            $result = json_decode($output, true);
-            
-            if (!$result || isset($result['error'])) {
-                \Log::error("Python Result Error: " . ($output ?: 'Empty output'));
-                @unlink($dataPath);
-                return back()->with('error', 'Error Parsing: ' . ($result['error'] ?? 'Format JSON tidak valid atau script crash.'));
-            }
+            // [TRACE JSON] Dump parser output to storage for UAT
+            file_put_contents(storage_path('logs/import_dump.json'), json_encode([
+                'source' => $parserSource,
+                'data' => $result,
+            ], JSON_PRETTY_PRINT));
 
             // PRIORITIZE MANUALLY SELECTED DATE FROM MODAL
             $manualDate = $request->get('date');
@@ -346,20 +397,64 @@ class ProductionPlanController extends Controller
                     if ($shiftName) $uniqueShifts[$shiftName] = true;
                 }
 
-                // Skip cleanup if there are IN_PRODUCTION recovery items on this date
-                $hasInProduction = ProductionPlan::whereDate('plan_date', $parsedDate)
-                    ->where('source_type', 'recovery')
-                    ->whereHas('recoveryItem', function ($q) {
-                        $q->where('status', 'in_production');
-                    })
-                    ->exists();
+                foreach (array_keys($uniqueShifts) as $shiftToDelete) {
+                    // 1. DELETE old PPC baseline rows (source_type = 'ppc')
+                    $ppcPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
+                        ->where('shift_name', $shiftToDelete)
+                        ->where('source_type', 'ppc')
+                        ->pluck('id');
 
-                if (!$hasInProduction) {
-                    foreach (array_keys($uniqueShifts) as $shiftToDelete) {
-                        ProductionPlan::whereDate('plan_date', $parsedDate)
-                            ->where('shift_name', $shiftToDelete)
-                            ->where('source_type', 'ppc')
-                            ->delete();
+                    if ($ppcPlanIds->isNotEmpty()) {
+                        // Disassociate recovery queue items — DON'T delete them
+                        \App\Models\RecoveryItem::whereIn('production_plan_id', $ppcPlanIds)
+                            ->update(['production_plan_id' => null]);
+                    }
+
+                    ProductionPlan::whereDate('plan_date', $parsedDate)
+                        ->where('shift_name', $shiftToDelete)
+                        ->where('source_type', 'ppc')
+                        ->delete();
+
+                    // 2. DELETE recovery-generated timeline rows (source_type = 'recovery')
+                    //    BUT keep plans for items that are already in_production or completed
+                    $recoveryPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
+                        ->where('shift_name', $shiftToDelete)
+                        ->where('source_type', 'recovery')
+                        ->whereDoesntHave('recoveryItem', function ($q) {
+                            $q->whereIn('status', ['in_production', 'completed']);
+                        })
+                        ->pluck('id');
+
+                    if ($recoveryPlanIds->isNotEmpty()) {
+                        \App\Models\RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
+                            ->update(['production_plan_id' => null]);
+                    }
+
+                    ProductionPlan::whereDate('plan_date', $parsedDate)
+                        ->where('shift_name', $shiftToDelete)
+                        ->where('source_type', 'recovery')
+                        ->whereDoesntHave('recoveryItem', function ($q) {
+                            $q->whereIn('status', ['in_production', 'completed']);
+                        })
+                        ->delete();
+
+                    // Revert approved/scheduled RecoveryItems back to waiting_approval queue
+                    // First get the IDs of items to revert (all, not just those with null production_plan_id)
+                    $revertRecoveryIds = \App\Models\RecoveryItem::whereDate('source_date', $parsedDate)
+                        ->where('source_shift', $shiftToDelete)
+                        ->whereIn('status', ['approved', 'scheduled'])
+                        ->pluck('id');
+
+                    if ($revertRecoveryIds->isNotEmpty()) {
+                        // Reset any ProductionPlan rows linked to these RecoveryItems
+                        // This handles orphaned plans on other dates/shifts that weren't deleted above
+                        \App\Models\ProductionPlan::whereIn('recovery_id', $revertRecoveryIds)
+                            ->where('source_type', 'recovery')
+                            ->update(['source_type' => 'ppc', 'recovery_id' => null]);
+
+                        // Revert the RecoveryItems
+                        \App\Models\RecoveryItem::whereIn('id', $revertRecoveryIds)
+                            ->update(['status' => 'waiting_approval']);
                     }
                 }
 
@@ -374,15 +469,16 @@ class ProductionPlanController extends Controller
                     }
                 }
 
+                $importedJobKeys = [];
+                $importedBreakKeys = [];
                 foreach ($sheets as $sheetData) {
                     $originalShift = $sheetData['shift_name'] ?? '';
                     $cleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $originalShift))));
                     $groupKey = $cleanShift . '||' . ($sheetData['press_name'] ?? '');
+                    $isRevSheet = (bool) preg_match('/REV|REVISI/i', $originalShift);
 
-                    // Skip non-REV sheet jika ada versi REV di grup yang sama
-                    if (!preg_match('/REV|REVISI/i', $originalShift) && !empty($hasRevInGroup[$groupKey])) {
-                        continue;
-                    }
+                    // Non-Rev sheet: process but skip rows already imported from Rev
+                    // Rev sheet tetap diproses normal
                     $rows = [];
                     $shiftName = $sheetData['shift_name'];
                     $shiftName = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $shiftName);
@@ -403,39 +499,65 @@ class ProductionPlanController extends Controller
 
                     // INSERT EXCEL ITEMS
                     $excelRowNos = [];
+                    $totalReceived = count($sheetData['rows']);
+                    $skippedMeta = 0;
 
                     foreach ($sheetData['rows'] as $item) {
+                        \Log::info('[TRACE ROW PARSER]', [
+                            'raw_row_no' => $item['row_no'] ?? 'KEY_MISSING',
+                            'type'       => gettype($item['row_no'] ?? null),
+                            'job_no'     => $item['job_no'] ?? null,
+                            'row_type'   => $item['row_type'] ?? null,
+                            'start'      => $item['start_time'] ?? null,
+                            'finish'     => $item['finish_time'] ?? null,
+                        ]);
+
+                        // ── SAFETY NET: skip rows that are clearly Excel metadata, not jobs ──
+                        $rawJm = $item['job_master'] ?? '';
+                        $rawJn = $item['job_no'] ?? '';
+                        $isMeta = (
+                            str_starts_with($rawJm, ':') ||                                   // ": Selasa Pagi", ": 23-Juni-2026"
+                            strtoupper(trim($rawJm)) === 'JOB MASTER' ||                       // "JOB MASTER" header row
+                            strtoupper(trim($rawJn)) === 'JOB NO.'                             // "JOB NO." header row
+                        );
+                        if ($isMeta) {
+                            \Log::info('[IMPORT] Skipped metadata row', ['job_master' => $rawJm, 'job_no' => $rawJn]);
+                            $skippedMeta++;
+                            continue;
+                        }
                         $rowType = $item['row_type'] ?? 'job';
                         $jn = strtoupper($item['job_no'] ?? '');
                         $jm = strtoupper($item['job_master'] ?? '');
                         
-                        if ($rowType === 'note') {
-                            // Keep as note
-                        } else {
-                            $isBreakDesc = false;
-                            $breakKeywords = ['ISTIRAHAT', 'JUMAT', 'SORE', 'MALAM', 'CINGKORAK', 'BREAK', 'TOTAL FINISH', 'TOTAL FNISH', 'BREAKTI'];
-                            foreach ($breakKeywords as $kw) {
-                                if (str_contains($jn, $kw) || str_contains($jm, $kw)) {
-                                    $isBreakDesc = true;
-                                    break;
-                                }
+                        $planQty = floatval($item['plan'] ?? 0);
+                        $processTime = floatval($item['process_time'] ?? 0);
+                        $ctDetik = floatval($item['ct_detik'] ?? 0);
+                        $qtyPlt = floatval($item['qty_plt'] ?? 0);
+
+                        $isBreakDesc = false;
+                        $breakKeywords = ['ISTIRAHAT', 'CINGKORAK', 'BREAKTIME', 'BREAK TIME', 'ISHOMA'];
+                        foreach ($breakKeywords as $kw) {
+                            if (str_contains($jn, $kw) || str_contains($jm, $kw) || str_contains(strtoupper($item['keterangan'] ?? ''), $kw)) {
+                                $isBreakDesc = true;
+                                break;
                             }
-                        if ($isBreakDesc || $rowType === 'break') {
-                            $rowType = 'break';
                         }
-                        
-                        // Extra check: if it's a known summary keyword but not a break, force to note
-                            $noteKeywords = ['PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'];
-                            $isNoteDesc = false;
-                            foreach ($noteKeywords as $kw) {
-                                if (str_replace(' ', '', $jn) === str_replace(' ', '', $kw) || str_replace(' ', '', $jm) === str_replace(' ', '', $kw)) {
-                                    $isNoteDesc = true;
-                                    break;
-                                }
-                            }
-                            if ($isNoteDesc) {
-                                $rowType = 'note';
-                            }
+
+                        $isSummaryPattern = str_contains($jm, 'TOTAL FINISH') || str_contains($jn, 'TOTAL FINISH') || 
+                                            str_contains($jm, 'TOTAL FNISH') || str_contains($jn, 'TOTAL FNISH');
+
+                        // Structure-Driven RowClassifier
+                        if ($isSummaryPattern) {
+                            $rowType = 'total_finish';
+                        } elseif ($isBreakDesc || $rowType === 'break') {
+                            $rowType = 'break';
+                        } elseif ($planQty > 0 || $qtyPlt > 0 || $ctDetik > 0) {
+                            $rowType = 'job';
+                        } elseif ($planQty == 0 && $ctDetik == 0 && $processTime == 0 && empty($jm) && empty($jn)) {
+                            // Empty metrics + no job identity -> Note / Overflow / Deleted / Spacer
+                            $rowType = 'note';
+                        } else {
+                            $rowType = 'job';
                         }
 
                     $jm = $item['job_master'] ?? '';
@@ -454,6 +576,54 @@ class ProductionPlanController extends Controller
                             ? (int) $this->safeVal($item['process_time'], ProductionMetricsService::calculateProcessTime($ctDetik, $planQty))
                             : 0;
 
+                        // Dedup: skip non-Rev row if same job_master+job_no already imported from Rev
+                        if (!$isRevSheet && $rowType === 'job' && $jm && $jn) {
+                            $jobKey = $lineId . '||' . $jm . '||' . $jn;
+                            if (isset($importedJobKeys[$jobKey])) {
+                                $skippedMeta++;
+                                continue;
+                            }
+                        }
+                        // Track job key for Rev sheets
+                        if ($isRevSheet && $rowType === 'job' && $jm && $jn) {
+                            $jobKey = $lineId . '||' . $jm . '||' . $jn;
+                            $importedJobKeys[$jobKey] = true;
+                        }
+
+                        // Dedup break rows: skip if same line+press+keterangan+start+finish already imported
+                        if ($rowType === 'break') {
+                            $breakKeterangan = strtoupper(trim($item['job_no'] ?? $item['keterangan'] ?? ''));
+                            $breakStart = $item['start_time'] ?? '';
+                            $breakFinish = $item['finish_time'] ?? '';
+                            $breakKey = $lineId . '||break||' . $breakKeterangan . '||' . $breakStart . '||' . $breakFinish;
+                            \Log::info('[BREAK DEDUP]', [
+                                'sheetType'    => $isRevSheet ? 'Rev' : 'non-Rev',
+                                'keterangan'   => $item['keterangan'] ?? null,
+                                'job_no'       => $item['job_no'] ?? null,
+                                'breakLabel'   => $breakKeterangan,
+                                'start'        => $breakStart,
+                                'finish'       => $breakFinish,
+                                'breakKey'     => $breakKey,
+                                'alreadyExists'=> isset($importedBreakKeys[$breakKey]),
+                                'lineId'       => $lineId,
+                                'press'        => $pressName,
+                            ]);
+                            if (isset($importedBreakKeys[$breakKey])) {
+                                $skippedMeta++;
+                                continue;
+                            }
+                            $importedBreakKeys[$breakKey] = true;
+                        }
+
+                        $finalRowNo = $this->safeVal($item['row_no']) ?: 0;
+                        
+                        \Log::info('[TRACE IMPORT]', [
+                            'job'          => $jn,
+                            'raw_row_no'   => $item['row_no'] ?? 'KEY_MISSING',
+                            'final_row_no' => $finalRowNo,
+                            'row_type'     => $rowType,
+                        ]);
+
                         $rows[] = [
                             'line_master_id' => $lineId,
                             'plan_date'      => $parsedDate,
@@ -463,7 +633,8 @@ class ProductionPlanController extends Controller
                             'tgl'            => $this->safeVal($sheetData['tgl']),
                             'jam'            => $this->safeVal($sheetData['jam']),
                             'revisi'         => $this->safeVal($sheetData['revisi']),
-                            'row_no'         => ($this->safeVal($item['row_no']) ?: 0) + $recoveryRowNo,
+                            'row_no'         => $finalRowNo,
+                            'source_type'    => 'ppc',
                             'row_type'       => $rowType,
                             'job_master'     => $this->safeVal($jm),
                             'type_plt'       => $this->safeVal($item['type_plt']),
@@ -507,11 +678,25 @@ class ProductionPlanController extends Controller
                         ];
                     }
 
+                    $inserted = count($rows);
                     foreach (array_chunk($rows, 100) as $chunk) {
                         ProductionPlan::insert($chunk);
                     }
 
-                    $imported += count($rows);
+                    \Log::info('[IMPORT] Section stats', [
+                        'shift' => $shiftName,
+                        'press' => $pressName,
+                        'rows_from_python' => $totalReceived,
+                        'meta_skipped' => $skippedMeta,
+                        'inserted' => $inserted,
+                    ]);
+
+                    $imported += $inserted;
+                }
+
+                // Log Python's own row counts if available
+                if (isset($result['log'])) {
+                    \Log::info('[IMPORT] Python parser stats', $result['log']);
                 }
  
             });
@@ -535,9 +720,11 @@ class ProductionPlanController extends Controller
             }
 
             // CLEANUP DATA LAMA: Hapus PPC production plan untuk tanggal sebelum yang diimport
-            // Hanya source_type='ppc' — jangan sentuh recovery items
+            // Hanya source_type='ppc' — jangan sentuh recovery items dan plan yang punya recovery
+            $activeRecoveryPlanIds = \App\Models\RecoveryItem::pluck('production_plan_id')->filter()->unique();
             $oldPlansCount = ProductionPlan::whereDate('plan_date', '<', $parsedDate)
                 ->where('source_type', 'ppc')
+                ->whereNotIn('id', $activeRecoveryPlanIds)
                 ->delete();
             if ($oldPlansCount > 0) {
                 \Log::info("Import cleanup: {$oldPlansCount} old PPC plans deleted (before {$parsedDate})");
@@ -545,20 +732,10 @@ class ProductionPlanController extends Controller
 
             @unlink($dataPath);
 
-            $timelineGenerator = app(TimelineGenerationService::class);
-            $sections = ProductionPlan::whereDate('plan_date', $parsedDate)
-                ->select('shift_name', 'press_name')
-                ->distinct()
-                ->get();
-            foreach ($sections as $section) {
-                if ($section->shift_name) {
-                    $timelineGenerator->regenerateSection(
-                        $parsedDate,
-                        $section->shift_name,
-                        $section->press_name
-                    );
-                }
-            }
+            \Log::info('[IMPORT] Baseline saved — no timeline regeneration (per SRS Step 1)', [
+                'date' => $parsedDate,
+                'imported' => $imported,
+            ]);
 
             // Auto-redirect to the first parsed sheet for convenience
             if (!empty($result['sheets'])) {
@@ -605,11 +782,96 @@ class ProductionPlanController extends Controller
             $query->where('shift_name', 'like', "Shift $shift%");
         }
 
+        $plansToDelete = (clone $query)->pluck('id');
+        if ($plansToDelete->isNotEmpty()) {
+            \App\Models\RecoveryItem::whereIn('production_plan_id', $plansToDelete)
+                ->delete();
+        }
+
         $count = $query->count();
         $query->delete();
 
         return redirect()->route('ppc.planning.production_plan', ['date' => $date])
             ->with('success', "Clear Data Selesai! $count record untuk tanggal $date" . ($shift ? " (Shift $shift)" : '') . " telah dihapus.");
+    }
+
+    public function cancelApproval(Request $request)
+    {
+        $itemIds = $request->input('item_ids', []);
+
+        if (empty($itemIds)) {
+            return response()->json(['success' => false, 'message' => 'Tidak ada item yang dipilih.']);
+        }
+
+        $processedCount = 0;
+        $failedCount = 0;
+        $targets = [];
+
+        DB::transaction(function () use ($itemIds, &$processedCount, &$failedCount, &$targets) {
+            $items = RecoveryItem::whereIn('id', $itemIds)
+                ->where('status', 'approved')
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($items as $item) {
+                $plan = ProductionPlan::where('recovery_id', $item->id)->first();
+                
+                if ($plan) {
+                    // Strict cancelation check based on operational reality
+                    $hasStarted = ($plan->ok > 0 || $plan->repair > 0 || $plan->reject > 0 || $plan->status === 'running');
+                    
+                    if ($hasStarted) {
+                        $failedCount++;
+                        continue;
+                    }
+
+                    // Save target context to recalculate the timeline later
+                    $key = $plan->plan_date . '||' . $plan->press_name;
+                    $targets[$key] = [
+                        'date' => $plan->plan_date,
+                        'shift' => $plan->shift_name,
+                        'press' => $plan->press_name
+                    ];
+
+                    $plan->delete();
+                }
+
+                $item->update([
+                    'status' => 'waiting_approval',
+                    'updated_at' => now(),
+                ]);
+
+                // Safety net: reset any surviving ProductionPlan rows linked to this RecoveryItem
+                \App\Models\ProductionPlan::where('recovery_id', $item->id)
+                    ->where('source_type', 'recovery')
+                    ->update(['source_type' => 'ppc', 'recovery_id' => null]);
+
+                $processedCount++;
+            }
+        });
+
+        // Regenerate sections using the target contexts
+        if ($processedCount > 0) {
+            try {
+                $timelineGenerator = app(TimelineGenerationService::class);
+                foreach ($targets as $target) {
+                    $timelineGenerator->regenerateSection($target['date'], $target['shift'], $target['press']);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning('Resimulation after cancel failed: ' . $e->getMessage());
+            }
+        }
+
+        if ($processedCount === 0) {
+            return response()->json(['success' => false, 'message' => 'Semua item ditolak untuk cancel karena sudah diproduksi atau tidak ditemukan.']);
+        }
+
+        $msg = $processedCount . ' item berhasil di-cancel.';
+        if ($failedCount > 0) {
+            $msg .= ' (' . $failedCount . ' item ditolak karena sudah mulai diproduksi).';
+        }
+
+        return response()->json(['success' => true, 'message' => $msg]);
     }
 
     public function approveRecovery($id)
@@ -649,29 +911,93 @@ class ProductionPlanController extends Controller
     public function approveItems(Request $request)
     {
         $itemIds = $request->input('item_ids', []);
+        $targetDate = $request->input('target_date');
+        $targetShift = $request->input('target_shift');
+        $targetPress = $request->input('target_press');
 
         if (empty($itemIds)) {
             return response()->json(['success' => false, 'message' => 'Tidak ada item yang dipilih.']);
         }
 
-        $items = RecoveryItem::whereIn('id', $itemIds)
-            ->where('status', 'waiting_approval')
-            ->get();
-
-        if ($items->isEmpty()) {
-            return response()->json(['success' => false, 'message' => 'Item tidak ditemukan atau sudah diproses.']);
+        if (empty($targetDate) || empty($targetShift) || empty($targetPress)) {
+            return response()->json(['success' => false, 'message' => 'Context planning tidak ditemukan. Silakan refresh halaman.']);
         }
 
-        // Approve selected items only — no cascade to other items in same schedule
-        RecoveryItem::whereIn('id', $items->pluck('id'))
-            ->update([
-                'status' => 'approved',
-                'updated_at' => now(),
-            ]);
+        $processedCount = 0;
+
+        DB::transaction(function () use ($itemIds, $targetDate, $targetShift, $targetPress, &$processedCount) {
+            // Fetch and lock items to prevent race conditions (Duplicate protection)
+            $items = RecoveryItem::whereIn('id', $itemIds)
+                ->where('status', 'waiting_approval')
+                ->lockForUpdate()
+                ->orderBy('source_date', 'asc')
+                ->orderBy('source_shift', 'asc')
+                ->orderBy('original_row_no', 'asc')
+                ->get();
+
+            if ($items->isEmpty()) {
+                return;
+            }
+            
+            $processedCount = $items->count();
+
+            // Dapatkan hari untuk targetDate
+            $hari = \Carbon\Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
+            
+            // Dapatkan line_master_id dari jadwal yang ada di hari tersebut, atau fallback
+            $existingPlan = ProductionPlan::whereDate('plan_date', $targetDate)
+                ->where('press_name', $targetPress)
+                ->first();
+            $lineMasterId = $existingPlan ? $existingPlan->line_master_id : 1;
+
+            foreach ($items as $index => $item) {
+
+                $processTime = (int)ceil((($item->ct_detik ?? 0) * $item->recovery_qty) / 60.0);
+
+                ProductionPlan::create([
+                    'plan_date'      => $targetDate,
+                    'shift_name'     => $targetShift,
+                    'press_name'     => $targetPress,
+                    'line_master_id' => $lineMasterId,
+                    'hari'           => $hari,
+                    'row_type'       => 'job',
+                    'row_no'         => 0,
+                    'job_no'         => $item->job_no,
+                    'job_master'     => $item->job_master,
+                    'plan'           => $item->recovery_qty,
+                    'original_plan'  => $item->plan_qty,
+                    'remaining_plan' => $item->recovery_qty,
+                    'ct_detik'       => $item->ct_detik,
+                    'dct'            => $item->dct,
+                    'total_mesin'    => (int)($item->total_mesin ?? 1),
+                    'process_time'   => $processTime,
+                    'recovery_id'    => $item->id,
+                    'source_type'    => 'recovery',
+                    'status'         => 'pending',
+                ]);
+
+                $item->update([
+                    'status' => 'scheduled',
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+
+        if ($processedCount === 0) {
+            return response()->json(['success' => false, 'message' => 'Item tidak ditemukan atau sudah diproses oleh user lain.']);
+        }
+
+        // Regenerate sections using the target context
+        try {
+            $timelineGenerator = app(TimelineGenerationService::class);
+            $timelineGenerator->regenerateSection($targetDate, $targetShift, $targetPress);
+        } catch (\Throwable $e) {
+            \Log::warning('Resimulation after approve failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
-            'message' => count($items) . ' item berhasil di-approve.',
+            'message' => $processedCount . ' item berhasil di-approve.',
         ]);
     }
 
@@ -691,7 +1017,7 @@ class ProductionPlanController extends Controller
                 if (str_contains($out, 'Python 3')) return $cmd;
             }
         }
-        return 'python'; 
+        return null; 
     }
 
     private function runPythonScript($python, $script, $file, $orig)
@@ -878,19 +1204,65 @@ class ProductionPlanController extends Controller
 
         $ids = $request->ids;
 
+        // AUDIT 1: Pastikan array $ids dari Javascript benar-benar masuk
+        \Log::info('[REORDER IDS]', [
+            'ids' => $ids
+        ]);
+
         DB::transaction(function () use ($ids) {
             foreach ($ids as $index => $id) {
                 ProductionPlan::where('id', $id)->update(['row_no' => $index + 1]);
             }
+
+            $recoveryPlans = ProductionPlan::whereIn('id', $ids)
+                ->whereNotNull('recovery_id')
+                ->select('id', 'recovery_id')
+                ->get()
+                ->keyBy('id');
+
+            $recoveryOrder = 0;
+            $recoveryIds = [];
+            foreach ($ids as $id) {
+                if (isset($recoveryPlans[$id])) {
+                    $recoveryIds[] = $recoveryPlans[$id]->recovery_id;
+                    RecoveryItem::where('id', $recoveryPlans[$id]->recovery_id)
+                        ->update(['sort_order' => ++$recoveryOrder]);
+                }
+            }
+
+            \Log::info('[REORDER] RecoveryItem sort_order updated', [
+                'count' => count($recoveryIds),
+                'orders' => RecoveryItem::whereIn('id', $recoveryIds)
+                    ->pluck('sort_order', 'id')
+                    ->toArray()
+            ]);
         });
 
-        // Regenerate timeline so breaks and timing are recalculated
         $firstPlan = ProductionPlan::find($ids[0] ?? null);
+
         if ($firstPlan) {
+            // AUDIT 2: Buktikan database row_no benar-benar berubah sebelum masuk ke Timeline
+            $rows = ProductionPlan::whereDate('plan_date', $firstPlan->plan_date)
+                ->where('shift_name', $firstPlan->shift_name)
+                ->where('press_name', $firstPlan->press_name)
+                ->orderBy('row_no')
+                ->pluck('id', 'row_no');
+                
+            \Log::info('[REORDER AFTER UPDATE]', $rows->toArray());
+
             try {
                 $timelineGenerator = app(TimelineGenerationService::class);
                 $timelineGenerator->regenerateForPlan($firstPlan);
-                ProductionPlanUpdated::dispatch($firstPlan->fresh(), 'row_no');
+
+                $dispatchPlan = ProductionPlan::whereDate('plan_date', $firstPlan->plan_date)
+                    ->where('shift_name', $firstPlan->shift_name)
+                    ->where('press_name', $firstPlan->press_name)
+                    ->where('row_type', 'job')
+                    ->orderBy('id')
+                    ->first();
+                if ($dispatchPlan) {
+                    ProductionPlanUpdated::dispatch($dispatchPlan, 'row_no');
+                }
             } catch (\Throwable $e) {
                 \Log::warning("Timeline regeneration after reorder: " . $e->getMessage());
             }
@@ -1095,4 +1467,166 @@ class ProductionPlanController extends Controller
             ]
         );
     }
+
+    /**
+     * Move one or more recovery items to a different shift, date, or press.
+     * §4 SRS: Recovery harus dapat dipindahkan ke Shift/Hari lain.
+     */
+    public function movePlanItem(Request $request)
+    {
+        $request->validate([
+            'plan_ids'     => 'required|array|min:1',
+            'plan_ids.*'   => 'exists:production_plans,id',
+            'target_date'  => 'required|date',
+            'target_shift' => 'required|string|max:50',
+            'target_press' => 'required|string|max:50',
+        ]);
+
+        $plans = ProductionPlan::whereIn('id', $request->plan_ids)->get();
+
+        // Only allow moving recovery items
+        foreach ($plans as $plan) {
+            if ($plan->source_type !== 'recovery') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Hanya item Recovery yang dapat dipindahkan ke shift/hari lain.',
+                ], 422);
+            }
+        }
+
+        // Track source sections for regeneration (deduplicate)
+        $sourceSections = [];
+        foreach ($plans as $plan) {
+            $key = $plan->plan_date->format('Y-m-d') . '||' . $plan->shift_name . '||' . $plan->press_name;
+            $sourceSections[$key] = [
+                'date'  => $plan->plan_date->format('Y-m-d'),
+                'shift' => $plan->shift_name,
+                'press' => $plan->press_name,
+            ];
+        }
+
+        $targetDate = $request->target_date;
+        $targetShift = $request->target_shift;
+        $targetPress = $request->target_press;
+
+        $hari = \Carbon\Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
+
+        // Get line_master_id for the target press
+        $lineMap = LineMaster::pluck('id', 'line_name')->toArray();
+        $lineId = null;
+        $pressKey = strtoupper(str_replace([' ', '-', 'LINE'], '', $targetPress));
+        foreach ($lineMap as $name => $id) {
+            $cleanName = strtoupper(str_replace([' ', '-', 'LINE'], '', $name));
+            if ($cleanName === $pressKey || str_contains($pressKey, $cleanName) || str_contains($cleanName, $pressKey)) {
+                $lineId = $id;
+                break;
+            }
+        }
+
+        DB::transaction(function () use ($plans, $targetDate, $targetShift, $targetPress, $hari, $lineId) {
+            foreach ($plans as $plan) {
+                $plan->update([
+                    'plan_date'      => $targetDate,
+                    'shift_name'     => $targetShift,
+                    'press_name'     => $targetPress,
+                    'line_master_id' => $lineId ?? $plan->line_master_id,
+                    'hari'           => $hari,
+                    'row_no'         => 0,
+                    'start_time'     => null,
+                    'finish_time'    => null,
+                ]);
+
+                // Disassociate any recovery item so it stays in the queue
+                if ($plan->recovery_id) {
+                    \App\Models\RecoveryItem::where('id', $plan->recovery_id)
+                        ->where('production_plan_id', $plan->id)
+                        ->update(['production_plan_id' => null]);
+                }
+            }
+        });
+
+        // Regenerate all source sections and target section
+        $timelineGenerator = app(TimelineGenerationService::class);
+        foreach ($sourceSections as $section) {
+            try {
+                $timelineGenerator->regenerateSection($section['date'], $section['shift'], $section['press']);
+            } catch (\Throwable $e) {
+                \Log::warning('Resimulation after move (source): ' . $e->getMessage());
+            }
+        }
+        try {
+            $timelineGenerator->regenerateSection($targetDate, $targetShift, $targetPress);
+        } catch (\Throwable $e) {
+            \Log::warning('Resimulation after move (target): ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($plans) . ' item berhasil dipindahkan.',
+        ]);
+    }
+
+    public function forceOverflow(Request $request)
+    {
+        $planIds = $request->input('plan_ids', []);
+        $action  = $request->input('action'); // 'force_timeline' | 'to_recovery'
+
+        if (empty($planIds)) {
+            return response()->json(['success' => false, 'message' => 'Tidak ada item dipilih.']);
+        }
+
+        $plans = ProductionPlan::whereIn('id', $planIds)->get();
+
+        if ($action === 'force_timeline') {
+            // Tetap di timeline: hapus flag cutoff, timing diatur ulang
+            foreach ($plans as $plan) {
+                $plan->update([
+                    'start_time'  => null,
+                    'finish_time' => null,
+                ]);
+            }
+            // Trigger regenerate agar item di-schedule ulang
+            $first = $plans->first();
+            if ($first) {
+                $timelineGenerator = app(TimelineGenerationService::class);
+                $timelineGenerator->regenerateSection(
+                    $first->plan_date,
+                    $first->shift_name,
+                    $first->press_name
+                );
+            }
+            return response()->json([
+                'success' => true,
+                'message' => count($plans) . ' item tetap di timeline.',
+            ]);
+        }
+
+        if ($action === 'to_recovery') {
+            // Pindah ke recovery queue: ubah source_type
+            foreach ($plans as $plan) {
+                $plan->update([
+                    'source_type' => 'recovery',
+                    'start_time'  => null,
+                    'finish_time' => null,
+                    'row_no'      => null,
+                ]);
+            }
+            $first = $plans->first();
+            if ($first) {
+                $timelineGenerator = app(TimelineGenerationService::class);
+                $timelineGenerator->regenerateSection(
+                    $first->plan_date,
+                    $first->shift_name,
+                    $first->press_name
+                );
+            }
+            return response()->json([
+                'success' => true,
+                'message' => count($plans) . ' item dipindah ke recovery queue.',
+            ]);
+        }
+
+        return response()->json(['success' => false, 'message' => 'Action tidak dikenali.']);
+    }
 }
+
