@@ -438,6 +438,13 @@ class ProductionPlanController extends Controller
                         })
                         ->delete();
 
+                    // 3. DELETE timeline-generated breaks (source_type = null from regenerateSection)
+                    ProductionPlan::whereDate('plan_date', $parsedDate)
+                        ->where('shift_name', $shiftToDelete)
+                        ->where('row_type', 'break')
+                        ->whereNull('source_type')
+                        ->delete();
+
                     // Revert approved/scheduled RecoveryItems back to waiting_approval queue
                     // First get the IDs of items to revert (all, not just those with null production_plan_id)
                     $revertRecoveryIds = \App\Models\RecoveryItem::whereDate('source_date', $parsedDate)
