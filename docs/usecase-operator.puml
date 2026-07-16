@@ -1,0 +1,79 @@
+@startuml Use Case - Operator
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - Operator
+
+' ===== AKTOR KIRI =====
+actor "Operator" as OP
+
+rectangle "Operator Module" {
+  usecase "Login" as UC_LOGIN
+  usecase "Lihat Dashboard" as UC_DASH
+
+  usecase "Input Harian" as UC_INPUT
+  usecase "Start Job" as UC_START
+  usecase "Pause Job" as UC_PAUSE
+  usecase "Resume Job" as UC_RESUME
+  usecase "Finish Job" as UC_FINISH
+  usecase "Input OK Qty" as UC_OK
+  usecase "Input Repair" as UC_REPAIR
+  usecase "Input Reject" as UC_REJECT
+
+  usecase "Break Time" as UC_BREAK
+
+  usecase "Dandori" as UC_DANDORI
+  usecase "Input Dandori" as UC_INPUT_DAND
+  usecase "Riwayat Dandori" as UC_HIST_DAND
+
+  usecase "Downtime" as UC_DT
+  usecase "Catat Downtime" as UC_DT_START
+  usecase "Selesaikan Downtime" as UC_DT_FINISH
+
+  usecase "Q-Check" as UC_QC
+  usecase "Repair & Reject Log" as UC_RR
+
+  usecase "Shift Submission" as UC_SHIFT
+
+  usecase "Lihat Notifikasi" as UC_NOTIF
+
+  ' ===== RELATIONSHIPS =====
+  UC_INPUT ..> UC_START : <<include>>
+  UC_INPUT ..> UC_FINISH : <<include>>
+  UC_INPUT ..> UC_OK : <<include>>
+  UC_INPUT ..> UC_REPAIR : <<extend>>
+  UC_INPUT ..> UC_REJECT : <<extend>>
+  UC_START ..> UC_PAUSE : <<extend>>
+  UC_START ..> UC_RESUME : <<extend>>
+  UC_INPUT ..> UC_DT_START : <<extend>>
+  UC_INPUT ..> UC_DANDORI : <<extend>>
+  UC_INPUT ..> UC_QC : <<extend>>
+  UC_INPUT ..> UC_RR : <<extend>>
+  UC_DANDORI ..> UC_INPUT_DAND : <<include>>
+  UC_DANDORI ..> UC_HIST_DAND : <<include>>
+  UC_DT ..> UC_DT_START : <<include>>
+  UC_DT ..> UC_DT_FINISH : <<include>>
+  UC_SHIFT ..> UC_INPUT : <<include>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Supervisor" as SPV
+
+' ===== RELASI AKTOR =====
+OP --> UC_LOGIN
+OP --> UC_DASH
+OP --> UC_INPUT
+OP --> UC_BREAK
+OP --> UC_SHIFT
+OP --> UC_NOTIF
+SPV --> UC_DASH : <<extend>>
+
+@enduml

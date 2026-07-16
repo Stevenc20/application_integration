@@ -21,7 +21,7 @@
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
                     <tr>
-                        <th class="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Line/Shift</th>
+                        <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Line/Shift</th>
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Plan Qty</th>
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Actual Qty</th>
                         <th class="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Pencapaian (%)</th>
@@ -53,7 +53,7 @@
                 </tbody>
                 <tfoot class="bg-gray-50 border-t border-gray-200">
                     <tr>
-                        <th class="px-4 py-3 text-right text-sm font-bold text-gray-700">Total Produksi Hari Ini:</th>
+                        <th class="px-4 py-3 text-center text-sm font-bold text-gray-700">Total Produksi Hari Ini:</th>
                         <th class="px-4 py-3 text-center text-sm font-bold text-gray-900">8,000</th>
                         <th class="px-4 py-3 text-center text-sm font-bold text-primary-red">7,600</th>
                         <th class="px-4 py-3 text-center text-sm font-bold text-gray-900">95.0%</th>

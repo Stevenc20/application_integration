@@ -120,6 +120,7 @@ class DashboardRealtimeService
                 $downtimeSecs = (int) Downtime::where('job_master_id', $mj->id)
                     ->where('start_time', '>=', $shiftStartDt)
                     ->where('start_time', '<', $shiftEndDt)
+                    ->where('jenis_downtime', '!=', 'dandori')
                     ->sum('duration_seconds');
 
                 $virtual = new DailyProduction([
@@ -237,10 +238,6 @@ class DashboardRealtimeService
         }
         $dtTotalMinutes = round($dtTotalMinutes, 1);
 
-        if ($allDowntimes->isEmpty() && $dtTotalMinutes <= 0) {
-            $dtTotalMinutes = round((int) $dailyRecords->sum('downtime_seconds') / 60, 1);
-        }
-
         $breakdown = ProductionMetricsService::downtimeBreakdown($allDowntimes);
 
         $dtMachMinutes = $breakdown['machine'];
@@ -284,6 +281,7 @@ class DashboardRealtimeService
         $rejectRows = [];
 
         foreach ($allDowntimes as $dt) {
+            if (str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori')) continue;
             $dur = round($this->downtimeDurationSeconds($dt) / 60, 1);
             $rawJob = $dt->jobMaster?->job_name ?? '-';
             $jobName = $shortJob($rawJob);
@@ -308,26 +306,6 @@ class DashboardRealtimeService
                 $matRows[] = $row;
             } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
                 $logRows[] = $row;
-            }
-        }
-
-        if (empty($dtRows)) {
-            foreach ($dailyRecords as $dp) {
-                $dtSec = (int) $dp->downtime_seconds;
-                if ($dtSec > 0) {
-                    $job = $dp->jobMaster;
-                    $shortJobName = $shortJob($job?->job_name);
-                    $dtRows[] = [
-                        'no'       => count($dtRows) + 1,
-                        'jenis'    => 'downtime',
-                        'job'      => $shortJobName,
-                        'item'     => $shortJobName,
-                        'problem'  => '-',
-                        'penyebab' => '-',
-                        'action'   => '-',
-                        'durasi'   => round($dtSec / 60, 1),
-                    ];
-                }
             }
         }
 

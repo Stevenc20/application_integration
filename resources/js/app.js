@@ -77,6 +77,13 @@ window.openModal = function () {
 
     if (!modal) return;
 
+    // reset role cards
+    const addRoleVal = document.getElementById('add_role_val');
+    if (addRoleVal) addRoleVal.value = '';
+    document.querySelectorAll('#userModal .role-card').forEach(c => {
+        c.className = 'role-card flex items-center gap-3 p-3 rounded-2xl border-2 border-gray-100 hover:border-gray-300 hover:bg-gray-50 cursor-pointer transition-all duration-200 group';
+    });
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 
@@ -111,17 +118,22 @@ window.closeModal = function () {
 // modal edit
 window.openEditModal = function (id, name, nrp, role) {
     const modal = document.getElementById('editModal');
+    if (!modal) return;
 
-    // isi data ke form
     document.getElementById('edit_name').value = name;
     document.getElementById('edit_nrp').value = nrp;
-    document.getElementById('edit_role').value = role;
 
-    // set action form
+    const norm = typeof window.normalizeRole === 'function' ? window.normalizeRole(role) : role;
+    document.getElementById('edit_role_val').value = norm;
+
     const form = document.getElementById('editForm');
     form.action = `/admin/users/${id}`;
 
-    // tampilkan modal
+    // highlight role card
+    if (typeof window.setEditRole === 'function') {
+        window.setEditRole(norm);
+    }
+
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 };

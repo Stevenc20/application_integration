@@ -38,6 +38,40 @@
         </div>
     </div>
 
+    {{-- Recovery Alert Banner --}}
+    @if($recoveryAlert)
+    <a href="{{ route('ppc.planning.production_plan') }}" class="block group">
+        <div class="bg-gradient-to-r from-amber-500 to-orange-500 rounded-2xl px-6 py-5 shadow-lg shadow-amber-200/50 hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 relative overflow-hidden">
+            <div class="absolute inset-0 opacity-10">
+                <svg class="w-full h-full" viewBox="0 0 800 200" fill="none"><circle cx="750" cy="100" r="120" fill="white"/><circle cx="50" cy="50" r="80" fill="white"/></svg>
+            </div>
+            <div class="relative flex items-center gap-5">
+                <div class="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center ring-1 ring-white/30 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/>
+                    </svg>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-white font-black text-sm tracking-tight">
+                        <span class="bg-white/20 rounded-lg px-2 py-0.5 text-white mr-2">{{ $recoveryAlert['total'] }}</span>
+                        Item Recovery Menunggu Persetujuan
+                    </p>
+                    <p class="text-amber-100 text-xs font-semibold mt-1">
+                        Dari {{ implode(', ', $recoveryAlert['presses']) }} 
+                        &bull; Klik untuk langsung ke Production Plan
+                    </p>
+                </div>
+                <div class="flex items-center gap-2 text-white/80 group-hover:text-white transition-colors shrink-0">
+                    <span class="text-xs font-black uppercase tracking-wider">Lihat</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                    </svg>
+                </div>
+            </div>
+        </div>
+    </a>
+    @endif
+
     {{-- Summary Statistics --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
         {{-- Card 1: Total Plans Today --}}
@@ -91,6 +125,60 @@
             <p class="text-xs font-bold text-slate-400 mt-1">Menunggu Approval</p>
         </div>
     </div>
+
+    {{-- Recovery Summary Widget --}}
+    <div class="bg-white rounded-2xl border border-amber-100 p-5 shadow-sm">
+        <div class="flex items-center justify-between mb-4">
+            <div class="flex items-center gap-3">
+                <div class="w-9 h-9 bg-amber-100 rounded-xl flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                </div>
+                <div>
+                    <h3 class="text-sm font-black text-slate-700 tracking-tight">RECOVERY SUMMARY</h3>
+                    <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Qty: {{ number_format($recoverySummary['total_qty']) }} pcs</p>
+                </div>
+            </div>
+            <a href="{{ route('ppc.planning.recovery.index') }}"
+               class="text-[11px] font-black text-amber-600 hover:text-amber-700 flex items-center gap-1 transition-colors">
+                LIHAT SEMUA
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </a>
+        </div>
+        <div class="grid grid-cols-5 gap-3">
+            <div class="bg-amber-50 rounded-xl px-3 py-2.5 text-center">
+                <p class="text-lg font-black text-amber-700">{{ $recoverySummary['pending'] }}</p>
+                <p class="text-[10px] font-bold text-amber-500 uppercase tracking-wider">Pending</p>
+            </div>
+            <div class="bg-sky-50 rounded-xl px-3 py-2.5 text-center">
+                <p class="text-lg font-black text-sky-700">{{ $recoverySummary['approved'] }}</p>
+                <p class="text-[10px] font-bold text-sky-500 uppercase tracking-wider">Approved</p>
+            </div>
+            <div class="bg-emerald-50 rounded-xl px-3 py-2.5 text-center">
+                <p class="text-lg font-black text-emerald-700">{{ $recoverySummary['scheduled'] }}</p>
+                <p class="text-[10px] font-bold text-emerald-500 uppercase tracking-wider">Scheduled</p>
+            </div>
+            <div class="bg-slate-50 rounded-xl px-3 py-2.5 text-center">
+                <p class="text-lg font-black text-slate-700">{{ $recoverySummary['completed'] }}</p>
+                <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Completed</p>
+            </div>
+            <div class="bg-rose-50 rounded-xl px-3 py-2.5 text-center">
+                <p class="text-sm font-black text-rose-700 truncate" title="{{ number_format($recoverySummary['total_qty']) }}">{{ number_format($recoverySummary['total_qty'], 0) }}</p>
+                <p class="text-[10px] font-bold text-rose-500 uppercase tracking-wider">Total Qty</p>
+            </div>
+        </div>
+        @if($recoverySummary['by_press']->isNotEmpty())
+        <div class="mt-3 flex flex-wrap gap-2">
+            @foreach($recoverySummary['by_press'] as $rp)
+            <span class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 rounded-full text-[10px] font-bold">
+                {{ $rp->press_name }}
+                <span class="px-1.5 py-0.5 bg-amber-200 rounded-full text-[9px]">{{ $rp->total }} item ({{ number_format($rp->qty) }} pcs)</span>
+            </span>
+            @endforeach
+        </div>
+        @endif
+    </div>
+
+    @include('components.grafik-gsph')
 
     {{-- Main Content Grid --}}
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -246,6 +334,8 @@
 </div>
 
 @push('scripts')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     // Live Clock

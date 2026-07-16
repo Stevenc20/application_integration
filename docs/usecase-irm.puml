@@ -1,0 +1,111 @@
+@startuml Use Case - IRM
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - IRM (Inventory & Raw Material)
+
+' ===== AKTOR KIRI =====
+actor "IRM Staff" as IRM
+
+rectangle "IRM Module" {
+  usecase "Login" as UC_LOGIN
+
+  usecase "Vendor" as UC_VENDOR
+  usecase "CRUD Vendor" as UC_CRUD_VENDOR
+  usecase "Import Vendor (Excel)" as UC_IMP_VENDOR
+  usecase "Export Vendor (PDF/Excel)" as UC_EXP_VENDOR
+
+  usecase "Material" as UC_MAT
+  usecase "CRUD Material" as UC_CRUD_MAT
+  usecase "Import Material (Excel)" as UC_IMP_MAT
+  usecase "Export Material (PDF/Excel)" as UC_EXP_MAT
+
+  usecase "Customer" as UC_CUST
+  usecase "CRUD Customer" as UC_CRUD_CUST
+  usecase "Import Customer (Excel)" as UC_IMP_CUST
+  usecase "Export Customer (PDF/Excel)" as UC_EXP_CUST
+
+  usecase "Storage Location" as UC_SL
+  usecase "CRUD Storage" as UC_CRUD_SL
+  usecase "Export Storage" as UC_EXP_SL
+
+  usecase "Purchase Order (PO)" as UC_PO
+  usecase "Create PO" as UC_CREATE_PO
+  usecase "Approval PO" as UC_APPROVE_PO
+  usecase "Cancel PO" as UC_CANCEL_PO
+  usecase "Import PO (Excel)" as UC_IMP_PO
+  usecase "Export PO (PDF/Excel)" as UC_EXP_PO
+
+  usecase "Goods Receipt (GR)" as UC_GR
+  usecase "Create GR" as UC_CREATE_GR
+  usecase "Update GR" as UC_UPD_GR
+  usecase "Print GR" as UC_PRINT_GR
+
+  usecase "Goods Issue (GI)" as UC_GI
+  usecase "Create GI" as UC_CREATE_GI
+  usecase "Update GI" as UC_UPD_GI
+  usecase "Print GI" as UC_PRINT_GI
+
+  usecase "Summary Kanban" as UC_KANBAN
+  usecase "Generate PO dari Kanban" as UC_GEN_PO
+  usecase "Import Demand" as UC_IMP_DEMAND
+  usecase "Export Kanban (PDF/Excel)" as UC_EXP_KANBAN
+
+  usecase "Stock Overview" as UC_STOCK
+  usecase "Export Stock (Excel)" as UC_EXP_STOCK
+
+  ' ===== RELATIONSHIPS =====
+  UC_VENDOR ..> UC_CRUD_VENDOR : <<include>>
+  UC_VENDOR ..> UC_IMP_VENDOR : <<extend>>
+  UC_VENDOR ..> UC_EXP_VENDOR : <<include>>
+  UC_MAT ..> UC_CRUD_MAT : <<include>>
+  UC_MAT ..> UC_IMP_MAT : <<extend>>
+  UC_MAT ..> UC_EXP_MAT : <<include>>
+  UC_CUST ..> UC_CRUD_CUST : <<include>>
+  UC_CUST ..> UC_IMP_CUST : <<extend>>
+  UC_CUST ..> UC_EXP_CUST : <<include>>
+  UC_SL ..> UC_CRUD_SL : <<include>>
+  UC_SL ..> UC_EXP_SL : <<include>>
+  UC_PO ..> UC_CREATE_PO : <<include>>
+  UC_PO ..> UC_APPROVE_PO : <<extend>>
+  UC_PO ..> UC_CANCEL_PO : <<extend>>
+  UC_PO ..> UC_IMP_PO : <<extend>>
+  UC_PO ..> UC_EXP_PO : <<include>>
+  UC_GR ..> UC_CREATE_GR : <<include>>
+  UC_GR ..> UC_UPD_GR : <<extend>>
+  UC_GR ..> UC_PRINT_GR : <<include>>
+  UC_GI ..> UC_CREATE_GI : <<include>>
+  UC_GI ..> UC_UPD_GI : <<extend>>
+  UC_GI ..> UC_PRINT_GI : <<include>>
+  UC_KANBAN ..> UC_GEN_PO : <<include>>
+  UC_KANBAN ..> UC_IMP_DEMAND : <<extend>>
+  UC_KANBAN ..> UC_EXP_KANBAN : <<include>>
+  UC_STOCK ..> UC_EXP_STOCK : <<include>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Supervisor" as SPV
+actor "PPC Staff" as PPC
+
+IRM --> UC_LOGIN
+IRM --> UC_VENDOR
+IRM --> UC_MAT
+IRM --> UC_CUST
+IRM --> UC_SL
+IRM --> UC_PO
+IRM --> UC_GR
+IRM --> UC_GI
+IRM --> UC_KANBAN
+IRM --> UC_STOCK
+SPV --> UC_STOCK : <<extend>>
+PPC --> UC_KANBAN : <<extend>>
+
+@enduml

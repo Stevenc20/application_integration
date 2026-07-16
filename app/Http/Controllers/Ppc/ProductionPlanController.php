@@ -29,7 +29,7 @@ class ProductionPlanController extends Controller
         $lastImportAt = $latestImport ? $latestImport->created_at->format('d M Y H:i') : '—';
 
         $rawDate = $request->get('date');
-        $date    = $rawDate ?: $maxDate;
+        $date    = $rawDate ?: now()->toDateString();
 
         // Sync LKH quantities to ProductionPlan for display
         try {
@@ -277,9 +277,30 @@ class ProductionPlanController extends Controller
                 ->first();
         }
 
+        // Boundary overflow: items with finish_time past press production_end
+        $boundaryOverflowIds = [];
+        if ($pressMeta && $pressMeta->production_end) {
+            $endMins = \App\Models\MasterBreakTime::timeToMinutes($pressMeta->production_end);
+            $boundaryOverflow = $plans->filter(function($plan) use ($endMins) {
+                if (($plan->row_type ?? 'job') !== 'job') return false;
+                if (!$plan->finish_time) return false;
+                if (($plan->source_type ?? 'ppc') === 'recovery') return false;
+                return \App\Models\MasterBreakTime::timeToMinutes($plan->finish_time) >= $endMins;
+            })->values();
+            $boundaryOverflowIds = $boundaryOverflow->pluck('id')->toArray();
+
+            $existingIds = $overflowItems->pluck('id')->toArray();
+            $newOverflow = $boundaryOverflow->whereNotIn('id', $existingIds);
+            if ($newOverflow->isNotEmpty()) {
+                $overflowItems = $overflowItems->concat($newOverflow);
+                $overflowByPress = $overflowItems->groupBy('press_name');
+                $overflowCount = $overflowItems->count();
+            }
+        }
+
         return view(
             'ppc.planning.production_plan',
-            compact('plans', 'lines', 'date', 'currentPress', 'totalFinishRow', 'cardSummaries', 'currentShift', 'availableShifts', 'totalJobs', 'activeFilters', 'pendingRecoveries', 'pendingRecoveryItems', 'overflowItems', 'overflowByPress', 'overflowCount', 'pressMeta')
+            compact('plans', 'lines', 'date', 'currentPress', 'totalFinishRow', 'cardSummaries', 'currentShift', 'availableShifts', 'totalJobs', 'activeFilters', 'pendingRecoveries', 'pendingRecoveryItems', 'overflowItems', 'overflowByPress', 'overflowCount', 'pressMeta', 'boundaryOverflowIds')
         );
     }
 
@@ -532,6 +553,19 @@ class ProductionPlanController extends Controller
                             $skippedMeta++;
                             continue;
                         }
+
+                        // ── Skip rows marked as "Delete" in keterangan (deleted schedule items) ──
+                        if (str_contains(strtoupper($item['keterangan'] ?? ''), 'DELETE')) {
+                            // Track Rev sheet job key BEFORE skipping, so non-Rev dedup can match
+                            if ($isRevSheet && $rawJn && $rawJm) {
+                                $jobKey = $lineId . '||' . $rawJm . '||' . $rawJn;
+                                $importedJobKeys[$jobKey] = true;
+                            }
+                            \Log::info('[IMPORT] Skipped deleted row', ['keterangan' => $item['keterangan'], 'job_no' => $rawJn]);
+                            $skippedMeta++;
+                            continue;
+                        }
+
                         $rowType = $item['row_type'] ?? 'job';
                         $jn = strtoupper($item['job_no'] ?? '');
                         $jm = strtoupper($item['job_master'] ?? '');
@@ -558,10 +592,17 @@ class ProductionPlanController extends Controller
                             $rowType = 'total_finish';
                         } elseif ($isBreakDesc || $rowType === 'break') {
                             $rowType = 'break';
-                        } elseif ($planQty > 0 || $qtyPlt > 0 || $ctDetik > 0) {
+                            // Safety net: skip non-break rows misclassified as break (e.g. info/note row containing keyword like ISTIRAHAT)
+                            // Legitimate breaks always have proper start_time; misclassified rows have empty start_time
+                            if (empty($item['start_time'])) {
+                                \Log::info('[IMPORT] Skipped break misclassification', ['job_no' => $rawJn]);
+                                $skippedMeta++;
+                                continue;
+                            }
+                        } elseif ($planQty > 0 || $ctDetik > 0) {
                             $rowType = 'job';
-                        } elseif ($planQty == 0 && $ctDetik == 0 && $processTime == 0 && empty($jm) && empty($jn)) {
-                            // Empty metrics + no job identity -> Note / Overflow / Deleted / Spacer
+                        } elseif ($planQty == 0 && $ctDetik == 0 && $processTime == 0) {
+                            // Zero production metrics -> Note / Info / Spacer (not a real job)
                             $rowType = 'note';
                         } else {
                             $rowType = 'job';

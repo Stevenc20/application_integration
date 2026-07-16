@@ -10,13 +10,13 @@
     </div>
     
     <div class="p-5">
-        <form method="POST" action="#">
+        <form method="POST" action="{{ $qc ? route('supervisor.qcheck.update', $qc->id) : route('supervisor.qcheck.store') }}">
             @csrf
             @if($qc)
                 @method('PUT')
             @endif
             
-            <input type="hidden" name="id_detailjob" value="{{ $detail_job->id_detailjob }}">
+            <input type="hidden" name="job_master_id" value="{{ $qc->job_master_id ?? request('job_master_id', $detail_job->id_detailjob) }}">
 
             <div class="mb-5">
                 <label for="jenis_qcheck" class="block text-sm font-medium text-gray-700 mb-1">Jenis Q-Check</label>

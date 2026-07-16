@@ -7,10 +7,10 @@
     $masterActive = request()->routeIs('master.job') || request()->routeIs('supervisor.planning.production_line') || request()->is('admin/users*');
     
     // Operational States
-    $operasionalActive = request()->routeIs('operational.dandori') || request()->routeIs('supervisor.breaktime.index') || request()->routeIs('supervisor.handwork.index') || request()->routeIs('supervisor.qcheck.index');
+    $operasionalActive = request()->routeIs('operational.dandori') || request()->routeIs('supervisor.breaktime.index') || request()->routeIs('supervisor.handwork.index') || request()->routeIs('supervisor.qcheck.index') || request()->routeIs('monitoring.history') || request()->routeIs('operational.repair_reject.index') || request()->routeIs('analytics.production') || request()->routeIs('monitoring.downtime.list') || request()->routeIs('monitoring.tryout');
     
     // Monitoring & Analytics States
-    $monitoringActive = request()->routeIs('monitoring.*') || request()->routeIs('supervisor.downtime.*') || request()->routeIs('supervisor.grafik.*') || request()->routeIs('grafik.quality');
+    $monitoringActive = request()->routeIs('monitoring.line') || request()->routeIs('supervisor.downtime.*') || request()->routeIs('supervisor.grafik.*') || request()->routeIs('grafik.quality');
     
     // Audit & Management States
     $auditActive = request()->routeIs('operational.audit_trail') || request()->routeIs('operational.job.logs.detail') || request()->routeIs('production_recap') || request()->routeIs('supervisor.approval.*');
@@ -130,12 +130,14 @@
             {!! sprintf($arrow, $operasionalActive ? 'rotate-90' : '') !!}
         </a>
         <ul class="list-none ml-9 mt-1 space-y-1 {{ $operasionalActive ? '' : 'hidden' }} menu-sub">
+            @if(auth()->user()->hasFeature('production_analytics'))
             <li>
-                <a href="{{ route('operational.dandori') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('operational.dandori') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                    <span>History Dandori</span>
+                <a href="{{ route('analytics.production') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('analytics.production') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>Production Analytics</span>
                 </a>
             </li>
+            @endif
             <li>
                 <a href="{{ route('supervisor.breaktime.index') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.breaktime.index') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -152,6 +154,40 @@
                 <a href="{{ route('supervisor.qcheck.index') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.qcheck.index') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     <span>Q-Check</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('monitoring.history', ['type' => 'downtime']) }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('monitoring.history') && request('type') == 'downtime' ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    <span>History Downtime</span>
+                </a>
+            </li>
+            @if(auth()->user()->hasFeature('line_monitoring'))
+            <li>
+                <a href="{{ route('operational.dandori') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('operational.dandori') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                    <span>History Dandori</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('monitoring.history', ['type' => 'break']) }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('monitoring.history') && request('type') == 'break' ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                    <span>History Break Time</span>
+                </a>
+            </li>
+            @endif
+            @if(auth()->user()->hasFeature('repair_reject'))
+            <li>
+                <a href="{{ route('operational.repair_reject.index') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('operational.repair_reject.index') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z"/></svg>
+                    <span>History Repair & Reject</span>
+                </a>
+            </li>
+            @endif
+            <li>
+                <a href="{{ route('monitoring.tryout') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('monitoring.tryout') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <span>History Tryout</span>
                 </a>
             </li>
         </ul>
@@ -172,13 +208,11 @@
             {!! sprintf($arrow, $monitoringActive ? 'rotate-90' : '') !!}
         </a>
         <ul class="list-none ml-9 mt-1 space-y-1 {{ $monitoringActive ? '' : 'hidden' }} menu-sub">
-            <li><a href="{{ route('supervisor.downtime.dashboard') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.downtime.dashboard') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Downtime Dashboard</a></li>
-            <li><a href="{{ route('monitoring.line') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('monitoring.line') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Line Monitoring</a></li>
-            <li><a href="{{ route('monitoring.machine_status') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('monitoring.machine_status') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Machine Status</a></li>
-            <li><a href="{{ route('supervisor.downtime.monitoring') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.downtime.monitoring') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Downtime Aktif</a></li>
-            <li><a href="{{ route('supervisor.grafik.output_line') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.grafik.output_line') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Tren Output</a></li>
-            <li><a href="{{ route('supervisor.quality.dashboard') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.quality.dashboard') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Quality Dashboard</a></li>
-            <li><a href="{{ route('grafik.quality') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('grafik.quality') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Pencapaian Kualitas</a></li>
+            <li><a href="{{ route('monitoring.line') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('monitoring.line') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg><span>Line Monitoring</span></a></li>
+            <li><a href="{{ route('grafik.quality') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('grafik.quality') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><span>Pencapaian Kualitas</span></a></li>
+            <li><a href="{{ route('supervisor.grafik.downtime_item') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.grafik.downtime_item') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z"/></svg><span>Tren Downtime</span></a></li>
+            <li><a href="{{ route('supervisor.grafik.downtime_type') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.grafik.downtime_type') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg><span>Downtime per Tipe</span></a></li>
+            <li><a href="{{ route('supervisor.grafik.downtime_machine') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.grafik.downtime_machine') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/></svg><span>Downtime Mesin</span></a></li>
         </ul>
     </li>
 
@@ -197,10 +231,9 @@
             {!! sprintf($arrow, $auditActive ? 'rotate-90' : '') !!}
         </a>
         <ul class="list-none ml-9 mt-1 space-y-1 {{ $auditActive ? '' : 'hidden' }} menu-sub">
-            <li><a href="{{ route('operational.audit_trail') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('operational.audit_trail') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Audit Trail</a></li>
-            <li><a href="{{ route('production_recap') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('production_recap') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Production Recap</a></li>
-            <li><a href="{{ route('supervisor.approval.production') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.approval.production') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Prod Approval</a></li>
-            <li><a href="{{ route('supervisor.approval.quality') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.approval.quality') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">QC Approval</a></li>
+            <li><a href="{{ route('operational.audit_trail') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('operational.audit_trail') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg><span>Audit Trail</span></a></li>
+            <li><a href="{{ route('production_recap') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('production_recap') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>Production Recap</span></a></li>
+
         </ul>
     </li>
 
@@ -219,8 +252,8 @@
             {!! sprintf($arrow, $reportActive ? 'rotate-90' : '') !!}
         </a>
         <ul class="list-none ml-9 mt-1 space-y-1 {{ $reportActive ? '' : 'hidden' }} menu-sub">
-            <li><a href="{{ route('supervisor.reports.daily_production') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.reports.daily_production') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Daily Report</a></li>
-            <li><a href="{{ route('supervisor.reports.performance') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.reports.performance') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Performance</a></li>
+            <li><a href="{{ route('supervisor.reports.daily_production') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.reports.daily_production') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg><span>LKH</span></a></li>
+            <li><a href="{{ route('supervisor.reports.performance') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.reports.performance') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}"><svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 8v8m-4-5v5m-4-2v2m-2 4h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg><span>Performance</span></a></li>
         </ul>
     </li>
 

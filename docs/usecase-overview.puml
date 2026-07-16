@@ -1,0 +1,190 @@
+@startuml
+left to right direction
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+  ArrowColor #333333
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+skinparam note {
+  BackgroundColor #FFFDE7
+  BorderColor #F9A825
+  FontSize 11
+}
+
+title Gambar 3.x Use Case Diagram\nSistem Integrasi Produksi Stamping
+
+' ===================================================
+' AKTOR KIRI (dideklarasikan duluan)
+' ===================================================
+actor "Super Admin" as SA
+actor "Admin" as ADM
+actor "Supervisor" as SPV
+actor "Operator" as OP
+actor "Foreman" as FRM
+actor "Leader" as LDR
+
+note left of SA : **Super Admin**\nHak akses penuh.\nFungsi: Kelola user,\nrole, permission,\nline, recycle bin, TTD.
+note left of ADM : **Admin**\nFungsi: CRUD user,\ndashboard, event log.
+note left of SPV : **Supervisor**\nFungsi: Dashboard SSE,\nmonitor line, LKH,\nQ-Check, approval.
+note left of OP : **Operator**\nFungsi: Input harian,\ntimer, dandori,\ndowntime, shift.
+note left of FRM : **Foreman**\nFungsi: Monitor line,\ndowntime, Q-Check,\nhandwork.
+note left of LDR : **Leader**\nFungsi: Monitor line,\ndowntime, TTD\nhambatan jalur.
+
+' ===================================================
+' SISTEM (TENGAH)
+' ===================================================
+rectangle "Sistem Integrasi Produksi Stamping" {
+  usecase "Input Harian" as UC1
+  usecase "Monitoring Realtime" as UC2
+  usecase "Dandori" as UC3
+  usecase "Downtime" as UC4
+  usecase "Q-Check" as UC5
+  usecase "Break Time" as UC6
+  usecase "Handwork" as UC7
+  usecase "Repair & Reject" as UC8
+  usecase "Shift Submission" as UC9
+  usecase "Production Plan" as UC10
+  usecase "Schedule Stamping" as UC11
+  usecase "Recovery Schedule" as UC12
+  usecase "BOM" as UC13
+  usecase "Production Order" as UC14
+  usecase "MRP" as UC15
+  usecase "Master Stamping" as UC16
+  usecase "Vendor" as UC17
+  usecase "Material" as UC18
+  usecase "Customer" as UC19
+  usecase "Purchase Order" as UC20
+  usecase "Goods Receipt" as UC21
+  usecase "Goods Issue" as UC22
+  usecase "Stock Overview" as UC23
+  usecase "Summary Kanban" as UC24
+  usecase "Rundown Incoming" as UC25
+  usecase "Pallet Mutation" as UC26
+  usecase "SMR Tracking" as UC27
+  usecase "Data GR & Scrap" as UC28
+  usecase "Quality Dashboard" as UC29
+  usecase "Defect Monitoring" as UC30
+  usecase "Quality Achievement" as UC31
+  usecase "User Management" as UC32
+  usecase "Role & Permission" as UC33
+  usecase "Line Assignment" as UC34
+  usecase "Recycle Bin" as UC35
+  usecase "Signature (TTD)" as UC36
+  usecase "Notification" as UC37
+}
+
+' ===================================================
+' AKTOR KANAN (dideklarasikan sesudah rectangle)
+' ===================================================
+actor "PPC Staff" as PPS
+actor "IRM Staff" as IRM
+actor "Logistik" as LOG
+actor "Quality" as QL
+actor "Manager" as MGR
+actor "Kadiv" as KDV
+actor "Direktur" as DIR
+actor "Presiden Dir." as PD
+actor "Dies Shop" as DS
+actor "Plant Service" as PS
+
+note right of PPS : **PPC Staff**\nFungsi: Production plan,\nschedule stamping,\nrecovery, BOM, SPP,\nMRP, master stamping.
+note right of IRM : **IRM Staff**\nFungsi: Vendor, material,\ncustomer, PO, GR, GI,\nstock, kanban.
+note right of LOG : **Logistik**\nFungsi: Rundown incoming,\npallet, SMR, data GR.
+note right of QL : **Quality**\nFungsi: Q-Check, defect\nmonitoring, repair/reject,\nquality achievement.
+note right of MGR : **Manager**\nFungsi: Dashboard\nreal-time, trouble history.
+note right of KDV : **Kadiv**\nFungsi: Dashboard\nreal-time, trouble history.
+note right of DIR : **Direktur**\nFungsi: Dashboard real-time.
+note right of PD : **Presiden Dir.**\nFungsi: Dashboard real-time.
+note right of DS : **Dies Shop**\nFungsi: Hambatan jalur,\ndata GR.
+note right of PS : **Plant Service**\nFungsi: Hambatan jalur.
+
+' ===================================================
+' HIDDEN LINKS - paksa layout kiri kanan
+' ===================================================
+LDR -[hidden]down-> PPS
+SA -[hidden]down-> PPS
+
+' ===================================================
+' RELASI AKTOR KIRI --> USE CASE
+' ===================================================
+OP --> UC1
+OP --> UC6
+OP --> UC37
+
+FRM --> UC2
+FRM --> UC4
+FRM --> UC5
+FRM --> UC7
+FRM --> UC6
+
+LDR --> UC2
+LDR --> UC4
+LDR --> UC37
+
+SPV --> UC2
+SPV --> UC5
+SPV --> UC4
+SPV --> UC7
+SPV --> UC12
+SPV --> UC36
+
+ADM --> UC32
+ADM --> UC2
+
+SA --> UC32
+SA --> UC33
+SA --> UC34
+SA --> UC35
+SA --> UC37
+
+' ===================================================
+' RELASI AKTOR KANAN --> USE CASE
+' ===================================================
+PPS --> UC10
+PPS --> UC11
+PPS --> UC12
+PPS --> UC13
+PPS --> UC14
+PPS --> UC15
+PPS --> UC16
+
+IRM --> UC17
+IRM --> UC18
+IRM --> UC19
+IRM --> UC20
+IRM --> UC21
+IRM --> UC22
+IRM --> UC23
+IRM --> UC24
+
+LOG --> UC25
+LOG --> UC26
+LOG --> UC27
+LOG --> UC28
+
+QL --> UC29
+QL --> UC30
+QL --> UC31
+
+MGR --> UC2
+KDV --> UC2
+DIR --> UC2
+PD --> UC2
+
+DS --> UC28
+PS --> UC28
+
+' ===================================================
+' EXTEND / INCLUDE
+' ===================================================
+UC1 ..> UC4 : <<extend>>
+UC1 ..> UC3 : <<extend>>
+UC1 ..> UC8 : <<extend>>
+UC12 ..> UC10 : <<include>>
+UC9 ..> UC1 : <<include>>
+
+@enduml

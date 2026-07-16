@@ -52,16 +52,6 @@
 
     </div>
 
-    {{-- QUICK ACTION --}}
-    <div class="bg-white p-4 rounded-xl shadow">
-        <h2 class="font-semibold mb-3">Production Input</h2>
-
-        <a href="{{ route('production_entry') }}"
-           class="block w-full text-center bg-red-600 text-white py-3 rounded-lg hover:bg-red-700">
-            Input Produksi
-        </a>
-    </div>
-
     {{-- LINE STATUS --}}
     <div class="bg-white p-4 rounded-xl shadow">
         <h2 class="font-semibold mb-4">Line Status</h2>
@@ -87,6 +77,8 @@
         </div>
     </div>
 
+    @include('components.grafik-gsph')
+
     {{-- RECENT INPUT --}}
     <div class="bg-white p-4 rounded-xl shadow">
         <h2 class="font-semibold mb-4">Recent Production</h2>
@@ -106,10 +98,10 @@
                 <tbody>
                     @forelse($recentProductions as $item)
                     <tr class="border-b">
-                        <td class="px-3 py-2">{{ $item->production_order_number }}</td>
+                        <td class="px-3 py-2">{{ $item->jobMaster->job_number ?? '-' }}</td>
                         <td class="px-3 py-2">{{ $item->line }}</td>
-                        <td class="px-3 py-2 text-green-600">{{ $item->qty_ok }}</td>
-                        <td class="px-3 py-2 text-red-600">{{ $item->qty_reject }}</td>
+                        <td class="px-3 py-2 text-green-600">{{ $item->actual_ok }}</td>
+                        <td class="px-3 py-2 text-red-600">{{ $item->actual_reject }}</td>
                     </tr>
                     @empty
                     <tr>

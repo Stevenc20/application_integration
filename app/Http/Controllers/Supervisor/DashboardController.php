@@ -3,16 +3,33 @@
 namespace App\Http\Controllers\Supervisor;
 
 use App\Http\Controllers\Controller;
-use App\Models\ProductionProcess;
+use App\Models\MasterBreakTime;
+use App\Models\ProductionPlan;
 use App\Models\ProductionTarget;
+use App\Models\JobMaster;
+use App\Models\LineMaster;
+use App\Models\DailyProduction;
+use App\Models\ProductionLog;
+use App\Services\DashboardRealtimeService;
+use App\Services\DashboardDetailService;
+use App\Services\LineStatusService;
 use Carbon\Carbon;
+use Illuminate\Http\Response;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DashboardController extends Controller
 {
+    protected DashboardRealtimeService $dashService;
+
+    public function __construct(DashboardRealtimeService $dashService)
+    {
+        $this->dashService = $dashService;
+    }
+
     public function index()
     {
         $selectedLine = request('line');
-        $linesQuery = \App\Models\LineMaster::where('status', 'active')->select('line_name')->distinct();
+        $linesQuery = LineMaster::where('status', 'active')->select('line_name')->distinct();
         
         if ($selectedLine) {
             $linesQuery->where('line_name', $selectedLine);
@@ -21,134 +38,342 @@ class DashboardController extends Controller
         $lines = $linesQuery->pluck('line_name');
         
         $view = 'supervisor.dashboard';
-        if (request()->routeIs('supervisor.downtime.dashboard')) $view = 'supervisor.downtime.dashboard';
-        if (request()->routeIs('supervisor.quality.dashboard'))  $view = 'supervisor.quality.dashboard';
+        if (request()->routeIs('supervisor.quality.dashboard') || request()->routeIs('quality.dashboard'))  $view = 'supervisor.quality.dashboard';
         
         return view($view, compact('selectedLine', 'lines'));
+    }
+
+    public function monitor()
+    {
+        $lines = LineMaster::where('status', 'active')->select('line_name')->distinct()->pluck('line_name');
+        return view('supervisor.monitor', compact('lines'));
     }
 
     public function getApiData()
     {
         $date  = request('date', now()->toDateString());
-        $shift = request('shift', 1);
+        $shift = (int) request('shift', 1);
         $selectedLine = request('line');
 
-        // Fetch lines dynamically from database
-        $lines = \App\Models\LineMaster::where('status', 'active')->select('line_name')->distinct()->pluck('line_name')->toArray();
+        $lines = LineMaster::where('status', 'active')
+            ->select('line_name')->distinct()->pluck('line_name')->toArray();
 
-        // If a specific line is selected, only process that line
         if ($selectedLine && in_array($selectedLine, $lines)) {
             $lines = [$selectedLine];
         }
 
-        // 1. Get all jobs for the selected date and shift
-        $jobs = \App\Models\JobMaster::whereDate('created_at', $date)
-            ->where('status', '!=', 'pending')
-            ->with(['productionLogs', 'downtimes'])
-            ->get();
         $lineKpi = [];
+        $lineMeta = [];
         $detailData = [
+            'QTY'      => ['type' => 'production'],
             'TOTAL_DT' => ['type' => 'dt_summary'],
             'MACH_T'   => ['type' => 'dt_detail'],
             'DIES_T'   => ['type' => 'dt_detail'],
             'MAT_T'    => ['type' => 'dt_detail'],
             'LOG_T'    => ['type' => 'dt_detail'],
-            'PROD_T'   => ['type' => 'dt_detail'],
+            'PROD_T'   => ['type' => 'runtime'],
             'REPAIR'   => ['type' => 'quality'],
             'REJECT'   => ['type' => 'quality'],
         ];
 
         foreach ($lines as $lineName) {
-            $lineJobs = $jobs->filter(fn($j) => strtoupper($j->line) === strtoupper($lineName));
-            
-            $ok      = 0;
-            $repair  = 0;
-            $reject  = 0;
-            $dtTotal = 0;
-            $dtMach  = 0;
-            $dtDies  = 0;
-            $dtMat   = 0;
-            $dtLog   = 0;
-            $prodT   = 0;
+            $metrics = $this->dashService->getLineMetrics($lineName, $date, $shift);
 
-            $dtRows     = [];
-            $machRows   = [];
-            $diesRows   = [];
-            $matRows    = [];
-            $logRows    = [];
-            $repairRows = [];
-            $rejectRows = [];
+            $lineKpi[$lineName] = $metrics['kpi'];
+            $lineMeta[$lineName] = $metrics['meta'] ?? ['job' => '-', 'stroke' => '0'];
 
-            foreach ($lineJobs as $job) {
-                // Production Qty
-                $ok     += $job->productionLogs->sum('ok_qty');
-                $repair += $job->productionLogs->sum('repair_qty');
-                $reject += $job->productionLogs->sum('reject_qty');
-
-                // Downtimes
-                foreach ($job->downtimes as $dt) {
-                    $dur = round($dt->duration_seconds / 60, 1);
-                    $dtTotal += $dur;
-
-                    $row = [
-                        'no'     => count($dtRows) + 1,
-                        'jenis'  => $dt->jenis_downtime,
-                        'item'   => $dt->problem ?? '-',
-                        'problem'=> $dt->problem ?? '-',
-                        'penyebab'=> $dt->penyebab ?? '-',
-                        'action' => $dt->action ?? '-',
-                        'durasi' => $dur
-                    ];
-
-                    $dtRows[] = $row;
-
-                    $type = strtoupper($dt->jenis_downtime);
-                    if (str_contains($type, 'MACHINE')) { $dtMach += $dur; $machRows[] = $row; }
-                    elseif (str_contains($type, 'DIES'))    { $dtDies += $dur; $diesRows[] = $row; }
-                    elseif (str_contains($type, 'MATERIAL')){ $dtMat  += $dur; $matRows[]  = $row; }
-                    elseif (str_contains($type, 'LOGISTIC')){ $dtLog  += $dur; $logRows[]  = $row; }
-                }
-
-                // Repair/Reject Detail
-                foreach($job->productionLogs->where('repair_qty', '>', 0) as $log) {
-                    $repairRows[] = ['no' => count($repairRows)+1, 'item' => $job->job_name, 'problem' => 'Defect', 'qty' => $log->repair_qty];
-                }
-                foreach($job->productionLogs->where('reject_qty', '>', 0) as $log) {
-                    $rejectRows[] = ['no' => count($rejectRows)+1, 'item' => $job->job_name, 'problem' => 'Reject', 'qty' => $log->reject_qty];
-                }
+            foreach ($detailData as $key => $template) {
+                $detailData[$key][$lineName] = $metrics['detailData'][$key][$lineName] ?? ['rows' => [], 'total' => '0'];
             }
-
-            // GSPH Calculation (Dummy logic for now: assume 8 hours if ok > 0)
-            $gsph = $ok > 0 ? round($ok / 8, 1) : 0;
-
-            $lineKpi[$lineName] = [
-                ['desc'=>'QTY',      'plan'=>'450',           'actual'=>(string)$ok,         'actualLink'=>true, 'current'=>'-'              ],
-                ['desc'=>'GSPH',     'plan'=>'85.0',          'actual'=>(string)$gsph,       'current'=>(string)($gsph*0.9)                  ],
-                ['desc'=>'PROD_T',   'plan'=>'480 m',         'actual'=>'460 m',             'current'=>'230 m', 'popup'=>true               ],
-                ['desc'=>'TOTAL_DT', 'plan'=>'0 m',           'actual'=>$dtTotal.' m',       'current'=>round($dtTotal/2,1).' m', 'popup'=>true, 'danger'=>$dtTotal > 0],
-                ['desc'=>'MACH_T',   'plan'=>'0 m',           'actual'=>$dtMach.' m',        'current'=>round($dtMach/2,1).' m', 'popup'=>true   ],
-                ['desc'=>'DIES_T',   'plan'=>'0 m',           'actual'=>$dtDies.' m',        'current'=>round($dtDies/2,1).' m', 'popup'=>true   ],
-                ['desc'=>'MAT_T',    'plan'=>'0 m',           'actual'=>$dtMat.' m',         'current'=>round($dtMat/2,1).' m',  'popup'=>true   ],
-                ['desc'=>'LOG_T',    'plan'=>'0 m',           'actual'=>$dtLog.' m',         'current'=>round($dtLog/2,1).' m',  'popup'=>true   ],
-                ['desc'=>'IDLE_T',   'plan'=>'0 m',           'actual'=>'0 m',               'current'=>'-'                               ],
-                ['desc'=>'OVERTIME', 'plan'=>'0 m',           'actual'=>'0 m',               'current'=>'-'                               ],
-                ['desc'=>'REPAIR',   'plan'=>'5 pcs',         'actual'=>$repair.' pcs',      'actualPct'=>($ok>0?round(($repair/$ok)*100,1):0).'%', 'current'=>'-', 'popup'=>true ],
-                ['desc'=>'REJECT',   'plan'=>'2 pcs',         'actual'=>$reject.' pcs',      'actualPct'=>($ok>0?round(($reject/$ok)*100,1):0).'%', 'current'=>'-', 'popup'=>true ],
-            ];
-
-            $detailData['TOTAL_DT'][$lineName] = ['rows' => $dtRows, 'total' => (string)$dtTotal];
-            $detailData['MACH_T'][$lineName]   = ['rows' => $machRows, 'total' => (string)$dtMach];
-            $detailData['DIES_T'][$lineName]   = ['rows' => $diesRows, 'total' => (string)$dtDies];
-            $detailData['MAT_T'][$lineName]    = ['rows' => $matRows, 'total' => (string)$dtMat];
-            $detailData['LOG_T'][$lineName]    = ['rows' => $logRows, 'total' => (string)$dtLog];
-            $detailData['PROD_T'][$lineName]   = ['rows' => [], 'total' => '460']; // Placeholder rows for now
-            $detailData['REPAIR'][$lineName]   = ['rows' => $repairRows, 'total' => (string)$repair];
-            $detailData['REJECT'][$lineName]   = ['rows' => $rejectRows, 'total' => (string)$reject];
         }
 
         return response()->json([
             'line_kpi'    => $lineKpi,
-            'detail_data' => $detailData
+            'line_meta'   => $lineMeta,
+            'detail_data' => $detailData,
+        ]);
+    }
+
+    public function getDetailData()
+    {
+        $date  = request('date', now()->toDateString());
+        $shift = (int) request('shift', 1);
+        $selectedLine = request('line');
+
+        $detailService = app(DashboardDetailService::class);
+        $result = [];
+
+        $lines = LineMaster::where('status', 'active')
+            ->select('line_name')->distinct()->pluck('line_name')->toArray();
+
+        if ($selectedLine && in_array($selectedLine, $lines)) {
+            $lines = [$selectedLine];
+        }
+
+        foreach ($lines as $lineName) {
+            $result[$lineName] = $detailService->getLineDetail($lineName, $date, $shift);
+        }
+
+        return response()->json(['detail' => $result]);
+    }
+
+    public function stream(): StreamedResponse
+    {
+        $date  = request('date', now()->toDateString());
+        $shift = (int) request('shift', 1);
+        $selectedLine = request('line');
+
+        $response = new StreamedResponse(function () use ($date, $shift, $selectedLine) {
+            ob_implicit_flush(true);
+
+            header('Content-Type: text/event-stream');
+            header('Cache-Control: no-cache');
+            header('Connection: keep-alive');
+            header('X-Accel-Buffering: no');
+
+            $maxLoops = 5;
+
+            $lines = LineMaster::where('status', 'active')
+                ->select('line_name')->distinct()->pluck('line_name')->toArray();
+
+            if ($selectedLine && in_array($selectedLine, $lines)) {
+                $lines = [$selectedLine];
+            }
+
+            for ($i = 0; $i < $maxLoops; $i++) {
+                if (connection_aborted()) break;
+
+                $hasUpdate = false;
+
+                foreach ($lines as $lineName) {
+                    if (DashboardRealtimeService::hasUpdate($lineName)) {
+                        $hasUpdate = true;
+                        DashboardRealtimeService::consumeUpdate($lineName);
+                    }
+                }
+
+                if ($hasUpdate) {
+                    $lineKpi = [];
+                    $lineMeta = [];
+                    $detailData = [
+                        'QTY'      => ['type' => 'production'],
+                        'TOTAL_DT' => ['type' => 'dt_summary'],
+                        'MACH_T'   => ['type' => 'dt_detail'],
+                        'DIES_T'   => ['type' => 'dt_detail'],
+                        'MAT_T'    => ['type' => 'dt_detail'],
+                        'LOG_T'    => ['type' => 'dt_detail'],
+                        'PROD_T'   => ['type' => 'runtime'],
+                        'REPAIR'   => ['type' => 'quality'],
+                        'REJECT'   => ['type' => 'quality'],
+                    ];
+
+                    foreach ($lines as $lineName) {
+                        $metrics = $this->dashService->getLineMetrics($lineName, $date, $shift);
+                        $lineKpi[$lineName] = $metrics['kpi'];
+                        $lineMeta[$lineName] = $metrics['meta'] ?? ['job' => '-', 'stroke' => '0'];
+                        foreach ($detailData as $key => $template) {
+                            $detailData[$key][$lineName] = $metrics['detailData'][$key][$lineName] ?? ['rows' => [], 'total' => '0'];
+                        }
+                    }
+
+                    echo "data: " . json_encode([
+                        'line_kpi'    => $lineKpi,
+                        'line_meta'   => $lineMeta,
+                        'detail_data' => $detailData,
+                    ]) . "\n\n";
+                } else {
+                    echo ": keepalive\n\n";
+                }
+
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+
+                sleep(2);
+            }
+        });
+
+        $response->headers->set('Content-Type', 'text/event-stream');
+        $response->headers->set('Cache-Control', 'no-cache');
+        $response->headers->set('Connection', 'keep-alive');
+        $response->headers->set('X-Accel-Buffering', 'no');
+
+        return $response;
+    }
+
+    private function computeOverviewData(string $dateFrom, string $dateTo, string $selectedLine, int $shift): array
+    {
+        $shiftText = $shift === 1 ? 'Shift Pagi' : 'Shift Malam';
+
+        $query = DailyProduction::query();
+
+        $query->where('work_date', '>=', $dateFrom)
+              ->where('work_date', '<=', $dateTo);
+
+        if ($selectedLine !== 'all') {
+            $query->where('line', 'LIKE', '%' . $selectedLine);
+        }
+
+        $query->where(function ($q) use ($shiftText) {
+            $q->where('shift', $shiftText)->orWhere('shift', '')->orWhereNull('shift');
+        });
+
+        $totals = (clone $query)->selectRaw('COALESCE(SUM(actual_ok),0) as total_ok, COALESCE(SUM(actual_repair),0) as total_repair, COALESCE(SUM(actual_reject),0) as total_reject')->first();
+        $totalOk = (int) $totals->total_ok;
+        $totalRepair = (int) $totals->total_repair;
+        $totalReject = (int) $totals->total_reject;
+        $totalProduction = $totalOk + $totalRepair + $totalReject;
+
+        $okPercent = $totalProduction > 0 ? round(($totalOk / $totalProduction) * 100, 1) : 0;
+        $rejectRate = $totalProduction > 0 ? round(($totalReject / $totalProduction) * 100, 2) : 0;
+
+        $targetQuery = ProductionTarget::query();
+        $targetQuery->whereDate('target_date', $dateFrom);
+        if ($selectedLine !== 'all') {
+            $targetQuery->where('process_type', 'LIKE', '%' . $selectedLine);
+        }
+        $targetQuery->where('shift', $shiftText);
+        $targetQty = $targetQuery->sum('target_qty');
+
+        if ($targetQty <= 0) {
+            $prodPlanQuery = ProductionPlan::where('plan_date', $dateFrom)
+                ->where('shift_name', 'like', $shiftText . '%')
+                ->where('row_type', 'job');
+            if ($selectedLine !== 'all') {
+                $prodPlanQuery->where('press_name', 'LIKE', '%' . $selectedLine);
+            }
+            $targetQty = (int) $prodPlanQuery->sum('plan');
+        }
+
+        if ($targetQty <= 0) {
+            $jmQuery = JobMaster::whereHas('dailyProduction', function ($q) use ($dateFrom, $shiftText, $selectedLine) {
+                $q->where('work_date', $dateFrom)
+                  ->where(function ($sq) use ($shiftText) {
+                      $sq->where('shift', $shiftText)->orWhere('shift', '')->orWhereNull('shift');
+                  });
+                if ($selectedLine !== 'all') {
+                    $q->where('line', 'LIKE', '%' . $selectedLine);
+                }
+            });
+            $targetQty = (int) $jmQuery->sum('target_qty');
+        }
+
+        $achievementPercent = $targetQty > 0 ? round(($totalOk / $targetQty) * 100, 1) : 0;
+        $gap = $targetQty > 0 ? max(0, $targetQty - $totalOk) : 0;
+
+        if ($achievementPercent >= 100) {
+            $performanceColor = 'bg-green-600';
+        } elseif ($achievementPercent >= 80) {
+            $performanceColor = 'bg-yellow-500';
+        } elseif ($targetQty > 0) {
+            $performanceColor = 'bg-red-600';
+        } else {
+            $performanceColor = 'bg-gray-400';
+        }
+
+        // Chart data
+        $chartLabels = [];
+        $actualProduction = [];
+        $expectedProduction = [];
+
+        $now = Carbon::now();
+        $chartDate = Carbon::parse($dateFrom);
+        $chartEndDate = Carbon::parse($dateTo);
+
+        if ($shift === 1) {
+            $chartStart = $chartDate->copy()->setTime(7, 30);
+            $chartEnd   = $chartDate->copy()->setTime(21, 0);
+        } else {
+            $shiftEndDate = $shift === 2 && $now->format('H:i') >= '21:00' ? Carbon::parse($dateTo)->addDay() : $chartEndDate;
+            $chartStart = $chartDate->copy()->setTime(21, 0);
+            $chartEnd   = $shiftEndDate->copy()->setTime(7, 30);
+        }
+
+        $current = $chartStart->copy();
+        while ($current <= $chartEnd) {
+            $chartLabels[] = $current->format('H:i');
+            $current->addHour();
+        }
+
+        $logQuery = ProductionLog::whereBetween('created_at', [$chartStart, $chartEnd]);
+        if ($selectedLine !== 'all') {
+            $logQuery->whereHas('jobMaster', function ($q) use ($selectedLine) {
+                $q->where('line', 'LIKE', '%' . $selectedLine);
+            });
+        }
+        $chartData = $logQuery->selectRaw("HOUR(created_at) as local_hour, SUM(ok_qty) as total_ok")
+            ->groupBy('local_hour')
+            ->pluck('total_ok', 'local_hour')
+            ->toArray();
+
+        $cumulative = 0;
+        foreach ($chartLabels as $label) {
+            $h = (int)substr($label, 0, 2);
+            $cumulative += ($chartData[$h] ?? 0);
+            $actualProduction[] = $cumulative;
+        }
+
+        if ($targetQty > 0) {
+            $step = $targetQty / (count($chartLabels) > 1 ? count($chartLabels) - 1 : 1);
+            for ($i = 0; $i < count($chartLabels); $i++) {
+                $expectedProduction[] = round($step * $i);
+            }
+        } else {
+            foreach($chartLabels as $l) $expectedProduction[] = 0;
+        }
+
+        $latestProductions = $query->with('jobMaster')->latest()->paginate(10);
+
+        return compact(
+            'totalOk', 'totalRepair', 'totalReject', 'totalProduction',
+            'okPercent', 'rejectRate',
+            'targetQty', 'achievementPercent', 'gap', 'performanceColor',
+            'chartLabels', 'actualProduction', 'expectedProduction',
+            'latestProductions',
+        );
+    }
+
+    public function overviewData()
+    {
+        $dateFrom = request('date_from') ?? now()->toDateString();
+        $dateTo   = request('date_to') ?? now()->toDateString();
+        $selectedLine = request('line', 'all');
+        if (empty($selectedLine)) $selectedLine = 'all';
+        $shift = (int) (request('shift', '1') ?: '1');
+
+        $data = $this->computeOverviewData($dateFrom, $dateTo, $selectedLine, $shift);
+
+        $progress = ($data['targetQty'] ?? 0) > 0 ? min(round((($data['totalOk'] ?? 0) / $data['targetQty']) * 100, 1), 100) : 0;
+        $progColor = $progress >= 80 ? 'bg-green-500' : ($progress >= 50 ? 'bg-amber-500' : 'bg-red-500');
+        if (($data['targetQty'] ?? 0) <= 0) $progColor = 'bg-gray-300';
+
+        // Render recent logs HTML
+        $logsHtml = view('supervisor.partials.overview_logs', ['latestProductions' => $data['latestProductions'], 'shift' => $shift])->render();
+
+        $noData = ($data['totalOk'] ?? 0) <= 0 && ($data['targetQty'] ?? 0) <= 0;
+
+        return response()->json([
+            'kpi' => [
+                'target' => $data['targetQty'] ?? 0,
+                'achievement' => $data['achievementPercent'] ?? 0,
+                'gap' => $data['gap'] ?? 0,
+                'ok_qty' => $data['totalOk'] ?? 0,
+                'reject_qty' => $data['totalReject'] ?? 0,
+                'ok_pct' => $data['okPercent'] ?? 0,
+                'reject_rate' => $data['rejectRate'] ?? 0,
+                'target_label' => 'Target: ' . (($data['targetQty'] ?? 0) > 0 ? number_format($data['targetQty']) : '0'),
+                'actual_label' => 'Actual: ' . number_format($data['totalOk'] ?? 0),
+                'progress' => $progress,
+                'prog_color' => $progColor,
+                'achievement_color' => ($data['achievementPercent'] ?? 0) >= 80 ? 'text-green-600' : 'text-red-600',
+                'no_data' => $noData,
+            ],
+            'chart' => [
+                'labels' => $data['chartLabels'] ?? [],
+                'expected' => $data['expectedProduction'] ?? [],
+                'actual' => $data['actualProduction'] ?? [],
+            ],
+            'logs_html' => $logsHtml,
+            'logs_pagination' => $data['latestProductions']->links()->toHtml(),
         ]);
     }
 
@@ -167,110 +392,15 @@ class DashboardController extends Controller
 
         /*
         ====================================
-        BASE QUERY
+        FILTERS
         ====================================
         */
 
-        $query = ProductionProcess::with('job');
+        $selectedLine = request('line', 'all');
+        if (empty($selectedLine)) $selectedLine = 'all';
 
-        $query->whereDate('created_at', '>=', $dateFrom)
-              ->whereDate('created_at', '<=', $dateTo);
-
-        if (request('process_type')) {
-            $query->where('process_type', request('process_type'));
-        }
-
-        if (request('shift')) {
-            $query->where('shift', request('shift'));
-        }
-
-        if (request('order')) {
-            $query->where('production_order_number', 'like', '%' . request('order') . '%');
-        }
-
-
-        /*
-        ====================================
-        PRODUCTION TOTAL
-        ====================================
-        */
-
-        $totalOk = (clone $query)->sum('qty_ok');
-        $totalRepair = (clone $query)->sum('qty_repair');
-        $totalReject = (clone $query)->sum('qty_reject');
-
-        $totalProduction = $totalOk + $totalRepair + $totalReject;
-
-        $okPercent = $totalProduction > 0 ? round(($totalOk / $totalProduction) * 100, 1) : 0;
-        $repairPercent = $totalProduction > 0 ? round(($totalRepair / $totalProduction) * 100, 1) : 0;
-        $rejectPercent = $totalProduction > 0 ? round(($totalReject / $totalProduction) * 100, 1) : 0;
-
-
-        /*
-        ====================================
-        REJECT RATE
-        ====================================
-        */
-
-        $rejectRate = $totalProduction > 0
-            ? round(($totalReject / $totalProduction) * 100, 2)
-            : 0;
-
-
-        /*
-        ====================================
-        TARGET QUERY
-        ====================================
-        */
-
-        $targetQuery = ProductionTarget::query();
-
-        $targetQuery->whereDate('target_date', $dateFrom);
-
-        if (request('process_type')) {
-            $targetQuery->where('process_type', request('process_type'));
-        }
-
-        if (request('shift')) {
-            $targetQuery->where('shift', request('shift'));
-        }
-
-        $targetQty = $targetQuery->sum('target_qty');
-
-
-        /*
-        ====================================
-        ACHIEVEMENT
-        ====================================
-        */
-
-        if ($targetQty > 0) {
-
-            $achievementPercent = round(($totalOk / $targetQty) * 100, 1);
-
-            $gap = $targetQty - $totalOk;
-
-            if ($achievementPercent >= 100) {
-                $performanceColor = 'bg-green-600';
-            } elseif ($achievementPercent >= 80) {
-                $performanceColor = 'bg-yellow-500';
-            } else {
-                $performanceColor = 'bg-red-600';
-            }
-
-        } else {
-
-            $achievementPercent = 0;
-            $gap = 0;
-            $performanceColor = 'bg-gray-400';
-
-        }
-
-        /*
-        ====================================
-        TIME BASE (FIX REDUNDANSI)
-        ====================================
-        */
+        $selectedShift = request('shift', '1');
+        if (empty($selectedShift)) $selectedShift = '1';
 
         $now = Carbon::now();
         $time = $now->format('H:i');
@@ -279,301 +409,164 @@ class DashboardController extends Controller
         $yesterday = Carbon::yesterday();
         $tomorrow = Carbon::tomorrow();
 
-        // DEFAULT
-        $minutesPassed = 0;
-        $remainingMinutes = 0;
-        $shift = null;
+        $shift = (int) $selectedShift;
         $isOvertime = false;
+        $shiftStart = null;
+        $shiftEnd = null;
 
-        /*
-        ====================================
-        SHIFT LOGIC
-        ====================================
-        */
-
-        if ($time >= '07:30' && $time < '16:15') {
-            $shift = 1;
-            $shiftStart = $today->copy()->setTime(7,30);
-            $shiftEnd   = $today->copy()->setTime(16,15);
-        }
-
-        elseif ($time >= '16:15' && $time < '21:00') {
-            $shift = 1;
-            $isOvertime = true;
-            $shiftStart = $today->copy()->setTime(7,30);
-            $shiftEnd   = $today->copy()->setTime(21,0);
-        }
-
-        elseif ($time >= '21:00' || $time < '04:30') {
-            $shift = 2;
-
+        if ($shift === 1) {
+            $shiftStart = $today->copy()->setTime(7, 30);
+            $shiftEnd   = $today->copy()->setTime(21, 0);
+            $isOvertime = $time >= '16:15' && $time < '21:00';
+        } else {
             if ($time >= '21:00') {
-                $shiftStart = $today->copy()->setTime(21,0);
-                $shiftEnd   = $tomorrow->copy()->setTime(4,30);
+                $shiftStart = $today->copy()->setTime(21, 0);
+                $shiftEnd   = $tomorrow->copy()->setTime(7, 30);
             } else {
-                $shiftStart = $yesterday->copy()->setTime(21,0);
-                $shiftEnd   = $today->copy()->setTime(4,30);
+                $shiftStart = $yesterday->copy()->setTime(21, 0);
+                $shiftEnd   = $today->copy()->setTime(7, 30);
             }
+            $isOvertime = $time >= '04:30' && $time < '07:30';
         }
 
-        elseif ($time >= '04:30' && $time < '07:30') {
-            $shift = 2;
-            $isOvertime = true;
-            $shiftStart = $yesterday->copy()->setTime(21,0);
-            $shiftEnd   = $today->copy()->setTime(7,30);
-        }
-
-        /*
-====================================
-REALTIME TIME CALC (SYNC WITH JS)
-====================================
-*/
-
-if (isset($shiftStart) && isset($shiftEnd)) {
-
-    // total shift duration
-    $shiftDurationMinutes = $shiftStart->diffInMinutes($shiftEnd);
-
-    // realtime minutes passed
-    $minutesPassed = $shiftStart->diffInMinutes($now);
-
-    // clamp biar ga minus / over
-    if ($now < $shiftStart) {
-        $minutesPassed = 0;
-    }
-
-    if ($now > $shiftEnd) {
-        $minutesPassed = $shiftDurationMinutes;
-    }
-
-    // remaining realtime
-    $remainingMinutes = max($shiftDurationMinutes - $minutesPassed, 0);
-}
 
         /*
         ====================================
-        BREAK LOGIC
+        BUILD OVERVIEW DATA
         ====================================
         */
 
-        $day = $now->format('l');
+        $data = $this->computeOverviewData($dateFrom, $dateTo, $selectedLine, $shift);
 
-        $breaks = []; 
+        extract($data);
+
+
+        /*
+        ====================================
+        BREAK SCHEDULE
+        ====================================
+        */
+
+        $dayName = $now->format('l');
+        $dayMap = [
+            'Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu',
+            'Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'
+        ];
+        $dayDb = $dayMap[$dayName] ?? strtolower($dayName);
+        $shiftDb = $shift === 1 ? 'Shift Pagi' : 'Shift Malam';
+
+        $masterBreaks = MasterBreakTime::where('is_active', true)
+            ->where(function ($q) use ($dayDb) {
+                $q->where('hari', $dayDb)->orWhere('hari', 'semua');
+            })
+            ->where(function ($q) use ($shiftDb) {
+                $q->where('shift', $shiftDb)->orWhereNull('shift');
+            })
+            ->orderBy('sort_order')
+            ->get();
+
+        $breakSchedule = [];
         $isBreak = false;
+        $currentBreak = null;
+        $nowMinutes = $now->hour * 60 + $now->minute;
 
-        $currentBreakStart = null;
-        $currentBreakEnd = null;
+        foreach ($masterBreaks as $b) {
+            $startStr = substr($b->waktu_mulai, 0, 5);
+            $endStr   = substr($b->waktu_selesai, 0, 5);
+            $startMin = MasterBreakTime::timeToMinutes($startStr);
+            $endMin   = MasterBreakTime::timeToMinutes($endStr);
 
-        if (in_array($day, ['Monday','Tuesday','Wednesday','Thursday'])) {
-
-            $breaks[] = [
-                'start' => $today->copy()->setTime(12,0),
-                'end'   => $today->copy()->setTime(12,40),
+            $entry = [
+                'label'    => $b->label,
+                'type'     => $b->type,
+                'start'    => $startStr,
+                'end'      => $endStr,
+                'startMin' => $startMin,
+                'endMin'   => $endMin,
             ];
+            $breakSchedule[] = $entry;
 
-            $breaks[] = [
-                'start' => $today->copy()->setTime(15,15),
-                'end'   => $today->copy()->setTime(15,30),
-            ];
-        }
-
-        elseif ($day == 'Friday') {
-
-            $breaks[] = [
-                'start' => $today->copy()->setTime(11,45),
-                'end'   => $today->copy()->setTime(12,45),
-            ];
-        }
-
-        foreach ($breaks as $b) {
-
-            if (
-                $now->greaterThanOrEqualTo($b['start']) &&
-                $now->lessThan($b['end'])
-            ) {
+            if ($nowMinutes >= $startMin && $nowMinutes < $endMin) {
                 $isBreak = true;
-                $currentBreakStart = $b['start'];
-                $currentBreakEnd = $b['end'];
-                break;
+                $currentBreak = $entry;
             }
         }
 
-        /*
-        ====================================
-        EFFECTIVE TIME
-        ====================================
-        */
-
-        $breakMinutesPassed = 0;
-        $futureBreakMinutes = 0;
-
-        $effectiveMinutesPassed = max($minutesPassed - $breakMinutesPassed, 0);
-        $effectiveRemainingMinutes = max($remainingMinutes - $futureBreakMinutes, 0);
-
-        if ($effectiveRemainingMinutes < 0) {
-            $effectiveRemainingMinutes = 0;
-        }
-
-        foreach ($breaks as $b) {
-
-            if ($now > $b['end']) {
-                $breakMinutesPassed += $b['start']->diffInMinutes($b['end']);
-            }
-
-            elseif ($now >= $b['start'] && $now < $b['end']) {
-                $breakMinutesPassed += $b['start']->diffInMinutes($now);
-            }
-
-            elseif ($now < $b['start']) {
-                $futureBreakMinutes += $b['start']->diffInMinutes($b['end']);
+        $timeToNextBreak = null;
+        if (!$isBreak) {
+            foreach ($breakSchedule as $b) {
+                if ($nowMinutes < $b['startMin']) {
+                    $timeToNextBreak = $b['start'] . ' - ' . $b['end'] . ' (' . $b['label'] . ')';
+                    break;
+                }
             }
         }
 
-        $effectiveMinutesPassed = max($minutesPassed - $breakMinutesPassed, 0);
-        $effectiveRemainingMinutes = max($remainingMinutes - $futureBreakMinutes, 0);
-
-        // HOURS
-        $hoursPassed = round($effectiveMinutesPassed / 60, 2);
-        $remainingHours = round($effectiveRemainingMinutes / 60, 2);
-
-        /*
-        ====================================
-        SPEED CALCULATION
-        ====================================
-        */
-
-        $currentSpeed = ($effectiveMinutesPassed > 0)
-            ? round(($totalOk / $effectiveMinutesPassed) * 60, 1)
-            : 0;
-
-        $requiredSpeed = ($effectiveRemainingMinutes > 0 && $gap > 0)
-            ? round(($gap / $effectiveRemainingMinutes) * 60, 1)
-            : 0;
-
-        /*
-        ====================================
-        MACHINE STATUS
-        ====================================
-        */
+        $lineStatuses = LineStatusService::getStatuses($shift);
 
         $openAbnormality = 0;
         $activeDowntime = 0;
 
-        /*
-        ====================================
-        PRODUCTION TREND CHART (IMPROVED)
-        ====================================
-        */
-        $chartLabels = [];
-        $actualProduction = [];
-        $expectedProduction = [];
+        $serverNow = now()->format('Y-m-d H:i:s');
+        $shiftStartFull = $shiftStart->format('Y-m-d H:i:s');
+        $shiftEndFull = $shiftEnd->format('Y-m-d H:i:s');
 
-        // Generate full shift timeline
-        $current = $shiftStart->copy();
-        while ($current <= $shiftEnd) {
-            $chartLabels[] = $current->format('H:i');
-            $current->addHour();
+        return view('supervisor.overview', compact(
+            'dateFrom', 'dateTo', 'selectedLine', 'selectedShift',
+            'totalOk', 'totalRepair', 'totalReject', 'rejectRate',
+            'okPercent',
+            'targetQty', 'achievementPercent', 'gap', 'performanceColor',
+            'openAbnormality', 'activeDowntime',
+            'lineStatuses',
+            'chartLabels', 'actualProduction', 'expectedProduction',
+            'latestProductions',
+            'shift', 'isOvertime', 'shiftStart', 'shiftEnd',
+            'isBreak', 'currentBreak', 'breakSchedule', 'timeToNextBreak',
+            'serverNow', 'shiftStartFull', 'shiftEndFull',
+        ));
+    }
+
+    public function allProductionLogs()
+    {
+        $dateFrom = request('date_from') ?? now()->toDateString();
+        $selectedLine = request('line', 'all');
+        $shift = (int) (request('shift', '1') ?: '1');
+        $shiftText = $shift === 1 ? 'Shift Pagi' : 'Shift Malam';
+
+        $logs = DailyProduction::with('jobMaster')
+            ->where('work_date', $dateFrom)
+            ->where(function ($q) use ($shiftText) {
+                $q->where('shift', $shiftText)->orWhere('shift', '')->orWhereNull('shift');
+            });
+
+        if ($selectedLine !== 'all') {
+            $logs->where('line', 'LIKE', '%' . $selectedLine);
         }
 
-        // Fetch data and map to local timezone
-        $chartData = ProductionProcess::whereBetween('created_at', [$shiftStart, $shiftEnd])
-            ->selectRaw("HOUR(CONVERT_TZ(created_at, '+00:00', '+07:00')) as local_hour, SUM(qty_ok) as total_ok")
-            ->groupBy('local_hour')
-            ->pluck('total_ok', 'local_hour')
-            ->toArray();
+        $logs = $logs->latest()->paginate(15);
 
-        $cumulative = 0;
-        foreach ($chartLabels as $label) {
-            $h = (int)substr($label, 0, 2);
-            $cumulative += ($chartData[$h] ?? 0);
-            $actualProduction[] = $cumulative;
-        }
+        return response()->json($logs);
+    }
 
-        // Expected line based on target
-        if ($targetQty > 0) {
-            $step = $targetQty / (count($chartLabels) > 1 ? count($chartLabels) - 1 : 1);
-            for ($i = 0; $i < count($chartLabels); $i++) {
-                $expectedProduction[] = round($step * $i);
-            }
-        } else {
-            // Placeholder expected line if target is 0
-            foreach($chartLabels as $l) $expectedProduction[] = 0;
-        }
+    public function overviewLineStatus()
+    {
+        $dateFrom = request('date_from') ?? now()->toDateString();
+        $time = now()->format('H:i');
+        $shift = ($time >= '07:30' && $time < '21:00') ? 1 : 2;
 
-        /*
-        ====================================
-        RECENT PRODUCTION (TIDAK DIUBAH)
-        ====================================
-        */
+        $statuses = LineStatusService::getStatuses($shift);
 
-        $latestProductions = $query
-            ->latest()
-            ->paginate(10)
-            ->withQueryString();
+        return response()->json(['line_statuses' => $statuses]);
+    }
 
-        /*
-        ====================================
-        STATUS
-        ====================================
-        */
+    public function lineStatusSingle($line)
+    {
+        $time = now()->format('H:i');
+        $shift = ($time >= '07:30' && $time < '21:00') ? 1 : 2;
+        $statuses = LineStatusService::getStatuses($shift);
+        $status = $statuses[$line] ?? ['label' => 'NOT RUNNING', 'color' => 'gray', 'pulse' => false];
 
-        $status = 'waiting';
-
-        if (($requiredSpeed ?? 0) > 0) {
-            $status = $currentSpeed >= $requiredSpeed ? 'on_track' : 'behind';
-        }
-
-        // realtime shift egine
-        
-
-        /*
-        ====================================
-        RETURN
-        ====================================
-        */
-
-        return view('supervisor.overview', [
-
-            'totalOk' => $totalOk,
-            'totalRepair' => $totalRepair,
-            'totalReject' => $totalReject,
-            'rejectRate' => $rejectRate,
-            'okPercent' => $okPercent,
-            'repairPercent' => $repairPercent, 
-            'rejectPercent' => $rejectPercent,
-
-            'targetQty' => $targetQty,
-            'achievementPercent' => $achievementPercent,
-            'gap' => $gap,
-            'performanceColor' => $performanceColor,
-
-            'remainingHours' => $remainingHours,
-            'currentSpeed' => $currentSpeed,
-            'requiredSpeed' => $requiredSpeed,
-            
-            'openAbnormality' => $openAbnormality,
-            'activeDowntime' => $activeDowntime,
-
-            'chartLabels' => $chartLabels,
-            'actualProduction' => $actualProduction,
-            'expectedProduction' => $expectedProduction,
-
-            'latestProductions' => $latestProductions,
-            'status' => $status,
-            
-            'shift' => $shift,
-            'isOvertime' => $isOvertime,
-            'shiftStart' => $shiftStart->format('H:i'),
-            'shiftEnd' => $shiftEnd->format('H:i'),
-
-            'isBreak' => $isBreak,
-            'breakStart' => $currentBreakStart?->format('H:i'),
-            'breakEnd' => $currentBreakEnd?->format('H:i'),
-            'serverNow' => now()->format('Y-m-d H:i:s'),
-            'shiftStartFull' => $shiftStart->format('Y-m-d H:i:s'),
-            'shiftEndFull' => $shiftEnd->format('Y-m-d H:i:s'),
-
-        ]);
+        return response()->json(['line' => $line, 'status' => $status]);
     }
 
     public function troubleHistory()

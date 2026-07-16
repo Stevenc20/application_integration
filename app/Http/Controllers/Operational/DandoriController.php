@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\JobMaster;
 use App\Models\Dandori;
+use App\Models\Downtime;
 use Carbon\Carbon;
 
 class DandoriController extends Controller
@@ -66,7 +67,8 @@ class DandoriController extends Controller
         $job = JobMaster::findOrFail($id);
 
         $activityTypes = [
-            'dandori_process' => 'DANDORI'
+            'dandori_process' => 'DANDORI',
+            'first_check'     => '1ST CHECK'
         ];
 
         $dandoriStatus = [];
@@ -103,19 +105,52 @@ class DandoriController extends Controller
         $job = JobMaster::findOrFail($id);
         
         $activityTypes = [
-            'dandori_process' => 'DANDORI'
+            'dandori_process' => 'DANDORI',
+            'first_check'     => '1ST CHECK'
         ];
 
         $activityName = $activityTypes[$type] ?? 'DANDORI';
+        $jenisDandori = $type === 'first_check' ? '1st_check' : 'dandori';
+        $now = now();
+
+        // Close any existing open downtime (e.g. auto-idle time) before starting Dandori
+        // For 1st_check, only close non-dandori downtimes
+        $openDowntime = Downtime::where('job_master_id', $id)
+            ->whereNull('finish_time');
+        if ($jenisDandori === '1st_check') {
+            $openDowntime->where('jenis_downtime', '!=', 'dandori');
+        }
+        $openDowntime = $openDowntime->first();
+        if ($openDowntime) {
+            $durationSeconds = abs($now->diffInSeconds(Carbon::parse($openDowntime->start_time)));
+            $openDowntime->update([
+                'finish_time' => $now,
+                'duration_seconds' => $durationSeconds
+            ]);
+        }
+
+        if ($jenisDandori !== '1st_check') {
+            // Create Downtime record so Input Harian timeline can render it
+            Downtime::create([
+                'job_master_id' => $id,
+                'jenis_downtime' => 'dandori',
+                'problem' => 'PERSIAPAN (DANDORI)',
+                'start_time' => $now,
+                'penyebab' => '-',
+                'action' => '-',
+                'pic' => auth()->user()->name ?? 'OPERATOR'
+            ]);
+        }
 
         Dandori::create([
-            'next_job_id' => $job->id,
-            'line'        => $job->line,
-            'shift'       => $request->shift ?? 'Shift 1',
-            'activity'    => $activityName,
-            'start_time'  => now(),
-            'work_date'   => now()->toDateString(),
-            'created_by'  => auth()->id()
+            'next_job_id'   => $job->id,
+            'line'          => $job->line,
+            'shift'         => $request->shift ?? 'Shift 1',
+            'activity'      => $activityName,
+            'jenis_dandori' => $jenisDandori,
+            'start_time'    => $now,
+            'work_date'     => now()->toDateString(),
+            'created_by'    => auth()->id()
         ]);
 
         if ($request->wantsJson()) {
@@ -138,6 +173,19 @@ class DandoriController extends Controller
             'finish_time'      => $finish,
             'duration_minutes' => round($minutes, 2)
         ]);
+
+        // Also close the corresponding Downtime record so Input Harian timeline reflects it
+        $openDowntime = Downtime::where('job_master_id', $row->next_job_id)
+            ->where('jenis_downtime', 'dandori')
+            ->whereNull('finish_time')
+            ->first();
+        if ($openDowntime) {
+            $durationSeconds = abs($finish->diffInSeconds(Carbon::parse($openDowntime->start_time)));
+            $openDowntime->update([
+                'finish_time' => $finish,
+                'duration_seconds' => $durationSeconds
+            ]);
+        }
 
         if (request()->wantsJson()) {
             return response()->json(['success' => true, 'message' => 'Dandori ' . $row->activity . ' selesai.']);
@@ -175,6 +223,10 @@ class DandoriController extends Controller
             $q->where('line', $request->line);
         }
 
+        if ($request->jenis) {
+            $q->where('jenis_dandori', $request->jenis);
+        }
+
         // Group by job, date, line, and shift
         $paginated = $q->leftJoin('job_masters', 'dandoris.next_job_id', '=', 'job_masters.id')
             ->select(
@@ -208,11 +260,12 @@ class DandoriController extends Controller
                 'total_duration' => round($activities->sum('duration_minutes'), 2),
                 'activities'     => $activities->map(function ($a) {
                     return [
-                        'type'        => $a->activity,
-                        'start'       => $a->start_time ? Carbon::parse($a->start_time)->format('H:i') : '-',
-                        'finish'      => $a->finish_time ? Carbon::parse($a->finish_time)->format('H:i') : '-',
-                        'duration'    => round($a->duration_minutes, 2),
-                        'is_finished' => !is_null($a->finish_time)
+                        'type'          => $a->activity,
+                        'jenis_dandori' => $a->jenis_dandori ?? 'dandori',
+                        'start'         => $a->start_time ? Carbon::parse($a->start_time)->format('H:i') : '-',
+                        'finish'        => $a->finish_time ? Carbon::parse($a->finish_time)->format('H:i') : '-',
+                        'duration'      => round($a->duration_minutes, 2),
+                        'is_finished'   => !is_null($a->finish_time)
                     ];
                 })
             ];
@@ -282,6 +335,8 @@ class DandoriController extends Controller
             'created_by'  => auth()->id()
         ]);
     }
+
+    // idle time creation removed — flow langsung Dandori
 
     /*
     =====================================

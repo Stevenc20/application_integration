@@ -240,13 +240,12 @@ class ProductionService
                 'job_master_id' => $jobId,
                 'work_date' => $workDate
             ]);
-            
-            $actualQty = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())->sum('ok_qty');
-            $actualRepair = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())->sum('repair_qty');
-            $actualReject = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())->sum('reject_qty');
+
+            // Delta-based: tambahkan delta ke nilai yang sudah ada (tidak SUM dari logs)
+            // SUM-based salah karena 5-log trimming menghapus history
+            $actualQty = ($daily->actual_ok ?? 0) + ($data['ok_qty'] ?? 0);
+            $actualRepair = ($daily->actual_repair ?? 0) + ($data['repair_qty'] ?? 0);
+            $actualReject = ($daily->actual_reject ?? 0) + ($data['reject_qty'] ?? 0);
 
             $job = JobMaster::find($jobId);
             $targetQty = $job?->capacity ?? 0;
@@ -267,7 +266,9 @@ class ProductionService
                 'actual_reject' => $actualReject,
                 'runtime_seconds' => $runtimeSeconds,
                 'downtime_seconds' => Downtime::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())->sum('duration_seconds'),
+                    ->whereDate('created_at', now())
+                    ->where('jenis_downtime', '!=', 'dandori')
+                    ->sum('duration_seconds'),
                 'efficiency' => $efficiency
             ]);
 
@@ -565,6 +566,7 @@ class ProductionService
 
             $totalDowntime = Downtime::where('job_master_id', $downtime->job_master_id)
                 ->whereDate('created_at', now()->toDateString())
+                ->where('jenis_downtime', '!=', 'dandori')
                 ->sum('duration_seconds');
 
             DailyProduction::updateOrCreate(
@@ -592,6 +594,7 @@ class ProductionService
 
             $totalDowntime = Downtime::where('job_master_id', $jobId)
                 ->whereDate('created_at', now()->toDateString())
+                ->where('jenis_downtime', '!=', 'dandori')
                 ->sum('duration_seconds');
 
             DailyProduction::where('job_master_id', $jobId)
@@ -710,23 +713,30 @@ class ProductionService
         $current = JobMaster::find($currentJobId);
         if (!$current) return null;
 
-        // Try resolving the next job using the planned sequence sheet
         $parts = explode('-', $current->job_number);
         $planId = end($parts);
 
         if (is_numeric($planId)) {
             $currentPlan = \App\Models\ProductionPlan::find($planId);
             if ($currentPlan) {
-                $nextPlan = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
+                $planQuery = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
                     ->where('shift_name', $currentPlan->shift_name)
                     ->where('press_name', $currentPlan->press_name)
                     ->where('row_type', 'job')
-                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
+
+                $nextPlan = (clone $planQuery)
                     ->where('row_no', '>', $currentPlan->row_no)
                     ->orderBy('row_no', 'asc')
                     ->first();
 
-                if ($nextPlan) {
+                if (!$nextPlan) {
+                    $nextPlan = (clone $planQuery)
+                        ->orderBy('row_no', 'asc')
+                        ->first();
+                }
+
+                if ($nextPlan && $nextPlan->id !== $currentPlan->id) {
                     $nextIdentifier = $nextPlan->job_no ? ($nextPlan->job_no . '-' . $nextPlan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($nextPlan->job_master) . '-' . $nextPlan->id);
                     $nextJob = JobMaster::where('job_number', $nextIdentifier)
                         ->whereNotIn(DB::raw('LOWER(status)'), ['complete'])
@@ -738,13 +748,24 @@ class ProductionService
             }
         }
 
-        // Fallback to old query
-        return JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
+        $allLineJobs = JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
             ->where('line', $current->line)
-            ->where('id', '!=', $currentJobId)
             ->orderBy('sequence_no')
             ->orderBy('id')
-            ->first();
+            ->get();
+
+        $currentIdx = $allLineJobs->search(fn($j) => $j->id == $currentJobId);
+        if ($currentIdx !== false && $allLineJobs->count() > 1) {
+            $total = $allLineJobs->count();
+            for ($i = 1; $i < $total; $i++) {
+                $candidate = $allLineJobs[($currentIdx + $i) % $total];
+                if ($candidate->id != $currentJobId) {
+                    return $candidate;
+                }
+            }
+        }
+
+        return $allLineJobs->first(fn($j) => $j->id != $currentJobId);
     }
 
     /**

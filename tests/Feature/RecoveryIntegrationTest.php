@@ -390,9 +390,11 @@ describe('Timeline Generation', function () {
         }
 
         $engine = app(TimelineGenerationService::class);
-        $count = $engine->regenerateSection('2026-06-25', 'Shift Pagi', 'PA');
+        $result = $engine->regenerateSection('2026-06-25', 'Shift Pagi', 'PA');
 
-        expect($count)->toBeGreaterThanOrEqual(5);
+        expect($result['updated'])->toBeGreaterThanOrEqual(5);
+        expect($result)->toHaveKey('overflow');
+        expect($result['overflow'])->toBeArray();
     });
 
     test('no time overlap in validated timeline', function () {

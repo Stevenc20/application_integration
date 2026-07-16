@@ -61,7 +61,7 @@
                 <tbody class="divide-y divide-slate-100">
                     @forelse($downtimes as $dt)
                         @php
-                            $isMissing = !$dt->problem || str_contains($dt->problem, '(Shortcut)');
+                            $isMissing = !$dt->problem || trim($dt->problem) === '-' || str_contains($dt->problem, '(Shortcut)');
                             $startTime = \Carbon\Carbon::parse($dt->start_time);
                             $finishTime = $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : null;
                             $dur = $dt->duration_seconds;

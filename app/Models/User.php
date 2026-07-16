@@ -21,7 +21,8 @@ class User extends Authenticatable
         'name',
         'nrp',
         'password',
-        'role'
+        'role',
+        'avatar',
     ];
 
     /**
@@ -31,7 +32,7 @@ class User extends Authenticatable
      */
     protected $hidden = [
         'password',
-    ];
+    ];  
 
     /**
      * Get the attributes that should be cast.
@@ -45,4 +46,28 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    public function hasFeature(string $featureCode): bool
+    {
+        $role = strtolower($this->role);
+    
+        if ($role === 'superadmin') {
+            return true;
+        }
+        if (str_starts_with($role, 'leader') || $role === 'shearing' || $role === 'handwork') {
+            $role = 'leader';
+        }
+        $hambatanRoles = ['dies_shop', 'plant_service', 'irm', 'logistik', 'produksi'];
+        if (in_array($role, $hambatanRoles)) {
+            $role = 'hambatan';
+        }
+
+        return RoleFeature::where('role', $role)
+            ->whereHas('feature', function ($q) use ($featureCode) {
+                $q->where('feature_code', $featureCode);
+            })  
+            ->where('enabled', true)
+            ->exists();
+    }
 }
+    

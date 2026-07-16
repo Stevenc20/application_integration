@@ -24,9 +24,12 @@ class UserController extends Controller
     {
     $request->validate([
         'name' => 'required',
-        'nrp' => 'required|unique:users,nrp',
+        'nrp' => 'required|digits:4|unique:users,nrp',
         'password' => 'required|min:6',
         'role' => 'required'
+    ], [
+        'nrp.digits' => 'NRP harus 4 digit angka.',
+        'nrp.unique' => 'NRP sudah terdaftar, gunakan NRP yang lain.',
     ]);
 
     User::create([
@@ -48,8 +51,11 @@ class UserController extends Controller
 {
     $request->validate([
         'name' => 'required',
-        'nrp' => 'required|unique:users,nrp,' . $user->id,
+        'nrp' => 'required|digits:4|unique:users,nrp,' . $user->id,
         'role' => 'required'
+    ], [
+        'nrp.digits' => 'NRP harus 4 digit angka.',
+        'nrp.unique' => 'NRP sudah digunakan user lain.',
     ]);
 
     $data = [

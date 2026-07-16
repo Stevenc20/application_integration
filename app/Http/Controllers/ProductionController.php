@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\ProductionProcess;
+use App\Models\DailyProduction;
 use App\Models\JobMaster;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Exports\ProductionRecapExport;
@@ -12,12 +12,11 @@ use Illuminate\Support\Facades\Auth;
 
 class ProductionController extends Controller
 {
-
     /*
     |--------------------------------------------------------------------------
     | Show Production Entry Page
     |--------------------------------------------------------------------------
-        */
+    */
     public function index(Request $request)
     {
         $user = auth()->user();
@@ -25,12 +24,12 @@ class ProductionController extends Controller
         // ambil tanggal dari filter / default hari ini
         $date = $request->date ?? now()->toDateString();
 
-        $query = ProductionProcess::with('job')
-                    ->whereDate('created_at', $date);
+        $query = DailyProduction::with('jobMaster')
+                    ->whereDate('work_date', $date);
 
         // filter khusus operator
         if($user->role == 'operator'){
-            $query->where('user_id', $user->id);
+            $query->where('saved_by', $user->id);
         }
 
         $productions = $query->latest()->get();
@@ -44,7 +43,6 @@ class ProductionController extends Controller
         ]);
     }
 
-
     /*
     |--------------------------------------------------------------------------
     | Store Production Data
@@ -52,28 +50,26 @@ class ProductionController extends Controller
     */
     public function store(Request $request)
     {
-
         $validated = $request->validate([
-            'production_order_number' => 'required|string|max:255',
             'job_id' => 'required|exists:job_masters,id',
-            'process_type' => 'required|string|max:100',
-            'shift' => 'required|string|max:50',
             'qty_ok' => 'required|integer|min:0',
             'qty_repair' => 'nullable|integer|min:0',
             'qty_reject' => 'nullable|integer|min:0',
         ]);
 
         try {
+            $ok = $validated['qty_ok'];
+            $repair = $validated['qty_repair'] ?? 0;
+            $reject = $validated['qty_reject'] ?? 0;
 
-            ProductionProcess::create([
-                'production_order_number' => $validated['production_order_number'],
-                'job_id' => $validated['job_id'],
-                'process_type' => $validated['process_type'],
-                'shift' => $validated['shift'],
-                'qty_ok' => $validated['qty_ok'],
-                'qty_repair' => $validated['qty_repair'] ?? 0,
-                'qty_reject' => $validated['qty_reject'] ?? 0,
-                'status' => 'pending'
+            DailyProduction::create([
+                'job_master_id' => $validated['job_id'],
+                'work_date' => now()->toDateString(),
+                'actual_qty' => $ok + $repair + $reject,
+                'actual_ok' => $ok,
+                'actual_repair' => $repair,
+                'actual_reject' => $reject,
+                'saved_by' => auth()->id()
             ]);
 
             return redirect()
@@ -81,15 +77,12 @@ class ProductionController extends Controller
                 ->with('success', 'Production data saved successfully');
 
         } catch (\Exception $e) {
-
             return redirect()
                 ->back()
                 ->withInput()
                 ->with('error', 'Failed to save production: ' . $e->getMessage());
         }
-
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -98,35 +91,31 @@ class ProductionController extends Controller
     */
     public function update(Request $request, $id)
     {
-
         $validated = $request->validate([
-            'production_order_number' => 'required|string|max:255',
             'job_id' => 'required|exists:job_masters,id',
-            'process_type' => 'required|string|max:100',
-            'shift' => 'required|string|max:50',
             'qty_ok' => 'required|integer|min:0',
             'qty_repair' => 'nullable|integer|min:0',
             'qty_reject' => 'nullable|integer|min:0',
         ]);
 
-        $production = ProductionProcess::findOrFail($id);
+        $production = DailyProduction::findOrFail($id);
+
+        $ok = $validated['qty_ok'];
+        $repair = $validated['qty_repair'] ?? 0;
+        $reject = $validated['qty_reject'] ?? 0;
 
         $production->update([
-            'production_order_number' => $validated['production_order_number'],
-            'job_id' => $validated['job_id'],
-            'process_type' => $validated['process_type'],
-            'shift' => $validated['shift'],
-            'qty_ok' => $validated['qty_ok'],
-            'qty_repair' => $validated['qty_repair'] ?? 0,
-            'qty_reject' => $validated['qty_reject'] ?? 0
+            'job_master_id' => $validated['job_id'],
+            'actual_qty' => $ok + $repair + $reject,
+            'actual_ok' => $ok,
+            'actual_repair' => $repair,
+            'actual_reject' => $reject
         ]);
 
         return redirect()
             ->back()
             ->with('success', 'Production updated successfully');
-
     }
-
 
     /*
     |--------------------------------------------------------------------------
@@ -135,9 +124,7 @@ class ProductionController extends Controller
     */
     public function delete($id)
     {
-
-        $production = ProductionProcess::findOrFail($id);
-
+        $production = DailyProduction::findOrFail($id);
         $production->delete();
 
         return redirect()
@@ -145,85 +132,75 @@ class ProductionController extends Controller
             ->with('success', 'Production deleted successfully');
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Production Recap
+    |--------------------------------------------------------------------------
+    */
+    public function recap(Request $request)
+    {
+        $type = $request->type ?? 'daily';
 
-   /*
-|--------------------------------------------------------------------------
-| Production Recap
-|--------------------------------------------------------------------------
-*/
-public function recap(Request $request)
-{
-    $type = $request->type ?? 'daily';
+        if($type == 'monthly'){
+            $month = $request->month ?? now()->format('Y-m');
 
-    if($type == 'monthly'){
-        $month = $request->month ?? now()->format('Y-m');
+            $productions = DailyProduction::with('jobMaster')
+                ->whereMonth('work_date', date('m', strtotime($month)))
+                ->whereYear('work_date', date('Y', strtotime($month)))
+                ->get();
 
-        $productions = ProductionProcess::with('job')
-            ->whereMonth('created_at', date('m', strtotime($month)))
-            ->whereYear('created_at', date('Y', strtotime($month)))
-            ->get();
+            $dateLabel = \Carbon\Carbon::parse($month)->format('F Y');
 
-        $dateLabel = \Carbon\Carbon::parse($month)->format('F Y');
+        }elseif($type == 'weekly'){
+            $start = $request->start ?? now()->startOfWeek()->toDateString();
+            $end   = $request->end ?? now()->endOfWeek()->toDateString();
 
-    }elseif($type == 'weekly'){
+            $productions = DailyProduction::with('jobMaster')
+                ->whereBetween('work_date', [$start, $end])
+                ->get();
 
-        $start = $request->start ?? now()->startOfWeek()->toDateString();
-        $end   = $request->end ?? now()->endOfWeek()->toDateString();
+            $dateLabel = $start . ' - ' . $end;
 
-        $productions = ProductionProcess::with('job')
-            ->whereBetween('created_at', [$start, $end])
-            ->get();
+        }else{
+            $date = $request->date ?? now()->toDateString();    
 
-        $dateLabel = $start . ' - ' . $end;
+            $productions = DailyProduction::with('jobMaster')
+                ->whereDate('work_date', $date)
+                ->get();
 
-    }else{
+            $dateLabel = \Carbon\Carbon::parse($date)->format('d F Y');
+        }
 
-        $date = $request->date ?? now()->toDateString();
+        $summary = [
+            'ok' => $productions->sum('actual_ok'),
+            'repair' => $productions->sum('actual_repair'),    
+            'reject' => $productions->sum('actual_reject'),
+        ];
 
-        $productions = ProductionProcess::with('job')
-            ->whereDate('created_at', $date)
-            ->get();
+        $summary['total'] = $summary['ok'] + $summary['repair'] + $summary['reject'];
 
-        $dateLabel = \Carbon\Carbon::parse($date)->format('d F Y');
+        $summary['achievement'] = $summary['total'] > 0 
+            ? round(($summary['ok'] / $summary['total']) * 100, 2)
+            : 0;
+
+        return view('production.production_recap', compact(
+            'productions','summary','type','dateLabel'
+        ));
     }
 
-    $summary = [
-        'ok' => $productions->sum('qty_ok'),
-        'repair' => $productions->sum('qty_repair'),
-        'reject' => $productions->sum('qty_reject'),
-    ];
-
-    $summary['total'] = $summary['ok'] + $summary['repair'] + $summary['reject'];
-
-    $summary['achievement'] = $summary['total'] > 0
-        ? round(($summary['ok'] / $summary['total']) * 100, 2)
-        : 0;
-
-    return view('production.production_recap', compact(
-        'productions','summary','type','dateLabel'
-    ));
-}
-
-public function export(Request $request)
-{
-    return \Maatwebsite\Excel\Facades\Excel::download(
-        new \App\Exports\ProductionRecapExport($request),
-        'production_recap.xlsx'
-    );
-}
-
- public function history()
+    public function export(Request $request)
     {
-        $user = Auth::user();
+        return \Maatwebsite\Excel\Facades\Excel::download(
+            new \App\Exports\ProductionRecapExport($request),
+            'production_recap.xlsx'
+        );  
+    }
 
-        // Ambil data production milik operator (jika nanti ada user_id)
-        $productions = ProductionProcess::latest()
+    public function history()
+    {
+        $productions = DailyProduction::latest()
             ->take(20)
-            ->get();
-
+            ->get();    
         return view('production.history', compact('productions'));
     }
 }
-
-
-

@@ -51,15 +51,29 @@ class AuthController extends Controller
 
             'supervisor' => redirect()->route('supervisor.dashboard'),
 
-            'foreman' => redirect()->route('foreman.dashboard'),
+            'foreman' => redirect()->route('supervisor.dashboard'),
 
-            'operator', 'leader a', 'leader b', 'leader c', 'leader d', 'shearing', 'handwork' => redirect()->route('operator.dashboard'),
+            'operator' => redirect()->route('operator.dashboard'),
+
+            'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => redirect()->route('supervisor.dashboard'),
 
             'ppc' => redirect()->route('ppc.dashboard'),
 
             'quality' => redirect()->route('quality.dashboard'),
 
             'production' => redirect()->route('production.dashboard'),
+
+            'manager' => redirect()->route('manager.dashboard'),
+
+            'kadiv' => redirect()->route('kadiv.dashboard'),
+
+            'direktur' => redirect()->route('direktur.dashboard'),
+
+            'presdir' => redirect()->route('presdir.dashboard'),
+
+            'superadmin' => redirect()->route('super-admin.dashboard'),
+
+            'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan' => redirect()->route('hambatan-jalur.index'),
 
             default => redirect('/login')
         };

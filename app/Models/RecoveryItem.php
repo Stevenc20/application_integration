@@ -29,6 +29,7 @@ class RecoveryItem extends Model
         'source_shift',
         'actual_qty',
         'recovery_qty',
+        'sort_order',
         'duration_minutes',
         'queued_at',
         'rejected_at',

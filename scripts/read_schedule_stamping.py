@@ -1,600 +1,610 @@
 #!/usr/bin/env python3
 """
 read_schedule_stamping.py
-Membaca file Schedule Stamping Excel (.xlsx/.xlsm).
-1 file berisi data 4 press (PRESS A, B, C, D) yang disusun berurutan dalam 1 sheet.
-Setiap press memiliki blok tersendiri, diawali dengan header "PRESS X" di kolom manapun.
+Parses Schedule Stamping Excel files.
 
-Usage: python read_schedule_stamping.py <excel_file> [original_filename]
+Structure per sheet:
+  - One sheet may contain PRESS A, PRESS B, PRESS C, PRESS D as vertical sections.
+  - Each section has its own mini-header block (Hari, Tgl, Jam rows) followed
+    by a data-header row (NO. | JOB MASTER | ... | JOB NO. | ... | START | FINISH)
+    and then data rows until the next PRESS marker or end of sheet.
+  - Rev sheet takes priority over non-Rev counterpart.
 """
 import sys
 import json
 import warnings
-import re
 import os
-from datetime import datetime, time
+import re
+import glob
+from datetime import datetime, time as dt_time, date as dt_date
 import openpyxl
 
 warnings.filterwarnings('ignore')
 
+# ── helpers ───────────────────────────────────────────────────────────────────
 
-BREAK_KEYWORDS = {
-    'ISTIRAHAT SIANG', 'ISTIRAHAT SORE', 'ISTIRAHAT JUMAT',
-    'ISTIRAHAT PAGI', 'CINGKORAK', 'BREAKTIME', 'BREAK TIME', 'BREAKTI',
-    'ISTIRAHAT SORE RAMADHAN', 'TOTAL FNISH', 'TOTAL FINISH',
-    'ISTIRAHAT', 'JUMAT', 'SORE', 'MALAM', 'PAGI', 'SIANG', 'BREAK'
-}
-
-MONTHS_ID = {
-    'JAN':'01','FEB':'02','MAR':'03','APR':'04','MEI':'05','MAY':'05',
-    'JUN':'06','JUL':'07','AGU':'08','AUG':'08','SEP':'09',
-    'OKT':'10','OCT':'10','NOV':'11','DES':'12','DEC':'12',
-}
-
-# Keywords that mark the start of a PRESS section header
-PRESS_HEADER_KEYWORDS = ['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D',
-                         'PRESS-A', 'PRESS-B', 'PRESS-C', 'PRESS-D']
-
-def safe_float(v):
-    if v is None:
-        return None
-    if isinstance(v, (int, float)):
-        return float(v)
-    s = str(v).strip().replace(',', '.')
-    if s in ('', '-', '#N/A', '#VALUE!', '#REF!', '0'):
-        return 0.0
+def safe_f(v):
+    if v is None: return 0.0
     try:
-        # Remove any non-numeric chars except dot
-        s_clean = re.sub(r'[^0-9\.]', '', s)
-        return float(s_clean) if s_clean else 0.0
+        if isinstance(v, str):
+            v = v.replace(',', '.').strip()
+            if v in ('', '-', '#N/A', 'N/A', '#REF!', '#VALUE!'): return 0.0
+        return float(v)
     except:
         return 0.0
 
-def safe_int(v):
-    if v in ('\u2014', '—', '-', '', None):
-        return None
-    f = safe_float(v)
-    return int(round(f)) if f is not None else None
+def safe_i(v):
+    if v is None: return 0
+    try:
+        return int(float(str(v).strip()))
+    except:
+        return 0
 
 def fmt_time(v):
-    """Convert time/datetime/float to 'HH:MM' string."""
+    """Convert a cell value (time, datetime, string) to HH:MM string or None."""
     if v is None:
         return None
-    if isinstance(v, time):
+    if isinstance(v, dt_time):
         return v.strftime('%H:%M')
     if isinstance(v, datetime):
         return v.strftime('%H:%M')
+    if isinstance(v, dt_date) and not isinstance(v, datetime):
+        return None
+    if isinstance(v, str):
+        s = v.strip()
+        if re.match(r'^\d{1,2}:\d{2}(:\d{2})?$', s):
+            return s[:5]
+        return None
+    # openpyxl sometimes gives a float (fraction of day)
     if isinstance(v, float):
         total_min = round(v * 24 * 60)
-        h, m = divmod(total_min, 60)
-        return f"{h % 24:02d}:{m:02d}"
+        h = (total_min // 60) % 24
+        m = total_min % 60
+        return f"{h:02d}:{m:02d}"
     return None
 
-def get_cell(row, col_0based):
-    """Get value from row by 0-based index."""
-    if col_0based is None:
+def extract_date(text):
+    if not text:
         return None
-    if col_0based < 0 or col_0based >= len(row):
-        return None
-    v = row[col_0based]
-    if isinstance(v, str) and v.strip() in ('#N/A', '#VALUE!', '#REF!', ''):
-        return None
-    return v
-
-def normalize_press_name(s):    
-    """Normalize press name: 'PRESS-A' -> 'PRESS A'"""
-    if not s:
-        return None
-    s = s.strip().upper().replace('-', ' ')
-    m = re.match(r'(PRESS)\s*([A-D])', s)
-    if m:
-        return f"PRESS {m.group(2)}"
-    return s
-
-def is_press_header(row):
-    """Check if row contains a PRESS name in ANY column."""
-    for cell in row:
-        if cell is not None:
-            s = str(cell).strip().upper().replace('-', ' ')
-            for pk in PRESS_HEADER_KEYWORDS:
-                if pk.replace('-', ' ') in s:
-                    return normalize_press_name(pk)
-    return False
-
-def is_data_header(row):
-    """Check if row is the column header row (NO. | JOB MASTER | ...)"""
-    c2 = get_cell(row, 2)
-    c3 = get_cell(row, 3)
-    if c2 and 'NO' in str(c2).upper():
-        return True
-    if c3 and 'JOB MASTER' in str(c3).upper():
-        return True
-    return False
-
-def is_summary_row(row):
-    """Check if row marks the end of a data section."""
-    keywords = ['PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'TOTAL FINISH', 'TOTAL FNISH', 'GSPH', 'TOTAL PCS']
-    for cell in row:
-        if cell is not None:
-            s = str(cell).upper()
-            if any(kw in s for kw in keywords):
-                return True
-    return False
-
-def parse_data_row(row, row_no, col_map):
-    """Parse one data row after data header using col_map."""
-    job_master_idx = col_map.get('job_master')
-    job_no_idx = col_map.get('job_no')
-    
-    jm_raw = get_cell(row, job_master_idx) if job_master_idx is not None else None
-    jn_raw = get_cell(row, job_no_idx) if job_no_idx is not None else None
-    
-    jm_str = str(jm_raw).strip() if jm_raw is not None else ''
-    jn_str = str(jn_raw).strip() if jn_raw is not None else ''
-
-    # 1. Structural Detection
-    row_no_raw = get_cell(row, 0)
-    is_dash_row = (str(row_no_raw).strip() in ("\u2014", "#N/A"))
-
-    # SIMPLE BREAK DETECTION (AS REQUESTED)
-    break_text = f"{jm_str} {jn_str}".upper()
-    is_break = any(k in break_text for k in ['ISTIRAHAT', 'BREAK', 'CINGKORAK', 'FINISH']) or (is_dash_row and not jm_str)
-    
-    # FORCE detect text from ANY cell before generic logic
-    for cell in row:
-        if cell is not None:
-            cell_upper = str(cell).strip().upper()
-            if any(kw in cell_upper for kw in BREAK_KEYWORDS):
-                jm_str = cell_upper
-                jn_str = cell_upper
-                is_break = True
-                break
-
-    if is_break:
-        break_text = f"{jm_str} {jn_str}".upper()
-        clean_label = None
-
-        if 'ISTIRAHAT JUMAT' in break_text:
-            clean_label = 'ISTIRAHAT JUMAT'
-        elif 'ISTIRAHAT SIANG' in break_text:
-            clean_label = 'ISTIRAHAT SIANG'
-        elif 'ISTIRAHAT SORE' in break_text:
-            clean_label = 'ISTIRAHAT SORE'
-        elif 'ISTIRAHAT MALAM' in break_text:
-            clean_label = 'ISTIRAHAT MALAM'
-        elif 'BREAKTIME' in break_text or 'BREAK TIME' in break_text:
-            clean_label = 'BREAKTIME'
-        elif 'CINGKORAK' in break_text:
-            clean_label = 'CINGKORAK'
-        elif 'TOTAL FINISH' in break_text or 'FINISH' in break_text:
-            clean_label = 'TOTAL FINISH'
-        
-        if clean_label:
-            jm_str = clean_label
-            jn_str = clean_label
-
-    if not is_break and not jm_str and not jn_str:
-        return None
-    
-    # Final cleanup: Ensure 'TOTAL FINISH' is pretty
-    if 'FINISH' in jm_str.upper() or 'FNISH' in jm_str.upper():
-        jm_str = 'TOTAL FINISH'
-        jn_str = 'TOTAL FINISH'
-
-    def get_val(key, default=None, is_int=False, is_time=False):
-        idx = col_map.get(key)
-        val = get_cell(row, idx) if idx is not None else None
-        
-        # FUZZY SEARCH for summary/break rows if the direct column is empty
-        if is_break and (val is None or val == 0 or val == ''):
-            if key in ('ok', 'plan', 'qty_plt', 'dt_menit', 'tpt', 'gsph_item', 'total_pcs'):
-                row_nums = []
-                for cell in row:
-                    f = safe_float(cell)
-                    if f and f > 0: row_nums.append(f)
-                
-                if not row_nums: return default
-
-                if key == 'dt_menit':
-                    for n in row_nums:
-                        if n in (15, 30, 40, 45, 60): return int(n)
-                
-                # Logic Fix: Plan is usually the Largest, OK is usually the Second Largest
-                if key == 'plan':
-                    return max(row_nums)
-                if key == 'ok':
-                    sorted_nums = sorted(row_nums, reverse=True)
-                    return sorted_nums[1] if len(sorted_nums) > 1 else sorted_nums[0]
-                
-                return max(row_nums)
-                    
-        if is_time: return fmt_time(val)
-        if is_int: return safe_int(val)
-        return safe_float(val)
-
-    ok = get_val('ok') or 0
-    repair = get_val('repair') or 0
-    reject = get_val('reject') or 0
-    total_pcs = ok + repair + reject
-
-    type_plt_idx = col_map.get('type_plt')
-    type_plt = str(get_cell(row, type_plt_idx) or '').strip() if type_plt_idx is not None else None
-    
-    each_part_idx = col_map.get('each_part')
-    each_part = get_cell(row, each_part_idx)
-    each_part_str = str(each_part).strip() if each_part and str(each_part).strip() not in ('None','') else None
-
-    keterangan_idx = col_map.get('keterangan')
-    keterangan = str(get_cell(row, keterangan_idx) or '').strip() if keterangan_idx is not None else None
-
-    job_no_str = jn_str
-    if is_break:
-        job_no_str = jm_str
-
-    # SHIFT MALAM FINAL RE-CHECK: Ensure labels force is_break
-    break_text = f"{jm_str} {jn_str}".upper()
-    if any(k in break_text for k in BREAK_KEYWORDS):
-        is_break = True
-        if not jm_str or jm_str in ('0', 'None', ''): jm_str = break_text
-        if not job_no_str or job_no_str in ('0', 'None', ''): job_no_str = break_text
-
-    return {
-        'row_no':       row_no if not is_break else None,
-        'row_type':     'break' if is_break else 'job',
-        'job_master':   jm_str or None,
-        'job_no':       job_no_str or jn_str or None,
-        'type_plt':     type_plt if not is_break else None,
-        'qty_plt':      get_val('qty_plt'),
-        'keb_mtl' :     get_val('keb_mtl'),
-        'total_plt':    get_val('total_plt'),
-        'each_part':    each_part_str,
-        'plan':         get_val('plan'),
-        'ok':           ok,
-        'repair':       repair,
-        'reject':       reject,
-        'total_mesin':  get_val('total_mesin', is_int=True),
-        'ct_detik':     get_val('ct_detik'),
-        'process_time': get_val('process_time') if not is_break else 0,
-        'reg_active':   get_val('reg_active') if not is_break else 0,
-        'dct':          get_val('dct'),
-        'mct':          get_val('mct'),
-        'plan_dct':     get_val('plan_dct'),
-        'tpt':          get_val('tpt'),
-        'gsph_item':    get_val('gsph_item'),
-        'start_time':   get_val('start_time', is_time=True),
-        'finish_time':  get_val('finish_time', is_time=True),
-        'act_start':    fmt_time(get_cell(row, col_map.get('act_start'))),
-        'act_finish':   fmt_time(get_cell(row, col_map.get('act_finish'))),
-        'keterangan':   keterangan,
-        'a1':           get_val('a1', is_int=True) if not is_break else 0,
-        'a2':           get_val('a2', is_int=True) if not is_break else 0,
-        'a3':           get_val('a3', is_int=True) if not is_break else 0,
-        'a4':           get_val('a4', is_int=True) if not is_break else 0,
-        'dt_menit':     get_val('dt_menit', is_int=True),
-        'total_pcs':    total_pcs,
-        'tpt_total':    get_val('tpt_total'),
-    }
-
-def get_merged_cell_value(ws, row_idx):
-    """Retrieve value from merged range by scanning nearby rows for keywords."""
-    # scan nearby rows (current row +/- 3)
-    for search_row in range(max(1, row_idx - 3), row_idx + 4):
-        for merged_range in ws.merged_cells.ranges:
-            min_col, min_row, max_col, max_row = merged_range.bounds
-            if min_row <= search_row <= max_row:
-                value = ws.cell(min_row, min_col).value
-                if value:
-                    text = str(value).strip()
-                    # important filter: only pick if it contains our keywords
-                    if any(k in text.upper() for k in BREAK_KEYWORDS):
-                        return text
+    months = ['JANUARI','FEBRUARI','MARET','APRIL','MEI','JUNI',
+              'JULI','AGUSTUS','SEPTEMBER','OKTOBER','NOVEMBER','DESEMBER']
+    text_up = text.upper()
+    for m in months:
+        match = re.search(rf'(\d{{1,2}})[\s\-/]+{m}[\s\-/]+(\d{{4}})', text_up)
+        if match:
+            return f"{match.group(1).zfill(2)} {m} {match.group(2)}"
+    # Try numeric date e.g. 07-05-2026 or 07/05/2026
+    match = re.search(r'(\d{2})[-/](\d{2})[-/](\d{4})', text_up)
+    if match:
+        d, mo, y = match.group(1), int(match.group(2)), match.group(3)
+        return f"{d} {months[mo-1]} {y}"
     return None
+
+# ── main section parser ────────────────────────────────────────────────────────
+
+def is_press_marker(row, col2_val):
+    """True if this row marks the beginning of a new Press section."""
+    if col2_val is None:
+        return False
+    s = str(col2_val).strip().upper()
+    return bool(re.match(r'^PRESS\s+[A-Z]$', s))
+
+HEADER_KEYWORDS = frozenset({'NO.', 'NO', 'JOB MASTER'})
+
+def is_header_row(row, col2_val):
+    """True if this row is the data header row (contains NO./NO or JOB MASTER in any cell)."""
+    for cell in row:
+        if cell is not None and str(cell).strip().upper() in HEADER_KEYWORDS:
+            return True
+    return False
+
+def row_value(row, idx, default=None):
+    """Safe index into a row tuple."""
+    if idx is None or idx >= len(row):
+        return default
+    return row[idx] if row[idx] is not None else default
 
 def parse_sheet(ws, sheet_name):
-    """Parse a single sheet."""
-    all_rows = list(ws.iter_rows(min_row=1, max_row=500, max_col=50, values_only=True))
+    """
+    Parse a single worksheet.
+    Returns a dict: { 'SheetName|||PRESS X': {shift_name, press_name, hari, tgl, jam, revisi, rows:[]} }
+    """
+    all_rows = list(ws.iter_rows(values_only=True))
+    total = len(all_rows)
 
-    global_meta = {'hari': None, 'tgl': None, 'jam': None, 'revisi': None}
-    # Scan first 35 rows for metadata anywhere
-    for ri in range(0, 35):
-        if ri >= len(all_rows): break
-        row = all_rows[ri]
-        row_str = " ".join([str(c) for c in row if c is not None]).upper()
-        
-        # Look for labels and extract what's after ':'
-        for cell_val in row:
-            if cell_val is None: continue
-            s = str(cell_val).strip()
-            if ':' in s:
-                parts = s.split(':', 1)
-                label = parts[0].upper()
-                val = parts[1].strip()
-                if 'HARI' in label: global_meta['hari'] = val
-                elif 'TGL' in label: global_meta['tgl'] = val
-                elif 'JAM' in label: global_meta['jam'] = val
-            
-            if 'REVISI' in s.upper():
-                global_meta['revisi'] = s
+    result = {}
 
-    press_sections = {p: {
-        'hari': global_meta['hari'],
-        'tgl': global_meta['tgl'],
-        'jam': global_meta['jam'],
-        'revisi': global_meta['revisi'],
-        'rows': []
-    } for p in ['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D']}
-    current_press   = "PRESS A"
-    in_data_section = False
-    row_no          = 1
-    current_meta    = dict(global_meta)
-    col_map         = {}
+    # Scan for PRESS section starts (col index 2 contains 'PRESS A' etc.)
+    press_starts = []  # list of (row_idx_0based, press_name)
+    for r_idx, row in enumerate(all_rows):
+        col2 = row[2] if len(row) > 2 else None
+        if is_press_marker(row, col2):
+            press_name = str(col2).strip().upper()
+            press_starts.append((r_idx, press_name))
 
-    KEYWORD_MAP = {
-        'JOBMASTER': 'job_master',
-        'TYPE': 'type_plt',
-        'QTY': 'qty_plt',
-        'TOTALPLT': 'total_plt',
-        'JOBNO': 'job_no',
-        'PLAN': 'plan',
-        'OK': 'ok',
-        'MESIN': 'total_mesin',
-        'CT': 'ct_detik',
-        'PROC': 'process_time',
-        'REG': 'reg_active',
-        'DCT': 'dct',
-        'MCT': 'mct',
-        'TPT': 'tpt',
-        'GSPH': 'gsph_item',
-        'START': 'start_time',
-        'FINISH': 'finish_time',
-        'KETERANGAN': 'keterangan',
-        'A1': 'a1', 'A2': 'a2', 'A3': 'a3', 'A4': 'a4',
-        'B1': 'a1', 'B2': 'a2', 'B3': 'a3', 'B4': 'a4',
-        'C1': 'a1', 'C2': 'a2', 'C3': 'a3', 'C4': 'a4',
-        'D1': 'a1', 'D2': 'a2', 'D3': 'a3', 'D4': 'a4',
-        'DT': 'dt_menit',
-        'TOTALPCS': 'total_pcs',
-    }
+    if not press_starts:
+        # Fallback: treat whole sheet as one block, try to detect press from sheet name
+        press_name = 'PRESS A'
+        for p in ['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D']:
+            if p in sheet_name.upper():
+                press_name = p
+                break
+        press_starts = [(0, press_name)]
 
-    last_seen = {
-        'job_master': None,
-        'job_no':     None,
-        'type_plt':   None,
-        'qty_plt':    None,
-        'press_name': current_press
-    }
-    row_count = 0
-    for ri, row in enumerate(all_rows):
-        row_count += 1
-        press_label = is_press_header(row)
-        if press_label:
-            current_press   = press_label
-            in_data_section = False
-            row_no          = 1
-            job_seq         = 0
-            current_meta    = dict(global_meta)
-            
-            # Reset persistence on new press section
-            for k in last_seen: last_seen[k] = None
-            last_seen['press_name'] = current_press
+    # Determine end row for each press section
+    for i, (start_r, press_name) in enumerate(press_starts):
+        end_r = press_starts[i + 1][0] if i + 1 < len(press_starts) else total
 
-            for offset in range(1, 10):
-                ni = ri + offset
-                if ni >= len(all_rows):
-                    break
-                nrow = all_rows[ni]
-                col2 = get_cell(nrow, 2)
-                col3 = get_cell(nrow, 3)
-                if col2 and str(col2).strip().upper().startswith('H') and col3 and ':' in str(col3):
-                    current_meta['hari'] = str(col3).split(':', 1)[1].strip()
-                elif col2 and str(col2).strip().upper().startswith('T') and col3 and ':' in str(col3):
-                    current_meta['tgl'] = str(col3).split(':', 1)[1].strip()
-                elif col2 and str(col2).strip().upper().startswith('J') and col3 and ':' in str(col3):
-                    current_meta['jam'] = str(col3).split(':', 1)[1].strip()
+        section_rows = all_rows[start_r:end_r]
+        section = parse_press_section(section_rows, start_r, sheet_name, press_name)
+        if section and section['rows']:
+            key = f"{sheet_name}|||{press_name}"
+            result[key] = section
 
-            press_sections[current_press] = {
-                'hari':  current_meta['hari'],
-                'tgl':   current_meta['tgl'],
-                'jam':   current_meta['jam'],
-                'revisi': current_meta['revisi'],
-                'rows':  press_sections.get(current_press, {}).get('rows', []),
-            }
-            continue
+    return result
 
-        if current_press is None:
-            continue
+def parse_press_section(section_rows, offset, sheet_name, press_name):
+    """
+    Parse rows belonging to one press section.
+    `offset` is the absolute row index of the first row in section_rows.
+    """
+    hari = None
+    tgl = None
+    jam = None
+    revisi = None
+    last_job_master = None
 
-        if is_data_header(row):
-            in_data_section = True
-            col_map = {}
-            for cidx, cell_val in enumerate(row):
-                if cell_val is None or cidx > 40:
+    # Find the header row (col 2 == 'NO.' or 'NO')
+    header_local_idx = None
+    col_map = {}
+
+    for local_i, row in enumerate(section_rows):
+        col2 = row[2] if len(row) > 2 else None
+        if is_header_row(row, col2):
+            header_local_idx = local_i
+            # Build column map from this header row
+            # We track job_no separately: prefer 'JOB NO.' (with dot, the main schedule
+            # column at ~col 8) over 'JOB NO' (no dot, the right-side summary column
+            # at ~col 37 which is often empty in data rows for PRESS B/C/D).
+            job_no_main = None   # JOB NO. (with dot)
+            job_no_alt  = None   # JOB NO  (without dot, right-side summary)
+            for j, v in enumerate(row):
+                if v is None:
                     continue
-                # Industrial-grade normalization: upper + remove non-alphanumeric
-                raw_s = str(cell_val).upper().strip()
-                s = re.sub(r'[^A-Z0-9]', '', raw_s)
-                
-                for kw, field in KEYWORD_MAP.items():
-                    if kw in s:
-                        if field not in col_map:
-                            col_map[field] = cidx
+                v_str = str(v).upper().replace('\n', ' ').strip()
+                if v_str in ('NO', 'NO.') and 'row_no' not in col_map:                    col_map['row_no']       = j
+                elif 'JOB MASTER' in v_str and 'job_master' not in col_map:                  col_map['job_master']   = j
+                elif 'TYPE PLT' in v_str and 'type_plt' not in col_map:                    col_map['type_plt']     = j
+                elif ('QTY/PLT' in v_str or 'QTY/ PLT' in v_str or 'QTY/ PLT' in v_str) and 'qty_plt' not in col_map:
+                                                              col_map['qty_plt']      = j
+                elif 'KEB. MTL' in v_str and 'keb_mtl' not in col_map:                    col_map['keb_mtl']      = j
+                elif 'TOTAL PLT' in v_str and 'total_plt' not in col_map:                   col_map['total_plt']    = j
+                elif 'JOB NO.' in v_str and job_no_main is None:                     job_no_main             = j
+                elif v_str == 'JOB NO' and job_no_alt is None:                      job_no_alt              = j
+                elif 'EACH PART' in v_str and 'each_part' not in col_map:                   col_map['each_part']    = j
+                elif (v_str == 'PLAN (PCS)' or v_str == 'PLAN') and 'plan' not in col_map:
+                                                              col_map['plan']         = j
+                elif v_str == 'OK' and 'ok' not in col_map:                          col_map['ok']           = j
+                elif v_str == 'REPAIR' and 'repair' not in col_map:                      col_map['repair']       = j
+                elif v_str == 'REJECT' and 'reject' not in col_map:                      col_map['reject']       = j
+                elif 'TOTAL MESIN' in v_str and 'total_mesin' not in col_map:                 col_map['total_mesin']  = j
+                elif ('CT (' in v_str or 'CYCLE TIME' in v_str) and 'ct_detik' not in col_map: col_map['ct_detik']  = j
+                elif 'PROCESS TIME' in v_str and 'process_time' not in col_map:                col_map['process_time'] = j
+                elif ('REG. ACTIVE' in v_str or 'REG.ACTIVE' in v_str) and 'reg_active' not in col_map:
+                                                              col_map['reg_active']   = j
+                elif v_str == 'DCT' and 'dct' not in col_map:                         col_map['dct']          = j
+                elif v_str == 'MCT' and 'mct' not in col_map:                         col_map['mct']          = j
+                elif 'PLAN DCT' in v_str and 'plan_dct' not in col_map:                    col_map['plan_dct']     = j
+                elif v_str == 'TPT' and 'tpt' not in col_map:                         col_map['tpt']          = j
+                elif 'GSPH' in v_str and 'gsph_item' not in col_map:                        col_map['gsph_item']    = j
+                elif v_str == 'START' and 'start_time' not in col_map:                       col_map['start_time']   = j
+                elif v_str == 'FINISH' and 'finish_time' not in col_map:                      col_map['finish_time']  = j
+                elif 'ACT START' in v_str and 'act_start' not in col_map:                   col_map['act_start']    = j
+                elif 'ACT FINISH' in v_str and 'act_finish' not in col_map:                  col_map['act_finish']   = j
+                elif 'KETERANGAN' in v_str and 'keterangan' not in col_map:                  col_map['keterangan']   = j
+                elif v_str in ('A-1', 'B-1', 'C-1', 'D-1') and 'a1' not in col_map:  col_map['a1']           = j
+                elif v_str in ('A-2', 'B-2', 'C-2', 'D-2') and 'a2' not in col_map:  col_map['a2']           = j
+                elif v_str in ('A-3', 'B-3', 'C-3', 'D-3') and 'a3' not in col_map:  col_map['a3']           = j
+                elif v_str in ('A-4', 'B-4', 'C-4', 'D-4') and 'a4' not in col_map:  col_map['a4']           = j
+                elif ('DT (MENIT)' in v_str and 'TOTAL' not in v_str) and 'dt_menit' not in col_map:
+                                                              col_map['dt_menit']     = j
+                elif 'TOTAL PCS' in v_str and 'total_pcs' not in col_map:                   col_map['total_pcs']    = j
+                elif 'TPT TOTAL' in v_str and 'tpt_total' not in col_map:                   col_map['tpt_total']    = j
+            # Prioritise JOB NO. (with dot) as the primary job_no column;
+            # only fall back to JOB NO (no dot) if the dotted version wasn't found.
+            col_map['job_no_main'] = job_no_main
+            col_map['job_no_alt']  = job_no_alt
+            col_map['job_no']      = job_no_main if job_no_main is not None else job_no_alt
+            break
+
+    if header_local_idx is None:
+        return None  # no data header found in this section
+
+    # Extract meta info (Hari/Tgl/Jam/Revisi) from rows BEFORE the header
+    for row in section_rows[:header_local_idx]:
+        for cell in row:
+            if cell is None:
+                continue
+            v_str = str(cell).upper()
+            # Detect Hari
+            if re.match(r'^HARI\s*:', v_str):
+                hari = str(cell).split(':', 1)[-1].strip()
+            elif re.match(r'^TGL\s*:', v_str) or re.match(r'^HARI\s*$', v_str):
+                pass
+        # Also check col 3 for colon-separated values when col 2 is label
+        col2 = row[2] if len(row) > 2 else None
+        col3 = row[3] if len(row) > 3 else None
+        if col2 and col3:
+            label = str(col2).strip().upper()
+            val   = str(col3).strip()
+            if label in ('HARI', 'HARI :', 'HARI:'):
+                # e.g. ':   Kamis Pagi' or 'Kamis Pagi'
+                hari = val.lstrip(':').strip()
+            elif label in ('TGL', 'TGL :', 'TGL:'):
+                tgl  = val.lstrip(':').strip()
+            elif label in ('JAM', 'JAM :', 'JAM:'):
+                jam  = val.lstrip(':').strip()
+            elif label in ('REVISI', 'REVISI :', 'REVISI:'):
+                revisi = val.lstrip(':').strip()
+
+    # Parse data rows (skip header row itself and one blank row after)
+    data_start_local = header_local_idx + 1
+    rows_out = []
+    row_counter = 0
+
+    # Keywords that indicate a summary/aggregate row (not an actual job or break)
+    SUMMARY_KEYWORDS = (
+        'TOTAL STROKE', 'TOTAL TPT', 'TOTAL FINISH', 'TOTAL PROD',
+        'PLAN STROKE', 'GSPH TOTAL', 'GSPH ITEM', 'TARGET GSPH', 'GSPH',
+        'TOTAL', 'TOTAL PCS'
+    )
+    # A row is a summary row if job_master is one of these summary labels
+    # (and has no valid start_time / finish_time)
+    def is_summary_row(jm_str, start_t, finish_t):
+        if not jm_str:
+            return False
+        jm_up = jm_str.strip().upper()
+        # If it matches a known summary keyword, skip
+        for kw in SUMMARY_KEYWORDS:
+            if jm_up == kw or jm_up.startswith(kw):
+                return True
+        # If job_master is exactly 'PLAN' with no time → summary row
+        if jm_up == 'PLAN' and start_t is None and finish_t is None:
+            return True
+        return False
+
+    for local_i in range(data_start_local, len(section_rows)):
+        row = section_rows[local_i]
+        if not any(v is not None for v in row):
             continue
 
-        if not in_data_section:
+        # Read job_no: prefer job_no_main (JOB NO. with dot) column;
+        # if that is empty/None, fall back to job_no_alt (JOB NO without dot).
+        job_no_val_main = row_value(row, col_map.get('job_no_main'))
+        job_no_val_alt  = row_value(row, col_map.get('job_no_alt'))
+        # Use main if non-empty, else alt
+        def _nonempty(v):
+            if v is None: return False
+            s = str(v).strip()
+            return s not in ('', '0', '#N/A', '#REF!', '#VALUE!')
+        job_no_val = job_no_val_main if _nonempty(job_no_val_main) else job_no_val_alt
+
+        job_master_val = row_value(row, col_map.get('job_master'))
+        plan_val_raw   = row_value(row, col_map.get('plan'))
+
+        # Read start/finish times early so we can use them in summary-row detection
+        start_raw_early  = row_value(row, col_map.get('start_time'))
+        finish_raw_early = row_value(row, col_map.get('finish_time'))
+        start_str_early  = fmt_time(start_raw_early)
+        finish_str_early = fmt_time(finish_raw_early)
+
+        # Check if summary/aggregate row
+        jm_str = str(job_master_val).strip() if job_master_val is not None else ''
+        jn_str = str(job_no_val).strip() if job_no_val is not None else ''
+        if is_summary_row(jm_str, start_str_early, finish_str_early) or is_summary_row(jn_str, start_str_early, finish_str_early):
+            row_type = 'summary'
+            if 'TOTAL FINISH' in jm_str.upper() or 'TOTAL FNISH' in jm_str.upper():
+                # Read the total finish row, then break completely
+                pass 
+            elif is_header_row(row, None):
+                # If we hit another header row, we've entered a new table. Stop.
+                break
+        else:
+            # Skip rows with no job identity at all (only for non-summary)
+            if not job_no_val and not job_master_val:
+                continue
+
+        # Skip obviously invalid rows (row_no column has '#N/A' etc)
+        job_no_str = str(job_no_val).strip() if job_no_val is not None else ''
+        if job_no_str.startswith('#'):
             continue
-            
-        # Use Excel row index (ri + 1) as the absolute source of truth for sequence
-        excel_row_idx = ri + 1
-        merged_label = get_merged_cell_value(ws, excel_row_idx)
 
-        if is_summary_row(row):
-            parsed = parse_data_row(row, excel_row_idx, col_map)
-            if parsed:
-                # Reset persistence on summary
-                for k in last_seen: 
-                    if k != 'press_name': last_seen[k] = None
+        # Determine row type
+        row_type = 'job'
+        if is_summary_row(jm_str, start_str_early, finish_str_early) or is_summary_row(jn_str, start_str_early, finish_str_early):
+            row_type = 'summary'
+        else:
+            check_str = job_no_str.upper()
+            if not check_str and job_master_val:
+                check_str = str(job_master_val).upper()
+            # Remove spaces to match "BREAK TIME" as well, and support ISHOMA
+            check_clean = check_str.replace(' ', '')
+            if any(x in check_clean for x in ['ISTIRAHAT', 'CINGKORAK', 'BREAKTIME']) or 'ISHOMA' in check_str:
+                row_type = 'break'
 
-                # FORCE overwrite if merged label found
-                if merged_label:
-                    parsed['job_master'] = merged_label
-                    parsed['job_no'] = merged_label
-                
-                row_text = (str(parsed.get('job_master', '')) + ' ' + str(parsed.get('job_no', ''))).upper()
-                if 'TOTAL FINISH' in row_text or 'TOTAL FNISH' in row_text or 'FINISH' in row_text:
-                    parsed['row_type'] = 'total_finish'
-                else:
-                    parsed['row_type'] = 'break'
-                press_sections[current_press]['rows'].append(parsed)
-            continue
+        # Read all fields
+        def gv(key, default=None):
+            idx = col_map.get(key)
+            if idx is None or idx >= len(row):
+                return default
+            v = row[idx]
+            return v if v is not None else default
 
-        parsed = parse_data_row(row, excel_row_idx, col_map)
-        if parsed:
-            # STRICT VALIDATION: Skip if no identifiable job data
-            jm = str(parsed.get('job_master') or '').strip()
-            jn = str(parsed.get('job_no') or '').strip()
-            
-            # If both are empty or just placeholder chars, skip this row
-            if not jm and not jn:
-                continue
-            if jm in ('—', '-', '0') and jn in ('—', '-', '0'):
-                continue
-                
-            job_seq += 1
-            parsed['row_no'] = job_seq
-            
-            # FORWARD FILL (Persistence Logic for Merged Cells)
-            if not parsed.get('job_master') and last_seen['job_master']:
-                parsed['job_master'] = last_seen['job_master']
-            else:
-                last_seen['job_master'] = parsed.get('job_master')
+        # Re-use the already-computed start/finish times
+        start_str  = start_str_early
+        finish_str = finish_str_early
 
-            if not parsed.get('job_no') and last_seen['job_no']:
-                parsed['job_no'] = last_seen['job_no']
-            else:
-                last_seen['job_no'] = parsed.get('job_no')
+        act_start_raw  = gv('act_start')
+        act_finish_raw = gv('act_finish')
+        act_start_str  = fmt_time(act_start_raw)
+        act_finish_str = fmt_time(act_finish_raw)
 
-            if not parsed.get('type_plt') and last_seen['type_plt']:
-                parsed['type_plt'] = last_seen['type_plt']
-            else:
-                last_seen['type_plt'] = parsed.get('type_plt')
+        row_no_val = gv('row_no')
+        if row_no_val is None or str(row_no_val).strip() == '':
+            row_counter += 1
+            row_no_val = row_counter
+        else:
+            try:
+                row_no_val = int(float(str(row_no_val)))
+                if row_type == 'job':
+                    row_counter = row_no_val
+            except:
+                row_counter += 1
+                row_no_val = row_counter
 
-            # Leniency: Only skip if it's COMPLETELY empty or clearly junk
-            jm = str(parsed.get('job_master') or '').upper()
-            jn = str(parsed.get('job_no') or '').upper()
-            
-            # Skip only if it's a known error string and NOT a break
-            if '#N/A' in jm and parsed['row_type'] != 'break':
-                job_seq -= 1 # Rollback
-                continue
+        current_job_master = str(gv('job_master', '') or '').strip()
+        if row_type == 'job':
+            if not current_job_master and last_job_master:
+                current_job_master = last_job_master
+            elif current_job_master:
+                last_job_master = current_job_master
 
-            # Check for merged label even in standard rows
-            if parsed['row_type'] == 'break' or (not parsed.get('job_master') and merged_label):
-                if merged_label:
-                    parsed['job_master'] = merged_label
-                    parsed['job_no'] = merged_label
-                    parsed['row_type'] = 'break'
-                    # Reset persistence on break
-                    for k in last_seen: 
-                        if k != 'press_name': last_seen[k] = None
+        item = {
+            'row_no':       safe_i(row_no_val),
+            'row_type':     row_type,
+            'job_master':   current_job_master,
+            'type_plt':     str(gv('type_plt', '') or ''),
+            'qty_plt':      safe_f(gv('qty_plt')),
+            'keb_mtl':      safe_f(gv('keb_mtl')),
+            'total_plt':    safe_f(gv('total_plt')),
+            'job_no':       job_no_str,
+            'each_part':    str(gv('each_part', '') or ''),
+            'plan':         safe_f(plan_val_raw),
+            'ok':           safe_f(gv('ok')),
+            'repair':       safe_f(gv('repair')),
+            'reject':       safe_f(gv('reject')),
+            'total_mesin':  safe_i(gv('total_mesin')),
+            'ct_detik':     safe_f(gv('ct_detik')),
+            'process_time': safe_f(gv('process_time')),
+            'reg_active':   safe_f(gv('reg_active')),
+            'dct':          safe_f(gv('dct')),
+            'mct':          safe_f(gv('mct')),
+            'plan_dct':     safe_f(gv('plan_dct')),
+            'tpt':          safe_f(gv('tpt')),
+            'gsph_item':    safe_f(gv('gsph_item')),
+            'start_time':   start_str,
+            'finish_time':  finish_str,
+            'act_start':    act_start_str,
+            'act_finish':   act_finish_str,
+            'keterangan':   str(gv('keterangan', '') or ''),
+            'a1':           safe_f(gv('a1')),
+            'a2':           safe_f(gv('a2')),
+            'a3':           safe_f(gv('a3')),
+            'a4':           safe_f(gv('a4')),
+            'dt_menit':     safe_f(gv('dt_menit')),
+            'total_pcs':    safe_f(gv('total_pcs')),
+            'tpt_total':    safe_f(gv('tpt_total')),
+        }
+        rows_out.append(item)
 
-            # Final check: Must have at least a Job Master OR Job No OR Plan OR Start Time
-            if not parsed.get('job_master') and not parsed.get('job_no') and not parsed.get('plan') and not parsed.get('start_time'):
-                job_seq -= 1 # Rollback
-                continue
+        # ── SAFETY BRAKE: Stop parsing section if we hit TOTAL FINISH ──
+        if row_type == 'summary' and ('TOTAL FINISH' in jm_str.upper() or 'TOTAL FNISH' in jm_str.upper()):
+            break
 
-            press_sections[current_press]['rows'].append(parsed)
+    # ── VALIDATION ──
+    validation_errors = []
+    for r in rows_out:
+        if r['row_type'] == 'job' and (str(r['job_master']).strip().upper() == 'JOB MASTER' or str(r['job_no']).strip().upper() == 'JOB NO.'):
+            validation_errors.append(f"Header row leaked as data: row_no={r['row_no']} job_master='{r['job_master']}' job_no='{r['job_no']}'")
+    if len(rows_out) == 0:
+        validation_errors.append("Zero data rows parsed — possible header detection failure")
 
-    return press_sections
+    return {
+        'shift_name': sheet_name,
+        'press_name': press_name,
+        'hari':       hari,
+        'tgl':        tgl,
+        'jam':        jam,
+        'revisi':     revisi,
+        'rows':        rows_out,
+        '_stats': {
+            'section_total_rows': len(section_rows),
+            'meta_rows_skipped':  header_local_idx if header_local_idx is not None else 0,
+            'data_rows_output':   len(rows_out),
+            'validation_errors':  validation_errors,
+            'header_local_idx':   header_local_idx,
+            'header_content':     [str(c) for c in section_rows[header_local_idx]] if header_local_idx is not None else None,
+        },
+    }
 
-def extract_upload_date(filepath, original_name):
-    """Extract date from filename."""
-    name = os.path.basename(original_name or filepath).upper()
-    for month_key, month_num in MONTHS_ID.items():
-        pattern = rf'(\d{{1,2}})[-_\s]*{month_key}[-_\s]*(\d{{4}})'
-        m = re.search(pattern, name)
-        if m:
-            day  = m.group(1).zfill(2)
-            year = m.group(2)
-            month_names = {
-                '01':'JANUARI','02':'FEBRUARI','03':'MARET','04':'APRIL',
-                '05':'MEI','06':'JUNI','07':'JULI','08':'AGUSTUS',
-                '09':'SEPTEMBER','10':'OKTOBER','11':'NOVEMBER','12':'DESEMBER',
-            }
-            return f"{day} {month_names.get(month_num, month_key)} {year}"
-    now = datetime.now()
-    month_names = {1:'JANUARI',2:'FEBRUARI',3:'MARET',4:'APRIL',5:'MEI',6:'JUNI',
-                   7:'JULI',8:'AGUSTUS',9:'SEPTEMBER',10:'OKTOBER',11:'NOVEMBER',12:'DESEMBER'}
-    return f"{str(now.day).zfill(2)} {month_names[now.month]} {now.year}"
+# ── sheet selection ────────────────────────────────────────────────────────────
+
+def _match_sheet(name):
+    """Find actual sheet name matching ``name`` (case-insensitive)."""
+    name_upper = name.upper()
+    for sn in sheetnames:
+        if sn.upper() == name_upper:
+            return sn
+    return None
+
+def choose_sheets(wb, target_shift_req):
+    """
+    Return list of sheet names to process, applying Rev-priority logic.
+    If a Rev variant exists, the non-Rev base sheet is also included so that
+    press sections present only in the non-Rev sheet (e.g. PRESS C, D) are not lost.
+    """
+    global sheetnames
+    sheetnames = wb.sheetnames
+
+    def base_sheets(base):
+        """Return sheet names for a base shift. When a Rev variant exists,
+        returns [Rev, non-Rev] so non-Rev can supply presses missing from Rev."""
+        rev = f"{base} (Rev)"
+        rev_variants = [rev]
+        for sn in sheetnames:
+            su = sn.upper()
+            if base.upper() in su and 'REV' in su and sn != base:
+                if sn not in rev_variants:
+                    rev_variants.append(sn)
+        rev_found = None
+        for rv in rev_variants:
+            actual = _match_sheet(rv)
+            if actual:
+                rev_found = actual
+                break
+        base_actual = _match_sheet(base)
+        if rev_found:
+            sheets = [rev_found]
+            if base_actual:
+                sheets.append(base_actual)
+            return sheets
+        if base_actual:
+            return [base_actual]
+        return []
+
+    if target_shift_req != 'AUTO':
+        # Single shift requested
+        chosen = base_sheets(target_shift_req)
+        if chosen:
+            return chosen
+        # Fall back to any sheet that matches
+        for sn in sheetnames:
+            if target_shift_req.upper() in sn.upper() and 'MASTER' not in sn.upper():
+                return [sn]
+        return []
+
+    # AUTO — collect both shifts
+    result = []
+    for base in ['Shift Pagi', 'Shift Malam']:
+        result.extend(base_sheets(base))
+
+    if not result:
+        # Last resort: any sheet with SHIFT in name
+        for sn in sheetnames:
+            if 'SHIFT' in sn.upper() and 'MASTER' not in sn.upper():
+                result.append(sn)
+
+    return result
+
+# ── entry point ───────────────────────────────────────────────────────────────
 
 def main():
     if len(sys.argv) < 2:
-        print(json.dumps({'error': 'No file path provided'}, default=str))
+        print(json.dumps({'error': 'No file path provided'}))
         sys.exit(1)
 
-    filepath  = sys.argv[1]
-    orig_name = sys.argv[2] if len(sys.argv) >= 3 else filepath
-    upload_date = extract_upload_date(filepath, orig_name)
+    filepath          = sys.argv[1]
+    original_name     = sys.argv[2] if len(sys.argv) > 2 else filepath
+    target_shift_req  = sys.argv[3] if len(sys.argv) > 3 else 'AUTO'
 
     try:
-        wb = openpyxl.load_workbook(filepath, data_only=True)
-        sheets = wb.sheetnames
+        wb = openpyxl.load_workbook(filepath, read_only=True, data_only=True)
 
-        all_candidate_sheets = []
-        for s in sheets:
-            sl = s.lower().strip()
-            if ('shift' in sl or 'press' in sl) and not any(k in sl for k in ['master', 'format', 'resume', 'template']):
-                all_candidate_sheets.append(s)
+        sheets_to_process = choose_sheets(wb, target_shift_req)
 
-        best_sheets = {}
-        for s in all_candidate_sheets:
-            # Smart cleaning: remove REV, REVISI, numbers, and brackets
-            # e.g. "SHIFT PAGI REV-001" -> "SHIFT PAGI"
-            clean = re.sub(r'[\(\s]REV.*|[\(\s]REVISI.*|\d+', '', s, flags=re.I).strip()
-            
-            is_rev = bool(re.search(r'REV|REVISI', s, re.I))
-            if clean not in best_sheets:
-                best_sheets[clean] = s
-            else:
-                # If we find a revision, or a longer name (likely more specific), prefer it
-                if is_rev or len(s) > len(best_sheets[clean]):
-                    best_sheets[clean] = s
-        
-        sheets_to_parse = list(best_sheets.values())
-        parsed_result = {}
+        if not sheets_to_process:
+            print(json.dumps({'error': 'Tidak ada sheet Shift Pagi / Shift Malam yang ditemukan di file ini.'}))
+            sys.exit(1)
 
-        for sname in sheets_to_parse:
-            ws = wb[sname]
-            press_sections = parse_sheet(ws, sname)
-            for press_name, section_data in press_sections.items():
-                if not section_data['rows']:
-                    continue
-                key = f"{sname}|||{press_name}"
-                parsed_result[key] = {
-                    'shift_name': sname,
-                    'press_name': press_name,
-                    'hari':   section_data['hari'],
-                    'tgl':    section_data['tgl'],
-                    'jam':    section_data['jam'],
-                    'revisi': section_data['revisi'],
-                    'rows':   section_data['rows'],
-                }
+        result_sheets = {}
+
+        for sn in sheets_to_process:
+            ws = wb[sn]
+            parsed = parse_sheet(ws, sn)
+            result_sheets.update(parsed)
+
+        # 1. Try to get date from the parsed 'tgl' cell of the first valid sheet
+        upload_date = None
+        for key, section in result_sheets.items():
+            if section.get('tgl'):
+                upload_date = extract_date(section['tgl'])
+                if upload_date:
+                    break
+
+        # 2. Fallback to extracting from the filename
+        if not upload_date:
+            upload_date = extract_date(original_name)
+
+        # 3. Fallback to current date
+        if not upload_date:
+            upload_date = datetime.now().strftime('%d MEI %Y').upper()
 
         wb.close()
 
-        if not parsed_result:
-            print(json.dumps({'error': 'Tidak ada data schedule ditemukan.'}, default=str))
+        # Build import log (row counts per sheet / section)
+        import_log = {}
+        total_excel_rows   = 0
+        total_data_rows    = 0
+        total_meta_skipped = 0
+        for key, section in result_sheets.items():
+            sheet_name = key.split('|||')[0]
+            if sheet_name not in import_log:
+                import_log[sheet_name] = {
+                    'sections': {},
+                    'sheet_excel_rows': 0,
+                }
+            stats = section.get('_stats', {})
+            sr = stats.get('section_total_rows', 0)
+            ms = stats.get('meta_rows_skipped', 0)
+            dr = stats.get('data_rows_output', 0)
+            import_log[sheet_name]['sections'][section['press_name']] = {
+                'section_rows':     sr,
+                'meta_rows_before_header': ms,
+                'data_rows_output': dr,
+                'header_local_idx': stats.get('header_local_idx'),
+                'header_content':   stats.get('header_content'),
+            }
+            import_log[sheet_name]['sheet_excel_rows'] += sr
+            total_excel_rows   += sr
+            total_meta_skipped += ms
+            total_data_rows    += dr
+        import_log['summary'] = {
+            'total_excel_rows_scanned': total_excel_rows,
+            'total_meta_rows_before_header': total_meta_skipped,
+            'total_data_rows_output': total_data_rows,
+        }
+
+        # Remove _stats from output rows (not needed by PHP)
+        for section in result_sheets.values():
+            section.pop('_stats', None)
+
+        # Remove empty sections
+        final_sheets = {k: v for k, v in result_sheets.items() if v['rows']}
+
+        if not final_sheets:
+            print(json.dumps({'error': 'Tidak ada data job yang berhasil dibaca dari file Excel. Pastikan format file sesuai.'}))
             sys.exit(1)
 
         print(json.dumps({
-            'success': True,
+            'success':     True,
             'upload_date': upload_date,
-            'total_sheets': len(parsed_result),
-            'sheets': parsed_result,
-        }, default=str))
+            'sheets':      final_sheets,
+            'log':         import_log,
+        }, ensure_ascii=False))
 
     except Exception as e:
         import traceback
-        print(json.dumps({'error': str(e), 'trace': traceback.format_exc()}, default=str))
+        print(json.dumps({'error': str(e), 'trace': traceback.format_exc()}))
         sys.exit(1)
 
 if __name__ == '__main__':

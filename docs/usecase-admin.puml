@@ -1,0 +1,103 @@
+@startuml Use Case - Admin & Super Admin
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - Admin & Super Admin
+
+' ===== AKTOR KIRI =====
+actor "Super Admin" as SA
+actor "Admin" as ADM
+
+rectangle "System Administration" {
+  usecase "Login" as UC_LOGIN
+
+  usecase "User Management" as UC_USER
+  usecase "CRUD User" as UC_CRUD_USER
+  usecase "Assign Role" as UC_ASSIGN_ROLE
+  usecase "Reset Password" as UC_RESET_PASS
+
+  usecase "Feature & Permission" as UC_FEAT
+  usecase "Toggle Feature per Role" as UC_TOGGLE
+  usecase "Assign Feature to Role" as UC_ASSIGN_FEAT
+
+  usecase "Line Assignment" as UC_LINE_ASSIGN
+  usecase "Assign User to Line" as UC_ASSIGN_LINE
+  usecase "Remove User from Line" as UC_REMOVE_LINE
+
+  usecase "Recycle Bin" as UC_TRASH
+  usecase "Restore Record" as UC_RESTORE
+  usecase "Force Delete" as UC_FORCE_DEL
+
+  usecase "Signature (TTD)" as UC_TTD
+  usecase "Upload TTD" as UC_UPLOAD_TTD
+  usecase "Hapus TTD" as UC_DEL_TTD
+
+  usecase "Department & Position" as UC_DEPT
+  usecase "CRUD Department" as UC_CRUD_DEPT
+  usecase "CRUD Position" as UC_CRUD_POS
+  usecase "CRUD Section" as UC_CRUD_SEC
+
+  usecase "Notification" as UC_NOTIF
+  usecase "Lihat Notifikasi" as UC_LIHAT_NOTIF
+  usecase "Tandai Dibaca" as UC_READ_NOTIF
+
+  usecase "Business Event Log" as UC_LOG_BIZ
+  usecase "Lihat Event Log" as UC_LIHAT_LOG
+  usecase "Export Log (Excel)" as UC_EXP_LOG
+
+  usecase "Profile" as UC_PROFILE
+  usecase "Update Profil" as UC_UPD_PROFILE
+  usecase "Upload Avatar" as UC_AVATAR
+
+  ' ===== RELATIONSHIPS =====
+  UC_USER ..> UC_CRUD_USER : <<include>>
+  UC_USER ..> UC_ASSIGN_ROLE : <<include>>
+  UC_USER ..> UC_RESET_PASS : <<extend>>
+  UC_FEAT ..> UC_TOGGLE : <<include>>
+  UC_FEAT ..> UC_ASSIGN_FEAT : <<include>>
+  UC_LINE_ASSIGN ..> UC_ASSIGN_LINE : <<include>>
+  UC_LINE_ASSIGN ..> UC_REMOVE_LINE : <<extend>>
+  UC_TRASH ..> UC_RESTORE : <<include>>
+  UC_TRASH ..> UC_FORCE_DEL : <<extend>>
+  UC_TTD ..> UC_UPLOAD_TTD : <<include>>
+  UC_TTD ..> UC_DEL_TTD : <<extend>>
+  UC_DEPT ..> UC_CRUD_DEPT : <<include>>
+  UC_DEPT ..> UC_CRUD_POS : <<include>>
+  UC_DEPT ..> UC_CRUD_SEC : <<extend>>
+  UC_NOTIF ..> UC_LIHAT_NOTIF : <<include>>
+  UC_NOTIF ..> UC_READ_NOTIF : <<extend>>
+  UC_LOG_BIZ ..> UC_LIHAT_LOG : <<include>>
+  UC_LOG_BIZ ..> UC_EXP_LOG : <<extend>>
+  UC_PROFILE ..> UC_UPD_PROFILE : <<include>>
+  UC_PROFILE ..> UC_AVATAR : <<extend>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Supervisor" as SPV
+actor "PPC Staff" as PPC
+
+SA --> UC_LOGIN
+SA --> UC_USER
+SA --> UC_FEAT
+SA --> UC_LINE_ASSIGN
+SA --> UC_TRASH
+SA --> UC_TTD
+SA --> UC_DEPT
+SA --> UC_NOTIF
+SA --> UC_LOG_BIZ
+SA --> UC_PROFILE
+ADM --> UC_LOGIN
+ADM --> UC_USER
+ADM --> UC_LOG_BIZ
+SPV --> UC_NOTIF : <<extend>>
+PPC --> UC_LOG_BIZ : <<extend>>
+
+@enduml

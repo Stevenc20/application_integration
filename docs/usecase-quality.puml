@@ -1,0 +1,66 @@
+@startuml Use Case - Quality
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - Quality
+
+' ===== AKTOR KIRI =====
+actor "Quality Staff" as QL
+
+rectangle "Quality Module" {
+  usecase "Login" as UC_LOGIN
+
+  usecase "Quality Dashboard" as UC_Q_DASH
+  usecase "Lihat KPI Quality" as UC_Q_KPI
+
+  usecase "Q-Check" as UC_QC
+  usecase "Buat Q-Check Form" as UC_QC_FORM
+  usecase "Daftar Q-Check" as UC_QC_LIST
+  usecase "Hasil Q-Check" as UC_QC_HASIL
+
+  usecase "Defect Monitoring" as UC_DEFECT
+  usecase "Daftar Defect" as UC_LIST_DEFECT
+  usecase "Analisis Defect" as UC_ANALISIS_DEF
+
+  usecase "Repair & Reject Log" as UC_RR_LOG
+  usecase "Catat Repair (data + gambar)" as UC_CATAT_RR
+  usecase "Analisis Reject" as UC_ANALISIS_REJECT
+
+  usecase "Quality Achievement" as UC_Q_ACHIEVE
+  usecase "Quality CRUD" as UC_Q_CRUD
+
+  ' ===== RELATIONSHIPS =====
+  UC_Q_DASH ..> UC_Q_KPI : <<include>>
+  UC_Q_DASH ..> UC_Q_ACHIEVE : <<extend>>
+  UC_QC ..> UC_QC_FORM : <<include>>
+  UC_QC ..> UC_QC_LIST : <<include>>
+  UC_QC_LIST ..> UC_QC_HASIL : <<include>>
+  UC_DEFECT ..> UC_LIST_DEFECT : <<include>>
+  UC_DEFECT ..> UC_ANALISIS_DEF : <<extend>>
+  UC_RR_LOG ..> UC_CATAT_RR : <<include>>
+  UC_RR_LOG ..> UC_ANALISIS_REJECT : <<extend>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Supervisor" as SPV
+actor "Foreman" as FRM
+
+QL --> UC_LOGIN
+QL --> UC_Q_DASH
+QL --> UC_QC
+QL --> UC_DEFECT
+QL --> UC_RR_LOG
+QL --> UC_Q_ACHIEVE
+QL --> UC_Q_CRUD
+SPV --> UC_Q_DASH : <<extend>>
+FRM --> UC_QC : <<extend>>
+
+@enduml

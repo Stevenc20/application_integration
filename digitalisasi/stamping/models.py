@@ -18,11 +18,15 @@ class PathForFotoRC(object):
 # DATA MASTER
 class karyawan(models.Model):
     opsi_jabatan = [
-        ('admin', 'admin'),
-        ('operator', 'operator'),
-        ('leader', 'leader'),
-        ('foreman', 'foreman'),
-        ('supervisor', 'supervisor'),
+        ('admin', 'Admin'),
+        ('operator', 'Operator'),
+        ('leader', 'Leader'),
+        ('foreman', 'Foreman'),
+        ('supervisor', 'Supervisor'),
+        ('manager', 'Manager'),
+        ('kadiv', 'Kepala Divisi'),
+        ('direktur', 'Direktur'),
+        ('presdir', 'President Director'),
     ]
     id_karyawan = models.AutoField(primary_key=True)
     nama_karyawan = models.CharField(max_length=100)

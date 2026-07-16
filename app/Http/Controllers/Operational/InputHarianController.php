@@ -9,7 +9,9 @@ use App\Models\ProductionSession;
 use Carbon\Carbon;
 use App\Models\DailyProduction;
 use App\Models\Downtime;
+use App\Models\LineMaster;
 use App\Models\ProductionLog;
+use App\Models\ShiftSubmission;
 use Illuminate\Support\Facades\DB;
 use App\Services\ProductionService;
 use App\Services\DashboardRealtimeService;
@@ -25,6 +27,7 @@ class InputHarianController extends Controller
 
     public function saveProductionLog(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         $workDate = $request->get('date') ?: now()->toDateString();
         $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
 
@@ -257,6 +260,12 @@ class InputHarianController extends Controller
             return $statusA <=> $statusB;
         })->values();
 
+        // Determine if all jobs are done (for showing "Akhiri Shift" button)
+        $jobPlans = $plans->filter(fn($p) => ($p->row_type ?? 'job') === 'job');
+        $allJobsDone = $jobPlans->isNotEmpty() && $jobPlans->every(
+            fn($p) => optional($p->job_data)->status === 'complete'
+        );
+
         // 4. DATE-AWARE ACTIVE JOB
         // Historical only when ALL job items in this date/shift have been processed (have DailyProduction).
         $isHistorical = false;
@@ -331,16 +340,6 @@ class InputHarianController extends Controller
 
         $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running'])
             ->whereIn('job_number', $scheduledJobNumbers)
-            ->where(function($q) use ($lineFilter, $plans) {
-                if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
-                    $pressNames = $plans->pluck('press_name')->unique()->filter()->values()->toArray();
-                    if (!empty($pressNames)) {
-                        $q->whereHas('productionPlans', function($pq) use ($pressNames) {
-                            $pq->whereIn('press_name', $pressNames);
-                        });
-                    }
-                }
-            })
             ->get()
             ->sortBy(function($job) use ($scheduledJobNumbers) {
                 return array_search($job->job_number, $scheduledJobNumbers);
@@ -363,6 +362,23 @@ class InputHarianController extends Controller
             ]);
         }
 
+        // Check if shift is locked (has been submitted)
+        $isLocked = false;
+        if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
+            $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+            $lineMaster = LineMaster::whereRaw("
+                REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+            ", ["%{$normalizedLine}%"])->first();
+            if ($lineMaster) {
+                $shiftVal = str_contains(strtoupper($currentShift), 'MALAM') ? 2 : 1;
+                $isLocked = ShiftSubmission::where([
+                    'line_id' => $lineMaster->id,
+                    'work_date' => $date,
+                    'shift' => $shiftVal,
+                ])->exists();
+            }
+        }
+
         return view('operational.input_harian', [
             'jobs'            => $plans, 
             'pendingJobs'     => $pendingJobs,
@@ -375,6 +391,8 @@ class InputHarianController extends Controller
             'currentShift'    => $currentShift,
             'date'            => $date,
             'isHistorical'    => $isHistorical,
+            'isLocked'        => $isLocked,
+            'allJobsDone'     => $allJobsDone,
             'sessionMap'      => $sessionMap,
             'scheduleContext' => $scheduleContext
         ]);
@@ -442,6 +460,7 @@ class InputHarianController extends Controller
 
     public function start(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         try {
             $this->productionService->startJob($id, $request->has('enqueue_only'));
             return response()->json(['success' => true]);
@@ -452,6 +471,7 @@ class InputHarianController extends Controller
 
     public function enqueue($id)
     {
+        $this->guardLockedShift($id);
         try {
             $workDate = now()->toDateString();
             $downtime = $this->productionService->startDandori($id, $workDate);
@@ -463,6 +483,7 @@ class InputHarianController extends Controller
 
     public function startDandori(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         try {
             $workDate = $request->get('date') ?: now()->toDateString();
             $downtime = $this->productionService->startDandori($id, $workDate);
@@ -474,6 +495,7 @@ class InputHarianController extends Controller
 
     public function finishDandori($jobId)
     {
+        $this->guardLockedShift($jobId);
         try {
             // Close any open 1st check before finishing dandori
             $this->productionService->finishFirstCheck($jobId);
@@ -490,6 +512,7 @@ class InputHarianController extends Controller
 
     public function startFirstCheck(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         try {
             $workDate = $request->get('date') ?: now()->toDateString();
             $dandori = $this->productionService->startFirstCheck($id, $workDate);
@@ -501,6 +524,7 @@ class InputHarianController extends Controller
 
     public function finishFirstCheck($jobId)
     {
+        $this->guardLockedShift($jobId);
         try {
             $success = $this->productionService->finishFirstCheck($jobId);
             if ($success) {
@@ -514,6 +538,7 @@ class InputHarianController extends Controller
 
     public function pause($id)
     {
+        $this->guardLockedShift($id);
         try {
             $runtime = $this->productionService->pauseJob($id);
             return response()->json(['success' => true, 'total_seconds' => $runtime]);
@@ -524,6 +549,7 @@ class InputHarianController extends Controller
     
     public function resume($id)
     {
+        $this->guardLockedShift($id);
         try {
             $this->productionService->resumeJob($id);
             return response()->json(['success' => true]);
@@ -534,6 +560,7 @@ class InputHarianController extends Controller
 
     public function restart($id)
     {
+        $this->guardLockedShift($id);
         try {
             $this->productionService->restartJob($id);
             return response()->json(['success' => true]);
@@ -544,6 +571,7 @@ class InputHarianController extends Controller
 
     public function finish(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         try {
             $nextJobId = $request->json('next_job_id') ?: $request->input('next_job_id');
             $skipIdle = filter_var($request->json('skip_idle') ?? $request->input('skip_idle', false), FILTER_VALIDATE_BOOLEAN);
@@ -588,6 +616,7 @@ class InputHarianController extends Controller
 
     public function saveQty(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         try {
             $result = $this->productionService->saveDailyProduction($id, $request->all());
             return response()->json([
@@ -612,6 +641,39 @@ class InputHarianController extends Controller
         }
 
         return 'Shift Malam';
+    }
+
+    private function getShiftFromRequest()
+    {
+        return request()->header('X-Shift')
+            ?: request('shift')
+            ?: $this->getShift();
+    }
+
+    private function guardLockedShift($jobMasterId)
+    {
+        $jm = JobMaster::find($jobMasterId);
+        if (!$jm || !$jm->line) return;
+
+        $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $jm->line)));
+        $lineMaster = LineMaster::whereRaw("
+            REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+        ", ["%{$normalized}%"])->first();
+        if (!$lineMaster) return;
+
+        $date = request()->header('X-Date') ?: request('date', now()->toDateString());
+        $shift = $this->getShiftFromRequest();
+        $shiftVal = str_contains(strtoupper($shift), 'MALAM') ? 2 : 1;
+
+        $locked = ShiftSubmission::where([
+            'line_id' => $lineMaster->id,
+            'work_date' => $date,
+            'shift' => $shiftVal,
+        ])->exists();
+
+        if ($locked) {
+            throw new \Exception('Shift sudah dikunci. Data tidak dapat diubah.');
+        }
     }
 
     public function nextList($id)
@@ -642,6 +704,7 @@ class InputHarianController extends Controller
     
     public function nextProcess(Request $request, $id)
     {
+        $this->guardLockedShift($id);
         $nextJobId = $request->get('next_job_id');
         $skipIdle = filter_var($request->get('skip_idle', true), FILTER_VALIDATE_BOOLEAN);
         
@@ -769,6 +832,7 @@ class InputHarianController extends Controller
 
     public function startDowntime(Request $request, $job_id)
     {
+        $this->guardLockedShift($job_id);
         try {
             $downtime = $this->productionService->startDowntime($job_id, $request->all());
             return response()->json([
@@ -783,6 +847,8 @@ class InputHarianController extends Controller
     public function finishDowntime($id)
     {
         try {
+            $dt = Downtime::find($id);
+            if ($dt) $this->guardLockedShift($dt->job_master_id);
             $downtime = $this->productionService->finishDowntime($id);
             if (!$downtime) {
                 return response()->json(['success' => false, 'message' => 'Downtime not found']);
@@ -800,6 +866,12 @@ class InputHarianController extends Controller
     {
         $downtime = Downtime::find($id);
         if (!$downtime) return response()->json(['success' => false, 'message' => 'Downtime not found']);
+
+        try {
+            $this->guardLockedShift($downtime->job_master_id);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
+        }
 
         $downtime->update($request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']));
 
@@ -819,6 +891,8 @@ class InputHarianController extends Controller
     public function deleteDowntime($id)
     {
         try {
+            $dt = Downtime::find($id);
+            if ($dt) $this->guardLockedShift($dt->job_master_id);
             $success = $this->productionService->deleteDowntime($id);
             if (!$success) {
                 return response()->json(['success' => false, 'message' => 'Downtime not found']);
@@ -837,6 +911,21 @@ class InputHarianController extends Controller
             ->paginate(50);
 
         return view('operational.log_detail', compact('job', 'logs'));
+    }
+
+    public function getQty(Request $request, $id)
+    {
+        $date = $request->get('date') ?: now()->toDateString();
+        $daily = DailyProduction::where('job_master_id', $id)
+            ->where('work_date', $date)
+            ->first();
+
+        return response()->json([
+            'success'       => true,
+            'actual_ok'     => $daily->actual_ok ?? 0,
+            'actual_repair' => $daily->actual_repair ?? 0,
+            'actual_reject' => $daily->actual_reject ?? 0,
+        ]);
     }
 
     public function submitShift(Request $request, $lineId)
@@ -860,60 +949,150 @@ class InputHarianController extends Controller
 
             $plans = $planQuery->get();
 
-            $incomplete = [];
+            if ($plans->isEmpty()) {
+                return response()->json([
+                    'success'    => false,
+                    'has_issues' => false,
+                    'message'    => 'Belum ada jadwal PPC untuk line/shift ini. Shift tidak bisa difinalisasi.',
+                ], 422);
+            }
+
+            $issues = [
+                'dt'     => [],
+                'repair' => [],
+                'reject' => [],
+                'remain' => [],
+            ];
 
             foreach ($plans as $plan) {
+                // Skip children — they are checked inside the parent loop
+                if ($plan->parent_job_id) continue;
+
                 $jn = trim($plan->job_no ?? '');
                 $jm = trim($plan->job_master ?? '');
                 if (blank($jn) && blank($jm)) continue;
                 $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
 
                 $jobMaster = \App\Models\JobMaster::where('job_number', $identifier)
-                    ->with(['dailyProduction', 'downtimes'])
+                    ->with(['dailyProduction', 'downtimes', 'repairRejects'])
                     ->first();
 
                 if (!$jobMaster) continue;
 
-                // Also check children (break splits)
+                // Collect parent + children JobMasters for comprehensive check
+                $allJms = collect([$jobMaster]);
                 $children = \App\Models\ProductionPlan::where('parent_job_id', $plan->id)->get();
                 foreach ($children as $child) {
                     $childKey = trim($child->job_no ?? '') . '-' . $child->id;
                     $childJm = \App\Models\JobMaster::where('job_number', $childKey)
-                        ->with(['dailyProduction', 'downtimes'])
+                        ->with(['downtimes', 'repairRejects'])
                         ->first();
-                    if (!$childJm) continue;
-                    // Merge downtimes
-                    foreach ($childJm->downtimes ?? [] as $dt) {
-                        $jobMaster->downtimes->push($dt);
+                    if ($childJm) $allJms->push($childJm);
+                }
+
+                $itemName = $plan->job_no ?: $plan->job_master;
+
+                // Check DT on all JobMasters (parent + children)
+                foreach ($allJms as $jm) {
+                    foreach ($jm->downtimes ?? [] as $dt) {
+                        if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
+                            continue;
+                        }
+                        if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
+                            $issues['dt'][] = [
+                                'item'          => $itemName,
+                                'issue'         => 'problem/penyebab/action belum lengkap',
+                                'dt_id'         => $dt->id,
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $plan->id,
+                            ];
+                        }
                     }
                 }
 
-                // Check DT: every downtime must have problem, penyebab, action
-                foreach ($jobMaster->downtimes ?? [] as $dt) {
-                    if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
-                        continue;
+                // Check Repair & Reject on all JobMasters + cek actual tanpa RR record
+                foreach ($allJms as $jm) {
+                    foreach ($jm->repairRejects ?? [] as $rr) {
+                        if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
+                            $key = $rr->type === 'reject' ? 'reject' : 'repair';
+                            $issues[$key][] = [
+                                'item'          => $itemName,
+                                'issue'         => 'area_problem/root_cause/countermeasure belum lengkap',
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $plan->id,
+                            ];
+                        }
                     }
-                    if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
-                        $incomplete[] = [
-                            'item' => $plan->job_no ?: $plan->job_master,
-                            'issue' => 'DT: problem/penyebab/action belum lengkap',
-                            'dt_id' => $dt->id,
-                        ];
+                    if ($jm->dailyProduction && $jm->dailyProduction->actual_repair > 0) {
+                        $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'repair');
+                        if (!$hasRR) {
+                            $issues['repair'][] = [
+                                'item'          => $itemName,
+                                'issue'         => (int)$jm->dailyProduction->actual_repair . ' pcs Repair tanpa catatan',
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $plan->id,
+                            ];
+                        }
+                    }
+                    if ($jm->dailyProduction && $jm->dailyProduction->actual_reject > 0) {
+                        $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'reject');
+                        if (!$hasRR) {
+                            $issues['reject'][] = [
+                                'item'          => $itemName,
+                                'issue'         => (int)$jm->dailyProduction->actual_reject . ' pcs Reject tanpa catatan',
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $plan->id,
+                            ];
+                        }
                     }
                 }
+
+        }
+
+        // Check Remain — skip children & breaks
+        foreach ($plans as $p) {
+            if ($p->parent_job_id) continue;
+            if (($p->row_type ?? 'job') === 'break') continue;
+            $pJn = trim($p->job_no ?? '');
+            $pJmStr = trim($p->job_master ?? '');
+            if (blank($pJn) && blank($pJmStr)) continue;
+            $pIdent = $pJn ? ($pJn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($pJmStr) . '-' . $p->id);
+            $pJm = \App\Models\JobMaster::where('job_number', $pIdent)->first();
+            if (!$pJm) {
+                $issues['remain'][] = [
+                    'item'          => $p->job_no ?: $p->job_master,
+                    'issue'         => 'Item belum dikerjakan (tidak ada JobMaster)',
+                    'job_master_id' => null,
+                    'plan_id'       => $p->id,
+                ];
+            } elseif (in_array(strtolower($pJm->status), ['running', 'pending'])) {
+                $issues['remain'][] = [
+                    'item'          => $p->job_no ?: $p->job_master,
+                    'issue'         => "Status masih {$pJm->status}",
+                    'job_master_id' => $pJm->id,
+                    'plan_id'       => $p->id,
+                ];
             }
+        }
 
-            if (!empty($incomplete)) {
+        if (!empty($issues['dt']) || !empty($issues['repair']) || !empty($issues['reject']) || !empty($issues['remain'])) {
                 return response()->json([
-                    'success' => false,
-                    'message' => 'Ada item yang belum lengkap',
-                    'incomplete' => $incomplete,
+                    'success'    => false,
+                    'has_issues' => true,
+                    'issues'     => $issues,
                 ], 422);
             }
 
             // All valid — create submission record
+            $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineId)));
+            $lineMaster = \App\Models\LineMaster::whereRaw("
+                REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+            ", ["%{$normalizedLine}%"])->first();
+            if (!$lineMaster) {
+                $lineMaster = \App\Models\LineMaster::where('line_name', 'LIKE', "%{$normalizedLine}%")->first();
+            }
             \App\Models\ShiftSubmission::create([
-                'line_id' => $lineId,
+                'line_id' => $lineMaster?->id ?? throw new \Exception("Line '{$lineId}' not found"),
                 'work_date' => $date,
                 'shift' => $shift ? ($shift === 'Shift Malam' ? 2 : 1) : 1,
                 'submitted_by' => auth()->id(),

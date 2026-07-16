@@ -277,6 +277,41 @@
         </div>
     @endif
 </div>
+
+{{-- CONFIRM MODAL (Tailwind) --}}
+<div id="confirmModal" class="fixed inset-0 z-[99999] hidden flex items-center justify-center">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeConfirm()"></div>
+    <div class="relative w-full max-w-sm mx-4 animate-in fade-in zoom-in duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl p-8">
+            <div class="flex flex-col items-center text-center">
+                <div class="w-14 h-14 bg-amber-50 rounded-2xl flex items-center justify-center mb-4 text-amber-600">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                    </svg>
+                </div>
+                <h3 class="text-xl font-black text-slate-800">KONFIRMASI</h3>
+                <p class="text-slate-500 text-sm mt-2" id="confirmMessage">—</p>
+            </div>
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="closeConfirm()" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">BATAL</button>
+                <button type="button" onclick="executeConfirm()" class="flex-1 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold transition-all shadow-lg shadow-emerald-200">LANJUTKAN</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- TOAST NOTIFICATION (Tailwind) --}}
+<div id="toast" class="fixed top-6 right-6 z-[99999] hidden items-center gap-3 transition-all duration-500">
+    <div class="bg-white rounded-2xl shadow-2xl border border-slate-200 px-6 py-4 flex items-center gap-3">
+        <span id="toastIcon" class="w-6 h-6 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+            </svg>
+        </span>
+        <span id="toastMessage" class="text-sm font-semibold text-slate-700">—</span>
+    </div>
+</div>
+
 @endsection
 
 @push('scripts')
@@ -301,28 +336,29 @@
     function approveSelectedItems() {
         const checked = document.querySelectorAll('.item-checkbox:checked');
         if (checked.length === 0) {
-            alert('Pilih minimal satu item yang akan di-approve.');
+            showToast('Pilih minimal satu item yang akan di-approve.', 'warning');
             return;
         }
-        if (!confirm('Approve ' + checked.length + ' item recovery yang dipilih? Item lain di schedule yang sama akan otomatis di-reject.')) return;
-        const itemIds = Array.from(checked).map(cb => parseInt(cb.value));
-        fetch('{{ route("ppc.planning.recovery.approve_items") }}', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ item_ids: itemIds })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) { location.reload(); }
-            else { alert(data.message || 'Gagal approve recovery.'); }
-        })
-        .catch(() => alert('Error saat approve recovery.'));
+        showConfirm('Approve ' + checked.length + ' item recovery yang dipilih?', function() {
+            const itemIds = Array.from(checked).map(cb => parseInt(cb.value));
+            fetch('{{ route("ppc.planning.recovery.approve_items") }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ item_ids: itemIds })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { location.reload(); }
+                else { showToast(data.message || 'Gagal approve recovery.', 'error'); }
+            })
+            .catch(() => showToast('Error saat approve recovery.', 'error'));
+        });
     }
 
     function rejectSelectedItems() {
         const checked = document.querySelectorAll('.item-checkbox:checked');
         if (checked.length === 0) {
-            alert('Pilih minimal satu item yang akan di-reject.');
+            showToast('Pilih minimal satu item yang akan di-reject.', 'warning');
             return;
         }
         const notes = prompt('Alasan reject (opsional):');
@@ -335,24 +371,25 @@
         .then(r => r.json())
         .then(data => {
             if (data.success) { location.reload(); }
-            else { alert(data.message || 'Gagal reject recovery.'); }
+            else { showToast(data.message || 'Gagal reject recovery.', 'error'); }
         })
-        .catch(() => alert('Error saat reject recovery.'));
+        .catch(() => showToast('Error saat reject recovery.', 'error'));
     }
 
     function approveItem(id) {
-        if (!confirm('Approve item ini?')) return;
-        fetch('{{ route("ppc.planning.recovery.approve_items") }}', {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ item_ids: [id] })
-        })
-        .then(r => r.json())
-        .then(data => {
-            if (data.success) { location.reload(); }
-            else { alert(data.message || 'Gagal approve.'); }
-        })
-        .catch(() => alert('Error.'));
+        showConfirm('Approve item ini?', function() {
+            fetch('{{ route("ppc.planning.recovery.approve_items") }}', {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
+                body: JSON.stringify({ item_ids: [id] })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) { location.reload(); }
+                else { showToast(data.message || 'Gagal approve.', 'error'); }
+            })
+            .catch(() => showToast('Error.', 'error'));
+        });
     }
 
     function rejectItem(id) {
@@ -365,9 +402,56 @@
         .then(r => r.json())
         .then(data => {
             if (data.success) { location.reload(); }
-            else { alert(data.message || 'Gagal reject.'); }
+            else { showToast(data.message || 'Gagal reject.', 'error'); }
         })
-        .catch(() => alert('Error.'));
+        .catch(() => showToast('Error.', 'error'));
+    }
+
+    // Confirm Modal helpers
+    let confirmCallback = null;
+
+    function showConfirm(message, onConfirm) {
+        document.getElementById('confirmMessage').textContent = message;
+        confirmCallback = onConfirm;
+        document.getElementById('confirmModal').classList.remove('hidden');
+        document.getElementById('confirmModal').classList.add('flex');
+    }
+
+    function closeConfirm() {
+        document.getElementById('confirmModal').classList.remove('flex');
+        document.getElementById('confirmModal').classList.add('hidden');
+        confirmCallback = null;
+    }
+
+    function executeConfirm() {
+        const cb = confirmCallback;
+        closeConfirm();
+        if (cb) cb();
+    }
+
+    // Toast notification helpers
+    function showToast(message, type) {
+        const el = document.getElementById('toast');
+        const msgEl = document.getElementById('toastMessage');
+        const iconEl = document.getElementById('toastIcon');
+        msgEl.textContent = message;
+
+        const icons = {
+            success: { bg: 'bg-emerald-100', text: 'text-emerald-600', path: 'M5 13l4 4L19 7' },
+            error: { bg: 'bg-rose-100', text: 'text-rose-600', path: 'M6 18L18 6M6 6l12 12' },
+            warning: { bg: 'bg-amber-100', text: 'text-amber-600', path: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z' },
+        };
+        const cfg = icons[type] || icons.success;
+        iconEl.className = 'w-6 h-6 rounded-full ' + cfg.bg + ' ' + cfg.text + ' flex items-center justify-center shrink-0';
+        iconEl.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="' + cfg.path + '" /></svg>';
+
+        el.classList.remove('hidden');
+        el.classList.add('flex');
+        setTimeout(function() {
+            el.classList.remove('flex');
+            el.classList.add('hidden');
+        }, 4000);
     }
 </script>
 @endpush
+
