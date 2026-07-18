@@ -306,6 +306,7 @@ class ProductionPlanController extends Controller
 
     public function import(Request $request)
     {
+        set_time_limit(120);
         \Log::info("--- PRODUCTION PLAN IMPORT STARTED ---");
         $request->validate([
             'excel_file' => 'required|file|max:51200|extensions:xlsx,xls,xlsm',
