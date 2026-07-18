@@ -13,21 +13,20 @@ class ExcelScheduleParser
     public function parse(string $filePath, string $originalName): array
     {
         try {
-            $reader = IOFactory::createReaderForFile($filePath);
-            $reader->setReadDataOnly(true);
-            $spreadsheet = $reader->load($filePath);
-            $sheetNames = $spreadsheet->getSheetNames();
-
+            $sheetNames = $this->getSheetNames($filePath);
             $sheetsToProcess = $this->chooseSheets($sheetNames);
             if (empty($sheetsToProcess)) {
                 return ['error' => 'Tidak ada sheet Shift Pagi / Shift Malam yang ditemukan di file ini.'];
             }
 
+            $reader = IOFactory::createReaderForFile($filePath);
+            $reader->setReadDataOnly(true);
+            $reader->setLoadSheetsOnly($sheetsToProcess);
+            $spreadsheet = $reader->load($filePath);
+
             $resultSheets = [];
-            foreach ($sheetsToProcess as $sn) {
-                $ws = $spreadsheet->getSheetByName($sn);
-                if (!$ws) continue;
-                $parsed = $this->parseSheet($ws, $sn);
+            foreach ($spreadsheet->getAllSheets() as $ws) {
+                $parsed = $this->parseSheet($ws, $ws->getTitle());
                 foreach ($parsed as $key => $section) {
                     $resultSheets[$key] = $section;
                 }
@@ -89,6 +88,25 @@ class ExcelScheduleParser
 
         } catch (\Throwable $e) {
             return ['error' => $e->getMessage()];
+        }
+    }
+
+    private function getSheetNames(string $filePath): array
+    {
+        try {
+            $zip = new \ZipArchive();
+            if ($zip->open($filePath) !== true) return [];
+            $xml = simplexml_load_string($zip->getFromName('xl/workbook.xml'));
+            $names = [];
+            if ($xml && isset($xml->sheets)) {
+                foreach ($xml->sheets->sheet as $sheet) {
+                    $names[] = (string)$sheet['name'];
+                }
+            }
+            $zip->close();
+            return $names;
+        } catch (\Throwable $e) {
+            return [];
         }
     }
 
