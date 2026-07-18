@@ -13,7 +13,9 @@ class ExcelScheduleParser
     public function parse(string $filePath, string $originalName): array
     {
         try {
-            $spreadsheet = IOFactory::load($filePath);
+            $reader = IOFactory::createReaderForFile($filePath);
+            $reader->setReadDataOnly(true);
+            $spreadsheet = $reader->load($filePath);
             $sheetNames = $spreadsheet->getSheetNames();
 
             $sheetsToProcess = $this->chooseSheets($sheetNames);
