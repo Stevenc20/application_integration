@@ -151,7 +151,17 @@ class ExcelScheduleParser
 
     private function parseSheet($ws, string $sheetName): array
     {
-        $allRows = $ws->toArray();
+        $allRows = [];
+        foreach ($ws->getRowIterator() as $row) {
+            $cellIterator = $row->getCellIterator();
+            $cellIterator->setIterateOnlyExistingCells(true);
+            $rowData = [];
+            foreach ($cellIterator as $cell) {
+                $colIdx = \PhpOffice\PhpSpreadsheet\Cell\Coordinate::columnIndexFromString($cell->getColumn()) - 1;
+                $rowData[$colIdx] = $cell->getValue();
+            }
+            $allRows[] = $rowData;
+        }
         $total = count($allRows);
         $result = [];
 
