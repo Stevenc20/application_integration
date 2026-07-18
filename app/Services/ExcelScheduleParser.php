@@ -22,6 +22,7 @@ class ExcelScheduleParser
             $reader = IOFactory::createReaderForFile($filePath);
             $reader->setReadDataOnly(true);
             $reader->setLoadSheetsOnly($sheetsToProcess);
+            $reader->setReadEmptyCells(false);
             $spreadsheet = $reader->load($filePath);
 
             $resultSheets = [];
@@ -151,7 +152,7 @@ class ExcelScheduleParser
 
     private function parseSheet($ws, string $sheetName): array
     {
-        $allRows = $ws->toArray();
+        $allRows = $ws->toArray(null, null, $ws->getHighestDataRow(), null, false, false, false);
         $total = count($allRows);
         $result = [];
 
