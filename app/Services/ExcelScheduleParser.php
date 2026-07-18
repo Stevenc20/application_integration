@@ -13,6 +13,8 @@ class ExcelScheduleParser
     public function parse(string $filePath, string $originalName): array
     {
         try {
+            $t0 = microtime(true);
+
             $sheetNames = $this->getSheetNames($filePath);
             $sheetsToProcess = $this->chooseSheets($sheetNames);
             if (empty($sheetsToProcess)) {
@@ -23,7 +25,10 @@ class ExcelScheduleParser
             $reader->setReadDataOnly(true);
             $reader->setLoadSheetsOnly($sheetsToProcess);
             $reader->setReadEmptyCells(false);
+
+            $t1 = microtime(true);
             $spreadsheet = $reader->load($filePath);
+            $t2 = microtime(true);
 
             $resultSheets = [];
             foreach ($spreadsheet->getAllSheets() as $ws) {
@@ -34,6 +39,8 @@ class ExcelScheduleParser
             }
 
             $spreadsheet->disconnectWorksheets();
+
+            $t3 = microtime(true);
 
             $uploadDate = $this->extractDate($resultSheets, $originalName);
 
@@ -79,6 +86,17 @@ class ExcelScheduleParser
             if (empty($resultSheets)) {
                 return ['error' => 'Tidak ada data job yang berhasil dibaca dari file Excel. Pastikan format file sesuai.'];
             }
+
+            $t4 = microtime(true);
+            \Log::info('[IMPORT TIMING]', [
+                'load' => round($t2 - $t1, 2) . 's',
+                'parse' => round($t3 - $t2, 2) . 's',
+                'post' => round($t4 - $t3, 2) . 's',
+                'total' => round($t4 - $t0, 2) . 's',
+                'sheets_count' => count($sheetsToProcess),
+                'result_sheets' => count($resultSheets),
+                'total_rows' => $totalDataRows,
+            ]);
 
             return [
                 'success' => true,
@@ -152,9 +170,7 @@ class ExcelScheduleParser
 
     private function parseSheet($ws, string $sheetName): array
     {
-        $maxCol = $ws->getHighestColumn();
-        $maxRow = $ws->getHighestDataRow();
-        $allRows = $ws->rangeToArray("A1:{$maxCol}{$maxRow}", null, false, true, false, false);
+                $allRows = @$ws->toArray();
         $total = count($allRows);
         $result = [];
 
