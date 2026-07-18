@@ -152,7 +152,9 @@ class ExcelScheduleParser
 
     private function parseSheet($ws, string $sheetName): array
     {
-        $allRows = $ws->toArray(null, false, true, false, false, $ws->getHighestDataRow());
+        $maxCol = $ws->getHighestColumn();
+        $maxRow = $ws->getHighestDataRow();
+        $allRows = $ws->rangeToArray("A1:{$maxCol}{$maxRow}", null, false, true, false, false);
         $total = count($allRows);
         $result = [];
 
