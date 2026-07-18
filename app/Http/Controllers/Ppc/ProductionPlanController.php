@@ -306,7 +306,13 @@ class ProductionPlanController extends Controller
 
     public function import(Request $request)
     {
-        dd('IMPORT MASUK');
+        dd(
+            'MASUK CONTROLLER',
+            $request->all(),
+            $request->hasFile('excel_file'),
+            $request->session()->token(),
+            $request->_token
+        );
 
         \Log::info("--- PRODUCTION PLAN IMPORT STARTED ---");
         $request->validate([
