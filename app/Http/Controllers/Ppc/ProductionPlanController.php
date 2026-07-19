@@ -331,6 +331,10 @@ class ProductionPlanController extends Controller
                 $scriptPath = base_path('scripts/read_schedule_stamping.py');
                 if (file_exists($scriptPath)) {
                     $output = $this->runPythonScript($python, $scriptPath, $dataPath, $originalName);
+
+                    \Log::info('[IMPORT] PYTHON RAW OUTPUT type=' . gettype($output) . ' strlen=' . strlen((string)($output ?? '')));
+                    \Log::info('[IMPORT] PYTHON RAW CONTENT: ' . mb_substr((string)($output ?? ''), 0, 2000));
+
                     if ($output) {
                         $output = trim($output);
                         $jsonStart = strpos($output, '{');
@@ -1093,7 +1097,13 @@ class ProductionPlanController extends Controller
         $err = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
-        proc_close($process);
+        $exitCode = proc_close($process);
+
+        \Log::info("[IMPORT] proc_close exit_code={$exitCode} stdout_strlen=" . strlen($out) . " stderr_strlen=" . strlen($err));
+        if ($err) {
+            \Log::warning("[IMPORT] PYTHON STDERR: " . mb_substr($err, 0, 1000));
+        }
+
         return $out ?: $err;
     }
 
