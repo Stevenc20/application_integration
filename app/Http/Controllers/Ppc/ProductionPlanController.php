@@ -1075,26 +1075,49 @@ class ProductionPlanController extends Controller
 
     private function runPythonScript($python, $script, $file, $orig)
     {
-        $cmd = [ $python, $script, $file, $orig ];
-        $process = proc_open($cmd, [0 => ['pipe','r'], 1 => ['pipe','w'], 2 => ['pipe','w']], $pipes);
+        $cmd = [$python, $script, $file, $orig];
+        $process = proc_open($cmd, [
+            0 => ['pipe', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['pipe', 'w'],
+        ], $pipes);
         if (!is_resource($process)) return null;
         fclose($pipes[0]);
 
+        stream_set_blocking($pipes[1], false);
+        stream_set_blocking($pipes[2], false);
+
+        $out = '';
+        $err = '';
         $start = time();
+
         while (true) {
+            $out .= stream_get_contents($pipes[1]);
+            $err .= stream_get_contents($pipes[2]);
+
             $status = proc_get_status($process);
-            if (!$status['running']) break;
+            if (!$status['running']) {
+                $out .= stream_get_contents($pipes[1]);
+                $err .= stream_get_contents($pipes[2]);
+                break;
+            }
+
             if (time() - $start > 30) {
                 \Log::warning('[IMPORT] Python script timeout after 30s, killing process.');
                 proc_terminate($process, 9);
+                stream_set_blocking($pipes[1], true);
+                stream_set_blocking($pipes[2], true);
+                $out .= stream_get_contents($pipes[1]);
+                $err .= stream_get_contents($pipes[2]);
+                fclose($pipes[1]);
+                fclose($pipes[2]);
                 proc_close($process);
                 return null;
             }
+
             usleep(100000);
         }
 
-        $out = stream_get_contents($pipes[1]);
-        $err = stream_get_contents($pipes[2]);
         fclose($pipes[1]);
         fclose($pipes[2]);
         $exitCode = proc_close($process);
