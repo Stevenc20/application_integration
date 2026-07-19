@@ -127,8 +127,12 @@ class InputHarianController extends Controller
             }
         }
 
-        // SYNC: Pastikan JobMaster terupdate dari Jadwal
-        $this->syncPlanToJobMaster($date, $currentShift);
+        // SYNC: Pastikan JobMaster terupdate dari Jadwal (cached 60s supaya tidak O(N) write tiap reload)
+        $syncCacheKey = 'sync_plan_' . $date . '_' . \Illuminate\Support\Str::slug($currentShift);
+        if (!\Illuminate\Support\Facades\Cache::has($syncCacheKey)) {
+            $this->syncPlanToJobMaster($date, $currentShift);
+            \Illuminate\Support\Facades\Cache::put($syncCacheKey, true, 60);
+        }
 
         // 2. QUERY UTAMA: Langsung dari ProductionPlan (Source of Truth)
         $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
@@ -204,8 +208,11 @@ class InputHarianController extends Controller
                 'dailyProduction' => function ($q) use ($date) {
                     $q->where('work_date', $date);
                 },
-                'downtimes' => function ($q) {
-                    // No date filter: job is already scoped to plan date via job_number
+                'downtimes' => function ($q) use ($date) {
+                    $q->where(function ($w) use ($date) {
+                        $w->whereDate('start_time', $date)
+                          ->orWhereNull('finish_time');
+                    });
                 },
                 'dandoris',
             ])
@@ -338,7 +345,7 @@ class InputHarianController extends Controller
             return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($p->job_master) . '-' . $p->id);
         })->toArray();
 
-        $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running'])
+        $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running', 'paused'])
             ->whereIn('job_number', $scheduledJobNumbers)
             ->get()
             ->sortBy(function($job) use ($scheduledJobNumbers) {
@@ -685,7 +692,8 @@ class InputHarianController extends Controller
         }
 
         $jobs = JobMaster::where('id', '!=', $id)
-            ->whereIn('status', ['pending', 'paused'])
+            ->whereIn('status', ['pending', 'paused', 'running'])
+            ->where('line', $current->line)
             ->orderBy('sequence_no')
             ->orderBy('job_number')
             ->get();
@@ -695,6 +703,8 @@ class InputHarianController extends Controller
                 'id' => $j->id,
                 'job_number' => $j->job_number,
                 'job_name' => $j->job_name,
+                'line' => $j->line,
+                'target_qty' => $j->target_qty,
                 'label' => "{$j->job_name} - {$j->job_number} (" . ($j->target_qty ?: 0) . " pcs)"
             ];
         });

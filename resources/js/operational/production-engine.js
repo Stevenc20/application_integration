@@ -328,10 +328,25 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
                 }
                 job._frozenTimer = currentSeconds;
                 job._breakPaused = true;
-                fetch(`/operational/job/${jobId}/pause`, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
-                }).catch(() => {});
+                // Await server pause — sync state before UI update
+                try {
+                    await fetch(`/operational/job/${jobId}/pause`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+                    });
+                } catch (e) {
+                    console.warn('AutoBreak pause request failed:', e);
+                }
+                // Persist break state across page reloads
+                try {
+                    sessionStorage.setItem('prod_break_state', JSON.stringify({
+                        jobId: jobId,
+                        frozenTimer: currentSeconds,
+                        downtimeId: window._autoBreakDowntimeId,
+                        label: breakInfo.label || 'AUTO BREAK',
+                        startedAt: Date.now()
+                    }));
+                } catch (e) {}
             }
 
             updateTimeline();
@@ -360,7 +375,8 @@ async function _triggerAutoBreakEnd(jobId) {
                 window.jobDowntimeHistory[jobId].push({
                     start: new Date(dt.start_time).getTime(),
                     end: dt.finish_time ? new Date(dt.finish_time).getTime() : Date.now(),
-                    type: dt.jenis_downtime
+                    type: dt.jenis_downtime,
+                    id: dt.id
                 });
             }
 
@@ -372,11 +388,18 @@ async function _triggerAutoBreakEnd(jobId) {
                 }
                 delete job._breakPaused;
                 delete job._frozenTimer;
-                fetch(`/operational/job/${jobId}/resume`, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
-                }).catch(() => {});
+                try {
+                    await fetch(`/operational/job/${jobId}/resume`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+                    });
+                } catch (e) {
+                    console.warn('AutoBreak resume request failed:', e);
+                }
             }
+
+            // Clear persisted break state
+            try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
 
             window._autoBreakActive = false;
             window._autoBreakDowntimeId = null;
@@ -444,10 +467,12 @@ function _updateBreakUI(jobId, label, isPaused) {
     }
 }
 
-// Mid-break detection on page load
+// Mid-break detection on page load — use DB history first, fallback to sessionStorage
 (function() {
     const activeId = window.ProductionConfig?.currentActiveId;
     if (!activeId) return;
+
+    // Try DB history first
     const history = window.jobDowntimeHistory?.[activeId] || [];
     for (const h of history) {
         if (!h.end && h.type === 'break time') {
@@ -467,6 +492,34 @@ function _updateBreakUI(jobId, label, isPaused) {
             }
             break;
         }
+    }
+
+    // Fallback: check sessionStorage if DB didn't have it but page reloaded mid-break
+    if (!window._autoBreakActive) {
+        try {
+            const saved = JSON.parse(sessionStorage.getItem('prod_break_state') || 'null');
+            if (saved && saved.jobId && saved.downtimeId) {
+                const job = window.jobMasterData?.[saved.jobId];
+                if (job && !job._breakPaused && (job.status === 'running' || job.status === 'paused')) {
+                    window._autoBreakActive = true;
+                    window._autoBreakDowntimeId = saved.downtimeId;
+                    job._frozenTimer = saved.frozenTimer;
+                    job._breakPaused = true;
+
+                    const typeMap = { 'break time': 'break' };
+                    window.runningDowntimes[`${saved.jobId}_break`] = {
+                        id: saved.downtimeId,
+                        start: new Date(saved.startedAt),
+                        jobId: saved.jobId,
+                        btnType: 'break',
+                        dtType: 'break time',
+                        problem: saved.label || 'AUTO BREAK'
+                    };
+                    window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+                    _updateBreakUI(saved.jobId, saved.label, true);
+                }
+            }
+        } catch (e) {}
     }
 })();
 
@@ -1680,6 +1733,7 @@ window.finishJob = function finishJob(id, jobNumber, jobName) {
         if (nextSelect) {
             nextSelect.innerHTML = `
                 <option value="">AUTO – lanjut ke urutan berikutnya</option>
+                <option value="FINISH_ONLY" style="color: #2563eb; font-weight: bold;">✅ Selesai Saja (Tanpa Lanjut Otomatis)</option>
                 <option value="STOP_SESSION" style="color: #ef4444; font-weight: bold;">🛑 SEMENTARA: STOP SESI</option>
             `;
             // Populate from blade data instead of fetch — instant, no lag
@@ -1692,12 +1746,18 @@ window.finishJob = function finishJob(id, jobNumber, jobName) {
                 const jobLine = (j.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '');
                 return jobLine === currentLine;
             });
-            filtered.forEach(j => {
-                const opt = document.createElement('option');
-                opt.value = j.id;
-                opt.innerText = (j.job_name || '') + ' - ' + (j.job_number || '') + ' (' + (j.target_qty || 0) + ' pcs)';
-                nextSelect.appendChild(opt);
-            });
+            if (filtered.length > 0) {
+                const group = document.createElement('optgroup');
+                group.label = 'Pilih Item Spesifik';
+                filtered.forEach(j => {
+                    const opt = document.createElement('option');
+                    opt.value = j.id;
+                    const statusLabel = (j.status || '').toLowerCase() === 'paused' ? ' ⏸️' : (j.status || '').toLowerCase() === 'running' ? ' 🔄' : '';
+                    opt.innerText = (j.job_name || '') + ' - ' + (j.job_number || '') + ' (' + (j.target_qty || 0) + ' pcs)' + statusLabel;
+                    group.appendChild(opt);
+                });
+                nextSelect.appendChild(group);
+            }
         }
         const okInput = document.getElementById('active-actual-' + id) || document.getElementById('actual-' + id);
         const repairInput = document.getElementById('active-repair-' + id) || document.getElementById('repair-' + id);
@@ -1870,11 +1930,22 @@ async function startQuickDowntime(jobId, btnType, dtType) {
                 }
                 job._frozenTimer = currentSeconds;
                 job._breakPaused = true;
-                // Call server pause (fire-and-forget)
-                fetch(`/operational/job/${jobId}/pause`, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
-                }).catch(() => {});
+                try {
+                    await fetch(`/operational/job/${jobId}/pause`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+                    });
+                } catch (e) {}
+                // Persist break state for page reload
+                try {
+                    sessionStorage.setItem('prod_break_state', JSON.stringify({
+                        jobId: jobId,
+                        frozenTimer: currentSeconds,
+                        downtimeId: res.downtime.id,
+                        label: dtType.toUpperCase(),
+                        startedAt: Date.now()
+                    }));
+                } catch (e) {}
             }
         }
     });
@@ -1921,10 +1992,13 @@ async function finishQuickDowntime(jobId, btnType, dtId) {
                 }
                 delete job._breakPaused;
                 delete job._frozenTimer;
-                fetch(`/operational/job/${jobId}/resume`, {
-                    method: 'POST',
-                    headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
-                }).catch(() => {});
+                try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
+                try {
+                    await fetch(`/operational/job/${jobId}/resume`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+                    });
+                } catch (e) {}
             }
         }
     });
@@ -2665,6 +2739,23 @@ function initProductionEngine() {
         setInterval(syncActualQty, 8000);
 
         window.addEventListener('beforeunload', function (e) {
+            // Persist break state to sessionStorage for page reload recovery
+            try {
+                const activeId = window.ProductionConfig?.currentActiveId;
+                if (activeId && window._autoBreakActive && window._autoBreakDowntimeId) {
+                    const job = window.jobMasterData?.[activeId];
+                    if (job && job._breakPaused && job._frozenTimer != null) {
+                        sessionStorage.setItem('prod_break_state', JSON.stringify({
+                            jobId: activeId,
+                            frozenTimer: job._frozenTimer,
+                            downtimeId: window._autoBreakDowntimeId,
+                            label: 'AUTO BREAK',
+                            startedAt: Date.now()
+                        }));
+                    }
+                }
+            } catch (e) {}
+
             if (window.ActionRunner && window.ActionRunner.locked) {
                 e.preventDefault();
                 e.returnValue = 'Masih ada data yang belum tersimpan. Yakin mau tinggalkan halaman?';

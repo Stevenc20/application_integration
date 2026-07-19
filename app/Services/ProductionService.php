@@ -453,7 +453,7 @@ class ProductionService
             );
 
             // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
-            if ($nextJobId === 'STOP_SESSION') {
+            if ($nextJobId === 'STOP_SESSION' || $nextJobId === 'FINISH_ONLY') {
                 $resolvedNextJobId = null;
             } else {
                 $resolvedNextJobId = $nextJobId;
