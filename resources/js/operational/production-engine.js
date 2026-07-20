@@ -2302,9 +2302,9 @@ async function performSave(id, ok, repair, reject) {
                         const now = new Date().toLocaleTimeString('en-GB', { hour12: false });
                         const card = document.createElement('div');
                         card.className = 'bg-slate-800/30 border border-slate-700/50 p-3 rounded-xl flex items-center justify-between group hover:border-blue-500/50 transition-all';
-                        card.innerHTML = '<div><p class="text-[8px] font-black text-slate-500 uppercase leading-none mb-1">' + now + '</p><p class="text-xs font-black text-white leading-none">OK: ' + (data.log.ok || 0) + ' <span class="text-slate-500">|</span> <span class="text-red-400">X: ' + (data.log.reject || 0) + '</span></p></div><div class="w-2 h-2 rounded-full bg-blue-500/20 group-hover:bg-blue-500 transition-colors"></div>';
+                        card.innerHTML = '<div><p class="text-[8px] font-black text-slate-500 uppercase leading-none mb-1">' + now + '</p><p class="text-xs font-black text-white leading-none">OK: ' + (data.log.ok || 0) + ' <span class="text-slate-500">|</span> <span class="text-orange-400">R: ' + (data.log.repair || 0) + '</span> <span class="text-slate-500">|</span> <span class="text-red-400">X: ' + (data.log.reject || 0) + '</span></p></div><div class="w-2 h-2 rounded-full bg-blue-500/20 group-hover:bg-blue-500 transition-colors"></div>';
                         grid.prepend(card);
-                        while (grid.children.length > 5) {
+                        while (grid.children.length > 20) {
                             grid.removeChild(grid.lastChild);
                         }
                     }

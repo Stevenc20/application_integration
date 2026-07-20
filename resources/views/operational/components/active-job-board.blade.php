@@ -609,11 +609,16 @@
                     <div class="bg-slate-800/30 border border-slate-700/50 p-3 rounded-xl flex items-center justify-between group hover:border-blue-500/50 transition-all">
                         <div>
                             <p class="text-[8px] font-black text-slate-500 uppercase leading-none mb-1">{{ $log->created_at->format('H:i:s') }}</p>
-                            <p class="text-xs font-black text-white leading-none">OK: {{ $log->ok_qty }} <span class="text-slate-500">|</span> <span class="text-red-400">X: {{ $log->reject_qty }}</span></p>
+                            <p class="text-xs font-black text-white leading-none">OK: {{ $log->ok_qty }} <span class="text-slate-500">|</span> <span class="text-orange-400">R: {{ $log->repair_qty ?? 0 }}</span> <span class="text-slate-500">|</span> <span class="text-red-400">X: {{ $log->reject_qty }}</span></p>
                         </div>
                         <div class="w-2 h-2 rounded-full bg-blue-500/20 group-hover:bg-blue-500 transition-colors"></div>
                     </div>
                     @endforeach
+                    @if($productionLogs->count() >= 20)
+                    <a href="{{ route('operational.job.logs.detail', $activeJob->id) }}" class="bg-slate-800/20 border border-dashed border-slate-700/50 p-3 rounded-xl flex items-center justify-center hover:border-blue-500/50 transition-all cursor-pointer">
+                        <span class="text-[10px] font-black text-blue-400 uppercase tracking-widest">+ Lebih Banyak History</span>
+                    </a>
+                    @endif
                 </div>
             </div>
             @endif

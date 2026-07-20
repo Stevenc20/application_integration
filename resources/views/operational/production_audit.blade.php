@@ -44,7 +44,7 @@
                         <td class="px-8 py-6">
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                    {{ substr($job->line_name, 0, 2) }}
+                                    {{ substr($job->line ?? '?', 0, 6) }}
                                 </div>
                                 <div>
                                     <p class="font-black text-slate-800 text-sm tracking-tight leading-none mb-1">{{ $job->job_number }}</p>

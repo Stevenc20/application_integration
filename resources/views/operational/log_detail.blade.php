@@ -15,7 +15,7 @@
                     <span class="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest">Job Master</span>
                     <h1 class="text-2xl font-black text-slate-800 tracking-tighter">{{ $job->job_number ?? '-' }}</h1>
                 </div>
-                <p class="text-sm text-slate-500 font-medium">{{ $job->job_name ?? 'N/A' }} <span class="mx-2 text-slate-300">|</span> Line: {{ $job->line_name ?? '-' }}</p>
+                <p class="text-sm text-slate-500 font-medium">{{ $job->job_name ?? 'N/A' }} <span class="mx-2 text-slate-300">|</span> Line: {{ $job->line ?? '-' }} <span class="mx-2 text-slate-300">|</span> Shift: {{ $job->dailyProduction?->shift ?? '-' }} <span class="mx-2 text-slate-300">|</span> Work Date: {{ $job->dailyProduction?->work_date ?? '-' }}</p>
             </div>
         </div>
         
@@ -59,6 +59,7 @@
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-100">
                         <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu Input</th>
+                        <th class="px-8 py-4 text-left text-[10px] font-black text-slate-400 uppercase tracking-widest">Shift</th>
                         <th class="px-8 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty OK (Pcs)</th>
                         <th class="px-8 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty Repair</th>
                         <th class="px-8 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty Reject</th>
@@ -79,6 +80,9 @@
                                 </div>
                             </div>
                         </td>
+                        <td class="px-8 py-5">
+                            <span class="text-[10px] font-black text-slate-500 uppercase">{{ $job->dailyProduction?->shift ?? '-' }}</span>
+                        </td>
                         <td class="px-8 py-5 text-center">
                             <span class="px-3 py-1 rounded-lg bg-blue-50 text-blue-600 font-black text-xs shadow-sm">+{{ $log->ok_qty }}</span>
                         </td>
@@ -97,7 +101,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="px-8 py-20 text-center">
+                        <td colspan="6" class="px-8 py-20 text-center">
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>

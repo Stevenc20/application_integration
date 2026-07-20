@@ -334,7 +334,7 @@ class InputHarianController extends Controller
             $productionLogs = \App\Models\ProductionLog::where('job_master_id', $activeJob->id)
                 ->whereDate('created_at', $date)
                 ->orderBy('created_at', 'desc')
-                ->take(5)
+                ->take(20)
                 ->get();
             $lastInputAt = $productionLogs->first()?->created_at ?? ($activeJob->started_at ?? null);
         }
@@ -915,7 +915,7 @@ class InputHarianController extends Controller
 
     public function showLogs($id)
     {
-        $job = JobMaster::with(['dailyProduction', 'downtimes'])->findOrFail($id);
+        $job = JobMaster::with(['dailyProduction', 'downtimes', 'productionLogs'])->findOrFail($id);
         $logs = ProductionLog::where('job_master_id', $id)
             ->orderBy('created_at', 'desc')
             ->paginate(50);
