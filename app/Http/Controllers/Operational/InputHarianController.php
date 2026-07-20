@@ -1169,64 +1169,60 @@ class InputHarianController extends Controller
     {
         $date = $request->get('date') ?: now()->toDateString();
 
-        $prodLogs = ProductionLog::with('jobMaster.dailyProduction')
-            ->whereDate('created_at', $date)
-            ->get()
-            ->map(fn($log) => [
-                'id' => $log->id,
-                'source' => 'input',
-                'created_at' => $log->created_at,
-                'job_master_id' => $log->job_master_id,
-                'job_number' => $log->jobMaster?->job_number ?? '-',
-                'job_name' => $log->jobMaster?->job_name ?? '-',
-                'line' => $log->jobMaster?->line ?? '-',
-                'shift' => $log->jobMaster?->dailyProduction?->shift ?? '-',
-                'target_qty' => $log->jobMaster?->target_qty ?? $log->jobMaster?->capacity ?? '-',
-                'work_date' => $log->jobMaster?->dailyProduction?->work_date ?? '-',
-                'ok_qty' => $log->ok_qty,
-                'repair_qty' => $log->repair_qty,
-                'reject_qty' => $log->reject_qty,
-                'defect_name' => null,
-                'operator' => null,
-            ]);
-
-        $rrLogs = RepairRejectLog::with('jobMaster.dailyProduction', 'creator')
-            ->whereDate('created_at', $date)
-            ->get()
-            ->map(fn($log) => [
-                'id' => 'rr-' . $log->id,
-                'source' => $log->type,
-                'created_at' => $log->created_at,
-                'job_master_id' => $log->job_master_id,
-                'job_number' => $log->jobMaster?->job_number ?? '-',
-                'job_name' => $log->jobMaster?->job_name ?? '-',
-                'line' => $log->jobMaster?->line ?? '-',
-                'shift' => $log->jobMaster?->dailyProduction?->shift ?? '-',
-                'target_qty' => $log->jobMaster?->target_qty ?? $log->jobMaster?->capacity ?? '-',
-                'work_date' => $log->jobMaster?->dailyProduction?->work_date ?? '-',
-                'ok_qty' => 0,
-                'repair_qty' => $log->type === 'repair' ? ($log->qty_a ?? 0) : 0,
-                'reject_qty' => $log->type === 'reject' ? ($log->qty_a ?? 0) : 0,
-                'defect_name' => $log->defect_name ?? '-',
-                'operator' => $log->creator?->name ?? '-',
-            ]);
-
-        $allLogs = $prodLogs->concat($rrLogs)->sortByDesc('created_at')->values();
-
-        $totalOk = $allLogs->sum('ok_qty');
-        $totalRepair = $allLogs->sum('repair_qty');
-        $totalReject = $allLogs->sum('reject_qty');
-        $totalCount = $allLogs->count();
-
-        $currentPage = (int) $request->get('page', 1);
-        $perPage = 50;
-        $sliced = $allLogs->slice(($currentPage - 1) * $perPage, $perPage)->values();
-
-        $logs = new \Illuminate\Pagination\LengthAwarePaginator(
-            $sliced, $totalCount, $perPage, $currentPage,
-            ['path' => $request->url(), 'query' => $request->query()]
+        $jobIds = collect();
+        $jobIds = $jobIds->concat(
+            ProductionLog::whereDate('created_at', $date)->pluck('job_master_id')->unique()
         );
+        $jobIds = $jobIds->concat(
+            RepairRejectLog::whereDate('created_at', $date)->pluck('job_master_id')->unique()
+        );
+        $jobIds = $jobIds->unique()->filter();
 
-        return view('operational.production_audit', compact('logs', 'date', 'totalOk', 'totalRepair', 'totalReject'));
+        $items = JobMaster::with('dailyProduction')
+            ->whereIn('id', $jobIds)
+            ->get()
+            ->map(function ($job) use ($date) {
+                $prodLogs = ProductionLog::where('job_master_id', $job->id)
+                    ->whereDate('created_at', $date);
+                $rrLogs = RepairRejectLog::where('job_master_id', $job->id)
+                    ->whereDate('created_at', $date);
+
+                $totalOk = (clone $prodLogs)->sum('ok_qty');
+                $totalRepairR = (clone $rrLogs)->where('type', 'repair')->sum('qty_a');
+                $totalRejectR = (clone $rrLogs)->where('type', 'reject')->sum('qty_a');
+                $prodRepair = (clone $prodLogs)->sum('repair_qty');
+                $prodReject = (clone $prodLogs)->sum('reject_qty');
+
+                $totalRepair = $prodRepair + $totalRepairR;
+                $totalReject = $prodReject + $totalRejectR;
+                $entryCount = (clone $prodLogs)->count() + (clone $rrLogs)->count();
+                $lastInput = ProductionLog::where('job_master_id', $job->id)
+                    ->whereDate('created_at', $date)
+                    ->latest('created_at')
+                    ->first()?->created_at;
+
+                return [
+                    'id' => $job->id,
+                    'job_number' => $job->job_number ?? '-',
+                    'job_name' => $job->job_name ?? '-',
+                    'line' => $job->line ?? '-',
+                    'shift' => $job->dailyProduction?->shift ?? '-',
+                    'target_qty' => $job->target_qty ?? $job->capacity ?? 0,
+                    'work_date' => $job->dailyProduction?->work_date ?? $date,
+                    'actual_ok' => $totalOk,
+                    'actual_repair' => $totalRepair,
+                    'actual_reject' => $totalReject,
+                    'entry_count' => $entryCount,
+                    'last_input' => $lastInput,
+                ];
+            })
+            ->sortByDesc('last_input')
+            ->values();
+
+        $totalOk = $items->sum('actual_ok');
+        $totalRepair = $items->sum('actual_repair');
+        $totalReject = $items->sum('actual_reject');
+
+        return view('operational.production_audit', compact('items', 'date', 'totalOk', 'totalRepair', 'totalReject'));
     }
 }
