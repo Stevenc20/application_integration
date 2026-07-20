@@ -1162,7 +1162,7 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             if (start > lastPos) {
                 const dandoriStart = hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null;
                 const hasRunningDandori = runningDowntimesForJob.some(rd => rd.btnType === 'dandori');
-                const isInitialDandoriGap = dandoriStart && start > dandoriStart && (hasRunningDandori || !effectiveActualStart || start <= effectiveActualStart);
+                const isInitialDandoriGap = dandoriStart && start > dandoriStart && lastPos === earliestActivity && (hasRunningDandori || !effectiveActualStart || start <= effectiveActualStart);
 
                 if (isInitialDandoriGap) {
                     addSegment(lastPos, start, 'bg-amber-400', 'Dandori');
