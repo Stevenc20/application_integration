@@ -2000,6 +2000,15 @@ async function finishQuickDowntime(jobId, btnType, dtId) {
                     });
                 } catch (e) {}
             }
+
+            // ——— CLEANUP AUTO-BREAK STATE ——— Reset flags & hide overlay
+            if (btnType === 'break') {
+                if (window._autoBreakActive) {
+                    window._autoBreakActive = false;
+                    window._autoBreakDowntimeId = null;
+                }
+                _updateBreakUI(jobId, null, false);
+            }
         }
     });
 }
