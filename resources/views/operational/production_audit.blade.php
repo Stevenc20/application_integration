@@ -36,78 +36,83 @@
             <table class="w-full text-left">
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-100">
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Tipe</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Job Number</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item / Defect</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Line</th>
-                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">OK</th>
-                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Repair</th>
-                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Reject</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Operator</th>
+                        <th class="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest w-10">#</th>
+                        <th class="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu</th>
+                        <th class="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Detail Item Produksi</th>
+                        <th class="px-4 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Qty Input</th>
+                        <th class="px-4 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Keterangan</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                     @forelse($logs as $log)
-                    <tr class="hover:bg-blue-50/30 transition-all group">
-                        <td class="px-6 py-4 text-[10px] font-bold text-slate-400">{{ ($logs->currentPage() - 1) * $logs->perPage() + $loop->iteration }}</td>
-                        <td class="px-6 py-4">
-                            <p class="font-black text-slate-800 text-sm">{{ $log['created_at']->format('H:i:s') }}</p>
+                    @php
+                        $hasRepair = ($log['repair_qty'] ?? 0) > 0;
+                        $hasReject = ($log['reject_qty'] ?? 0) > 0;
+                        $hasOk = ($log['ok_qty'] ?? 0) > 0;
+                        
+                        if ($log['source'] === 'repair') {
+                            $typeBadge = '<span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-black uppercase">Repair Report</span>';
+                            $typeColor = 'border-l-4 border-l-orange-400';
+                        } elseif ($log['source'] === 'reject') {
+                            $typeBadge = '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase">Reject Report</span>';
+                            $typeColor = 'border-l-4 border-l-red-400';
+                        } else {
+                            $typeBadge = '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-black uppercase">Input OK</span>';
+                            $typeColor = 'border-l-4 border-l-blue-400';
+                        }
+                    @endphp
+                    <tr class="hover:bg-blue-50/30 transition-all group {{ $typeColor }}">
+                        <td class="px-4 py-4 text-[10px] font-bold text-slate-400">{{ ($logs->currentPage() - 1) * $logs->perPage() + $loop->iteration }}</td>
+                        <td class="px-4 py-4 whitespace-nowrap">
+                            <p class="font-black text-slate-800 text-sm tabular-nums">{{ $log['created_at']->format('H:i:s') }}</p>
+                            <p class="text-[9px] font-bold text-slate-400 uppercase">{{ $log['created_at']->format('d M Y') }}</p>
                         </td>
-                        <td class="px-6 py-4">
-                            @if($log['source'] === 'input')
-                                <span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-black uppercase">Input</span>
-                            @elseif($log['source'] === 'repair')
-                                <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-black uppercase">Repair</span>
-                            @elseif($log['source'] === 'reject')
-                                <span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase">Reject</span>
-                            @else
-                                <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-black uppercase">{{ $log['source'] }}</span>
-                            @endif
+                        <td class="px-4 py-4">
+                            <div class="flex items-start gap-3">
+                                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px] group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0 mt-0.5">
+                                    {{ strtoupper(substr($log['line'] ?? '?', 0, 2)) }}
+                                </div>
+                                <div class="min-w-0">
+                                    <div class="flex items-center gap-2 mb-0.5">
+                                        <a href="{{ route('operational.job.logs.detail', $log['job_master_id']) }}" class="text-[10px] font-black text-blue-600 hover:text-blue-800 uppercase tracking-wider">{{ $log['job_number'] }}</a>
+                                        <span class="text-[9px] font-bold text-slate-400">|</span>
+                                        <span class="text-[9px] font-black text-slate-500 uppercase">{{ $log['line'] }}</span>
+                                    </div>
+                                    <p class="text-xs font-bold text-slate-700 truncate max-w-[300px]" title="{{ $log['job_name'] }}">{{ $log['job_name'] }}</p>
+                                    @if($log['defect_name'] && $log['defect_name'] !== '-')
+                                        <p class="text-[10px] font-bold text-orange-500 mt-0.5">Defect: {{ $log['defect_name'] }}</p>
+                                    @endif
+                                </div>
+                            </div>
                         </td>
-                        <td class="px-6 py-4">
-                            <a href="{{ route('operational.job.logs.detail', $log['job_master_id']) }}" class="px-2 py-0.5 rounded bg-blue-50 text-blue-600 font-black text-[10px] uppercase hover:bg-blue-100 transition">{{ $log['job_number'] }}</a>
-                        </td>
-                        <td class="px-6 py-4">
-                            <p class="text-xs font-bold text-slate-600 truncate max-w-[250px]" title="{{ $log['job_name'] }}">
-                                {{ $log['job_name'] }}
-                                @if($log['defect_name'])
-                                    <span class="text-orange-500">— {{ $log['defect_name'] }}</span>
+                        <td class="px-4 py-4">
+                            <div class="flex items-center justify-center gap-1.5">
+                                @if($hasOk)
+                                    <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs tabular-nums">+{{ $log['ok_qty'] }}</span>
                                 @endif
-                            </p>
+                                @if($hasRepair)
+                                    <span class="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-600 font-black text-xs tabular-nums">{{ $log['repair_qty'] }}R</span>
+                                @endif
+                                @if($hasReject)
+                                    <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 font-black text-xs tabular-nums">{{ $log['reject_qty'] }}X</span>
+                                @endif
+                                @if(!$hasOk && !$hasRepair && !$hasReject)
+                                    <span class="text-slate-300">-</span>
+                                @endif
+                            </div>
                         </td>
-                        <td class="px-6 py-4">
-                            <span class="text-xs font-black text-slate-500 uppercase">{{ $log['line'] }}</span>
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            @if($log['ok_qty'] > 0)
-                                <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs">+{{ $log['ok_qty'] }}</span>
-                            @else
-                                <span class="text-slate-300">-</span>
-                            @endif
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            @if($log['repair_qty'] > 0)
-                                <span class="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-600 font-black text-xs">{{ $log['repair_qty'] }}</span>
-                            @else
-                                <span class="text-slate-300">-</span>
-                            @endif
-                        </td>
-                        <td class="px-6 py-4 text-center">
-                            @if($log['reject_qty'] > 0)
-                                <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 font-black text-xs">{{ $log['reject_qty'] }}</span>
-                            @else
-                                <span class="text-slate-300">-</span>
-                            @endif
-                        </td>
-                        <td class="px-6 py-4">
-                            <span class="text-[10px] font-bold text-slate-500">{{ $log['operator'] ?? 'System' }}</span>
+                        <td class="px-4 py-4">
+                            <div class="flex flex-col gap-0.5">
+                                {!! $typeBadge !!}
+                                @if($log['operator'])
+                                    <span class="text-[9px] font-bold text-slate-500">{{ $log['operator'] }}</span>
+                                @endif
+                            </div>
                         </td>
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="10" class="px-8 py-20 text-center">
+                        <td colspan="5" class="px-8 py-20 text-center">
                             <div class="flex flex-col items-center">
                                 <div class="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
