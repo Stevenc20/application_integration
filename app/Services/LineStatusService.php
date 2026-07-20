@@ -7,6 +7,7 @@ use App\Models\JobMaster;
 use App\Models\Dandori;
 use App\Models\Downtime;
 use App\Models\ProductionSession;
+use App\Models\ProductionLog;
 
 class LineStatusService
 {
@@ -90,6 +91,23 @@ class LineStatusService
             }
         }
 
+        // 7. Jobs with actual production activity (ProductionLog saved today)
+        //    This determines if a line is truly producing vs still in dandori/setup phase
+        $jobIdsWithProductionLog = [];
+        if ($allJobIds->isNotEmpty()) {
+            $jobIdsWithProductionLog = ProductionLog::whereIn('job_master_id', $allJobIds)
+                ->whereDate('created_at', $today)
+                ->pluck('job_master_id')
+                ->toArray();
+        }
+        $linesWithProductionLog = [];
+        foreach ($allRunningJobs as $line => $jobs) {
+            $lineJobIdsArr = $jobs->pluck('id')->toArray();
+            if (array_intersect($lineJobIdsArr, $jobIdsWithProductionLog)) {
+                $linesWithProductionLog[] = $line;
+            }
+        }
+
         $statuses = [];
         foreach ($activeLines as $line) {
             $lineJobIds = $allRunningJobs->get($line, collect())->pluck('id')->toArray();
@@ -118,25 +136,32 @@ class LineStatusService
                 continue;
             }
 
-            // 5. SETUP (non-1st-check dandori)
+            // 5. PRODUCTION — If running session exists AND operator has saved qty today,
+            //    the line is in production even if dandori record wasn't properly closed
+            if (array_intersect($lineJobIds, $activeSessionJobIds) && in_array($line, $linesWithProductionLog)) {
+                $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
+                continue;
+            }
+
+            // 6. SETUP (non-1st-check dandori, no production activity yet)
             if (in_array($line, $linesWithSetup)) {
                 $statuses[$line] = ['label' => 'SETUP', 'color' => 'amber', 'pulse' => true];
                 continue;
             }
 
-            // 6. PRODUCTION (running session)
+            // 7. PRODUCTION (running session without dandori — started via startJob directly)
             if (array_intersect($lineJobIds, $activeSessionJobIds)) {
                 $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
                 continue;
             }
 
-            // 7. Running/paused job exists but no activity
+            // 8. Running/paused job exists but no activity
             if (!empty($lineJobIds)) {
                 $statuses[$line] = ['label' => 'NOT RUNNING', 'color' => 'gray', 'pulse' => false];
                 continue;
             }
 
-            // 8. No job at all
+            // 9. No job at all
             $statuses[$line] = ['label' => 'NOT RUNNING', 'color' => 'gray', 'pulse' => false];
         }
 

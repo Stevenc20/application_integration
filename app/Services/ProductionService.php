@@ -50,6 +50,11 @@ class ProductionService
                         'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($openDowntime->start_time)))
                     ]);
                 }
+
+                // Close any existing open dandori before starting
+                Dandori::where('next_job_id', $jobId)
+                    ->whereNull('finish_time')
+                    ->update(['finish_time' => $now]);
             }
 
             JobMaster::where('id', $jobId)->update($updateData);
@@ -128,45 +133,47 @@ class ProductionService
     public function finishDandori($jobId)
     {
         return DB::transaction(function () use ($jobId) {
+            $now = now();
+
+            // 1. Close dandori Downtime if still open
             $downtime = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
                 ->first();
 
             if ($downtime) {
-                $now = now();
                 $durationSeconds = abs($now->diffInSeconds(Carbon::parse($downtime->start_time)));
                 $downtime->update([
                     'finish_time' => $now,
                     'duration_seconds' => $durationSeconds
                 ]);
-                
-                $dandori = Dandori::where('next_job_id', $jobId)
-                    ->whereNull('finish_time')
-                    ->first();
-                
-                if ($dandori) {
-                    $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
-                    $dandori->update([
-                        'finish_time' => $now,
-                        'duration_minutes' => round($duration, 2)
-                    ]);
-                }
-
-                // After dandori, job starts production
-                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
-                $this->syncPlanStatus($jobId, 'running');
-                
-                $session = ProductionSession::firstOrCreate(
-                    ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
-                );
-                $session->update(['start_time' => $now, 'status' => 'running']);
-
-                $this->signalDashboard($jobId);
-
-                return true;
             }
-            return false;
+
+            // 2. Close Dandori record ALWAYS (independent of Downtime)
+            $dandori = Dandori::where('next_job_id', $jobId)
+                ->whereNull('finish_time')
+                ->first();
+
+            if ($dandori) {
+                $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
+                $dandori->update([
+                    'finish_time' => $now,
+                    'duration_minutes' => round($duration, 2)
+                ]);
+            }
+
+            // 3. After dandori, job starts production
+            JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
+            $this->syncPlanStatus($jobId, 'running');
+
+            $session = ProductionSession::firstOrCreate(
+                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
+            );
+            $session->update(['start_time' => $now, 'status' => 'running']);
+
+            $this->signalDashboard($jobId);
+
+            return true;
         });
     }
 
@@ -397,6 +404,11 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject) {
             // Auto-close any active downtimes for this job
             Downtime::where('job_master_id', $jobId)
+                ->whereNull('finish_time')
+                ->update(['finish_time' => now()]);
+
+            // Auto-close any active dandoris for this job
+            Dandori::where('next_job_id', $jobId)
                 ->whereNull('finish_time')
                 ->update(['finish_time' => now()]);
 
