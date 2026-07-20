@@ -1261,6 +1261,28 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
 window.enqueueJob = async function enqueueJob(id) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     if (window._autoBreakActive) { showToast('Sedang break time, tidak bisa enqueue job.', 'warning'); return; }
+
+    const activeId = window.ProductionConfig.currentActiveId;
+    if (activeId && activeId != id) {
+        const activeDtKeys = Object.keys(window.runningDowntimes || {}).filter(k => k.startsWith(activeId + '_'));
+        const activeDt = activeDtKeys.length > 0 ? window.runningDowntimes[activeDtKeys[0]] : null;
+        const dtLabel = activeDt ? (activeDt.dtType || activeDt.btnType || 'downtime').toUpperCase() : null;
+
+        showConfirm(
+            'Item Masih Diproses',
+            `Item sebelumnya masih dalam proses${dtLabel ? ' (' + dtLabel + ')' : ''}. Yakin ingin memulai item baru?`,
+            function(confirmed) {
+                if (!confirmed) return;
+                _doEnqueue(id);
+            }
+        );
+        return;
+    }
+
+    _doEnqueue(id);
+}
+
+async function _doEnqueue(id) {
     await window.ActionRunner.run('Enqueue Job', async () => {
         const res = await fetch(`/operational/job/${id}/enqueue`, {
             method: 'POST',
@@ -2457,6 +2479,78 @@ function syncActualQty() {
     }).catch(() => { });
 }
 
+function syncBreakStatus() {
+    const config = window.ProductionConfig;
+    const id = config.currentActiveId;
+    if (!id || config.isLocked) return;
+
+    fetch(`/operational/job/${id}/status`, { headers: { 'Accept': 'application/json' } })
+        .then(r => r.json())
+        .then(data => {
+            const job = jobMasterData[id];
+            if (!job) return;
+
+            const serverDown = data.active_downtime;
+            const clientBreak = window.runningDowntimes?.[`${id}_break`];
+            const clientAnyDt = Object.keys(window.runningDowntimes || {}).some(k => k.startsWith(id + '_'));
+
+            if (serverDown && serverDown.jenis_downtime === 'break time' && !clientBreak && !window._autoBreakActive) {
+                window._autoBreakActive = true;
+                window._autoBreakDowntimeId = serverDown.id;
+                window.runningDowntimes[`${id}_break`] = {
+                    id: serverDown.id,
+                    start: new Date(serverDown.start_time),
+                    jobId: id,
+                    btnType: 'break',
+                    dtType: 'break time',
+                    problem: 'AUTO BREAK'
+                };
+                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+                if (job && !job._breakPaused) {
+                    let currentSeconds = job.base_seconds || 0;
+                    const anchorTime = job.dandori_start ? new Date(job.dandori_start) : (job.started_at ? new Date(job.started_at) : null);
+                    if (anchorTime) currentSeconds += Math.floor((Date.now() - anchorTime.getTime()) / 1000);
+                    job._frozenTimer = currentSeconds;
+                    job._breakPaused = true;
+                }
+                updateTimeline();
+                _updateBreakUI(id, 'BREAK TIME', true);
+            } else if (!serverDown && clientBreak && window._autoBreakActive) {
+                delete window.runningDowntimes[`${id}_break`];
+                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+                if (job && job._breakPaused) {
+                    if (job._frozenTimer != null) {
+                        job.base_seconds = job._frozenTimer;
+                        job.started_at = new Date().toISOString();
+                    }
+                    delete job._breakPaused;
+                    delete job._frozenTimer;
+                    try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
+                }
+                window._autoBreakActive = false;
+                window._autoBreakDowntimeId = null;
+                window._autoBreakSkipped = false;
+                updateTimeline();
+                _updateBreakUI(id, null, false);
+                showToast('Break time selesai, produksi dilanjutkan.', 'success');
+            } else if (!serverDown && !clientBreak && window._autoBreakActive) {
+                window._autoBreakActive = false;
+                window._autoBreakDowntimeId = null;
+                window._autoBreakSkipped = false;
+                try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
+                if (job && job._breakPaused) {
+                    if (job._frozenTimer != null) {
+                        job.base_seconds = job._frozenTimer;
+                        job.started_at = new Date().toISOString();
+                    }
+                    delete job._breakPaused;
+                    delete job._frozenTimer;
+                }
+                _updateBreakUI(id, null, false);
+            }
+        }).catch(() => {});
+}
+
 window.stepInput = function (id, amount, jobId = null) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     if (window.ActionRunner.locked) { showToast('Proses sebelumnya masih berjalan, harap tunggu...', 'warning'); return; }
@@ -2752,6 +2846,7 @@ function initProductionEngine() {
         setInterval(() => updateTimeline(false), 3000);
         setInterval(checkSyncStatus, 5000);
         setInterval(syncActualQty, 8000);
+        setInterval(syncBreakStatus, 10000);
 
         window.addEventListener('beforeunload', function (e) {
             // Persist break state to sessionStorage for page reload recovery

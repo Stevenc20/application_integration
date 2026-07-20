@@ -612,13 +612,22 @@ class InputHarianController extends Controller
             ->whereDate('work_date', now()->toDateString())
             ->first();
 
-        // Use base total_seconds. Javascript will calculate and add the running diff.
         $baseSeconds = $session ? (int)$session->total_seconds : 0;
+
+        $activeDowntime = Downtime::where('job_master_id', $id)
+            ->whereNull('finish_time')
+            ->orderByDesc('start_time')
+            ->first();
 
         return response()->json([
             'status'        => $job->status ?? 'pending',
             'total_seconds' => $baseSeconds,
             'start_time'    => ($job->status === 'running' && $session) ? Carbon::parse($session->start_time)->toIso8601String() : null,
+            'active_downtime' => $activeDowntime ? [
+                'id' => $activeDowntime->id,
+                'jenis_downtime' => $activeDowntime->jenis_downtime,
+                'start_time' => Carbon::parse($activeDowntime->start_time)->toIso8601String(),
+            ] : null,
         ]);
     }
 
