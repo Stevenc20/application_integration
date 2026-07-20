@@ -257,6 +257,7 @@ function updateTimers() {
 window._autoBreakActive = false;
 window._autoBreakDowntimeId = null;
 window._autoBreakLastCheck = 0;
+window._autoBreakSkipped = false;
 
 function _isInBreakWindow(now) {
     const schedule = window._breakSchedule || [];
@@ -280,10 +281,12 @@ function _autoBreakTick() {
     const breakWindow = _isInBreakWindow(now);
     const alreadyRunningBreak = window.runningDowntimes?.[`${activeId}_break`];
 
-    if (breakWindow && !window._autoBreakActive && !alreadyRunningBreak) {
+    if (breakWindow && !window._autoBreakActive && !alreadyRunningBreak && !window._autoBreakSkipped) {
         _triggerAutoBreakStart(activeId, breakWindow);
     } else if (!breakWindow && window._autoBreakActive && window._autoBreakDowntimeId) {
         _triggerAutoBreakEnd(activeId);
+    } else if (!breakWindow) {
+        window._autoBreakSkipped = false;
     }
 }
 
@@ -403,6 +406,7 @@ async function _triggerAutoBreakEnd(jobId) {
 
             window._autoBreakActive = false;
             window._autoBreakDowntimeId = null;
+            window._autoBreakSkipped = false;
 
             updateTimeline();
             _updateBreakUI(jobId, null, false);
@@ -464,6 +468,7 @@ function _updateBreakUI(jobId, label, isPaused) {
 
         if (workArea) workArea.classList.remove('hidden');
         if (breakOverlay) breakOverlay.classList.add('hidden');
+        updateTimeline();
     }
 }
 
@@ -2007,6 +2012,7 @@ async function finishQuickDowntime(jobId, btnType, dtId) {
                     window._autoBreakActive = false;
                     window._autoBreakDowntimeId = null;
                 }
+                window._autoBreakSkipped = true;
                 _updateBreakUI(jobId, null, false);
             }
         }
