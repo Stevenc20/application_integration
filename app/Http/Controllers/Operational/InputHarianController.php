@@ -11,6 +11,7 @@ use App\Models\DailyProduction;
 use App\Models\Downtime;
 use App\Models\LineMaster;
 use App\Models\ProductionLog;
+use App\Models\RepairRejectLog;
 use App\Models\ShiftSubmission;
 use Illuminate\Support\Facades\DB;
 use App\Services\ProductionService;
@@ -1132,21 +1133,58 @@ class InputHarianController extends Controller
     {
         $date = $request->get('date') ?: now()->toDateString();
 
-        $logs = ProductionLog::with('jobMaster')
+        $prodLogs = ProductionLog::with('jobMaster')
             ->whereDate('created_at', $date)
-            ->orderBy('created_at', 'desc')
-            ->paginate(50)
-            ->appends(['date' => $date]);
+            ->get()
+            ->map(fn($log) => [
+                'id' => $log->id,
+                'source' => 'input',
+                'created_at' => $log->created_at,
+                'job_master_id' => $log->job_master_id,
+                'job_number' => $log->jobMaster?->job_number ?? '-',
+                'job_name' => $log->jobMaster?->job_name ?? '-',
+                'line' => $log->jobMaster?->line ?? '-',
+                'ok_qty' => $log->ok_qty,
+                'repair_qty' => $log->repair_qty,
+                'reject_qty' => $log->reject_qty,
+                'defect_name' => null,
+                'operator' => null,
+            ]);
 
-        $totalOk = $logs->getCollection()->sum('ok_qty');
-        $totalRepair = $logs->getCollection()->sum('repair_qty');
-        $totalReject = $logs->getCollection()->sum('reject_qty');
+        $rrLogs = RepairRejectLog::with('jobMaster', 'creator')
+            ->whereDate('created_at', $date)
+            ->get()
+            ->map(fn($log) => [
+                'id' => 'rr-' . $log->id,
+                'source' => $log->type,
+                'created_at' => $log->created_at,
+                'job_master_id' => $log->job_master_id,
+                'job_number' => $log->jobMaster?->job_number ?? '-',
+                'job_name' => $log->jobMaster?->job_name ?? '-',
+                'line' => $log->jobMaster?->line ?? '-',
+                'ok_qty' => 0,
+                'repair_qty' => $log->type === 'repair' ? ($log->qty_a ?? 0) : 0,
+                'reject_qty' => $log->type === 'reject' ? ($log->qty_a ?? 0) : 0,
+                'defect_name' => $log->defect_name ?? '-',
+                'operator' => $log->creator?->name ?? '-',
+            ]);
 
-        // Cumulative OK before this page (logs are desc, so sum older pages)
-        $cumulativeOffset = ProductionLog::whereDate('created_at', $date)
-            ->where('id', '<', $logs->last()?->id ?? 0)
-            ->sum('ok_qty');
+        $allLogs = $prodLogs->concat($rrLogs)->sortByDesc('created_at')->values();
 
-        return view('operational.production_audit', compact('logs', 'date', 'totalOk', 'totalRepair', 'totalReject', 'cumulativeOffset'));
+        $totalOk = $allLogs->sum('ok_qty');
+        $totalRepair = $allLogs->sum('repair_qty');
+        $totalReject = $allLogs->sum('reject_qty');
+        $totalCount = $allLogs->count();
+
+        $currentPage = (int) $request->get('page', 1);
+        $perPage = 50;
+        $sliced = $allLogs->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $logs = new \Illuminate\Pagination\LengthAwarePaginator(
+            $sliced, $totalCount, $perPage, $currentPage,
+            ['path' => $request->url(), 'query' => $request->query()]
+        );
+
+        return view('operational.production_audit', compact('logs', 'date', 'totalOk', 'totalRepair', 'totalReject'));
     }
 }
