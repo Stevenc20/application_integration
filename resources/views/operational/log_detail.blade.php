@@ -15,7 +15,7 @@
                     <span class="px-2 py-0.5 rounded bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest">Job Master</span>
                     <h1 class="text-2xl font-black text-slate-800 tracking-tighter">{{ $job->job_number ?? '-' }}</h1>
                 </div>
-                <p class="text-sm text-slate-500 font-medium">{{ $job->job_name ?? 'N/A' }} <span class="mx-2 text-slate-300">|</span> Line: {{ $job->line ?? '-' }} <span class="mx-2 text-slate-300">|</span> Shift: {{ $job->dailyProduction?->shift ?? '-' }} <span class="mx-2 text-slate-300">|</span> Work Date: {{ $job->dailyProduction?->work_date ?? '-' }}</p>
+                <p class="text-sm text-slate-500 font-medium">{{ $job->job_name ?? 'N/A' }} <span class="mx-2 text-slate-300">|</span> Line: {{ $job->line ?? $job->dailyProduction?->line ?? '-' }} <span class="mx-2 text-slate-300">|</span> Shift: {{ $job->dailyProduction?->shift ?? '-' }} <span class="mx-2 text-slate-300">|</span> Work Date: {{ $job->dailyProduction?->work_date ?? '-' }} <span class="mx-2 text-slate-300">|</span> Target: {{ $job->target_qty ?? $job->capacity ?? '-' }} Pcs</p>
             </div>
         </div>
         

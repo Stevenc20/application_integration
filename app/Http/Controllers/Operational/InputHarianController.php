@@ -1128,14 +1128,19 @@ class InputHarianController extends Controller
         }
     }
 
-    public function productionAudit()
+    public function productionAudit(Request $request)
     {
-        // Get all jobs that have started (meaning they have production data)
+        $date = $request->get('date') ?: now()->toDateString();
+
         $jobs = JobMaster::whereNotNull('started_at')
+            ->whereHas('dailyProduction', function ($q) use ($date) {
+                $q->where('work_date', $date);
+            })
             ->with(['dailyProduction', 'productionLogs'])
             ->orderBy('started_at', 'desc')
-            ->paginate(15);
+            ->paginate(15)
+            ->appends(['date' => $date]);
 
-        return view('operational.production_audit', compact('jobs'));
+        return view('operational.production_audit', compact('jobs', 'date'));
     }
 }
