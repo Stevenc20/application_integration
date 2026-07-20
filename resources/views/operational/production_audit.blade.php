@@ -61,7 +61,7 @@
                             $typeColor = 'border-l-4 border-l-blue-400';
                         }
                     @endphp
-                    <tr class="hover:bg-blue-50/30 transition-all group {{ $typeColor }}">
+                    <tr class="hover:bg-blue-50/30 transition-all {{ $typeColor }}">
                         <td class="px-4 py-4 text-[10px] font-bold text-slate-400">{{ ($logs->currentPage() - 1) * $logs->perPage() + $loop->iteration }}</td>
                         <td class="px-4 py-4 whitespace-nowrap">
                             <p class="font-black text-slate-800 text-sm tabular-nums">{{ $log['created_at']->format('H:i:s') }}</p>
@@ -69,7 +69,7 @@
                         </td>
                         <td class="px-4 py-4">
                             <div class="flex items-start gap-3">
-                                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px] group-hover:bg-blue-600 group-hover:text-white transition-all shrink-0 mt-0.5">
+                                <div class="w-9 h-9 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 font-black text-[10px] shrink-0 mt-0.5">
                                     {{ strtoupper(substr($log['line'] ?? '?', 0, 2)) }}
                                 </div>
                                 <div class="min-w-0">
@@ -78,7 +78,7 @@
                                         <span class="text-[9px] font-bold text-slate-400">|</span>
                                         <span class="text-[9px] font-black text-slate-500 uppercase">{{ $log['line'] }}</span>
                                     </div>
-                                    <p class="text-xs font-bold text-slate-700 truncate max-w-[300px]" title="{{ $log['job_name'] }}">{{ $log['job_name'] }}</p>
+                                    <p class="text-sm font-bold text-slate-700 truncate max-w-[350px]" title="{{ $log['job_name'] }}">{{ $log['job_name'] }}</p>
                                     @if($log['defect_name'] && $log['defect_name'] !== '-')
                                         <p class="text-[10px] font-bold text-orange-500 mt-0.5">Defect: {{ $log['defect_name'] }}</p>
                                     @endif
