@@ -51,13 +51,13 @@
                         $hasOk = ($log['ok_qty'] ?? 0) > 0;
                         
                         if ($log['source'] === 'repair') {
-                            $typeBadge = '<span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-black uppercase">Repair Report</span>';
+                            $typeBadge = '<span class="px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 text-[9px] font-black uppercase">R</span>';
                             $typeColor = 'border-l-4 border-l-orange-400';
                         } elseif ($log['source'] === 'reject') {
-                            $typeBadge = '<span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase">Reject Report</span>';
+                            $typeBadge = '<span class="px-1.5 py-0.5 rounded bg-red-100 text-red-700 text-[9px] font-black uppercase">X</span>';
                             $typeColor = 'border-l-4 border-l-red-400';
                         } else {
-                            $typeBadge = '<span class="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 text-[9px] font-black uppercase">Input OK</span>';
+                            $typeBadge = '<span class="px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 text-[9px] font-black uppercase">OK</span>';
                             $typeColor = 'border-l-4 border-l-blue-400';
                         }
                     @endphp
@@ -79,6 +79,11 @@
                                         <span class="text-[9px] font-black text-slate-500 uppercase">{{ $log['line'] }}</span>
                                     </div>
                                     <p class="text-sm font-bold text-slate-700 truncate max-w-[350px]" title="{{ $log['job_name'] }}">{{ $log['job_name'] }}</p>
+                                    <div class="flex items-center gap-2 mt-1">
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[8px] font-bold text-slate-500 uppercase">Shift {{ $log['shift'] ?? '-' }}</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[8px] font-bold text-slate-500">Tgt: {{ number_format($log['target_qty'] ?? 0) }}</span>
+                                        <span class="px-1.5 py-0.5 rounded bg-slate-100 text-[8px] font-bold text-slate-500">{{ $log['work_date'] ?? '-' }}</span>
+                                    </div>
                                     @if($log['defect_name'] && $log['defect_name'] !== '-')
                                         <p class="text-[10px] font-bold text-orange-500 mt-0.5">Defect: {{ $log['defect_name'] }}</p>
                                     @endif

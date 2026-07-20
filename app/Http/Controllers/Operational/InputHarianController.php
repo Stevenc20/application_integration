@@ -1169,7 +1169,7 @@ class InputHarianController extends Controller
     {
         $date = $request->get('date') ?: now()->toDateString();
 
-        $prodLogs = ProductionLog::with('jobMaster')
+        $prodLogs = ProductionLog::with('jobMaster.dailyProduction')
             ->whereDate('created_at', $date)
             ->get()
             ->map(fn($log) => [
@@ -1180,6 +1180,9 @@ class InputHarianController extends Controller
                 'job_number' => $log->jobMaster?->job_number ?? '-',
                 'job_name' => $log->jobMaster?->job_name ?? '-',
                 'line' => $log->jobMaster?->line ?? '-',
+                'shift' => $log->jobMaster?->dailyProduction?->shift ?? '-',
+                'target_qty' => $log->jobMaster?->target_qty ?? $log->jobMaster?->capacity ?? '-',
+                'work_date' => $log->jobMaster?->dailyProduction?->work_date ?? '-',
                 'ok_qty' => $log->ok_qty,
                 'repair_qty' => $log->repair_qty,
                 'reject_qty' => $log->reject_qty,
@@ -1187,7 +1190,7 @@ class InputHarianController extends Controller
                 'operator' => null,
             ]);
 
-        $rrLogs = RepairRejectLog::with('jobMaster', 'creator')
+        $rrLogs = RepairRejectLog::with('jobMaster.dailyProduction', 'creator')
             ->whereDate('created_at', $date)
             ->get()
             ->map(fn($log) => [
@@ -1198,6 +1201,9 @@ class InputHarianController extends Controller
                 'job_number' => $log->jobMaster?->job_number ?? '-',
                 'job_name' => $log->jobMaster?->job_name ?? '-',
                 'line' => $log->jobMaster?->line ?? '-',
+                'shift' => $log->jobMaster?->dailyProduction?->shift ?? '-',
+                'target_qty' => $log->jobMaster?->target_qty ?? $log->jobMaster?->capacity ?? '-',
+                'work_date' => $log->jobMaster?->dailyProduction?->work_date ?? '-',
                 'ok_qty' => 0,
                 'repair_qty' => $log->type === 'repair' ? ($log->qty_a ?? 0) : 0,
                 'reject_qty' => $log->type === 'reject' ? ($log->qty_a ?? 0) : 0,
