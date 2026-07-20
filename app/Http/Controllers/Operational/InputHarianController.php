@@ -1132,15 +1132,21 @@ class InputHarianController extends Controller
     {
         $date = $request->get('date') ?: now()->toDateString();
 
-        $jobs = JobMaster::whereNotNull('started_at')
-            ->whereHas('dailyProduction', function ($q) use ($date) {
-                $q->where('work_date', $date);
-            })
-            ->with(['dailyProduction', 'productionLogs'])
-            ->orderBy('started_at', 'desc')
-            ->paginate(15)
+        $logs = ProductionLog::with('jobMaster')
+            ->whereDate('created_at', $date)
+            ->orderBy('created_at', 'desc')
+            ->paginate(50)
             ->appends(['date' => $date]);
 
-        return view('operational.production_audit', compact('jobs', 'date'));
+        $totalOk = $logs->getCollection()->sum('ok_qty');
+        $totalRepair = $logs->getCollection()->sum('repair_qty');
+        $totalReject = $logs->getCollection()->sum('reject_qty');
+
+        // Cumulative OK before this page (logs are desc, so sum older pages)
+        $cumulativeOffset = ProductionLog::whereDate('created_at', $date)
+            ->where('id', '<', $logs->last()?->id ?? 0)
+            ->sum('ok_qty');
+
+        return view('operational.production_audit', compact('logs', 'date', 'totalOk', 'totalRepair', 'totalReject', 'cumulativeOffset'));
     }
 }

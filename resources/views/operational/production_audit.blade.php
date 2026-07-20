@@ -12,102 +12,79 @@
             </div>
             <div>
                 <h1 class="text-2xl font-black text-slate-800 tracking-tighter">Audit Trail Produksi</h1>
-                <p class="text-sm text-slate-500 font-medium">Rekapitulasi riwayat pengerjaan item dan log audit harian</p>
+                <p class="text-sm text-slate-500 font-medium">Semua input data produksi — {{ \Carbon\Carbon::parse($date)->format('d F Y') }}</p>
             </div>
         </div>
         
         <div class="flex items-center gap-4">
-            {{-- DATE FILTER --}}
             <form method="GET" class="flex items-center gap-2">
                 <input type="date" name="date" value="{{ $date }}" class="px-4 py-2 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none">
                 <button type="submit" class="px-4 py-2 rounded-xl bg-blue-600 text-white text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all">Filter</button>
             </form>
-            <div class="px-4 py-2 bg-slate-50 rounded-xl border border-slate-200 text-slate-600 text-sm font-bold flex items-center gap-2">
-                <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                {{ $jobs->total() }} Total Jobs
+            <div class="flex items-center gap-4 text-sm font-bold">
+                <div class="px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200 text-slate-500">{{ $logs->total() }} entries</div>
+                <div class="px-3 py-1.5 bg-emerald-50 rounded-xl border border-emerald-200 text-emerald-600">OK: {{ number_format($totalOk) }}</div>
+                <div class="px-3 py-1.5 bg-orange-50 rounded-xl border border-orange-200 text-orange-600">R: {{ number_format($totalRepair) }}</div>
+                <div class="px-3 py-1.5 bg-red-50 rounded-xl border border-red-200 text-red-600">X: {{ number_format($totalReject) }}</div>
             </div>
         </div>
     </div>
 
-    {{-- AUDIT LIST --}}
+    {{-- LOG TABLE --}}
     <div class="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div class="overflow-x-auto">
             <table class="w-full text-left">
                 <thead>
                     <tr class="bg-slate-50 border-b border-slate-100">
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item / Job Info</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">#</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Waktu</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Job Number</th>
+                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Item Name</th>
                         <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Line</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Shift</th>
-                        <th class="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Target</th>
                         <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">OK</th>
                         <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Repair</th>
                         <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Reject</th>
-                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Achievement</th>
-                        <th class="px-6 py-4 text-right text-[10px] font-black text-slate-400 uppercase tracking-widest">Action</th>
+                        <th class="px-6 py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">Status</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-50">
-                    @forelse($jobs as $job)
-                    @php
-                        $dp = $job->dailyProduction;
-                        $ok = $dp->actual_ok ?? 0;
-                        $repair = $dp->actual_repair ?? 0;
-                        $reject = $dp->actual_reject ?? 0;
-                        $total = $ok + $repair + $reject;
-                        $target = $job->target_qty ?? $job->capacity ?? 0;
-                        $eff = $target > 0 ? round(($total / $target) * 100, 1) : 0;
-                        $lineDisplay = $job->line ?? $dp->line ?? '-';
-                        $shiftDisplay = $dp->shift ?? '-';
-                    @endphp
-                    <tr class="hover:bg-slate-50 transition-all group">
-                        <td class="px-6 py-5">
-                            <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500 font-black text-xs group-hover:bg-blue-600 group-hover:text-white transition-all">
-                                    {{ strtoupper(substr($lineDisplay, 0, 2)) }}
-                                </div>
-                                <div>
-                                    <p class="font-black text-slate-800 text-sm tracking-tight leading-none mb-1">{{ $job->job_number }}</p>
-                                    <p class="text-[10px] font-bold text-slate-400 uppercase truncate max-w-[200px]">{{ $job->job_name }}</p>
-                                    @if($job->started_at)
-                                        <p class="text-[9px] font-bold text-slate-400 uppercase mt-0.5">{{ \Carbon\Carbon::parse($job->started_at)->format('H:i') }} - {{ $job->finished_at ? \Carbon\Carbon::parse($job->finished_at)->format('H:i') : 'Running' }}</p>
-                                    @endif
-                                </div>
-                            </div>
+                    @forelse($logs as $log)
+                        @php $job = $log->jobMaster; @endphp
+                    <tr class="hover:bg-blue-50/30 transition-all group">
+                        <td class="px-6 py-4 text-[10px] font-bold text-slate-400">{{ ($logs->currentPage() - 1) * $logs->perPage() + $loop->iteration }}</td>
+                        <td class="px-6 py-4">
+                            <p class="font-black text-slate-800 text-sm">{{ $log->created_at->format('H:i:s') }}</p>
                         </td>
-                        <td class="px-6 py-5">
-                            <span class="px-2.5 py-1 rounded-lg bg-blue-50 text-blue-600 font-black text-[10px] uppercase tracking-wider">{{ $lineDisplay }}</span>
+                        <td class="px-6 py-4">
+                            <a href="{{ route('operational.job.logs.detail', $log->job_master_id) }}" class="px-2 py-0.5 rounded bg-blue-50 text-blue-600 font-black text-[10px] uppercase hover:bg-blue-100 transition">{{ $job?->job_number ?? '-' }}</a>
                         </td>
-                        <td class="px-6 py-5">
-                            <span class="text-[10px] font-black text-slate-500 uppercase">{{ $shiftDisplay }}</span>
+                        <td class="px-6 py-4">
+                            <p class="text-xs font-bold text-slate-600 truncate max-w-[250px]" title="{{ $job?->job_name ?? '-' }}">{{ $job?->job_name ?? '-' }}</p>
                         </td>
-                        <td class="px-6 py-5 text-center">
-                            <span class="font-black text-slate-400 text-sm">{{ number_format($target) }}</span>
+                        <td class="px-6 py-4">
+                            <span class="text-xs font-black text-slate-500 uppercase">{{ $job?->line ?? '-' }}</span>
                         </td>
-                        <td class="px-6 py-5 text-center">
-                            <span class="px-2 py-1 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs shadow-sm">{{ number_format($ok) }}</span>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 font-black text-xs">+{{ $log->ok_qty }}</span>
                         </td>
-                        <td class="px-6 py-5 text-center">
-                            <span class="px-2 py-1 rounded-lg bg-orange-50 text-orange-600 font-black text-xs shadow-sm">{{ number_format($repair) }}</span>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-600 font-black text-xs">{{ $log->repair_qty }}</span>
                         </td>
-                        <td class="px-6 py-5 text-center">
-                            <span class="px-2 py-1 rounded-lg bg-red-50 text-red-600 font-black text-xs shadow-sm">{{ number_format($reject) }}</span>
+                        <td class="px-6 py-4 text-center">
+                            <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 font-black text-xs">{{ $log->reject_qty }}</span>
                         </td>
-                        <td class="px-6 py-5 text-center">
-                            @php
-                                $colorClass = $eff >= 100 ? 'bg-emerald-500 text-emerald-600' : ($eff >= 80 ? 'bg-blue-500 text-blue-600' : 'bg-amber-500 text-amber-600');
-                            @endphp
-                            <div class="flex flex-col items-center gap-1">
-                                <div class="w-14 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                    <div class="h-full {{ explode(' ', $colorClass)[0] }}" style="width: {{ min(100, $eff) }}%"></div>
-                                </div>
-                                <span class="text-[10px] font-black {{ explode(' ', $colorClass)[1] }}">{{ $eff }}%</span>
-                            </div>
-                        </td>
-                        <td class="px-6 py-5 text-right">
-                            <a href="{{ route('operational.job.logs.detail', $job->id) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-100 text-slate-600 hover:bg-slate-900 hover:text-white transition-all text-[10px] font-black uppercase tracking-widest group/btn">
-                                Detail
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 transform group-hover/btn:translate-x-0.5 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
-                            </a>
+                        <td class="px-6 py-4 text-center">
+                            @if(($log->ok_qty ?? 0) > 0)
+                                <span class="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 text-[9px] font-black uppercase">OK</span>
+                            @elseif(($log->repair_qty ?? 0) > 0 && ($log->reject_qty ?? 0) > 0)
+                                <span class="px-2 py-0.5 rounded-full bg-amber-100 text-amber-700 text-[9px] font-black uppercase">Mixed</span>
+                            @elseif(($log->repair_qty ?? 0) > 0)
+                                <span class="px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 text-[9px] font-black uppercase">Repair</span>
+                            @elseif(($log->reject_qty ?? 0) > 0)
+                                <span class="px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-[9px] font-black uppercase">Reject</span>
+                            @else
+                                <span class="px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 text-[9px] font-black uppercase">Empty</span>
+                            @endif
                         </td>
                     </tr>
                     @empty
@@ -117,7 +94,7 @@
                                 <div class="w-16 h-16 rounded-full bg-slate-50 flex items-center justify-center mb-4">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 text-slate-200" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                                 </div>
-                                <p class="text-slate-400 font-bold text-sm">Belum ada data produksi untuk tanggal {{ \Carbon\Carbon::parse($date)->format('d M Y') }}.</p>
+                                <p class="text-slate-400 font-bold text-sm">Belum ada input produksi untuk tanggal {{ \Carbon\Carbon::parse($date)->format('d M Y') }}.</p>
                             </div>
                         </td>
                     </tr>
@@ -126,9 +103,10 @@
             </table>
         </div>
         
-        @if($jobs->hasPages())
-        <div class="px-8 py-6 border-t border-slate-50 bg-slate-50/30">
-            {{ $jobs->links() }}
+        @if($logs->hasPages())
+        <div class="px-8 py-6 border-t border-gray-100 bg-slate-50/50 flex items-center justify-between">
+            <p class="text-xs text-slate-400 font-bold">Menampilkan {{ $logs->firstItem() }} - {{ $logs->lastItem() }} dari {{ $logs->total() }} entries</p>
+            {{ $logs->links() }}
         </div>
         @endif
     </div>
