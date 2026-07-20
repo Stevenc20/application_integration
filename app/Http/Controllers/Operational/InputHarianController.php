@@ -916,10 +916,46 @@ class InputHarianController extends Controller
 
     public function showLogs($id)
     {
-        $job = JobMaster::with(['dailyProduction', 'downtimes', 'productionLogs'])->findOrFail($id);
-        $logs = ProductionLog::where('job_master_id', $id)
-            ->orderBy('created_at', 'desc')
-            ->paginate(50);
+        $job = JobMaster::with(['dailyProduction', 'downtimes'])->findOrFail($id);
+
+        $prodLogs = ProductionLog::where('job_master_id', $id)
+            ->get()
+            ->map(fn($log) => [
+                'id' => $log->id,
+                'source' => 'input',
+                'created_at' => $log->created_at,
+                'ok_qty' => $log->ok_qty,
+                'repair_qty' => $log->repair_qty,
+                'reject_qty' => $log->reject_qty,
+                'defect_name' => null,
+                'operator' => auth()->user()->name ?? 'System',
+            ]);
+
+        $rrLogs = RepairRejectLog::where('job_master_id', $id)
+            ->with('creator')
+            ->get()
+            ->map(fn($log) => [
+                'id' => 'rr-' . $log->id,
+                'source' => $log->type,
+                'created_at' => $log->created_at,
+                'ok_qty' => 0,
+                'repair_qty' => $log->type === 'repair' ? ($log->qty_a ?? 0) : 0,
+                'reject_qty' => $log->type === 'reject' ? ($log->qty_a ?? 0) : 0,
+                'defect_name' => $log->defect_name ?? '-',
+                'operator' => $log->creator?->name ?? '-',
+            ]);
+
+        $allLogs = $prodLogs->concat($rrLogs)->sortByDesc('created_at')->values();
+
+        $totalCount = $allLogs->count();
+        $currentPage = (int) request()->get('page', 1);
+        $perPage = 50;
+        $sliced = $allLogs->slice(($currentPage - 1) * $perPage, $perPage)->values();
+
+        $logs = new \Illuminate\Pagination\LengthAwarePaginator(
+            $sliced, $totalCount, $perPage, $currentPage,
+            ['path' => request()->url(), 'query' => request()->query()]
+        );
 
         return view('operational.log_detail', compact('job', 'logs'));
     }
