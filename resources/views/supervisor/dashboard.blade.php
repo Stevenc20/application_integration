@@ -622,29 +622,6 @@
   width: 100%;
 }
 .detail-toggle:hover { background: #eff6ff; color: #3b82f6; }
-.detail-toggle .detail-arrow {
-  display: inline-block;
-  transition: transform 0.25s;
-  font-size: 0.6rem;
-}
-.detail-toggle.open .detail-arrow { transform: rotate(180deg); }
-
-/* Detail panel dropdown */
-.detail-panel {
-  max-height: 0;
-  overflow: hidden;
-  transition: max-height 0.35s ease-in-out;
-  background: #fafbfc;
-  border-top: 1px solid #e5e7eb;
-}
-.detail-panel.open {
-  max-height: 600px;
-  overflow-y: auto;
-}
-.detail-panel-inner {
-  padding: 8px;
-}
-.detail-panel .det-empty { padding: 20px 12px; }
 
 /* ── BLINK ANIMATIONS ──────────────────────────────────────── */
 @keyframes blink-red {
@@ -695,6 +672,7 @@ let charts = {};
 let LINE_KPI = {};
 let LINE_META = {};
 let DETAIL_DATA = {};
+let PRESS_DETAIL_DATA = {};
 let LAST_KPI_HASH = '';
 let LAST_DETAIL_HASH = '';
 
@@ -876,22 +854,6 @@ function cellClass(desc, actual, actPct){
 }
 
 var prevBlinkClass = {};
-
-function toggleDetail(safeLine){
-  const panel = document.getElementById('detail-panel-' + safeLine);
-  const btn = document.getElementById('detail-toggle-' + safeLine);
-  if (!panel || !btn) return;
-  const isOpen = panel.classList.contains('open');
-  if (isOpen) {
-    panel.classList.remove('open');
-    btn.classList.remove('open');
-    btn.innerHTML = '<span class="detail-arrow">&#9660;</span> Detail';
-  } else {
-    panel.classList.add('open');
-    btn.classList.add('open');
-    btn.innerHTML = '<span class="detail-arrow">&#9650;</span> Detail';
-  }
-}
 
 const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
 const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
@@ -1108,35 +1070,16 @@ function buildLineCard(line){
     </div>`;
   }
 
+  if (!IS_PER_PRESS) {
+    PRESS_DETAIL_DATA[safeLine] = { extraKpiHtml, detailTableHtml, hasDetail, rowCount };
+  }
+
   return `<div class="press-card" id="card-${safeLine}">
     <div class="press-card-header">${line}</div>
     <div class="press-card-body">${bodyHtml}</div>
-    <button class="detail-toggle" id="detail-toggle-${safeLine}" onclick="toggleDetail('${safeLine}')">
-      <span class="detail-arrow">&#9660;</span> Detail
+    <button class="detail-toggle" onclick="openPressDetailModal('${safeLine}','${line}')">
+      <span>&#9660;</span> Detail
     </button>
-    <div class="detail-panel" id="detail-panel-${safeLine}">
-      <div class="detail-panel-inner">
-        ${extraKpiHtml ? `
-        <div class="det-section-label">
-          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
-            <circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/>
-            <path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <span class="label-text">Downtime Detail</span>
-        </div>
-        ${extraKpiHtml}` : ''}
-        <div class="det-section-label">
-          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
-            <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
-            <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
-            <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
-          </svg>
-          <span class="label-text">Detail Produksi</span>
-          <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
-        </div>
-        ${detailTableHtml}
-      </div>
-    </div>
   </div>`;
 }
 
@@ -1272,6 +1215,41 @@ function flushCardCache() {
   CELL_CACHE = {};
   LAST_DETAIL_RENDER_HASH = '';
   prevBlinkClass = {};
+}
+
+function openPressDetailModal(safeLine, line){
+  const data = PRESS_DETAIL_DATA[safeLine];
+  if (!data) return;
+
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  const body = document.getElementById('modalBody');
+
+  document.getElementById('modalTitle').textContent = `${line} DETAIL`;
+
+  let html = '';
+  if (data.extraKpiHtml) {
+    html += `<div style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/><path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span style="font-size:0.85rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Downtime Detail</span>
+      </div>
+      ${data.extraKpiHtml}
+    </div>`;
+  }
+  html += `<div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/><path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/><path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/></svg>
+      <span style="font-size:0.85rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Detail Produksi</span>
+      <span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:99px;background:${data.hasDetail ? '#e5e7eb' : '#fef2f2'};color:${data.hasDetail ? '#6b7280' : '#dc2626'}">${data.hasDetail ? data.rowCount + ' Job' : 'Belum Ada Data'}</span>
+    </div>
+    ${data.detailTableHtml}
+  </div>`;
+
+  body.innerHTML = html;
+  backdrop.classList.remove('hidden');
+  backdrop.classList.add('flex');
+  setTimeout(() => { dialog.classList.add('scale-100', 'opacity-100'); dialog.classList.remove('scale-95', 'opacity-0'); }, 10);
 }
 
 function openKpiDetailModal(type, line){
