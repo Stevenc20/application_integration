@@ -711,8 +711,8 @@ function toggleDetail(safeLine){
   }
 }
 
-const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
-const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
+const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT','PROD_T','MACH_T','DIES_T','MAT_T','LOG_T'];
+const EXTRA_KPIS = ['OVERTIME'];
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
