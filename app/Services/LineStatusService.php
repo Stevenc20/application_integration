@@ -80,6 +80,7 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $allDandoris = Dandori::whereIn('next_job_id', $allJobIds->toArray())
                 ->whereNull('finish_time')
+                ->where('work_date', $today)
                 ->get();
         }
 
