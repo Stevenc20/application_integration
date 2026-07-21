@@ -493,16 +493,16 @@ class DashboardRealtimeService
         $kpi = [
             ['desc'=>'QTY',      'plan'=>'0',     'actual'=>'0',     'actualLink'=>true, 'current'=>'-'],
             ['desc'=>'GSPH',     'plan'=>'0',     'actual'=>'0',     'current'=>'-'],
-            ['desc'=>'PROD_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'TOTAL_DT', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'MACH_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'DIES_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'MAT_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'LOG_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
+            ['desc'=>'PROD_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
+            ['desc'=>'TOTAL_DT', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
+            ['desc'=>'MACH_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
+            ['desc'=>'DIES_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
+            ['desc'=>'MAT_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
+            ['desc'=>'LOG_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
 
             ['desc'=>'OVERTIME', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'REPAIR',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs'],
-            ['desc'=>'REJECT',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs'],
+            ['desc'=>'REPAIR',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs', 'popup'=>true],
+            ['desc'=>'REJECT',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs', 'popup'=>true],
         ];
         $detailData = [
             'QTY'      => ['type' => 'production', $lineName => ['rows' => [], 'total' => '0']],

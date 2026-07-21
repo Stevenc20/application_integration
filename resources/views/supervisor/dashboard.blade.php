@@ -711,8 +711,8 @@ function toggleDetail(safeLine){
   }
 }
 
-const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT','PROD_T','MACH_T','DIES_T','MAT_T','LOG_T'];
-const EXTRA_KPIS = ['OVERTIME'];
+const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
+const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
@@ -737,6 +737,8 @@ function buildLineCard(line){
     let valueHtml = '';
     if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
       valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
     } else if (isClickable) {
       valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     } else if(kpi.desc === 'GSPH'){
@@ -744,7 +746,7 @@ function buildLineCard(line){
     } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
       valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
     } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
-      valueHtml = `<span>${kpi.actual}m</span>`;
+      valueHtml = `<span>${kpi.actual}</span>`;
     } else {
       valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     }
@@ -930,7 +932,7 @@ function updateCards(forceDetail) {
       } else if(kpi.desc === 'GSPH'){
         valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
-        valueHtml = `<span>${kpi.actual}m</span>`;
+        valueHtml = `<span>${kpi.actual}</span>`;
       } else {
         valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       }
