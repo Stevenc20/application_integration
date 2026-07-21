@@ -39,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-h-[300px]" id="linesGrid"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -196,7 +196,7 @@
   .modal-dialog-inner      { max-width: 1400px !important; font-size: 1.6rem !important; }
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
-  #linesGrid               { grid-template-columns: repeat(4, 1fr) !important; gap: 2.5rem !important; }
+  #linesGrid               { grid-template-columns: repeat(2, 1fr) !important; gap: 2.5rem !important; }
   .press-card-header       { font-size: 1.4rem !important; padding: 18px 24px !important; letter-spacing: 0.25em !important; }
   .kpi-row                 { padding: 14px 22px !important; min-height: 48px !important; }
   .kpi-row .kpi-label      { font-size: 1.1rem !important; }
