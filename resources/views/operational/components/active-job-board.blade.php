@@ -60,19 +60,21 @@
             <div class="lg:col-span-9">
                 <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3 h-full">
 
-                    <!-- Jam PPC — Atas -->
-                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Jam PPC</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-base sm:text-lg font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
-                            <span class="text-slate-400 font-bold text-sm leading-none">→</span>
-                            <span class="text-base sm:text-lg font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Actual Progress</span>
-                            <p id="timeline-time-label" class="text-lg sm:text-xl font-black font-mono text-red-500 leading-none bg-red-50 px-3 py-1 rounded-lg">0%</p>
+                    <!-- Scheduling — Atas -->
+                    <div class="bg-slate-50 border border-slate-300 rounded-xl px-4 py-3">
+                        <div class="flex items-center justify-between">
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Scheduling</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xl sm:text-2xl font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
+                                    <span class="text-slate-400 font-bold text-lg leading-none">→</span>
+                                    <span class="text-xl sm:text-2xl font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
+                                </div>
+                            </div>
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Actual</span>
+                                <p id="timeline-time-label" class="text-2xl sm:text-3xl font-black font-mono text-red-500 leading-none bg-red-50 px-3 py-1 rounded-lg">0%</p>
+                            </div>
                         </div>
                     </div>
 
@@ -353,7 +355,7 @@
                                 <input type="hidden" id="active-actual-{{ $activeJob->id }}" value="0">
                                 <div class="flex flex-col gap-2 mt-2">
                                     <div class="flex gap-1.5">
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all active:scale-95 shadow-lg shadow-emerald-900/40 border-b-2 border-emerald-700 active:border-b-0 flex items-center justify-center gap-1">
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all active:scale-95 shadow-sm shadow-emerald-200 flex items-center justify-center gap-1">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                                             PLT ({{ $activeJob->capacity ?? 0 }})
                                         </button>
@@ -429,7 +431,7 @@
 
             <!-- Operator Console (Right Area) -->
             <div class="lg:col-span-3">
-                    <div class="h-full flex flex-col justify-between gap-4">
+                    <div class="h-full flex flex-col justify-between gap-2">
                     @php
                         $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
                         $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
@@ -493,7 +495,7 @@
 
                     <!-- SELESAIKAN JOB (paling bawah, besar) -->
                     @if(!$isDandori && $activeJob->started_at)
-                    <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-5 rounded-2xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white shadow-md active:translate-y-0.5 mt-auto">
+                    <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-5 rounded-2xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white shadow-md active:translate-y-0.5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                         Selesaikan Job
                     </button>
