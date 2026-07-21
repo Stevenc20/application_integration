@@ -312,7 +312,11 @@ class InputHarianController extends Controller
             $activeJob = $activeJobQuery->first();
         } else {
             // Today mode: cari job running atau paused (break time) realtime
-            $activeJob = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+            $activeJob = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                ->whereHas('productionSessions', function ($q) {
+                    $q->whereDate('work_date', now()->toDateString())
+                      ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+                });
 
             if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
                 $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
