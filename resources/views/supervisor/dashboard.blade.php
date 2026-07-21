@@ -388,6 +388,14 @@
 }
 .kpi-row[data-desc="STROKE"] .kpi-label { color: #7c3aed; }
 
+/* Danger row (high repair/reject/downtime) */
+.kpi-row-danger {
+  background: #fef2f2 !important;
+  border-left: 3px solid #ef4444;
+}
+.kpi-row-danger .kpi-label { color: #dc2626 !important; font-weight: 900 !important; }
+.kpi-row-danger .kpi-value { color: #dc2626 !important; font-weight: 900 !important; }
+
 /* Detail toggle button */
 .detail-toggle {
   display: flex;
@@ -679,8 +687,8 @@ function toggleDetail(safeLine){
   }
 }
 
-const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT'];
-const EXTRA_KPIS = ['PROD_T','TOTAL_DT','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
+const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
+const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
@@ -706,13 +714,17 @@ function buildLineCard(line){
       valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
     } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
       valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-    } else if(kpi.desc === 'DT'){
+    } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
       valueHtml = `<span>${kpi.actual}m</span>`;
     } else {
       valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     }
-    kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}">
-      <span class="kpi-label">${kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc}</span>
+    const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
+    const clickAttr = (kpi.popup || kpi.actualLink) ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+    const cursorCls = (kpi.popup || kpi.actualLink) ? ' style="cursor:pointer"' : '';
+    const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
+    kpiHtml += `<div class="kpi-row${dangerCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}${cursorCls}>
+      <span class="kpi-label">${label}</span>
       <span class="kpi-value">${valueHtml}</span>
     </div>`;
   });
@@ -738,7 +750,10 @@ function buildLineCard(line){
       if(kpi.desc === 'TOTAL_DT'){
         valueHtml = `<span>${kpi.actual}m</span>`;
       }
-      extraKpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="${kpi.desc}">
+      const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
+      const clickAttr = (kpi.popup || kpi.actualLink) ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+      const cursorCls = (kpi.popup || kpi.actualLink) ? ' style="cursor:pointer"' : '';
+      extraKpiHtml += `<div class="kpi-row${dangerCls}" data-line="${line}" data-desc="${kpi.desc}"${clickAttr}${cursorCls}>
         <span class="kpi-label">${kpi.desc}</span>
         <span class="kpi-value">${valueHtml}</span>
       </div>`;
@@ -879,15 +894,20 @@ function updateCards(forceDetail) {
         valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
         valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-      } else if(kpi.desc === 'DT'){
+      } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
         valueHtml = `<span>${kpi.actual}m</span>`;
       } else {
         valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       }
       if (valEl.innerHTML !== valueHtml) valEl.innerHTML = valueHtml;
 
-      const blinkDesc = kpi.desc === 'DT' ? 'DT' : kpi.desc;
-      const newBlink = cellClass(blinkDesc, kpi.actual, kpi.actualPct);
+      if (kpi.danger) {
+        rowEl.classList.add('kpi-row-danger');
+      } else {
+        rowEl.classList.remove('kpi-row-danger');
+      }
+
+      const newBlink = cellClass(kpi.desc, kpi.actual, kpi.actualPct);
       const prevBlink = prevBlinkClass[`${line}-${kpi.desc}`] || '';
 
       if (prevBlink && prevBlink.includes('blink') && !newBlink.includes('blink')) {
