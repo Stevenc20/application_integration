@@ -50,6 +50,12 @@ Schedule::command('ppc:process-cutoff')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/ppc-cutoff-scheduler.log'));
 
+// Schedule: auto-archive stuck production data from previous day(s) daily at 07:30
+Schedule::command('production:daily-archive')
+    ->dailyAt('07:30')
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/daily-archive-scheduler.log'));
+
 // Schedule: auto-break pause/resume every minute
 Schedule::command('break:auto')
     ->everyMinute()
