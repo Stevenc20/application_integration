@@ -424,7 +424,7 @@
   border-top: 1px solid #e5e7eb;
 }
 .detail-panel.open {
-  max-height: 400px;
+  max-height: 600px;
   overflow-y: auto;
 }
 .detail-panel-inner {
@@ -657,15 +657,15 @@ function detailCells(r){
 function cellClass(desc, actual, actPct){
     if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'blink-green':p>=80?'blink-yellow':'blink-red';}
     if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'blink-red':p>2?'blink-yellow':'';}
-    if(desc==='DT'||desc==='TOTAL_DT'){const v=parseFloat(actual);return v>30?'blink-red':v>15?'blink-yellow':'';}
+    if(['DT','TOTAL_DT','MACH_T','MAT_T','LOG_T','DIES_T'].includes(desc)){const v=parseFloat(actual);return v>30?'blink-red':v>15?'blink-yellow':'';}
     return '';
 }
 
 var prevBlinkClass = {};
 
-function toggleDetail(line){
-  const panel = document.getElementById('detail-panel-' + line);
-  const btn = document.getElementById('detail-toggle-' + line);
+function toggleDetail(safeLine){
+  const panel = document.getElementById('detail-panel-' + safeLine);
+  const btn = document.getElementById('detail-toggle-' + safeLine);
   if (!panel || !btn) return;
   const isOpen = panel.classList.contains('open');
   if (isOpen) {
@@ -675,9 +675,12 @@ function toggleDetail(line){
   } else {
     panel.classList.add('open');
     btn.classList.add('open');
-    btn.innerHTML = '<span class="detail-arrow">&#9660;</span> Detail';
+    btn.innerHTML = '<span class="detail-arrow">&#9650;</span> Detail';
   }
 }
+
+const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT'];
+const EXTRA_KPIS = ['PROD_T','TOTAL_DT','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
@@ -696,34 +699,29 @@ function buildLineCard(line){
     <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
   </div>`;
 
-  rows.forEach((kpi) => {
+  const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
+  mainRows.forEach((kpi) => {
     let valueHtml = '';
     if(kpi.desc === 'GSPH'){
       valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
     } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
       valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-    } else if(kpi.desc === 'TOTAL_DT' || kpi.desc === 'DT'){
-      valueHtml = `<span>${kpi.actual}m</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+    } else if(kpi.desc === 'DT'){
+      valueHtml = `<span>${kpi.actual}m</span>`;
     } else {
       valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     }
-
-    let clickAttr = kpi.popup || kpi.actualLink ? `onclick="event.stopPropagation(); openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-    let styleAttr = (kpi.popup || kpi.actualLink) ? 'cursor:pointer' : '';
-
-    kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="${kpi.desc}" ${clickAttr} style="${styleAttr}" id="kpi-${kpi.desc}-${safeLine}">
-      <span class="kpi-label">${kpi.desc}</span>
+    kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}">
+      <span class="kpi-label">${kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc}</span>
       <span class="kpi-value">${valueHtml}</span>
     </div>`;
-
-    if(kpi.desc === 'GSPH'){
-      const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
-      kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
-        <span class="kpi-label">STROKE</span>
-        <span class="kpi-value">${strokeDisplay}</span>
-      </div>`;
-    }
   });
+
+  const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
+  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
+    <span class="kpi-label">STROKE</span>
+    <span class="kpi-value">${strokeDisplay}</span>
+  </div>`;
 
   const hasDetail = detailRows.length > 0;
   const rowCount = detailRows.length;
@@ -732,7 +730,22 @@ function buildLineCard(line){
     detRows += `<tr>${detailCells(r)}</tr>`;
   });
 
-  const detInner = hasDetail ? `
+  let extraKpiHtml = '';
+  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
+  if (extraRows.length > 0) {
+    extraRows.forEach((kpi) => {
+      let valueHtml = `<span>${kpi.actual}</span>`;
+      if(kpi.desc === 'TOTAL_DT'){
+        valueHtml = `<span>${kpi.actual}m</span>`;
+      }
+      extraKpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="${kpi.desc}">
+        <span class="kpi-label">${kpi.desc}</span>
+        <span class="kpi-value">${valueHtml}</span>
+      </div>`;
+    });
+  }
+
+  const detailTableHtml = hasDetail ? `
     <div class="det-scroll">
       <table class="det-table">
         <thead>
@@ -760,7 +773,7 @@ function buildLineCard(line){
       </table>
     </div>` : `
     <div class="det-empty">
-      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db">
+      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db" style="width:28px;height:28px;opacity:0.5">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
       </svg>
@@ -770,11 +783,20 @@ function buildLineCard(line){
   return `<div class="press-card" id="card-${safeLine}">
     <div class="press-card-header">${line}</div>
     <div class="press-card-body">${kpiHtml}</div>
-    <button class="detail-toggle" id="detail-toggle-${safeLine}" onclick="toggleDetail('${line}')">
+    <button class="detail-toggle" id="detail-toggle-${safeLine}" onclick="toggleDetail('${safeLine}')">
       <span class="detail-arrow">&#9660;</span> Detail
     </button>
     <div class="detail-panel" id="detail-panel-${safeLine}">
       <div class="detail-panel-inner">
+        ${extraKpiHtml ? `
+        <div class="det-section-label">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+            <circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="label-text">Downtime Detail</span>
+        </div>
+        ${extraKpiHtml}` : ''}
         <div class="det-section-label">
           <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
             <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
@@ -784,7 +806,7 @@ function buildLineCard(line){
           <span class="label-text">Detail Produksi</span>
           <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
         </div>
-        ${detInner}
+        ${detailTableHtml}
       </div>
     </div>
   </div>`;
@@ -857,14 +879,15 @@ function updateCards(forceDetail) {
         valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
         valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-      } else if(kpi.desc === 'TOTAL_DT' || kpi.desc === 'DT'){
-        valueHtml = `<span>${kpi.actual}m</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      } else if(kpi.desc === 'DT'){
+        valueHtml = `<span>${kpi.actual}m</span>`;
       } else {
         valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       }
       if (valEl.innerHTML !== valueHtml) valEl.innerHTML = valueHtml;
 
-      const newBlink = cellClass(kpi.desc, kpi.actual, kpi.actualPct);
+      const blinkDesc = kpi.desc === 'DT' ? 'DT' : kpi.desc;
+      const newBlink = cellClass(blinkDesc, kpi.actual, kpi.actualPct);
       const prevBlink = prevBlinkClass[`${line}-${kpi.desc}`] || '';
 
       if (prevBlink && prevBlink.includes('blink') && !newBlink.includes('blink')) {
