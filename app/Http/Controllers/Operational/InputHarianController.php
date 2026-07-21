@@ -313,8 +313,8 @@ class InputHarianController extends Controller
         } else {
             // Today mode: cari job running atau paused (break time) realtime
             $activeJob = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
-                ->whereHas('productionSessions', function ($q) {
-                    $q->whereDate('work_date', now()->toDateString())
+                ->whereHas('productionSessions', function ($q) use ($date) {
+                    $q->whereDate('work_date', $date)
                       ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
                 });
 
@@ -327,8 +327,12 @@ class InputHarianController extends Controller
                     'dailyProduction' => function ($q) use ($date) {
                         $q->where('work_date', $date);
                     },
-                    'downtimes',
-                    'dandoris'
+                    'downtimes' => function ($q) use ($date) {
+                        $q->whereDate('created_at', $date);
+                    },
+                    'dandoris' => function ($q) use ($date) {
+                        $q->whereDate('created_at', $date);
+                    }
                 ])->first();
         }
 
@@ -352,6 +356,12 @@ class InputHarianController extends Controller
 
         $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running', 'paused'])
             ->whereIn('job_number', $scheduledJobNumbers)
+            ->where(function ($q) use ($date) {
+                $q->where('status', 'pending')
+                  ->orWhereHas('productionSessions', function ($sq) use ($date) {
+                      $sq->whereDate('work_date', $date);
+                  });
+            })
             ->get()
             ->sortBy(function($job) use ($scheduledJobNumbers) {
                 return array_search($job->job_number, $scheduledJobNumbers);
@@ -455,7 +465,18 @@ class InputHarianController extends Controller
             ];
 
             if ($existing) {
-                // Jangan paksa update status jika sudah jalan/selesai (Preserve state)
+                // AUTO-RESET: Jika status running/paused tapi ga ada session hari ini → reset ke pending
+                if (in_array(strtolower($existing->status), ['running', 'paused'])) {
+                    $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $existing->id)
+                        ->whereDate('work_date', $date)
+                        ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                        ->exists();
+                    if (!$hasTodaySession) {
+                        $existing->update(array_merge($data, ['status' => 'pending', 'started_at' => null, 'finished_at' => null]));
+                        continue;
+                    }
+                }
+
                 if (!in_array($existing->status, ['running', 'paused', 'complete', 'finished', 'closed'])) {
                     $existing->update($data);
                 } else {
