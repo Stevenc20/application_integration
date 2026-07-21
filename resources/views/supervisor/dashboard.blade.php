@@ -707,9 +707,6 @@ function toggleDetail(safeLine){
   }
 }
 
-const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
-const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
-
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
   const meta = LINE_META[line] || {};
@@ -727,17 +724,16 @@ function buildLineCard(line){
     <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
   </div>`;
 
-  const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
-  mainRows.forEach((kpi) => {
+  rows.forEach((kpi) => {
     const isClickable = kpi.popup || kpi.actualLink;
     let valueHtml = '';
     if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
       valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}m</span>`;
     } else if (isClickable) {
       valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     } else if(kpi.desc === 'GSPH'){
-      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-    } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
       valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
     } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
       valueHtml = `<span>${kpi.actual}m</span>`;
@@ -752,13 +748,15 @@ function buildLineCard(line){
       <span class="kpi-label">${label}</span>
       <span class="kpi-value">${valueHtml}</span>
     </div>`;
-  });
 
-  const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
-  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
-    <span class="kpi-label">STROKE</span>
-    <span class="kpi-value">${strokeDisplay}</span>
-  </div>`;
+    if(kpi.desc === 'GSPH'){
+      const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
+      kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
+        <span class="kpi-label">STROKE</span>
+        <span class="kpi-value">${strokeDisplay}</span>
+      </div>`;
+    }
+  });
 
   const hasDetail = detailRows.length > 0;
   const rowCount = detailRows.length;
@@ -766,27 +764,6 @@ function buildLineCard(line){
   detailRows.forEach((r) => {
     detRows += `<tr>${detailCells(r)}</tr>`;
   });
-
-  let extraKpiHtml = '';
-  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
-  if (extraRows.length > 0) {
-    extraRows.forEach((kpi) => {
-      const isClickable = kpi.popup || kpi.actualLink;
-      let valueHtml = '';
-      if (isClickable) {
-        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
-      } else {
-        valueHtml = `<span>${kpi.actual}</span>`;
-      }
-      const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
-      const clickCls = isClickable ? ' kpi-row-clickable' : '';
-      const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-      extraKpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}"${clickAttr}>
-        <span class="kpi-label">${kpi.desc}</span>
-        <span class="kpi-value">${valueHtml}</span>
-      </div>`;
-    });
-  }
 
   const detailTableHtml = hasDetail ? `
     <div class="det-scroll">
@@ -831,15 +808,6 @@ function buildLineCard(line){
     </button>
     <div class="detail-panel" id="detail-panel-${safeLine}">
       <div class="detail-panel-inner">
-        ${extraKpiHtml ? `
-        <div class="det-section-label">
-          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
-            <circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/>
-            <path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-          <span class="label-text">Downtime Detail</span>
-        </div>
-        ${extraKpiHtml}` : ''}
         <div class="det-section-label">
           <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
             <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
@@ -921,11 +889,11 @@ function updateCards(forceDetail) {
       let valueHtml = '';
       if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}m</span>`;
       } else if (isClickable) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       } else if(kpi.desc === 'GSPH'){
-        valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-      } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
         valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
         valueHtml = `<span>${kpi.actual}m</span>`;
