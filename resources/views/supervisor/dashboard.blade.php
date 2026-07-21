@@ -690,9 +690,8 @@ updateClock();
 (function(){
   const now = new Date();
   const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  let saved;
-  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
-  document.getElementById('dateInput').value = saved || today;
+  try { localStorage.removeItem('dash_filter_date'); } catch(e) {}
+  document.getElementById('dateInput').value = today;
 })();
 
 function setShift(s){
