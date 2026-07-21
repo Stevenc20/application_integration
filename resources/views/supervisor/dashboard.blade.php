@@ -162,6 +162,14 @@
   .kpi-row .kpi-label      { font-size: 0.78rem !important; }
   .kpi-row .kpi-value      { font-size: 0.82rem !important; }
   .detail-toggle           { font-size: 0.78rem !important; padding: 10px 14px !important; }
+  .per-press-view .press-card-header { font-size: 1.8rem !important; padding: 18px 22px !important; }
+  .per-press-view .kpi-row           { padding: 14px 18px !important; min-height: 46px !important; }
+  .per-press-view .kpi-row .kpi-label { font-size: 1.1rem !important; }
+  .per-press-view .kpi-row .kpi-value { font-size: 1.3rem !important; }
+  .per-press-view .kpi-row .kpi-pct   { font-size: 0.95rem !important; }
+  .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.4rem !important; }
+  .per-press-view .kpi-col-header     { font-size: 0.95rem !important; }
+  .per-press-view .detail-toggle      { font-size: 1.1rem !important; padding: 16px 18px !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
@@ -180,6 +188,14 @@
   .kpi-row .kpi-value      { font-size: 0.9rem !important; }
   .kpi-row .kpi-pct        { font-size: 0.75rem !important; }
   .detail-toggle           { font-size: 0.85rem !important; padding: 12px 16px !important; }
+  .per-press-view .press-card-header { font-size: 2.2rem !important; padding: 22px 28px !important; }
+  .per-press-view .kpi-row           { padding: 16px 22px !important; min-height: 52px !important; }
+  .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
+  .per-press-view .kpi-row .kpi-value { font-size: 1.5rem !important; }
+  .per-press-view .kpi-row .kpi-pct   { font-size: 1.1rem !important; }
+  .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
+  .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
+  .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 18px 22px !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
@@ -203,6 +219,65 @@
   .kpi-row .kpi-value      { font-size: 1.2rem !important; }
   .kpi-row .kpi-pct        { font-size: 0.95rem !important; }
   .detail-toggle           { font-size: 1.1rem !important; padding: 16px 22px !important; }
+  .per-press-view .press-card-header { font-size: 3rem !important; padding: 28px 36px !important; }
+  .per-press-view .kpi-row           { padding: 20px 30px !important; min-height: 64px !important; }
+  .per-press-view .kpi-row .kpi-label { font-size: 1.7rem !important; }
+  .per-press-view .kpi-row .kpi-value { font-size: 2rem !important; }
+  .per-press-view .kpi-row .kpi-pct   { font-size: 1.4rem !important; }
+  .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 2.2rem !important; }
+  .per-press-view .kpi-col-header     { font-size: 1.4rem !important; padding: 14px 30px !important; }
+  .per-press-view .detail-toggle      { font-size: 1.6rem !important; padding: 22px 30px !important; }
+}
+
+/* ── PER-PRESS VIEW (single press, 2-column KPI + big fonts) ─── */
+#linesGrid.per-press-view { gap: 0 !important; }
+.per-press-view .press-card {
+  border-radius: 1.25rem;
+  border: 1px solid #e5e7eb;
+}
+.per-press-view .press-card-header {
+  font-size: 1.6rem;
+  padding: 16px 20px;
+  letter-spacing: 0.3em;
+}
+.per-press-view .press-card-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+}
+.per-press-view .kpi-col-left {
+  border-right: 1px solid #e5e7eb;
+}
+.per-press-view .kpi-col-header {
+  padding: 8px 16px;
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #9ca3af;
+  background: #fafafa;
+  border-bottom: 1px solid #f3f4f6;
+}
+.per-press-view .kpi-row {
+  padding: 12px 16px;
+  min-height: 42px;
+}
+.per-press-view .kpi-row .kpi-label {
+  font-size: 1rem;
+  font-weight: 800;
+}
+.per-press-view .kpi-row .kpi-value {
+  font-size: 1.15rem;
+  font-weight: 800;
+}
+.per-press-view .kpi-row .kpi-pct {
+  font-size: 0.85rem;
+}
+.per-press-view .kpi-row-clickable .kpi-val-main {
+  font-size: 1.2rem;
+}
+.per-press-view .detail-toggle {
+  font-size: 0.95rem;
+  padding: 14px 16px;
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
@@ -505,6 +580,7 @@
 <script>
 const LINES = @json($lines);
 const SELECTED_LINE = @json($selectedLine);
+const IS_PER_PRESS = LINES.length === 1;
 
 let selectedShift = 1;
 let selectedDays  = 1;
@@ -713,6 +789,36 @@ function toggleDetail(safeLine){
 
 const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
 const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
+const LEFT_KPIS  = ['QTY','GSPH','REPAIR','REJECT'];
+const RIGHT_KPIS = ['DT','TOTAL_DT'];
+
+function buildKpiRow(kpi, line, safeLine){
+  const isClickable = kpi.popup || kpi.actualLink;
+  let valueHtml = '';
+  if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+  } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
+  } else if (isClickable) {
+    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+  } else if(kpi.desc === 'GSPH'){
+    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+  } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
+    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+  } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
+    valueHtml = `<span>${kpi.actual}</span>`;
+  } else {
+    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+  }
+  const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
+  const clickCls = isClickable ? ' kpi-row-clickable' : '';
+  const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+  const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
+  return `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
+    <span class="kpi-label">${label}</span>
+    <span class="kpi-value">${valueHtml}</span>
+  </div>`;
+}
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
@@ -724,47 +830,44 @@ function buildLineCard(line){
   const detailRows = LINE_DETAIL[line] || [];
   const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
 
-  let kpiHtml = '';
-
-  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="JOB">
+  const jobRow = `<div class="kpi-row" data-line="${line}" data-desc="JOB">
     <span class="kpi-label">JOB</span>
     <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
   </div>`;
 
-  const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
-  mainRows.forEach((kpi) => {
-    const isClickable = kpi.popup || kpi.actualLink;
-    let valueHtml = '';
-    if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
-      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-    } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
-      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
-    } else if (isClickable) {
-      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
-    } else if(kpi.desc === 'GSPH'){
-      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-    } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
-      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-    } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
-      valueHtml = `<span>${kpi.actual}</span>`;
-    } else {
-      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
-    }
-    const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
-    const clickCls = isClickable ? ' kpi-row-clickable' : '';
-    const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-    const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
-    kpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
-      <span class="kpi-label">${label}</span>
-      <span class="kpi-value">${valueHtml}</span>
-    </div>`;
-  });
-
   const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
-  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
+  const strokeRow = `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
     <span class="kpi-label">STROKE</span>
     <span class="kpi-value">${strokeDisplay}</span>
   </div>`;
+
+  const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
+  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
+
+  let bodyHtml = '';
+  if (IS_PER_PRESS) {
+    let leftHtml = jobRow;
+    let rightHtml = '';
+    mainRows.forEach((kpi) => {
+      if (LEFT_KPIS.includes(kpi.desc)) {
+        leftHtml += buildKpiRow(kpi, line, safeLine);
+      } else {
+        rightHtml += buildKpiRow(kpi, line, safeLine);
+      }
+    });
+    leftHtml += strokeRow;
+    extraRows.forEach((kpi) => {
+      rightHtml += buildKpiRow(kpi, line, safeLine);
+    });
+    bodyHtml = `<div class="kpi-col-left">${leftHtml}</div><div class="kpi-col-right">${rightHtml}</div>`;
+  } else {
+    let kpiHtml = jobRow;
+    mainRows.forEach((kpi) => {
+      kpiHtml += buildKpiRow(kpi, line, safeLine);
+    });
+    kpiHtml += strokeRow;
+    bodyHtml = kpiHtml;
+  }
 
   const hasDetail = detailRows.length > 0;
   const rowCount = detailRows.length;
@@ -774,8 +877,7 @@ function buildLineCard(line){
   });
 
   let extraKpiHtml = '';
-  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
-  if (extraRows.length > 0) {
+  if (!IS_PER_PRESS && extraRows.length > 0) {
     extraRows.forEach((kpi) => {
       const isClickable = kpi.popup || kpi.actualLink;
       let valueHtml = '';
@@ -831,7 +933,7 @@ function buildLineCard(line){
 
   return `<div class="press-card" id="card-${safeLine}">
     <div class="press-card-header">${line}</div>
-    <div class="press-card-body">${kpiHtml}</div>
+    <div class="press-card-body">${bodyHtml}</div>
     <button class="detail-toggle" id="detail-toggle-${safeLine}" onclick="toggleDetail('${safeLine}')">
       <span class="detail-arrow">&#9660;</span> Detail
     </button>
@@ -863,6 +965,11 @@ function buildLineCard(line){
 
 function renderLineCards(forceDetail){
   const grid = document.getElementById('linesGrid');
+  if (IS_PER_PRESS) {
+    grid.classList.add('per-press-view');
+  } else {
+    grid.classList.remove('per-press-view');
+  }
   if (!CARDS_CACHED) {
     grid.innerHTML = LINES.map(buildLineCard).join('');
     CARDS_CACHED = true;
@@ -927,6 +1034,8 @@ function updateCards(forceDetail) {
       let valueHtml = '';
       if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
       } else if (isClickable) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       } else if(kpi.desc === 'GSPH'){
