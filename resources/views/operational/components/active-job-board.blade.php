@@ -60,21 +60,18 @@
             <div class="lg:col-span-9">
                 <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3 h-full">
 
-                    <!-- Scheduling — Atas -->
-                    <div class="bg-slate-50 border border-slate-300 rounded-xl px-4 py-3">
-                        <div class="flex items-center justify-between">
-                            <div class="flex flex-col items-center">
-                                <span class="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Scheduling</span>
-                                <div class="flex items-center gap-2">
-                                    <span class="text-xl sm:text-2xl font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
-                                    <span class="text-slate-400 font-bold text-lg leading-none">→</span>
-                                    <span class="text-xl sm:text-2xl font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
-                                </div>
-                            </div>
-                            <div class="flex flex-col items-center">
-                                <span class="text-xs sm:text-sm font-black text-slate-400 uppercase tracking-widest leading-none mb-1.5">Actual</span>
-                                <p id="timeline-time-label" class="text-2xl sm:text-3xl font-black font-mono text-red-500 leading-none bg-red-50 px-3 py-1 rounded-lg">0%</p>
-                            </div>
+                    <!-- Scheduling -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Scheduling</span>
+                            <span class="w-px h-4 bg-slate-300"></span>
+                            <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
+                            <span class="text-slate-300 font-bold text-sm leading-none">—</span>
+                            <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Actual</span>
+                            <p id="timeline-time-label" class="text-xl sm:text-2xl font-black font-mono text-red-500 leading-none bg-red-50 px-2.5 py-0.5 rounded-lg">0%</p>
                         </div>
                     </div>
 
@@ -355,20 +352,20 @@
                                 <input type="hidden" id="active-actual-{{ $activeJob->id }}" value="0">
                                 <div class="flex flex-col gap-2 mt-2">
                                     <div class="flex gap-1.5">
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all active:scale-95 shadow-sm shadow-emerald-200 flex items-center justify-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition-all active:scale-95 shadow-sm shadow-emerald-200 flex items-center justify-center gap-1.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                                             PLT ({{ $activeJob->capacity ?? 0 }})
                                         </button>
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                         </button>
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', -1, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-1">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>-1
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', -1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>-1
                                         </button>
                                     </div>
-                                    <div class="flex items-center gap-1">
-                                        <input type="number" id="manual-ok-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                        <button onclick="manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-[10px] transition-all active:scale-95">OK</button>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="number" id="manual-ok-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-sm text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button onclick="manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-xs transition-all active:scale-95">OK</button>
                                     </div>
                                 </div>
                             </div>
@@ -380,12 +377,12 @@
                                     <span class="text-3xl sm:text-4xl font-black text-orange-500 leading-none tabular-nums" id="active-repair-display">{{ $activeJob->dailyProduction->actual_repair ?? 0 }}</span>
                                 </div>
                                 <div class="flex flex-col gap-2 mt-2">
-                                    <button onclick="stepInput('active-repair-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-xs hover:bg-orange-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
+                                    <button onclick="stepInput('active-repair-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-sm hover:bg-orange-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                     </button>
-                                    <div class="flex items-center gap-1">
-                                        <input type="number" id="manual-repair-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold outline-none focus:border-orange-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                        <button onclick="manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-2.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white font-black text-[10px] transition-all active:scale-95">Go</button>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="number" id="manual-repair-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-sm text-slate-800 font-bold outline-none focus:border-orange-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button onclick="manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-white font-black text-xs transition-all active:scale-95">Go</button>
                                     </div>
                                 </div>
                             </div>
@@ -397,12 +394,12 @@
                                     <span class="text-3xl sm:text-4xl font-black text-red-500 leading-none tabular-nums" id="active-reject-display">{{ $activeJob->dailyProduction->actual_reject ?? 0 }}</span>
                                 </div>
                                 <div class="flex flex-col gap-2 mt-2">
-                                    <button onclick="stepInput('active-reject-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-xs hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
+                                    <button onclick="stepInput('active-reject-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-sm hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                     </button>
-                                    <div class="flex items-center gap-1">
-                                        <input type="number" id="manual-reject-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                        <button onclick="manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-2.5 py-1.5 rounded-lg bg-red-500 hover:bg-red-400 text-white font-black text-[10px] transition-all active:scale-95">Go</button>
+                                    <div class="flex items-center gap-1.5">
+                                        <input type="number" id="manual-reject-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-sm text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button onclick="manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 rounded-lg bg-red-500 hover:bg-red-400 text-white font-black text-xs transition-all active:scale-95">Go</button>
                                     </div>
                                 </div>
                             </div>
@@ -431,7 +428,7 @@
 
             <!-- Operator Console (Right Area) -->
             <div class="lg:col-span-3">
-                    <div class="h-full flex flex-col justify-between gap-2">
+                    <div class="h-full flex flex-col justify-between">
                     @php
                         $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
                         $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
