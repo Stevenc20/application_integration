@@ -157,11 +157,11 @@
   #liveClock               { font-size: 3.5rem !important; }
   .dash-h1                 { font-size: 2rem !important; }
   .space-wrapper           { gap: 1.5rem !important; }
-  .press-card-header       { font-size: 0.9rem !important; padding: 12px 14px !important; }
-  .kpi-row                 { padding: 9px 14px !important; min-height: 34px !important; }
-  .kpi-row .kpi-label      { font-size: 0.78rem !important; }
-  .kpi-row .kpi-value      { font-size: 0.82rem !important; }
-  .detail-toggle           { font-size: 0.78rem !important; padding: 10px 14px !important; }
+  .press-card-header       { font-size: 1.2rem !important; padding: 14px 16px !important; }
+  .kpi-row                 { padding: 10px 16px !important; min-height: 44px !important; }
+  .kpi-row .kpi-label      { font-size: 1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.1rem !important; }
+  .detail-toggle           { font-size: 0.9rem !important; padding: 12px 16px !important; }
   .per-press-view .press-card-header { font-size: 2rem !important; padding: 20px 28px !important; }
   .per-press-view .kpi-row           { padding: 18px 24px !important; min-height: 56px !important; }
   .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
@@ -182,12 +182,12 @@
   .space-wrapper           { gap: 2rem !important; }
   .chart-grid              { gap: 1.75rem !important; }
   .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
-  .press-card-header       { font-size: 1rem !important; padding: 14px 18px !important; }
-  .kpi-row                 { padding: 10px 16px !important; min-height: 38px !important; }
-  .kpi-row .kpi-label      { font-size: 0.85rem !important; }
-  .kpi-row .kpi-value      { font-size: 0.9rem !important; }
-  .kpi-row .kpi-pct        { font-size: 0.75rem !important; }
-  .detail-toggle           { font-size: 0.85rem !important; padding: 12px 16px !important; }
+  .press-card-header       { font-size: 1.3rem !important; padding: 16px 20px !important; }
+  .kpi-row                 { padding: 12px 18px !important; min-height: 48px !important; }
+  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
+  .kpi-pct        { font-size: 1rem !important; }
+  .detail-toggle           { font-size: 1rem !important; padding: 14px 18px !important; }
   .per-press-view .press-card-header { font-size: 2.2rem !important; padding: 22px 28px !important; }
   .per-press-view .kpi-row           { padding: 16px 22px !important; min-height: 52px !important; }
   .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
@@ -213,12 +213,12 @@
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
   #linesGrid               { grid-template-columns: repeat(4, 1fr) !important; gap: 2.5rem !important; }
-  .press-card-header       { font-size: 1.4rem !important; padding: 18px 24px !important; letter-spacing: 0.25em !important; }
-  .kpi-row                 { padding: 14px 22px !important; min-height: 48px !important; }
-  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
-  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
-  .kpi-row .kpi-pct        { font-size: 0.95rem !important; }
-  .detail-toggle           { font-size: 1.1rem !important; padding: 16px 22px !important; }
+  .press-card-header       { font-size: 1.8rem !important; padding: 20px 28px !important; letter-spacing: 0.25em !important; }
+  .kpi-row                 { padding: 16px 22px !important; min-height: 54px !important; }
+  .kpi-row .kpi-label      { font-size: 1.4rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.6rem !important; }
+  .kpi-row .kpi-pct        { font-size: 1.2rem !important; }
+  .detail-toggle           { font-size: 1.4rem !important; padding: 18px 24px !important; }
   .per-press-view .press-card-header { font-size: 3rem !important; padding: 28px 36px !important; }
   .per-press-view .kpi-row           { padding: 20px 30px !important; min-height: 64px !important; }
   .per-press-view .kpi-row .kpi-label { font-size: 1.7rem !important; }
@@ -398,9 +398,9 @@
 .press-card-header {
   background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
   border-bottom: 2px solid #fecaca;
-  padding: 10px 12px;
+  padding: 12px 16px;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 1.1rem;
   font-weight: 900;
   color: #dc2626;
   letter-spacing: 0.22em;
@@ -417,16 +417,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px;
+  padding: 9px 16px;
   border-bottom: 1px solid #f3f4f6;
   transition: background 0.15s;
-  min-height: 32px;
+  min-height: 42px;
 }
 .kpi-row:last-child { border-bottom: none; }
 .kpi-row:hover { background: #f9fafb; }
 
 .kpi-row .kpi-label {
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: #6b7280;
   text-transform: uppercase;
@@ -434,7 +434,7 @@
   flex-shrink: 0;
 }
 .kpi-row .kpi-value {
-  font-size: 0.75rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #1f2937;
   text-align: right;
@@ -445,7 +445,7 @@
   gap: 1px;
 }
 .kpi-row .kpi-pct {
-  font-size: 0.6rem;
+  font-size: 0.8rem;
   font-weight: 600;
   color: #9ca3af;
   margin-left: 0;
@@ -506,12 +506,12 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px 12px;
+  padding: 10px 14px;
   background: #f8fafc;
   border-top: 1px solid #e5e7eb;
   border: none;
   cursor: pointer;
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: #64748b;
   letter-spacing: 0.05em;
