@@ -210,15 +210,27 @@ class InputHarianController extends Controller
                     $q->where('work_date', $date);
                 },
                 'downtimes' => function ($q) use ($date) {
-                    $q->where(function ($w) use ($date) {
-                        $w->whereDate('start_time', $date)
-                          ->orWhereNull('finish_time');
-                    });
+                    $q->whereDate('start_time', $date);
                 },
-                'dandoris',
+                'dandoris' => function ($q) use ($date) {
+                    $q->whereDate('created_at', $date);
+                },
             ])
             ->get()
             ->keyBy('job_number');
+
+        // AUTO-RESET: If a job_master has status running/paused but no session today, reset to pending
+        foreach ($jobMasters as $jm) {
+            if (in_array(strtolower($jm->status ?? ''), ['running', 'paused'])) {
+                $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $jm->id)
+                    ->whereDate('work_date', $date)
+                    ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                    ->exists();
+                if (!$hasTodaySession) {
+                    $jm->update(['status' => 'pending', 'started_at' => null, 'finished_at' => null]);
+                }
+            }
+        }
 
         // Merge children's production data into parent's JobMaster
         foreach ($childPlans as $parentId => $children) {
