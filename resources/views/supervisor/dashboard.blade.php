@@ -39,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6 min-h-[300px]" id="linesGrid"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -151,53 +151,58 @@
 <style>
 /* ── 1080p / Large Monitor ≥1920px ─────────────────────────── */
 @media (min-width: 1920px) {
-  .kpi-table-cell          { font-size: 0.95rem !important; padding: 10px 14px !important; }
-  .kpi-table-header        { font-size: 0.75rem !important; padding: 9px 14px !important; }
-  .card-line-title         { font-size: 1.05rem !important; padding: 12px 16px !important; }
   .chart-min-h             { min-height: 380px !important; }
   .filter-input            { font-size: 0.95rem !important; padding: 10px 16px !important; }
   .filter-btn              { font-size: 0.9rem !important; padding: 10px 20px !important; }
   #liveClock               { font-size: 3.5rem !important; }
   .dash-h1                 { font-size: 2rem !important; }
-  .linesGrid               { gap: 1.25rem !important; }
   .space-wrapper           { gap: 1.5rem !important; }
+  .press-card-header       { font-size: 0.9rem !important; padding: 12px 14px !important; }
+  .kpi-row                 { padding: 9px 14px !important; min-height: 34px !important; }
+  .kpi-row .kpi-label      { font-size: 0.78rem !important; }
+  .kpi-row .kpi-value      { font-size: 0.82rem !important; }
+  .detail-toggle           { font-size: 0.78rem !important; padding: 10px 14px !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
 @media (min-width: 2560px) {
-  .kpi-table-cell          { font-size: 1.15rem !important; padding: 13px 18px !important; }
-  .kpi-table-header        { font-size: 0.9rem !important; padding: 12px 18px !important; }
-  .card-line-title         { font-size: 1.3rem !important; padding: 15px 20px !important; letter-spacing: 0.15em !important; }
   .chart-min-h             { min-height: 500px !important; }
   .filter-input            { font-size: 1.1rem !important; padding: 12px 20px !important; }
   .filter-btn              { font-size: 1.05rem !important; padding: 12px 28px !important; }
   #liveClock               { font-size: 5rem !important; }
   .dash-h1                 { font-size: 2.6rem !important; }
-  .linesGrid               { gap: 1.75rem !important; grid-template-columns: repeat(4, 1fr) !important; }
   .space-wrapper           { gap: 2rem !important; }
   .chart-grid              { gap: 1.75rem !important; }
   .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
+  .press-card-header       { font-size: 1rem !important; padding: 14px 18px !important; }
+  .kpi-row                 { padding: 10px 16px !important; min-height: 38px !important; }
+  .kpi-row .kpi-label      { font-size: 0.85rem !important; }
+  .kpi-row .kpi-value      { font-size: 0.9rem !important; }
+  .kpi-row .kpi-pct        { font-size: 0.75rem !important; }
+  .detail-toggle           { font-size: 0.85rem !important; padding: 12px 16px !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
 @media (min-width: 3840px) {
-  .kpi-table-cell          { font-size: 1.65rem !important; padding: 20px 28px !important; }
-  .kpi-table-header        { font-size: 1.25rem !important; padding: 18px 28px !important; }
-  .card-line-title         { font-size: 1.9rem !important; padding: 22px 28px !important; letter-spacing: 0.2em !important; }
   .chart-min-h             { min-height: 720px !important; }
   .filter-input            { font-size: 1.5rem !important; padding: 18px 28px !important; border-radius: 1rem !important; }
   .filter-btn              { font-size: 1.45rem !important; padding: 18px 40px !important; border-radius: 1rem !important; }
   #liveClock               { font-size: 7.5rem !important; }
   .dash-h1                 { font-size: 3.75rem !important; }
   .dash-subtitle           { font-size: 1.4rem !important; }
-  .linesGrid               { gap: 2.5rem !important; grid-template-columns: repeat(4, 1fr) !important; }
   .space-wrapper           { gap: 3rem !important; }
   .chart-grid              { gap: 2.5rem !important; }
   .section-card            { border-radius: 1.5rem !important; padding: 2rem !important; }
   .modal-dialog-inner      { max-width: 1400px !important; font-size: 1.6rem !important; }
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
-  #linesGrid               { grid-template-columns: repeat(2, 1fr) !important; gap: 2.5rem !important; }
+  #linesGrid               { grid-template-columns: repeat(4, 1fr) !important; gap: 2.5rem !important; }
+  .press-card-header       { font-size: 1.4rem !important; padding: 18px 24px !important; letter-spacing: 0.25em !important; }
+  .kpi-row                 { padding: 14px 22px !important; min-height: 48px !important; }
+  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
+  .kpi-row .kpi-pct        { font-size: 0.95rem !important; }
+  .detail-toggle           { font-size: 1.1rem !important; padding: 16px 22px !important; }
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
@@ -296,6 +301,169 @@
 }
 .det-empty svg  { width: 32px; height: 32px; opacity: 0.5; }
 .det-empty span { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #b0b7c3; }
+
+/* ── PRESS CARD NEW LAYOUT ──────────────────────────────────── */
+.press-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.press-card:hover { border-color: #fca5a5; }
+
+.press-card-header {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
+  border-bottom: 2px solid #fecaca;
+  padding: 10px 12px;
+  text-align: center;
+  font-size: 0.85rem;
+  font-weight: 900;
+  color: #dc2626;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.press-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.kpi-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 12px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+  min-height: 32px;
+}
+.kpi-row:last-child { border-bottom: none; }
+.kpi-row:hover { background: #f9fafb; }
+
+.kpi-row .kpi-label {
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.kpi-row .kpi-value {
+  font-size: 0.75rem;
+  font-weight: 800;
+  color: #1f2937;
+  text-align: right;
+  word-break: break-word;
+}
+.kpi-row .kpi-pct {
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin-left: 3px;
+}
+
+/* GSPH row highlight */
+.kpi-row[data-desc="GSPH"] {
+  background: #f0f9ff;
+  border-bottom: 1px solid #bae6fd;
+}
+.kpi-row[data-desc="GSPH"] .kpi-label { color: #0369a1; }
+
+/* JOB row highlight */
+.kpi-row[data-desc="JOB"] {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+}
+.kpi-row[data-desc="JOB"] .kpi-label { color: #1d4ed8; }
+
+/* STROKE row highlight */
+.kpi-row[data-desc="STROKE"] {
+  background: #f5f3ff;
+  border-bottom: 1px solid #ddd6fe;
+}
+.kpi-row[data-desc="STROKE"] .kpi-label { color: #7c3aed; }
+
+/* Detail toggle button */
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #f8fafc;
+  border-top: 1px solid #e5e7eb;
+  border: none;
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  transition: all 0.15s;
+  width: 100%;
+}
+.detail-toggle:hover { background: #eff6ff; color: #3b82f6; }
+.detail-toggle .detail-arrow {
+  display: inline-block;
+  transition: transform 0.25s;
+  font-size: 0.6rem;
+}
+.detail-toggle.open .detail-arrow { transform: rotate(180deg); }
+
+/* Detail panel dropdown */
+.detail-panel {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.35s ease-in-out;
+  background: #fafbfc;
+  border-top: 1px solid #e5e7eb;
+}
+.detail-panel.open {
+  max-height: 400px;
+  overflow-y: auto;
+}
+.detail-panel-inner {
+  padding: 8px;
+}
+.detail-panel .det-empty { padding: 20px 12px; }
+
+/* ── BLINK ANIMATIONS ──────────────────────────────────────── */
+@keyframes blink-red {
+  0%, 100% { background: #ef4444 !important; color: #fff !important; }
+  50% { background: #fff !important; color: #ef4444 !important; }
+}
+@keyframes blink-yellow {
+  0%, 100% { background: #eab308 !important; color: #000 !important; }
+  50% { background: #fff !important; color: #eab308 !important; }
+}
+@keyframes blink-green {
+  0%, 100% { background: #22c55e !important; color: #fff !important; }
+  50% { background: #fff !important; color: #22c55e !important; }
+}
+
+.kpi-row.blink-red {
+  animation: blink-red 0.8s ease-in-out infinite;
+  border-radius: 4px;
+  margin: 0 4px;
+  padding: 7px 8px;
+}
+.kpi-row.blink-yellow {
+  animation: blink-yellow 1.2s ease-in-out infinite;
+  border-radius: 4px;
+  margin: 0 4px;
+  padding: 7px 8px;
+}
+.kpi-row.blink-green {
+  animation: blink-green 0.6s ease-in-out 3;
+  border-radius: 4px;
+  margin: 0 4px;
+  padding: 7px 8px;
+}
 </style>
 
 @endsection
@@ -486,78 +654,85 @@ function detailCells(r){
     dCell(r.plan_finish) + dCell(r.actual_finish);
 }
 
+function cellClass(desc, actual, actPct){
+    if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'blink-green':p>=80?'blink-yellow':'blink-red';}
+    if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'blink-red':p>2?'blink-yellow':'';}
+    if(desc==='DT'||desc==='TOTAL_DT'){const v=parseFloat(actual);return v>30?'blink-red':v>15?'blink-yellow':'';}
+    return '';
+}
+
+var prevBlinkClass = {};
+
+function toggleDetail(line){
+  const panel = document.getElementById('detail-panel-' + line);
+  const btn = document.getElementById('detail-toggle-' + line);
+  if (!panel || !btn) return;
+  const isOpen = panel.classList.contains('open');
+  if (isOpen) {
+    panel.classList.remove('open');
+    btn.classList.remove('open');
+    btn.innerHTML = '<span class="detail-arrow">&#9660;</span> Detail';
+  } else {
+    panel.classList.add('open');
+    btn.classList.add('open');
+    btn.innerHTML = '<span class="detail-arrow">&#9660;</span> Detail';
+  }
+}
+
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
   const meta = LINE_META[line] || {};
   const jobLabel = meta.job || '-';
-  const jobPlan = meta.jobPlan || '0';  
   const jobActual = meta.jobActual || '0/0';
   const strokeVal = meta.stroke || '0';
   const currStrokeVal = meta.currStroke || '-';
   const detailRows = LINE_DETAIL[line] || [];
+  const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
 
-  // KPI table rows
-  let kpiRows = `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
-    <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">JOB</td>
-    <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">${jobPlan}</td>
-    <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${jobActual}</td>
-    <td class="px-4 py-3 text-center text-gray-800 font-semibold text-xs sm:text-sm">${jobLabel}</td>
-  </tr>`;
+  let kpiHtml = '';
+
+  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="JOB">
+    <span class="kpi-label">JOB</span>
+    <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
+  </div>`;
 
   rows.forEach((kpi) => {
-    const dangerRowCls = kpi.danger ? 'bg-red-50' : 'hover:bg-gray-50/70';
-    const textDescCls  = kpi.danger ? 'text-red-700 font-extrabold' : 'text-gray-700 font-bold';
-    let clickAttr = kpi.popup || kpi.actualLink ? `onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-    let cursorCls = kpi.popup || kpi.actualLink ? 'cursor-pointer hover:bg-red-50 transition-colors' : '';
-    let underlineCls = kpi.popup || kpi.actualLink ? 'underline decoration-dotted decoration-red-300 underline-offset-4' : '';
-
-    let actualCell = '';
-    if(kpi.popup && (kpi.desc==='REPAIR' || kpi.desc==='REJECT')){
-      actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
+    let valueHtml = '';
+    if(kpi.desc === 'GSPH'){
+      valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
+      valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if(kpi.desc === 'TOTAL_DT' || kpi.desc === 'DT'){
+      valueHtml = `<span>${kpi.actual}m</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     } else {
-      actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span>`;
+      valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     }
 
-    kpiRows += `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
-      <td class="kpi-table-cell px-4 py-3 text-left ${textDescCls} border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base">${kpi.desc}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-gray-500 text-xs sm:text-sm lg:text-base">${kpi.plan}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-xs sm:text-sm lg:text-base ${cursorCls}" ${clickAttr}>${actualCell}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.currentPct ? `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>` : kpi.current}</td>
-    </tr>`;
+    let clickAttr = kpi.popup || kpi.actualLink ? `onclick="event.stopPropagation(); openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+    let styleAttr = (kpi.popup || kpi.actualLink) ? 'cursor:pointer' : '';
+
+    kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="${kpi.desc}" ${clickAttr} style="${styleAttr}" id="kpi-${kpi.desc}-${safeLine}">
+      <span class="kpi-label">${kpi.desc}</span>
+      <span class="kpi-value">${valueHtml}</span>
+    </div>`;
 
     if(kpi.desc === 'GSPH'){
-      kpiRows += `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
-        <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">STROKE</td>
-        <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">-</td>
-        <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${Number(strokeVal).toLocaleString('id-ID')}</td>
-        <td class="px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm">${currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID')}</td>
-      </tr>`;
+      const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
+      kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
+        <span class="kpi-label">STROKE</span>
+        <span class="kpi-value">${strokeDisplay}</span>
+      </div>`;
     }
   });
 
-  // Detail rows
   const hasDetail = detailRows.length > 0;
-  const rowCount  = detailRows.length;
-
+  const rowCount = detailRows.length;
   let detRows = '';
-  detailRows.forEach((r, idx) => {
-    detRows += `<tr>
-      ${detailCells(r)}
-    </tr>`;
+  detailRows.forEach((r) => {
+    detRows += `<tr>${detailCells(r)}</tr>`;
   });
 
-  // Detail section: label badge + table/empty state
-  const detSection = `
-    <div class="det-section-label">
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
-        <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
-        <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
-        <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
-      </svg>
-      <span class="label-text">Detail Produksi</span>
-      <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
-    </div>
-    ${hasDetail ? `
+  const detInner = hasDetail ? `
     <div class="det-scroll">
       <table class="det-table">
         <thead>
@@ -590,29 +765,28 @@ function buildLineCard(line){
           d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
       </svg>
       <span>Belum ada data produksi</span>
-    </div>`}
-  `;
-      
-  return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
-    <div class="card-line-title bg-red-50 border-b border-red-100 px-5 py-4 text-center text-red-700 font-black tracking-[0.2em] text-sm sm:text-base lg:text-lg uppercase">
-      ${line}
+    </div>`;
+
+  return `<div class="press-card" id="card-${safeLine}">
+    <div class="press-card-header">${line}</div>
+    <div class="press-card-body">${kpiHtml}</div>
+    <button class="detail-toggle" id="detail-toggle-${safeLine}" onclick="toggleDetail('${line}')">
+      <span class="detail-arrow">&#9660;</span> Detail
+    </button>
+    <div class="detail-panel" id="detail-panel-${safeLine}">
+      <div class="detail-panel-inner">
+        <div class="det-section-label">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+            <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
+            <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+          </svg>
+          <span class="label-text">Detail Produksi</span>
+          <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
+        </div>
+        ${detInner}
+      </div>
     </div>
-    <div class="overflow-x-auto">
-      <table class="border-collapse w-full">
-        <thead>
-          <tr class="bg-gray-100 border-b-2 border-gray-200 text-gray-500">
-            <th class="kpi-table-header px-4 py-3 text-left text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">DESC</th>
-            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">PLAN</th>
-            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">ACTUAL</th>
-            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">CURR</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${kpiRows}
-        </tbody>
-      </table>
-    </div>
-    ${detSection}
   </div>`;
 }
 
@@ -629,22 +803,22 @@ function renderLineCards(forceDetail){
 
 function cacheCards() {
   CELL_CACHE = {};
-  document.querySelectorAll('#linesGrid .bg-white').forEach(card => {
-    const line = card.querySelector('.card-line-title').textContent.trim();
+  LINES.forEach(line => {
+    const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
+    const card = document.getElementById('card-' + safeLine);
+    if (!card) return;
     CELL_CACHE[line] = { el: card };
-    card.querySelectorAll('tbody tr').forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 4) return;
-      const desc = cells[0].textContent.trim();
-      CELL_CACHE[`${line}-${desc}-plan`]   = cells[1];
-      CELL_CACHE[`${line}-${desc}-actual`] = cells[2];
-      CELL_CACHE[`${line}-${desc}-curr`]   = cells[3];
+
+    card.querySelectorAll('.kpi-row').forEach(row => {
+      const desc = row.getAttribute('data-desc');
+      if (!desc) return;
+      CELL_CACHE[`${line}-${desc}-row`] = row;
+      CELL_CACHE[`${line}-${desc}-value`] = row.querySelector('.kpi-value');
     });
   });
 }
 
 function updateCards(forceDetail) {
-  // Detail changed: skip KPI update, rebuild everything
   if (forceDetail || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH) {
     LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
     flushCardCache();
@@ -654,60 +828,56 @@ function updateCards(forceDetail) {
     return;
   }
 
-  // Only KPI data changed — incremental cell update
   LINES.forEach(line => {
     const rows = LINE_KPI[line] || [];
     const meta = LINE_META[line] || {};
+    const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
 
-    setText(CELL_CACHE[`${line}-JOB-plan`],   meta.jobPlan || '0');
-    setText(CELL_CACHE[`${line}-JOB-actual`],  meta.jobActual || '0/0');
-    setText(CELL_CACHE[`${line}-JOB-curr`],    meta.job || '-');
+    const jobValEl = CELL_CACHE[`${line}-JOB-value`];
+    if (jobValEl) {
+      const h = `${meta.jobActual || '0/0'} <span class="kpi-pct">${meta.job && meta.job !== '-' ? meta.job : ''}</span>`;
+      if (jobValEl.innerHTML !== h) jobValEl.innerHTML = h;
+    }
 
-    const st = meta.stroke || '0';
-    const cs = meta.currStroke || '-';
-    setText(CELL_CACHE[`${line}-STROKE-plan`], '-');
-    setText(CELL_CACHE[`${line}-STROKE-actual`], Number(st).toLocaleString('id-ID'));
-    setText(CELL_CACHE[`${line}-STROKE-curr`], cs==='-'?'-':Number(cs||0).toLocaleString('id-ID'));
+    const strokeValEl = CELL_CACHE[`${line}-STROKE-value`];
+    if (strokeValEl) {
+      const st = meta.stroke || '0';
+      const cs = meta.currStroke || '-';
+      const h = cs === '-' ? '-' : Number(cs || 0).toLocaleString('id-ID') + ' / ' + Number(st).toLocaleString('id-ID');
+      if (strokeValEl.textContent !== h) strokeValEl.textContent = h;
+    }
 
     rows.forEach(kpi => {
-      const planCell   = CELL_CACHE[`${line}-${kpi.desc}-plan`];
-      const actualCell = CELL_CACHE[`${line}-${kpi.desc}-actual`];
-      const currCell   = CELL_CACHE[`${line}-${kpi.desc}-curr`];
+      const rowEl = CELL_CACHE[`${line}-${kpi.desc}-row`];
+      const valEl = CELL_CACHE[`${line}-${kpi.desc}-value`];
+      if (!rowEl || !valEl) return;
 
-      if (planCell) setText(planCell, kpi.plan || '-');
-
-      if (actualCell) {
-        if (kpi.popup && (kpi.desc==='REPAIR'||kpi.desc==='REJECT')) {
-          const h = `<span class="text-red-600 font-extrabold underline decoration-dotted decoration-red-300 underline-offset-4">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
-          if (actualCell.innerHTML !== h) actualCell.innerHTML = h;
-        } else {
-          setText(actualCell, kpi.actual);
-        }
+      let valueHtml = '';
+      if(kpi.desc === 'GSPH'){
+        valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
+        valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      } else if(kpi.desc === 'TOTAL_DT' || kpi.desc === 'DT'){
+        valueHtml = `<span>${kpi.actual}m</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      } else {
+        valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       }
+      if (valEl.innerHTML !== valueHtml) valEl.innerHTML = valueHtml;
 
-      if (currCell) {
-        if (kpi.currentPct) {
-          const h = `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>`;
-          if (currCell.innerHTML !== h) currCell.innerHTML = h;
-        } else {
-          setText(currCell, kpi.current);
-        }
-      }
+      const newBlink = cellClass(kpi.desc, kpi.actual, kpi.actualPct);
+      const prevBlink = prevBlinkClass[`${line}-${kpi.desc}`] || '';
 
-      if (planCell) {
-        const row  = planCell.closest('tr');
-        const dsc  = row ? row.cells[0] : null;
-        if (row && dsc) {
-          const dangerCls = 'border-b border-gray-100 transition-colors bg-red-50';
-          const safeCls   = 'border-b border-gray-100 transition-colors hover:bg-gray-50/70';
-          const wantDanger = kpi.danger ? dangerCls : safeCls;
-          if (row.className !== wantDanger) row.className = wantDanger;
-          const txtCls = kpi.danger
-            ? 'kpi-table-cell px-4 py-3 text-left text-red-700 font-extrabold border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base'
-            : 'kpi-table-cell px-4 py-3 text-left text-gray-700 font-bold border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base';
-          if (dsc.className !== txtCls) dsc.className = txtCls;
-        }
+      if (prevBlink && prevBlink.includes('blink') && !newBlink.includes('blink')) {
+        rowEl.classList.remove('blink-red', 'blink-yellow', 'blink-green');
+        rowEl.classList.add('blink-green');
+        setTimeout(() => {
+          rowEl.classList.remove('blink-green');
+        }, 1800);
+      } else {
+        rowEl.classList.remove('blink-red', 'blink-yellow', 'blink-green');
+        if (newBlink) rowEl.classList.add(newBlink);
       }
+      prevBlinkClass[`${line}-${kpi.desc}`] = newBlink;
     });
   });
 }
@@ -716,6 +886,7 @@ function flushCardCache() {
   CARDS_CACHED = false;
   CELL_CACHE = {};
   LAST_DETAIL_RENDER_HASH = '';
+  prevBlinkClass = {};
 }
 
 function openKpiDetailModal(type, line){
