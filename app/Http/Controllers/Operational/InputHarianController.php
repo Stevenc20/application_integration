@@ -219,16 +219,19 @@ class InputHarianController extends Controller
             ->get()
             ->keyBy('job_number');
 
-        // AUTO-RESET: If a job_master has status running/paused but no session today, reset to pending
+        // AUTO-RESET: Reset stale job_masters that have no active session for today
+        // This handles: running/paused from yesterday, complete from yesterday, etc.
         foreach ($jobMasters as $jm) {
-            if (in_array(strtolower($jm->status ?? ''), ['running', 'paused'])) {
-                $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $jm->id)
-                    ->whereDate('work_date', $date)
-                    ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
-                    ->exists();
-                if (!$hasTodaySession) {
-                    $jm->update(['status' => 'pending', 'started_at' => null, 'finished_at' => null]);
-                }
+            if (strtolower($jm->status ?? '') === 'pending') continue;
+            $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $jm->id)
+                ->whereDate('work_date', $date)
+                ->exists();
+            if (!$hasTodaySession) {
+                $jm->update([
+                    'status' => 'pending',
+                    'started_at' => null,
+                    'finished_at' => null,
+                ]);
             }
         }
 
