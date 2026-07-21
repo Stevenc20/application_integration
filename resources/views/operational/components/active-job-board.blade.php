@@ -428,7 +428,7 @@
 
             <!-- Operator Console (Right Area) -->
             <div class="lg:col-span-3">
-                    <div class="h-full flex flex-col justify-between">
+                    <div class="h-full flex flex-col">
                     @php
                         $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
                         $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
