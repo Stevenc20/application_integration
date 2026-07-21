@@ -129,7 +129,13 @@
 <div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeKpiDetailModal()">
     <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
         <div class="px-5 py-4 border-b border-red-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
-            <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
+            <div class="flex items-center">
+                <button id="modalBackBtn" onclick="modalGoBack()">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 16l-6-6 6-6"/></svg>
+                    Kembali
+                </button>
+                <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
+            </div>
             <button onclick="closeKpiDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -161,7 +167,6 @@
   .kpi-row                 { padding: 10px 16px !important; min-height: 44px !important; }
   .kpi-row .kpi-label      { font-size: 1rem !important; }
   .kpi-row .kpi-value      { font-size: 1.1rem !important; }
-  .detail-toggle           { font-size: 0.9rem !important; padding: 12px 16px !important; }
   .per-press-view .press-card-header { font-size: 2rem !important; padding: 20px 28px !important; }
   .per-press-view .kpi-row           { padding: 18px 24px !important; min-height: 56px !important; }
   .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
@@ -169,7 +174,6 @@
   .per-press-view .kpi-row .kpi-pct   { font-size: 1.1rem !important; }
   .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
   .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
-  .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 20px 24px !important; }
   .per-press-table thead th           { font-size: 1.1rem !important; padding: 16px 24px !important; }
   .per-press-table tbody td           { font-size: 1.25rem !important; padding: 16px 24px !important; }
   .per-press-table .pp-td-clickable   { font-size: 1.25rem !important; }
@@ -190,7 +194,6 @@
   .kpi-row .kpi-label      { font-size: 1.1rem !important; }
   .kpi-row .kpi-value      { font-size: 1.2rem !important; }
   .kpi-pct        { font-size: 1rem !important; }
-  .detail-toggle           { font-size: 1rem !important; padding: 14px 18px !important; }
   .per-press-view .press-card-header { font-size: 2.2rem !important; padding: 22px 28px !important; }
   .per-press-view .kpi-row           { padding: 16px 22px !important; min-height: 52px !important; }
   .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
@@ -198,7 +201,6 @@
   .per-press-view .kpi-row .kpi-pct   { font-size: 1.1rem !important; }
   .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
   .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
-  .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 18px 22px !important; }
   .per-press-table thead th           { font-size: 1.2rem !important; padding: 18px 28px !important; }
   .per-press-table tbody td           { font-size: 1.4rem !important; padding: 18px 28px !important; }
   .per-press-table .pp-td-clickable   { font-size: 1.4rem !important; }
@@ -224,7 +226,6 @@
   .kpi-row .kpi-label      { font-size: 1.4rem !important; }
   .kpi-row .kpi-value      { font-size: 1.6rem !important; }
   .kpi-row .kpi-pct        { font-size: 1.2rem !important; }
-  .detail-toggle           { font-size: 1.4rem !important; padding: 18px 24px !important; }
   .per-press-view .press-card-header { font-size: 3rem !important; padding: 28px 36px !important; }
   .per-press-view .kpi-row           { padding: 20px 30px !important; min-height: 64px !important; }
   .per-press-view .kpi-row .kpi-label { font-size: 1.7rem !important; }
@@ -232,7 +233,6 @@
   .per-press-view .kpi-row .kpi-pct   { font-size: 1.4rem !important; }
   .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 2.2rem !important; }
   .per-press-view .kpi-col-header     { font-size: 1.4rem !important; padding: 14px 30px !important; }
-  .per-press-view .detail-toggle      { font-size: 1.6rem !important; padding: 22px 30px !important; }
   .per-press-table thead th           { font-size: 1.5rem !important; padding: 22px 36px !important; }
   .per-press-table tbody td           { font-size: 1.7rem !important; padding: 22px 36px !important; }
   .per-press-table .pp-td-clickable   { font-size: 1.7rem !important; }
@@ -363,9 +363,6 @@
 .per-press-view .kpi-row-clickable .kpi-val-main {
   font-size: 1.5rem;
 }
-.per-press-view .detail-toggle {
-  font-size: 1.15rem;
-  padding: 18px 24px;
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
@@ -609,19 +606,61 @@
   justify-content: center;
   gap: 6px;
   padding: 10px 14px;
-  background: #f8fafc;
-  border-top: 1px solid #e5e7eb;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
   border: none;
+  border-top: 1px solid #e2e8f0;
   cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 800;
-  color: #64748b;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.04em;
   transition: all 0.15s;
   width: 100%;
 }
-.detail-toggle:hover { background: #eff6ff; color: #3b82f6; }
+.detail-toggle svg { opacity: 0.6; transition: opacity 0.15s; }
+.detail-toggle:hover { background: #eff6ff; color: #2563eb; }
+.detail-toggle:hover svg { opacity: 1; }
+
+/* ── MODAL KPI CLICKABLE ROWS (inside press detail modal) ──── */
+.kpi-modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+.kpi-modal-row:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.kpi-modal-row .kpi-modal-label { font-size: 0.8rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-modal-row .kpi-modal-value { font-size: 1.1rem; font-weight: 900; color: #1e293b; }
+.kpi-modal-row .kpi-modal-arrow { color: #94a3b8; transition: color 0.15s, transform 0.15s; }
+.kpi-modal-row:hover .kpi-modal-arrow { color: #2563eb; transform: translateX(2px); }
+.kpi-modal-row.is-zero .kpi-modal-value { color: #94a3b8; }
+
+/* Modal back button */
+#modalBackBtn {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  margin-right: 8px;
+}
+#modalBackBtn:hover { background: #fee2e2; color: #dc2626; }
+#modalBackBtn.visible { display: inline-flex; }
 
 /* ── BLINK ANIMATIONS ──────────────────────────────────────── */
 @keyframes blink-red {
@@ -673,6 +712,7 @@ let LINE_KPI = {};
 let LINE_META = {};
 let DETAIL_DATA = {};
 let PRESS_DETAIL_DATA = {};
+let MODAL_STACK = [];
 let LAST_KPI_HASH = '';
 let LAST_DETAIL_HASH = '';
 
@@ -1002,17 +1042,22 @@ function buildLineCard(line){
       const isClickable = kpi.popup || kpi.actualLink;
       let valueHtml = '';
       if (isClickable) {
-        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+        const zeroCls = (!kpi.actual || kpi.actual === '0 m' || kpi.actual === '0') ? ' is-zero' : '';
+        valueHtml = `<span class="kpi-modal-value${zeroCls}">${kpi.actual}</span>`;
+        extraKpiHtml += `<div class="kpi-modal-row" onclick="openKpiFromPressDetail('${kpi.desc}','${line}')">
+          <span class="kpi-modal-label">${kpi.desc}</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            ${valueHtml}
+            <span class="kpi-modal-arrow"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l6 6-6 6"/></svg></span>
+          </span>
+        </div>`;
       } else {
-        valueHtml = `<span>${kpi.actual}</span>`;
+        valueHtml = `<span class="kpi-modal-value">${kpi.actual}</span>`;
+        extraKpiHtml += `<div class="kpi-modal-row">
+          <span class="kpi-modal-label">${kpi.desc}</span>
+          <span>${valueHtml}</span>
+        </div>`;
       }
-      const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
-      const clickCls = isClickable ? ' kpi-row-clickable' : '';
-      const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-      extraKpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}"${clickAttr}>
-        <span class="kpi-label">${kpi.desc}</span>
-        <span class="kpi-value">${valueHtml}</span>
-      </div>`;
     });
   }
 
@@ -1078,7 +1123,8 @@ function buildLineCard(line){
     <div class="press-card-header">${line}</div>
     <div class="press-card-body">${bodyHtml}</div>
     <button class="detail-toggle" onclick="openPressDetailModal('${safeLine}','${line}')">
-      <span>&#9660;</span> Detail
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M13.5 13.5L17 17"/></svg>
+      Detail
     </button>
   </div>`;
 }
@@ -1224,17 +1270,24 @@ function openPressDetailModal(safeLine, line){
   const backdrop = document.getElementById('modalBackdrop');
   const dialog = document.getElementById('modalDialog');
   const body = document.getElementById('modalBody');
+  const backBtn = document.getElementById('modalBackBtn');
+
+  MODAL_STACK = [];
+  backBtn.classList.remove('visible');
 
   document.getElementById('modalTitle').textContent = `${line} DETAIL`;
 
   let html = '';
   if (data.extraKpiHtml) {
-    html += `<div style="margin-bottom:16px">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+    html += `<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
         <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/><path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/></svg>
         <span style="font-size:0.85rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Downtime Detail</span>
+        <span style="font-size:0.65rem;color:#94a3b8;font-weight:600">— klik untuk rincian</span>
       </div>
-      ${data.extraKpiHtml}
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${data.extraKpiHtml}
+      </div>
     </div>`;
   }
   html += `<div>
@@ -1250,6 +1303,178 @@ function openPressDetailModal(safeLine, line){
   backdrop.classList.remove('hidden');
   backdrop.classList.add('flex');
   setTimeout(() => { dialog.classList.add('scale-100', 'opacity-100'); dialog.classList.remove('scale-95', 'opacity-0'); }, 10);
+}
+
+function openKpiFromPressDetail(type, line){
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  const body = document.getElementById('modalBody');
+  const title = document.getElementById('modalTitle');
+  const backBtn = document.getElementById('modalBackBtn');
+
+  MODAL_STACK.push({ html: body.innerHTML, title: title.textContent });
+  backBtn.classList.add('visible');
+
+  title.textContent = `Rincian ${type} — ${line}`;
+  body.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
+      <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+      <span class="text-sm font-semibold">Memuat rincian...</span>
+    </div>`;
+  body.scrollTop = 0;
+
+  try {
+    const typeData = DETAIL_DATA[type];
+    if(!typeData) { showKpiModalEmpty(); return; }
+
+    let html = '';
+
+    if(typeData.type === 'production'){
+      const lineData = typeData[line];
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">OK Qty</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map((r, i) => `<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${i + 1}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-center text-green-600 font-black">${r.ok}</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
+        </tbody></table></div>`;
+    } else {
+      const lineData = typeData[line];
+      if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { showKpiModalEmpty(); return; }
+
+      if(typeData.type === 'quality'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-20">Qty</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="3" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
+          </tbody></table></div>`;
+      } else if(typeData.type === 'dt_summary'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
+            <td class="px-4 py-3 font-semibold text-blue-700">${r.job || '-'}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+            <td class="px-4 py-3 text-gray-600">${r.action || '-'}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50 font-black">
+            <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+            <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
+          </tr>
+          </tbody></table></div>`;
+      } else if(typeData.type === 'runtime'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
+          </tbody></table></div>`;
+      } else if(typeData.type === 'idle_detail'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item / Job</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200">Idle Start</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200">Idle End</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-center text-gray-600">${r.start}</td>
+            <td class="px-4 py-3 text-center text-gray-600">${r.end}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="4" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL IDLE</td>
+            <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td></tr>
+          </tbody></table></div>`;
+      } else {
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+            <td class="px-4 py-3 text-gray-600">${r.action}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td></tr>
+          </tbody></table></div>`;
+      }
+    }
+
+    body.innerHTML = html;
+  } catch (e) {
+    console.error("Error in openKpiFromPressDetail:", e);
+    body.innerHTML = `<div class="text-center py-10 text-red-500 font-medium">Error: ${e.message}</div>`;
+  }
+}
+
+function modalGoBack(){
+  if (MODAL_STACK.length === 0) return;
+  const prev = MODAL_STACK.pop();
+  const body = document.getElementById('modalBody');
+  const title = document.getElementById('modalTitle');
+  const backBtn = document.getElementById('modalBackBtn');
+
+  body.innerHTML = prev.html;
+  title.textContent = prev.title;
+  body.scrollTop = 0;
+
+  if (MODAL_STACK.length === 0) backBtn.classList.remove('visible');
 }
 
 function openKpiDetailModal(type, line){
@@ -1443,7 +1668,11 @@ function showKpiModalEmpty(){
 function closeKpiDetailModal(){
   const backdrop = document.getElementById('modalBackdrop');
   const dialog = document.getElementById('modalDialog');
-  
+  const backBtn = document.getElementById('modalBackBtn');
+
+  MODAL_STACK = [];
+  backBtn.classList.remove('visible');
+
   dialog.classList.remove('scale-100', 'opacity-100');
   dialog.classList.add('scale-95', 'opacity-0');
   
