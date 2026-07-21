@@ -172,6 +172,7 @@
   .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 20px 24px !important; }
   .per-press-table thead th           { font-size: 1.1rem !important; padding: 16px 24px !important; }
   .per-press-table tbody td           { font-size: 1.25rem !important; padding: 16px 24px !important; }
+  .per-press-table .pp-td-clickable   { font-size: 1.25rem !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
@@ -200,6 +201,7 @@
   .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 18px 22px !important; }
   .per-press-table thead th           { font-size: 1.2rem !important; padding: 18px 28px !important; }
   .per-press-table tbody td           { font-size: 1.4rem !important; padding: 18px 28px !important; }
+  .per-press-table .pp-td-clickable   { font-size: 1.4rem !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
@@ -233,6 +235,7 @@
   .per-press-view .detail-toggle      { font-size: 1.6rem !important; padding: 22px 30px !important; }
   .per-press-table thead th           { font-size: 1.5rem !important; padding: 22px 36px !important; }
   .per-press-table tbody td           { font-size: 1.7rem !important; padding: 22px 36px !important; }
+  .per-press-table .pp-td-clickable   { font-size: 1.7rem !important; }
 }
 
 /* ── PER-PRESS VIEW (single press, full-width card + big fonts) ─── */
@@ -296,6 +299,18 @@
 .per-press-table .pp-row-job td { background: #eff6ff; border-bottom-color: #bfdbfe; }
 .per-press-table .pp-row-gsph td { background: #f0f9ff; border-bottom-color: #bae6fd; }
 .per-press-table .pp-row-stroke td { background: #f5f3ff; border-bottom-color: #ddd6fe; }
+.per-press-table .pp-td-clickable {
+  color: #dc2626;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #fca5a5;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.per-press-table .pp-td-clickable:hover { color: #b91c1c; }
+.per-press-table .pp-row-clickable { cursor: pointer; }
+.per-press-table .pp-row-clickable:hover { background: #fef2f2; }
 
 /* Per-press detail section (no toggle, shown directly) */
 .per-press-detail {
@@ -953,13 +968,18 @@ function buildLineCard(line){
     sorted.push(...remaining);
 
     sorted.forEach(kpi => {
+      const isClickable = kpi.popup || kpi.actualLink;
+      const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+      const actualClass = isClickable ? 'pp-td-actual pp-td-clickable' : 'pp-td-actual';
+
       if (kpi.desc === 'QTY') {
         const planNum = Number(kpi.plan || 0).toLocaleString('id-ID');
         const actualNum = Number(kpi.actual || 0).toLocaleString('id-ID');
-        tableRows += `<tr>
+        const rowCls = isClickable ? ' class="pp-row-clickable"' : '';
+        tableRows += `<tr${rowCls}>
           <td>QTY</td>
           <td>${planNum}</td>
-          <td class="pp-td-actual">${actualNum}</td>
+          <td${clickAttr} class="${actualClass}">${actualNum}</td>
           <td class="pp-td-curr">${kpi.current || '-'}</td>
         </tr>`;
         tableRows += `<tr class="pp-row-stroke">
@@ -969,12 +989,13 @@ function buildLineCard(line){
           <td class="pp-td-curr">${currStrokeVal !== '-' ? currStrokeVal : '-'}</td>
         </tr>`;
       } else {
-        const rowClass = kpi.desc === 'GSPH' ? ' class="pp-row-gsph"' : '';
+        let rowClass = kpi.desc === 'GSPH' ? 'pp-row-gsph' : '';
+        if (isClickable) rowClass = 'pp-row-clickable';
         const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
-        tableRows += `<tr${rowClass}>
+        tableRows += `<tr class="${rowClass}">
           <td>${label}</td>
           <td>${kpi.plan || '-'}</td>
-          <td class="pp-td-actual">${kpi.actual}</td>
+          <td${clickAttr} class="${actualClass}">${kpi.actual}</td>
           <td class="pp-td-curr">${kpi.current || '-'}</td>
         </tr>`;
       }
