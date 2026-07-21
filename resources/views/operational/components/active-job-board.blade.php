@@ -428,78 +428,92 @@
 
             <!-- Operator Console (Right Area) -->
             <div class="lg:col-span-3">
-                    <div class="h-full flex flex-col">
-                    @php
-                        $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
-                        $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
-                        $alertBg = 'bg-red-500/10 border-red-500/30';
-                        $alertText = 'text-red-500';
+                @php
+                    $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
+                    $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
+                    $alertBg = 'bg-red-500/10 border-red-500/30';
+                    $alertText = 'text-red-500';
+                    $alertTitle = 'DOWNTIME';
+                    $alertDesc = 'DOWNTIME';
+                    if ($dtType === 'dandori' && $openFirstCheck) {
+                        $alertBg = 'bg-purple-500/10 border-purple-500/30';
+                        $alertText = 'text-purple-400';
+                        $alertTitle = '1st Check';
+                        $alertDesc = 'PROSES FIRST CHECK (SETTING DIES)';
+                    } elseif ($dtType === 'dandori') {
+                        $alertBg = 'bg-amber-500/10 border-amber-500/30';
+                        $alertText = 'text-amber-500';
+                        $alertTitle = 'Dandori (Persiapan)';
+                        $alertDesc = 'PROSES DANDORI & SETTING DIES';
+                    } elseif ($dtType === 'break time') {
+                        $alertBg = 'bg-indigo-500/10 border-indigo-500/30';
+                        $alertText = 'text-indigo-400';
+                        $alertTitle = 'Break Time';
+                        $alertDesc = 'WAKTU ISTIRAHAT OPERATOR';
+                    } elseif ($dtType === 'try out') {
+                        $alertBg = 'bg-orange-500/10 border-orange-500/30';
+                        $alertText = 'text-orange-400';
+                        $alertTitle = 'Try Out';
+                        $alertDesc = 'TRY OUT MESIN / DIES';
+                    } elseif ($activeDowntime) {
                         $alertTitle = 'DOWNTIME';
-                        $alertDesc = 'DOWNTIME';
-                        
-                        if ($dtType === 'dandori' && $openFirstCheck) {
-                            $alertBg = 'bg-purple-500/10 border-purple-500/30';
-                            $alertText = 'text-purple-400';
-                            $alertTitle = '1st Check';
-                            $alertDesc = 'PROSES FIRST CHECK (SETTING DIES)';
-                        } elseif ($dtType === 'dandori') {
-                            $alertBg = 'bg-amber-500/10 border-amber-500/30';
-                            $alertText = 'text-amber-500';
-                            $alertTitle = 'Dandori (Persiapan)';
-                            $alertDesc = 'PROSES DANDORI & SETTING DIES';
-                        } elseif ($dtType === 'break time') {
-                            $alertBg = 'bg-indigo-500/10 border-indigo-500/30';
-                            $alertText = 'text-indigo-400';
-                            $alertTitle = 'Break Time';
-                            $alertDesc = 'WAKTU ISTIRAHAT OPERATOR';
-                        } elseif ($dtType === 'try out') {
-                            $alertBg = 'bg-orange-500/10 border-orange-500/30';
-                            $alertText = 'text-orange-400';
-                            $alertTitle = 'Try Out';
-                            $alertDesc = 'TRY OUT MESIN / DIES';
-                        } elseif ($activeDowntime) {
-                            $alertTitle = 'DOWNTIME';
-                            if (!empty($activeDowntime->problem) && !in_array($activeDowntime->problem, ['-', 'MENUNGGU PROSES MULAI (IDLE TIME)'])) {
-                                $alertDesc = strtoupper($activeDowntime->problem);
-                            } else {
-                                $alertDesc = 'DOWNTIME';
-                            }
+                        if (!empty($activeDowntime->problem) && !in_array($activeDowntime->problem, ['-', 'MENUNGGU PROSES MULAI (IDLE TIME)'])) {
+                            $alertDesc = strtoupper($activeDowntime->problem);
+                        } else {
+                            $alertDesc = 'DOWNTIME';
                         }
-                    @endphp
+                    }
+                @endphp
 
-                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center shadow-lg transition-all duration-300 flex-shrink-0">
-                        <p id="active-downtime-title" class="text-xs sm:text-sm font-black {{ $alertText }} uppercase tracking-widest mb-1">{{ $alertTitle }}</p>
-                        <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-3xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
+                @if($activeJob->started_at && !$isDandori)
+                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[220px] flex flex-col h-full">
+                    <!-- Header -->
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                            <span class="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Ready</span>
+                        </div>
                     </div>
 
-                    <!-- Actions Card (Downtime/TryOut/Break/Checklist/Selesaikan combined) -->
-                    @if(!$isDandori && $activeJob->started_at)
-                    <div class="p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
-                        <div class="grid grid-cols-2 gap-2">
-                            <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Downtime</button>
-                            <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-sm font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Try Out</button>
-                            <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn w-full py-3 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 text-sm font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Break</button>
-                            <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-3 rounded-xl bg-white border border-slate-300 text-slate-600 text-sm font-black uppercase text-center transition-all flex items-center justify-center gap-1.5 hover:bg-slate-50 hover:border-slate-400 shadow-sm active:translate-y-0.5">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                                Checklist
-                            </button>
-                        </div>
-                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full mt-2 py-4 rounded-xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white active:translate-y-0.5">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                            Selesaikan Job
+                    <!-- Downtime Alert -->
+                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-3 text-center mb-2 transition-all duration-300">
+                        <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-0.5">{{ $alertTitle }}</p>
+                        <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
+                    </div>
+
+                    <!-- Quick Actions (full width, no gaps) -->
+                    <div class="flex flex-col gap-1.5">
+                        <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-sm font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5">Downtime</button>
+                        <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-500 text-sm font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all active:translate-y-0.5">Try Out</button>
+                        <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn w-full py-3 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-500 text-sm font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all active:translate-y-0.5">Break Time</button>
+                        <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-3 rounded-xl bg-slate-100 border border-slate-300 text-slate-600 text-sm font-black uppercase text-center transition-all flex items-center justify-center gap-1.5 hover:bg-slate-200 hover:border-slate-400 active:translate-y-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                            Checklist
                         </button>
                     </div>
-                    @endif
 
-                    <!-- Mulai Dandori (before started) -->
-                    @if(!$activeJob->started_at && !$isDandori)
-                    <button onclick="jsStartDandori({{ $activeJob->id }})" class="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-md transition-all flex items-center justify-center gap-2.5 group active:translate-y-0.5">
+                    <!-- Selesaikan Job (flush bottom) -->
+                    <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full mt-auto pt-3 py-4 rounded-xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white active:translate-y-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Selesaikan Job
+                    </button>
+                </div>
+
+                @elseif(!$activeJob->started_at && !$isDandori)
+                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[220px] flex flex-col h-full">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                        <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
+                        <span class="text-[9px] sm:text-[10px] text-amber-500 font-bold uppercase tracking-wider">Dandori</span>
+                    </div>
+                    <button onclick="jsStartDandori({{ $activeJob->id }})" class="w-full mt-auto py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-md transition-all flex items-center justify-center gap-2.5 group active:translate-y-0.5">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
                         Mulai Dandori
                     </button>
-                    @endif
-                    </div>
                 </div>
+                @endif
             </div>
 
             </div> {{-- end #active-work-area --}}
