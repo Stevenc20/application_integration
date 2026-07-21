@@ -157,12 +157,12 @@
   #liveClock               { font-size: 3.5rem !important; }
   .dash-h1                 { font-size: 2rem !important; }
   .space-wrapper           { gap: 1.5rem !important; }
-  .press-card-header       { font-size: 0.9rem !important; padding: 12px 14px !important; }
-  .kpi-col-header          { font-size: 0.7rem !important; padding: 8px 14px !important; }
-  .kpi-row                 { padding: 9px 14px !important; min-height: 34px !important; }
-  .kpi-row .kpi-label      { font-size: 0.78rem !important; }
-  .kpi-row .kpi-value      { font-size: 0.82rem !important; }
-  .detail-toggle           { font-size: 0.78rem !important; padding: 10px 14px !important; }
+  .press-card-header       { font-size: 1.1rem !important; padding: 14px 16px !important; }
+  .kpi-col-header          { font-size: 0.9rem !important; padding: 10px 16px !important; }
+  .kpi-row                 { padding: 11px 16px !important; min-height: 38px !important; }
+  .kpi-row .kpi-label      { font-size: 1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.05rem !important; }
+  .detail-toggle           { font-size: 1rem !important; padding: 12px 16px !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
@@ -175,13 +175,13 @@
   .space-wrapper           { gap: 2rem !important; }
   .chart-grid              { gap: 1.75rem !important; }
   .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
-  .press-card-header       { font-size: 1rem !important; padding: 14px 18px !important; }
-  .kpi-col-header          { font-size: 0.75rem !important; padding: 8px 16px !important; }
-  .kpi-row                 { padding: 10px 16px !important; min-height: 38px !important; }
-  .kpi-row .kpi-label      { font-size: 0.85rem !important; }
-  .kpi-row .kpi-value      { font-size: 0.9rem !important; }
-  .kpi-row .kpi-pct        { font-size: 0.75rem !important; }
-  .detail-toggle           { font-size: 0.85rem !important; padding: 12px 16px !important; }
+  .press-card-header       { font-size: 1.3rem !important; padding: 16px 20px !important; }
+  .kpi-col-header          { font-size: 1rem !important; padding: 10px 18px !important; }
+  .kpi-row                 { padding: 12px 18px !important; min-height: 42px !important; }
+  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
+  .kpi-row .kpi-pct        { font-size: 0.9rem !important; }
+  .detail-toggle           { font-size: 1.05rem !important; padding: 14px 18px !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
@@ -199,13 +199,13 @@
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
   #linesGrid               { grid-template-columns: repeat(1, 1fr) !important; gap: 2.5rem !important; }
-  .press-card-header       { font-size: 1.4rem !important; padding: 18px 24px !important; letter-spacing: 0.25em !important; }
-  .kpi-col-header          { font-size: 1rem !important; padding: 10px 22px !important; }
-  .kpi-row                 { padding: 14px 22px !important; min-height: 48px !important; }
-  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
-  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
-  .kpi-row .kpi-pct        { font-size: 0.95rem !important; }
-  .detail-toggle           { font-size: 1.1rem !important; padding: 16px 22px !important; }
+  .press-card-header       { font-size: 1.6rem !important; padding: 20px 26px !important; letter-spacing: 0.25em !important; }
+  .kpi-col-header          { font-size: 1.2rem !important; padding: 12px 24px !important; }
+  .kpi-row                 { padding: 16px 24px !important; min-height: 52px !important; }
+  .kpi-row .kpi-label      { font-size: 1.3rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.5rem !important; }
+  .kpi-row .kpi-pct        { font-size: 1.1rem !important; }
+  .detail-toggle           { font-size: 1.3rem !important; padding: 18px 24px !important; }
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
@@ -321,9 +321,9 @@
 .press-card-header {
   background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
   border-bottom: 2px solid #fecaca;
-  padding: 10px 12px;
+  padding: 12px 14px;
   text-align: center;
-  font-size: 0.85rem;
+  font-size: 1rem;
   font-weight: 900;
   color: #dc2626;
   letter-spacing: 0.22em;
@@ -344,8 +344,8 @@
 }
 .kpi-col-left { border-right: 1px solid #f3f4f6; }
 .kpi-col-header {
-  padding: 6px 12px;
-  font-size: 0.6rem;
+  padding: 8px 14px;
+  font-size: 0.8rem;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: 0.1em;
@@ -358,16 +358,16 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 7px 12px;
+  padding: 9px 14px;
   border-bottom: 1px solid #f3f4f6;
   transition: background 0.15s;
-  min-height: 32px;
+  min-height: 36px;
 }
 .kpi-row:last-child { border-bottom: none; }
 .kpi-row:hover { background: #f9fafb; }
 
 .kpi-row .kpi-label {
-  font-size: 0.7rem;
+  font-size: 0.9rem;
   font-weight: 800;
   color: #6b7280;
   text-transform: uppercase;
@@ -375,7 +375,7 @@
   flex-shrink: 0;
 }
 .kpi-row .kpi-value {
-  font-size: 0.75rem;
+  font-size: 1rem;
   font-weight: 800;
   color: #1f2937;
   text-align: right;
@@ -386,7 +386,7 @@
   gap: 1px;
 }
 .kpi-row .kpi-pct {
-  font-size: 0.6rem;
+  font-size: 0.75rem;
   font-weight: 600;
   color: #9ca3af;
   margin-left: 0;
