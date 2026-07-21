@@ -39,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 gap-4 min-h-[300px]" id="linesGrid"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -157,12 +157,11 @@
   #liveClock               { font-size: 3.5rem !important; }
   .dash-h1                 { font-size: 2rem !important; }
   .space-wrapper           { gap: 1.5rem !important; }
-  .press-card-header       { font-size: 1.1rem !important; padding: 14px 16px !important; }
-  .kpi-col-header          { font-size: 0.9rem !important; padding: 10px 16px !important; }
-  .kpi-row                 { padding: 11px 16px !important; min-height: 38px !important; }
-  .kpi-row .kpi-label      { font-size: 1rem !important; }
-  .kpi-row .kpi-value      { font-size: 1.05rem !important; }
-  .detail-toggle           { font-size: 1rem !important; padding: 12px 16px !important; }
+  .press-card-header       { font-size: 0.9rem !important; padding: 12px 14px !important; }
+  .kpi-row                 { padding: 9px 14px !important; min-height: 34px !important; }
+  .kpi-row .kpi-label      { font-size: 0.78rem !important; }
+  .kpi-row .kpi-value      { font-size: 0.82rem !important; }
+  .detail-toggle           { font-size: 0.78rem !important; padding: 10px 14px !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
@@ -175,13 +174,12 @@
   .space-wrapper           { gap: 2rem !important; }
   .chart-grid              { gap: 1.75rem !important; }
   .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
-  .press-card-header       { font-size: 1.3rem !important; padding: 16px 20px !important; }
-  .kpi-col-header          { font-size: 1rem !important; padding: 10px 18px !important; }
-  .kpi-row                 { padding: 12px 18px !important; min-height: 42px !important; }
-  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
-  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
-  .kpi-row .kpi-pct        { font-size: 0.9rem !important; }
-  .detail-toggle           { font-size: 1.05rem !important; padding: 14px 18px !important; }
+  .press-card-header       { font-size: 1rem !important; padding: 14px 18px !important; }
+  .kpi-row                 { padding: 10px 16px !important; min-height: 38px !important; }
+  .kpi-row .kpi-label      { font-size: 0.85rem !important; }
+  .kpi-row .kpi-value      { font-size: 0.9rem !important; }
+  .kpi-row .kpi-pct        { font-size: 0.75rem !important; }
+  .detail-toggle           { font-size: 0.85rem !important; padding: 12px 16px !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
@@ -198,14 +196,13 @@
   .modal-dialog-inner      { max-width: 1400px !important; font-size: 1.6rem !important; }
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
-  #linesGrid               { grid-template-columns: repeat(1, 1fr) !important; gap: 2.5rem !important; }
-  .press-card-header       { font-size: 1.6rem !important; padding: 20px 26px !important; letter-spacing: 0.25em !important; }
-  .kpi-col-header          { font-size: 1.2rem !important; padding: 12px 24px !important; }
-  .kpi-row                 { padding: 16px 24px !important; min-height: 52px !important; }
-  .kpi-row .kpi-label      { font-size: 1.3rem !important; }
-  .kpi-row .kpi-value      { font-size: 1.5rem !important; }
-  .kpi-row .kpi-pct        { font-size: 1.1rem !important; }
-  .detail-toggle           { font-size: 1.3rem !important; padding: 18px 24px !important; }
+  #linesGrid               { grid-template-columns: repeat(4, 1fr) !important; gap: 2.5rem !important; }
+  .press-card-header       { font-size: 1.4rem !important; padding: 18px 24px !important; letter-spacing: 0.25em !important; }
+  .kpi-row                 { padding: 14px 22px !important; min-height: 48px !important; }
+  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
+  .kpi-row .kpi-pct        { font-size: 0.95rem !important; }
+  .detail-toggle           { font-size: 1.1rem !important; padding: 16px 22px !important; }
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
@@ -321,9 +318,9 @@
 .press-card-header {
   background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
   border-bottom: 2px solid #fecaca;
-  padding: 12px 14px;
+  padding: 10px 12px;
   text-align: center;
-  font-size: 1rem;
+  font-size: 0.85rem;
   font-weight: 900;
   color: #dc2626;
   letter-spacing: 0.22em;
@@ -331,43 +328,25 @@
 }
 
 .press-card-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  flex: 1;
-}
-@media (max-width: 767px) {
-  .press-card-body { grid-template-columns: 1fr; }
-}
-.kpi-col-left, .kpi-col-right {
   display: flex;
   flex-direction: column;
-}
-.kpi-col-left { border-right: 1px solid #f3f4f6; }
-.kpi-col-header {
-  padding: 8px 14px;
-  font-size: 0.8rem;
-  font-weight: 800;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-  color: #9ca3af;
-  background: #fafafa;
-  border-bottom: 1px solid #f3f4f6;
+  flex: 1;
 }
 
 .kpi-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 9px 14px;
+  padding: 7px 12px;
   border-bottom: 1px solid #f3f4f6;
   transition: background 0.15s;
-  min-height: 36px;
+  min-height: 32px;
 }
 .kpi-row:last-child { border-bottom: none; }
 .kpi-row:hover { background: #f9fafb; }
 
 .kpi-row .kpi-label {
-  font-size: 0.9rem;
+  font-size: 0.7rem;
   font-weight: 800;
   color: #6b7280;
   text-transform: uppercase;
@@ -375,7 +354,7 @@
   flex-shrink: 0;
 }
 .kpi-row .kpi-value {
-  font-size: 1rem;
+  font-size: 0.75rem;
   font-weight: 800;
   color: #1f2937;
   text-align: right;
@@ -386,7 +365,7 @@
   gap: 1px;
 }
 .kpi-row .kpi-pct {
-  font-size: 0.75rem;
+  font-size: 0.6rem;
   font-weight: 600;
   color: #9ca3af;
   margin-left: 0;
@@ -734,36 +713,6 @@ function toggleDetail(safeLine){
 
 const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
 const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
-const LEFT_KPIS  = ['QTY','GSPH','REPAIR','REJECT'];
-const RIGHT_KPIS = ['DT','TOTAL_DT'];
-
-function buildKpiRow(kpi, line, safeLine){
-  const isClickable = kpi.popup || kpi.actualLink;
-  let valueHtml = '';
-  if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
-    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-  } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
-    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
-  } else if (isClickable) {
-    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
-  } else if(kpi.desc === 'GSPH'){
-    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-  } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
-    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-  } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
-    valueHtml = `<span>${kpi.actual}</span>`;
-  } else {
-    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
-  }
-  const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
-  const clickCls = isClickable ? ' kpi-row-clickable' : '';
-  const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-  const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
-  return `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
-    <span class="kpi-label">${label}</span>
-    <span class="kpi-value">${valueHtml}</span>
-  </div>`;
-}
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
@@ -775,34 +724,47 @@ function buildLineCard(line){
   const detailRows = LINE_DETAIL[line] || [];
   const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
 
-  let leftHtml = '';
-  let rightHtml = '';
+  let kpiHtml = '';
 
-  leftHtml += `<div class="kpi-row" data-line="${line}" data-desc="JOB">
+  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="JOB">
     <span class="kpi-label">JOB</span>
     <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
   </div>`;
 
-  rows.forEach((kpi) => {
-    const isLeft = LEFT_KPIS.includes(kpi.desc);
-    const isRight = RIGHT_KPIS.includes(kpi.desc);
-    if (isLeft) {
-      leftHtml += buildKpiRow(kpi, line, safeLine);
-    } else if (isRight) {
-      rightHtml += buildKpiRow(kpi, line, safeLine);
+  const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
+  mainRows.forEach((kpi) => {
+    const isClickable = kpi.popup || kpi.actualLink;
+    let valueHtml = '';
+    if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
+    } else if (isClickable) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+    } else if(kpi.desc === 'GSPH'){
+      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
+      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
+      valueHtml = `<span>${kpi.actual}</span>`;
+    } else {
+      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     }
+    const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
+    const clickCls = isClickable ? ' kpi-row-clickable' : '';
+    const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+    const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
+    kpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
+      <span class="kpi-label">${label}</span>
+      <span class="kpi-value">${valueHtml}</span>
+    </div>`;
   });
 
   const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
-  leftHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
+  kpiHtml += `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
     <span class="kpi-label">STROKE</span>
     <span class="kpi-value">${strokeDisplay}</span>
   </div>`;
-
-  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
-  extraRows.forEach((kpi) => {
-    rightHtml += buildKpiRow(kpi, line, safeLine);
-  });
 
   const hasDetail = detailRows.length > 0;
   const rowCount = detailRows.length;
@@ -810,6 +772,27 @@ function buildLineCard(line){
   detailRows.forEach((r) => {
     detRows += `<tr>${detailCells(r)}</tr>`;
   });
+
+  let extraKpiHtml = '';
+  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
+  if (extraRows.length > 0) {
+    extraRows.forEach((kpi) => {
+      const isClickable = kpi.popup || kpi.actualLink;
+      let valueHtml = '';
+      if (isClickable) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      } else {
+        valueHtml = `<span>${kpi.actual}</span>`;
+      }
+      const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
+      const clickCls = isClickable ? ' kpi-row-clickable' : '';
+      const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+      extraKpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}"${clickAttr}>
+        <span class="kpi-label">${kpi.desc}</span>
+        <span class="kpi-value">${valueHtml}</span>
+      </div>`;
+    });
+  }
 
   const detailTableHtml = hasDetail ? `
     <div class="det-scroll">
@@ -848,15 +831,21 @@ function buildLineCard(line){
 
   return `<div class="press-card" id="card-${safeLine}">
     <div class="press-card-header">${line}</div>
-    <div class="press-card-body">
-      <div class="kpi-col-left">${leftHtml}</div>
-      <div class="kpi-col-right">${rightHtml}</div>
-    </div>
+    <div class="press-card-body">${kpiHtml}</div>
     <button class="detail-toggle" id="detail-toggle-${safeLine}" onclick="toggleDetail('${safeLine}')">
       <span class="detail-arrow">&#9660;</span> Detail
     </button>
     <div class="detail-panel" id="detail-panel-${safeLine}">
       <div class="detail-panel-inner">
+        ${extraKpiHtml ? `
+        <div class="det-section-label">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+            <circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/>
+          </svg>
+          <span class="label-text">Downtime Detail</span>
+        </div>
+        ${extraKpiHtml}` : ''}
         <div class="det-section-label">
           <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
             <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
