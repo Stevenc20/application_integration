@@ -311,8 +311,8 @@ class InputHarianController extends Controller
 
             $activeJob = $activeJobQuery->first();
         } else {
-            // Today mode: cari job running realtime
-            $activeJob = JobMaster::where(DB::raw('LOWER(status)'), 'running');
+            // Today mode: cari job running atau paused (break time) realtime
+            $activeJob = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
 
             if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
                 $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
@@ -481,6 +481,19 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
+            $job = JobMaster::find($id);
+            if (!$job) {
+                return response()->json(['success' => false, 'message' => 'Job tidak ditemukan'], 404);
+            }
+            if (strtolower($job->status) === 'paused') {
+                $hasActiveBreak = Downtime::where('job_master_id', $id)
+                    ->whereNull('finish_time')
+                    ->where('jenis_downtime', 'break time')
+                    ->exists();
+                if ($hasActiveBreak) {
+                    return response()->json(['success' => false, 'message' => 'Sedang break time, item tidak bisa dipindahkan ke dandori.'], 400);
+                }
+            }
             $workDate = now()->toDateString();
             $downtime = $this->productionService->startDandori($id, $workDate);
             return response()->json(['success' => true, 'downtime' => $downtime]);
@@ -493,6 +506,16 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
+            $job = JobMaster::find($id);
+            if ($job && strtolower($job->status) === 'paused') {
+                $hasActiveBreak = Downtime::where('job_master_id', $id)
+                    ->whereNull('finish_time')
+                    ->where('jenis_downtime', 'break time')
+                    ->exists();
+                if ($hasActiveBreak) {
+                    return response()->json(['success' => false, 'message' => 'Sedang break time, tidak bisa start dandori.'], 400);
+                }
+            }
             $workDate = $request->get('date') ?: now()->toDateString();
             $downtime = $this->productionService->startDandori($id, $workDate);
             return response()->json(['success' => true, 'downtime' => $downtime]);

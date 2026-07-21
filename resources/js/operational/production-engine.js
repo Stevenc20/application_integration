@@ -151,7 +151,20 @@ function updateTimers() {
                 const frozen = formatSeconds(job._frozenTimer);
                 timerEl.textContent = frozen;
                 const breakTimerEl = document.getElementById('break-overlay-timer');
-                if (breakTimerEl) breakTimerEl.textContent = frozen;
+                if (breakTimerEl) {
+                    if (window._autoBreakEndMin != null) {
+                        const now = new Date();
+                        const nowMin = now.getHours() * 60 + now.getMinutes();
+                        const nowSec = now.getSeconds();
+                        const remaining = Math.max(0, (window._autoBreakEndMin - nowMin) * 60 - nowSec);
+                        breakTimerEl.textContent = formatSeconds(remaining);
+                        breakTimerEl.className = remaining <= 0
+                            ? 'text-5xl sm:text-6xl font-black text-emerald-500 mt-6 tabular-nums'
+                            : 'text-5xl sm:text-6xl font-black text-slate-800 mt-6 tabular-nums';
+                    } else {
+                        breakTimerEl.textContent = frozen;
+                    }
+                }
                 continue;
             }
 
@@ -258,6 +271,7 @@ window._autoBreakActive = false;
 window._autoBreakDowntimeId = null;
 window._autoBreakLastCheck = 0;
 window._autoBreakSkipped = false;
+window._autoBreakEndMin = null;
 
 function _isInBreakWindow(now) {
     const schedule = window._breakSchedule || [];
@@ -311,6 +325,7 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
         if (res.success) {
             window._autoBreakActive = true;
             window._autoBreakDowntimeId = res.downtime.id;
+            window._autoBreakEndMin = breakInfo.endMin;
 
             const startTime = new Date();
             window.runningDowntimes[`${jobId}_break`] = {
@@ -346,6 +361,7 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
                         jobId: jobId,
                         frozenTimer: currentSeconds,
                         downtimeId: window._autoBreakDowntimeId,
+                        endMin: breakInfo.endMin || null,
                         label: breakInfo.label || 'AUTO BREAK',
                         startedAt: Date.now()
                     }));
@@ -391,6 +407,8 @@ async function _triggerAutoBreakEnd(jobId) {
                 }
                 delete job._breakPaused;
                 delete job._frozenTimer;
+                job.status = 'running';
+                window.ProductionConfig.currentStatus = 'running';
                 try {
                     await fetch(`/operational/job/${jobId}/resume`, {
                         method: 'POST',
@@ -407,6 +425,7 @@ async function _triggerAutoBreakEnd(jobId) {
             window._autoBreakActive = false;
             window._autoBreakDowntimeId = null;
             window._autoBreakSkipped = false;
+            window._autoBreakEndMin = null;
 
             updateTimeline();
             _updateBreakUI(jobId, null, false);
@@ -483,6 +502,8 @@ function _updateBreakUI(jobId, label, isPaused) {
         if (!h.end && h.type === 'break time') {
             window._autoBreakActive = true;
             window._autoBreakDowntimeId = h.id;
+            const activeBreakWindow = _isInBreakWindow(new Date());
+            window._autoBreakEndMin = activeBreakWindow ? activeBreakWindow.endMin : null;
             const job = window.jobMasterData?.[activeId];
             if (job && !job._breakPaused) {
                 let currentSeconds = job.base_seconds || 0;
@@ -508,6 +529,7 @@ function _updateBreakUI(jobId, label, isPaused) {
                 if (job && !job._breakPaused && (job.status === 'running' || job.status === 'paused')) {
                     window._autoBreakActive = true;
                     window._autoBreakDowntimeId = saved.downtimeId;
+                    window._autoBreakEndMin = saved.endMin || null;
                     job._frozenTimer = saved.frozenTimer;
                     job._breakPaused = true;
 
@@ -1263,6 +1285,13 @@ window.enqueueJob = async function enqueueJob(id) {
     if (window._autoBreakActive) { showToast('Sedang break time, tidak bisa enqueue job.', 'warning'); return; }
 
     const activeId = window.ProductionConfig.currentActiveId;
+    if (activeId && activeId == id) {
+        const activeJob = window.jobMasterData?.[activeId];
+        if (activeJob && activeJob.status === 'paused') {
+            showToast('Item ini sedang break time / dijeda. Tidak bisa enqueue ulang.', 'warning');
+            return;
+        }
+    }
     if (activeId && activeId != id) {
         const activeDtKeys = Object.keys(window.runningDowntimes || {}).filter(k => k.startsWith(activeId + '_'));
         const activeDt = activeDtKeys.length > 0 ? window.runningDowntimes[activeDtKeys[0]] : null;
@@ -2497,6 +2526,8 @@ function syncBreakStatus() {
             if (serverDown && serverDown.jenis_downtime === 'break time' && !clientBreak && !window._autoBreakActive) {
                 window._autoBreakActive = true;
                 window._autoBreakDowntimeId = serverDown.id;
+                const serverBreakWindow = _isInBreakWindow(new Date());
+                window._autoBreakEndMin = serverBreakWindow ? serverBreakWindow.endMin : null;
                 window.runningDowntimes[`${id}_break`] = {
                     id: serverDown.id,
                     start: new Date(serverDown.start_time),
@@ -2518,18 +2549,21 @@ function syncBreakStatus() {
             } else if (!serverDown && clientBreak && window._autoBreakActive) {
                 delete window.runningDowntimes[`${id}_break`];
                 window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-                if (job && job._breakPaused) {
-                    if (job._frozenTimer != null) {
+                if (job) {
+                    if (job._breakPaused && job._frozenTimer != null) {
                         job.base_seconds = job._frozenTimer;
                         job.started_at = new Date().toISOString();
                     }
                     delete job._breakPaused;
                     delete job._frozenTimer;
+                    job.status = 'running';
+                    window.ProductionConfig.currentStatus = 'running';
                     try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
                 }
                 window._autoBreakActive = false;
                 window._autoBreakDowntimeId = null;
                 window._autoBreakSkipped = false;
+                window._autoBreakEndMin = null;
                 updateTimeline();
                 _updateBreakUI(id, null, false);
                 showToast('Break time selesai, produksi dilanjutkan.', 'success');
@@ -2537,14 +2571,17 @@ function syncBreakStatus() {
                 window._autoBreakActive = false;
                 window._autoBreakDowntimeId = null;
                 window._autoBreakSkipped = false;
+                window._autoBreakEndMin = null;
                 try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
-                if (job && job._breakPaused) {
-                    if (job._frozenTimer != null) {
+                if (job) {
+                    if (job._breakPaused && job._frozenTimer != null) {
                         job.base_seconds = job._frozenTimer;
                         job.started_at = new Date().toISOString();
                     }
                     delete job._breakPaused;
                     delete job._frozenTimer;
+                    job.status = 'running';
+                    window.ProductionConfig.currentStatus = 'running';
                 }
                 _updateBreakUI(id, null, false);
             }
@@ -2859,6 +2896,7 @@ function initProductionEngine() {
                             jobId: activeId,
                             frozenTimer: job._frozenTimer,
                             downtimeId: window._autoBreakDowntimeId,
+                            endMin: window._autoBreakEndMin,
                             label: 'AUTO BREAK',
                             startedAt: Date.now()
                         }));

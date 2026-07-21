@@ -1,4 +1,4 @@
-@if($activeJob && strtolower($activeJob->status) == 'running')
+@if($activeJob && in_array(strtolower($activeJob->status), ['running', 'paused']))
     @if($isLocked ?? false)
     {{-- LOCKED SUMMARY CARD --}}
     <div id="active-job-card" class="bg-slate-900 rounded-3xl p-6 shadow-2xl border-2 border-slate-800/50 text-white relative overflow-hidden">
@@ -49,6 +49,7 @@
             $actFinishVal = $prodPlan && $prodPlan->act_finish ? $prodPlan->act_finish : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->format('H:i') : null);
 
             $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
+            $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time';
         @endphp
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10 items-stretch">
@@ -269,20 +270,25 @@
 
 
             {{-- BREAK OVERLAY (hidden by default, shown during auto-break) --}}
-            <div id="break-overlay" class="lg:col-span-12 hidden">
+            <div id="break-overlay" class="lg:col-span-12 {{ $isOnBreak ? '' : 'hidden' }}">
                 <div class="flex flex-col items-center justify-center py-16 rounded-3xl bg-white border-2 border-slate-200">
                     <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6 border border-slate-200">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-slate-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                     </div>
-                    <p id="break-overlay-label" class="text-3xl sm:text-4xl font-black text-slate-700 uppercase tracking-widest mb-2">BREAK TIME</p>
+                    <p id="break-overlay-label" class="text-3xl sm:text-4xl font-black text-slate-700 uppercase tracking-widest mb-2">{{ $activeDowntime->problem ?? 'BREAK TIME' }}</p>
                     <p class="text-sm font-black text-slate-500 uppercase tracking-widest">Istirahat — Timer dijeda</p>
                     <p id="break-overlay-timer" class="text-5xl sm:text-6xl font-black text-slate-800 mt-6 tabular-nums">00:00:00</p>
-                    <p class="text-xs text-slate-500 mt-4 font-bold">Produksi akan otomatis dilanjutkan setelah istirahat selesai</p>
+                    <div class="mt-6 px-6 py-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3 max-w-md">
+                        <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                        <p class="text-xs font-black text-amber-700 leading-relaxed">Item sedang dalam jeda istirahat. Mohon tunggu sebentar — produksi akan otomatis dilanjutkan setelah waktu istirahat selesai.</p>
+                    </div>
                 </div>
             </div>
 
             {{-- ROW 2: Performance Console (Left, 9 cols) & Operator Console (Right, 3 cols) --}}
-            <div id="active-work-area" class="lg:col-span-12">
+            <div id="active-work-area" class="lg:col-span-12 {{ $isOnBreak ? 'hidden' : '' }}">
 
             <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <!-- Performance Console (Left Area) -->
@@ -491,7 +497,7 @@
                     </div>
 
                     <!-- Operator Console Card -->
-                    <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm min-h-[280px] flex flex-col h-full">
+                    <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm min-h-[360px] flex flex-col h-full">
                         <div>
                             <div class="flex items-center border-b border-slate-200 pb-2 mb-4">
                                 <span class="text-xs sm:text-sm font-black text-slate-600 uppercase tracking-widest">Operator Console</span>
@@ -499,40 +505,40 @@
 
                             <div id="control-board-actions" class="mt-4">
                                 @if(!$activeJob->started_at && !$isDandori)
-                                    <button onclick="jsStartDandori({{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                                    <button onclick="jsStartDandori({{ $activeJob->id }})" class="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-md transition-all flex items-center justify-center gap-2.5 group active:translate-y-0.5">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
                                         MULAI DANDORI (PERSIAPAN)
                                     </button>
                                 @elseif($isDandori)
-                                    <div class="grid grid-cols-2 gap-2">
-                                        <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
                                             STOP &amp; LANJUT
                                         </button>
                                         @if($openFirstCheck)
-                                            <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                            <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
                                                 STOP 1ST CHECK
                                             </button>
                                         @else
-                                            <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-xs shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm0-9c-2.76 0-5 2.24-5 5h2c0-1.66 1.34-3 3-3s3 1.34 3 3c0 2-3 2.5-3 4.5h2c0-1.5 2-2 2-4.5 0-2.76-2.24-5-5-5z"/></svg>
+                                            <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
+                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm0-9c-2.76 0-5 2.24-5 5h2c0-1.66 1.34-3 3-3s3 1.34 3 3c0 2-3 2.5-3 4.5h2c0-1.5 2-2 2-4.5 0-2.76-2.24-5-5-5z"/></svg>
                                                 1ST CHECK
                                             </button>
                                         @endif
-                                        <button id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                        <button id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                             DOWNTIME
                                         </button>
                                     </div>
                                 @else
-                                    <div class="flex flex-col gap-2">
-                                        <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-2.5 rounded-xl bg-white border border-slate-300 text-slate-600 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-slate-400 shadow-sm active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                    <div class="flex flex-col gap-3">
+                                        <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-3.5 rounded-xl bg-white border border-slate-300 text-slate-600 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 hover:bg-slate-50 hover:border-slate-400 shadow-sm active:translate-y-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                                             Cek List Downtime
                                         </button>
-                                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-2.5 rounded-xl bg-red-600/10 border border-red-500/50 text-red-400 font-black text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 group hover:bg-red-600 hover:text-white shadow-sm active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-3.5 rounded-xl bg-red-600/10 border border-red-500/50 text-red-400 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 group hover:bg-red-600 hover:text-white shadow-sm active:translate-y-0.5">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                                             SELESAIKAN JOB 
                                         </button>
                                     </div>
@@ -541,12 +547,12 @@
                         </div>
 
                         @if(!$isDandori && $activeJob->started_at)
-                        <div class="space-y-2 mt-auto pt-3 border-t border-slate-200">
-                            <div class="grid grid-cols-2 gap-2">
-                                <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-[11px] font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Downtime</button>
-                                <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-2 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-[11px] font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Try Out</button>
-                                <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn col-span-2 w-full py-2 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 text-[11px] font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Break</button>
-                                <a href="{{ route('operational.dandori', ['job_id' => $activeJob->id, 'line' => $activeJob->line, 'shift' => 'Shift 1']) }}" class="col-span-2 w-full py-2 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-[11px] font-black uppercase text-center hover:bg-blue-500 hover:text-white transition-all shadow-sm active:translate-y-0.5 flex items-center justify-center">Dandori Mod</a>
+                        <div class="space-y-3 mt-auto pt-3 border-t border-slate-200">
+                            <div class="grid grid-cols-2 gap-3">
+                                <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Downtime</button>
+                                <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Try Out</button>
+                                <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn col-span-2 w-full py-3 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 text-xs font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Break</button>
+                                <a href="{{ route('operational.dandori', ['job_id' => $activeJob->id, 'line' => $activeJob->line, 'shift' => 'Shift 1']) }}" class="col-span-2 w-full py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-black uppercase text-center hover:bg-blue-500 hover:text-white transition-all shadow-sm active:translate-y-0.5 flex items-center justify-center">Dandori Mod</a>
                             </div>
                         </div>
                         @endif
