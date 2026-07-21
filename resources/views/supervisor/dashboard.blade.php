@@ -359,13 +359,33 @@
   color: #1f2937;
   text-align: right;
   word-break: break-word;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
 }
 .kpi-row .kpi-pct {
   font-size: 0.6rem;
   font-weight: 600;
   color: #9ca3af;
-  margin-left: 3px;
+  margin-left: 0;
 }
+
+/* Clickable rows — red value + underline + pct below */
+.kpi-row-clickable { cursor: pointer; }
+.kpi-row-clickable .kpi-val-main {
+  color: #dc2626;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #fca5a5;
+  text-underline-offset: 3px;
+}
+.kpi-row-clickable .kpi-pct {
+  color: #9ca3af;
+  font-weight: 600;
+}
+.kpi-row-clickable:hover { background: #fef2f2; }
 
 /* GSPH row highlight */
 .kpi-row[data-desc="GSPH"] {
@@ -709,21 +729,26 @@ function buildLineCard(line){
 
   const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
   mainRows.forEach((kpi) => {
+    const isClickable = kpi.popup || kpi.actualLink;
     let valueHtml = '';
-    if(kpi.desc === 'GSPH'){
-      valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    } else if (isClickable) {
+      valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+    } else if(kpi.desc === 'GSPH'){
+      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
     } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
-      valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
     } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
       valueHtml = `<span>${kpi.actual}m</span>`;
     } else {
-      valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
     }
     const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
-    const clickAttr = (kpi.popup || kpi.actualLink) ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-    const cursorCls = (kpi.popup || kpi.actualLink) ? ' style="cursor:pointer"' : '';
+    const clickCls = isClickable ? ' kpi-row-clickable' : '';
+    const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
     const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
-    kpiHtml += `<div class="kpi-row${dangerCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}${cursorCls}>
+    kpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
       <span class="kpi-label">${label}</span>
       <span class="kpi-value">${valueHtml}</span>
     </div>`;
@@ -746,14 +771,17 @@ function buildLineCard(line){
   const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
   if (extraRows.length > 0) {
     extraRows.forEach((kpi) => {
-      let valueHtml = `<span>${kpi.actual}</span>`;
-      if(kpi.desc === 'TOTAL_DT'){
-        valueHtml = `<span>${kpi.actual}m</span>`;
+      const isClickable = kpi.popup || kpi.actualLink;
+      let valueHtml = '';
+      if (isClickable) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      } else {
+        valueHtml = `<span>${kpi.actual}</span>`;
       }
       const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
-      const clickAttr = (kpi.popup || kpi.actualLink) ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-      const cursorCls = (kpi.popup || kpi.actualLink) ? ' style="cursor:pointer"' : '';
-      extraKpiHtml += `<div class="kpi-row${dangerCls}" data-line="${line}" data-desc="${kpi.desc}"${clickAttr}${cursorCls}>
+      const clickCls = isClickable ? ' kpi-row-clickable' : '';
+      const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+      extraKpiHtml += `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}"${clickAttr}>
         <span class="kpi-label">${kpi.desc}</span>
         <span class="kpi-value">${valueHtml}</span>
       </div>`;
@@ -889,17 +917,29 @@ function updateCards(forceDetail) {
       const valEl = CELL_CACHE[`${line}-${kpi.desc}-value`];
       if (!rowEl || !valEl) return;
 
+      const isClickable = kpi.popup || kpi.actualLink;
       let valueHtml = '';
-      if(kpi.desc === 'GSPH'){
-        valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+      } else if (isClickable) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      } else if(kpi.desc === 'GSPH'){
+        valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
-        valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+        valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
         valueHtml = `<span>${kpi.actual}m</span>`;
       } else {
-        valueHtml = `<span>${kpi.actual}</span> <span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+        valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       }
       if (valEl.innerHTML !== valueHtml) valEl.innerHTML = valueHtml;
+
+      if (isClickable) {
+        rowEl.classList.add('kpi-row-clickable');
+        if (!rowEl.getAttribute('onclick')) {
+          rowEl.setAttribute('onclick', `openKpiDetailModal('${kpi.desc}','${line}')`);
+        }
+      }
 
       if (kpi.danger) {
         rowEl.classList.add('kpi-row-danger');
