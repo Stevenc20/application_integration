@@ -58,68 +58,68 @@
             
             <!-- Progress Timeline (Left Area) -->
             <div class="lg:col-span-9">
-                <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col justify-between h-full">
-                    <div class="flex items-center justify-between">
-                        <div class="flex flex-col">
-                            <span class="text-[10px] sm:text-xs text-slate-500 font-black uppercase tracking-widest leading-none">Production Progress (OK / Repair / Reject)</span>
-                            <div class="flex items-center gap-1.5 mt-1">
-                                <span class="text-xs sm:text-sm font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
-                                <span class="text-slate-400 font-bold text-[10px] sm:text-xs leading-none">→</span>
-                                <span class="text-xs sm:text-sm font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
-                            </div>
+                <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3 h-full">
+
+                    <!-- Jam PPC — Atas -->
+                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl px-4 py-2.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Jam PPC</span>
                         </div>
-                        <div class="text-right flex items-center gap-2.5">
-                            <div class="flex flex-col">
-                                <span class="text-[10px] sm:text-xs text-slate-500 font-black uppercase tracking-widest leading-none">Actual Progress :</span>
-                            </div>
-                            <p id="timeline-time-label" class="text-base sm:text-lg font-black font-mono text-red-500 leading-none bg-red-50 px-2 py-1 rounded-lg">0%</p>
+                        <div class="flex items-center gap-2">
+                            <span class="text-base sm:text-lg font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
+                            <span class="text-slate-400 font-bold text-sm leading-none">→</span>
+                            <span class="text-base sm:text-lg font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest">Actual Progress</span>
+                            <p id="timeline-time-label" class="text-lg sm:text-xl font-black font-mono text-red-500 leading-none bg-red-50 px-3 py-1 rounded-lg">0%</p>
                         </div>
                     </div>
 
-                    <!-- TARGET & ACTUAL PROGRESS BARS (ENLARGED LIKE OLD SYSTEM) -->
-                    <div class="space-y-2.5 my-2">
-                        <!-- PLANNED BAR -->
-                        <div class="h-4 w-full bg-slate-100 rounded-full border border-slate-200 overflow-hidden relative cursor-pointer flex"
-                             onmouseenter="window.showActiveTargetTooltip(event)"
-                             onmouseleave="window.hideTimelineTooltip()">
-                            <div id="timeline-bar-ok" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
-                            <div id="timeline-bar-repair" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%"></div>
-                            <div id="timeline-bar-reject" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+                    <!-- Production Progress Label + Planned Bar -->
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] sm:text-xs text-slate-500 font-black uppercase tracking-widest leading-none">Production Progress (OK / Repair / Reject)</span>
+                    </div>
+                    <div class="h-4 w-full bg-slate-100 rounded-full border border-slate-200 overflow-hidden relative cursor-pointer flex"
+                         onmouseenter="window.showActiveTargetTooltip(event)"
+                         onmouseleave="window.hideTimelineTooltip()">
+                        <div id="timeline-bar-ok" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
+                        <div id="timeline-bar-repair" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%"></div>
+                        <div id="timeline-bar-reject" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+                    </div>
+
+                    <!-- ACTUAL TIMES MARKERS ABOVE ACTUAL PROGRESS BAR -->
+                    <div class="flex items-center justify-between text-[11px] sm:text-xs font-black uppercase tracking-wider mt-1 mb-1">
+                        <span id="execution-started-at" class="text-red-500">
+                            Started: {{ $actStartVal ?: '--:--' }}
+                        </span>
+                        <span id="timeline-current-time" class="text-slate-400 font-mono">
+                            End: {{ $actFinishVal ?: '--:--' }}
+                        </span>
+                    </div>
+
+                    <!-- DYNAMIC SEGMENTS CONTAINER BAR -->
+                    <div class="relative h-10 w-full group">
+                        <div class="absolute inset-0 bg-slate-100 rounded-xl border border-slate-200 shadow-inner overflow-hidden">
+                            <div id="timeline-actual-container" class="absolute inset-0 rounded-xl">
+                                <!-- SEGMENTS RENDERED VIA JS -->
+                            </div>
                         </div>
                         
-                        <!-- ACTUAL TIMES MARKERS ABOVE ACTUAL PROGRESS BAR -->
-                        <div class="flex items-center justify-between text-[11px] sm:text-xs font-black uppercase tracking-wider mt-3 mb-1">
-                            <span id="execution-started-at" class="text-red-500">
-                                Started: {{ $actStartVal ?: '--:--' }}
-                            </span>
-                            <span id="timeline-current-time" class="text-slate-400 font-mono">
-                                End: {{ $actFinishVal ?: '--:--' }}
-                            </span>
-                        </div>
+                        <div id="timeline-actual-labels" class="absolute inset-0 pointer-events-none z-50"></div>
 
-                        <!-- DYNAMIC SEGMENTS CONTAINER BAR (ENLARGED) -->
-                        <div class="relative h-10 w-full group">
-                            <div class="absolute inset-0 bg-slate-100 rounded-xl border border-slate-200 shadow-inner overflow-hidden">
-                                <div id="timeline-actual-container" class="absolute inset-0 rounded-xl">
-                                    <!-- SEGMENTS RENDERED VIA JS -->
-                                </div>
-                            </div>
-                            
-                            <div id="timeline-actual-labels" class="absolute inset-0 pointer-events-none z-50"></div>
-
-                            <!-- Current Time Marker Line -->
-                            @php
-                                $ppcStart = $prodPlan?->start_time ? \Carbon\Carbon::parse($date . ' ' . $prodPlan->start_time) : null;
-                                $ppcEnd = $prodPlan?->finish_time ? \Carbon\Carbon::parse($date . ' ' . $prodPlan->finish_time) : null;
-                                $planStart = $ppcStart ?? \Carbon\Carbon::parse($activeJob->plan_start ?? now()->startOfDay()->addHours(7)->addMinutes(40));
-                                $planEnd = $ppcEnd ?? \Carbon\Carbon::parse($activeJob->plan_end ?? now()->startOfDay()->addHours(10)->addMinutes(40));
-                                $totalDur = max(1, $planEnd->diffInSeconds($planStart));
-                                $elapsed = max(0, now()->diffInSeconds($planStart, false));
-                                $markerPerc = min(100, max(0, ($elapsed / $totalDur) * 100));
-                            @endphp
-                            <div id="timeline-marker" class="absolute top-0 h-full w-[2px] bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,1)] z-40 pointer-events-none" style="left: {{ $markerPerc }}%">
-                                <div class="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping"></div>
-                            </div>
+                        <!-- Current Time Marker Line -->
+                        @php
+                            $ppcStart = $prodPlan?->start_time ? \Carbon\Carbon::parse($date . ' ' . $prodPlan->start_time) : null;
+                            $ppcEnd = $prodPlan?->finish_time ? \Carbon\Carbon::parse($date . ' ' . $prodPlan->finish_time) : null;
+                            $planStart = $ppcStart ?? \Carbon\Carbon::parse($activeJob->plan_start ?? now()->startOfDay()->addHours(7)->addMinutes(40));
+                            $planEnd = $ppcEnd ?? \Carbon\Carbon::parse($activeJob->plan_end ?? now()->startOfDay()->addHours(10)->addMinutes(40));
+                            $totalDur = max(1, $planEnd->diffInSeconds($planStart));
+                            $elapsed = max(0, now()->diffInSeconds($planStart, false));
+                            $markerPerc = min(100, max(0, ($elapsed / $totalDur) * 100));
+                        @endphp
+                        <div id="timeline-marker" class="absolute top-0 h-full w-[2px] bg-yellow-400 shadow-[0_0_8px_rgba(250,204,21,1)] z-40 pointer-events-none" style="left: {{ $markerPerc }}%">
+                            <div class="absolute -top-0.5 -left-0.5 w-1.5 h-1.5 bg-yellow-400 rounded-full animate-ping"></div>
                         </div>
                     </div>
 
@@ -308,123 +308,100 @@
                         </div>
                     </div>
                     
-                    <!-- Integrated Performance Stats (Achievement & Lost Time side-by-side) -->
-                    <div class="grid grid-cols-2 gap-4 border-b border-slate-200 pb-4">
-                        <!-- Achievement (Left Stat) -->
-                        <div class="bg-white border border-slate-200 p-4 rounded-2xl flex items-center justify-between">
-                            <div class="flex flex-col">
-                                <span class="text-[10px] sm:text-xs text-slate-500 font-black uppercase tracking-wider">Achievement</span>
-                                @php
-                                    $totalActual = ($activeJob->dailyProduction->actual_ok ?? 0) + ($activeJob->dailyProduction->actual_repair ?? 0) + ($activeJob->dailyProduction->actual_reject ?? 0);
-                                    $achievementPct = $activeJob->target_qty > 0 ? round(($totalActual / $activeJob->target_qty) * 100) : 0;
-                                @endphp
-                                <div class="flex items-baseline gap-2 mt-2 leading-none">
-                                    <span id="active-achievement-display" class="text-2xl sm:text-3xl font-black tracking-tighter tabular-nums {{ $achievementPct >= 100 ? 'text-green-400' : 'text-yellow-400' }}">
-                                        {{ $achievementPct }}%
-                                    </span>
-                                    <span id="active-achievement-pcs" class="text-[10px] sm:text-xs font-bold text-slate-400 tracking-tight tabular-nums">
-                                        ({{ $totalActual }} / {{ $activeJob->target_qty ?? 0 }} PCS)
-                                    </span>
+                    <!-- Achievement + Lost Time (Left) | OK/Repair/Reject (Right) -->
+                    <div class="flex gap-4 border-b border-slate-200 pb-4">
+                        <!-- Left: Achievement + Lost Time (stacked) -->
+                        <div class="w-[180px] shrink-0 flex flex-col gap-3">
+                            @php
+                                $totalActual = ($activeJob->dailyProduction->actual_ok ?? 0) + ($activeJob->dailyProduction->actual_repair ?? 0) + ($activeJob->dailyProduction->actual_reject ?? 0);
+                                $achievementPct = $activeJob->target_qty > 0 ? round(($totalActual / $activeJob->target_qty) * 100) : 0;
+                                $lostSeconds = $activeJob->downtimes
+                                    ->filter(fn($dt) => !in_array(strtolower(trim($dt->jenis_downtime ?? '')), ['dandori', 'break', 'break time']))
+                                    ->sum('duration_seconds');
+                                $lostMins = intdiv($lostSeconds, 60);
+                                $lostSecs = $lostSeconds % 60;
+                            @endphp
+                            <!-- Achievement -->
+                            <div class="bg-white border border-slate-200 p-3 rounded-2xl flex items-center justify-between">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-wider">Achievement</span>
+                                    <span id="active-achievement-display" class="text-2xl sm:text-3xl font-black tracking-tighter tabular-nums leading-none mt-1 {{ $achievementPct >= 100 ? 'text-green-400' : 'text-yellow-400' }}">{{ $achievementPct }}%</span>
+                                    <span id="active-achievement-pcs" class="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight tabular-nums mt-0.5">({{ $totalActual }} / {{ $activeJob->target_qty ?? 0 }} PCS)</span>
                                 </div>
-                            </div>
-                            <div class="flex flex-col items-end justify-between h-full">
                                 <div class="w-2 h-2 rounded-full {{ $achievementPct >= 100 ? 'bg-green-400 animate-pulse' : 'bg-yellow-400' }}"></div>
-                                <span class="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase mt-2">Efficiency</span>
                             </div>
-                        </div>
-
-                        <!-- Lost Time (Right Stat) -->
-                        <div class="bg-white border border-slate-200 p-4 rounded-2xl flex items-center justify-between">
-                            <div class="flex flex-col">
-                                <span class="text-[10px] sm:text-xs text-slate-500 font-black uppercase tracking-wider">Lost Time</span>
-                                @php
-                                    $lostSeconds = $activeJob->downtimes
-                                        ->filter(fn($dt) => !in_array(strtolower(trim($dt->jenis_downtime ?? '')), ['dandori', 'break', 'break time']))
-                                        ->sum('duration_seconds');
-                                    $lostMins = intdiv($lostSeconds, 60);
-                                    $lostSecs = $lostSeconds % 60;
-                                @endphp
-                                <span id="active-lost-time-display" class="text-2xl sm:text-3xl font-black tracking-tighter text-red-500 mt-2 leading-none tabular-nums">
-                                    @if($lostMins > 0)
-                                        {{ $lostMins }}<span class="text-xs sm:text-sm font-black text-slate-500">m </span>
-                                    @endif
-                                    {{ $lostSecs }}<span class="text-xs sm:text-sm font-black text-slate-500">s</span>
-                                </span>
-                            </div>
-                            <div class="flex flex-col items-end justify-between h-full">
+                            <!-- Lost Time -->
+                            <div class="bg-white border border-slate-200 p-3 rounded-2xl flex items-center justify-between">
+                                <div class="flex flex-col">
+                                    <span class="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-wider">Lost Time</span>
+                                    <span id="active-lost-time-display" class="text-2xl sm:text-3xl font-black tracking-tighter text-red-500 leading-none tabular-nums mt-1">
+                                        @if($lostMins > 0){{ $lostMins }}<span class="text-[10px] sm:text-xs font-black text-slate-500">m </span>@endif{{ $lostSecs }}<span class="text-[10px] sm:text-xs font-black text-slate-500">s</span>
+                                    </span>
+                                </div>
                                 <div class="w-2 h-2 rounded-full bg-red-500 animate-pulse"></div>
-                                <span class="text-[9px] sm:text-[10px] text-slate-500 font-bold uppercase mt-2">Downtime</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Production Counter Columns (OK, Repair, Reject) -->
-                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <!-- OK Counter -->
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between">
-                            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
-                                <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">OK</span>
-                                <span class="text-2xl sm:text-3xl font-black text-slate-800 leading-none tabular-nums animate-pulse" id="active-actual-display">{{ $activeJob->dailyProduction->actual_ok ?? 0 }}</span>
-                            </div>
-                            <input type="hidden" id="active-actual-{{ $activeJob->id }}" value="0">
-                            <div class="flex flex-col gap-2 mt-3">
-                                <div class="flex gap-2">
-                                    <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition-all active:scale-95 shadow-lg shadow-emerald-900/40 border-b-2 border-emerald-700 active:border-b-0 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                                        PLT ({{ $activeJob->capacity ?? 0 }})
-                                    </button>
-                                    <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-2xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                                        +1
-                                    </button>
-                                    <button onclick="stepInput('active-actual-{{ $activeJob->id }}', -1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-2xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>
-                                        -1
-                                    </button>
-                                </div>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <input type="number" id="manual-ok-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-xl px-2 py-2 sm:px-3 sm:py-2.5 text-sm text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                    <button onclick="manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs transition-all active:scale-95">OK</button>
-                                </div>
                             </div>
                         </div>
 
-                        <!-- REPAIR Counter -->
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between">
-                            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
-                                <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Repair</span>
-                                <span class="text-2xl sm:text-3xl font-black text-orange-500 leading-none tabular-nums" id="active-repair-display">{{ $activeJob->dailyProduction->actual_repair ?? 0 }}</span>
-                            </div>
-                            <div class="flex flex-col gap-2 mt-3">
-                                <div class="flex gap-2">
-                                    <button onclick="stepInput('active-repair-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-2xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-sm hover:bg-orange-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                                        +1
-                                    </button>
+                        <!-- Right: OK / Repair / Reject (side by side) -->
+                        <div class="flex-1 grid grid-cols-3 gap-3">
+                            <!-- OK Counter -->
+                            <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                                <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                                    <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">OK</span>
+                                    <span class="text-3xl sm:text-4xl font-black text-slate-800 leading-none tabular-nums animate-pulse" id="active-actual-display">{{ $activeJob->dailyProduction->actual_ok ?? 0 }}</span>
                                 </div>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <input type="number" id="manual-repair-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-xl px-2 py-2 sm:px-3 sm:py-2.5 text-sm text-slate-800 font-bold outline-none focus:border-orange-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                    <button onclick="manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-orange-500 hover:bg-orange-400 text-white font-black text-xs transition-all active:scale-95">Go</button>
+                                <input type="hidden" id="active-actual-{{ $activeJob->id }}" value="0">
+                                <div class="flex flex-col gap-2 mt-2">
+                                    <div class="flex gap-1.5">
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all active:scale-95 shadow-lg shadow-emerald-900/40 border-b-2 border-emerald-700 active:border-b-0 flex items-center justify-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                            PLT ({{ $activeJob->capacity ?? 0 }})
+                                        </button>
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
+                                        </button>
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', -1, {{ $activeJob->id }})" class="flex-1 py-2.5 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-black text-xs transition-all active:scale-95 flex items-center justify-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>-1
+                                        </button>
+                                    </div>
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" id="manual-ok-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button onclick="manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-2.5 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-[10px] transition-all active:scale-95">OK</button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <!-- REJECT Counter -->
-                        <div class="bg-white p-4 rounded-2xl border border-slate-200 flex flex-col justify-between">
-                            <div class="flex justify-between items-center border-b border-slate-200 pb-2">
-                                <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Reject</span>
-                                <span class="text-2xl sm:text-3xl font-black text-red-500 leading-none tabular-nums" id="active-reject-display">{{ $activeJob->dailyProduction->actual_reject ?? 0 }}</span>
-                            </div>
-                            <div class="flex flex-col gap-2 mt-3">
-                                <div class="flex gap-2">
-                                    <button onclick="stepInput('active-reject-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-sm hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                                        +1
-                                    </button>
+                            <!-- REPAIR Counter -->
+                            <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                                <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                                    <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Repair</span>
+                                    <span class="text-3xl sm:text-4xl font-black text-orange-500 leading-none tabular-nums" id="active-repair-display">{{ $activeJob->dailyProduction->actual_repair ?? 0 }}</span>
                                 </div>
-                                <div class="flex items-center gap-1 sm:gap-2">
-                                    <input type="number" id="manual-reject-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-xl px-2 py-2 sm:px-3 sm:py-2.5 text-sm text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                    <button onclick="manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 sm:px-4 sm:py-2.5 rounded-xl bg-red-500 hover:bg-red-400 text-white font-black text-xs transition-all active:scale-95">Go</button>
+                                <div class="flex flex-col gap-2 mt-2">
+                                    <button onclick="stepInput('active-repair-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-xs hover:bg-orange-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
+                                    </button>
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" id="manual-repair-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold outline-none focus:border-orange-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button onclick="manualStep('active-repair-{{ $activeJob->id }}','manual-repair-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-2.5 py-1.5 rounded-lg bg-orange-500 hover:bg-orange-400 text-white font-black text-[10px] transition-all active:scale-95">Go</button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- REJECT Counter -->
+                            <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                                <div class="flex justify-between items-center border-b border-slate-200 pb-2">
+                                    <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Reject</span>
+                                    <span class="text-3xl sm:text-4xl font-black text-red-500 leading-none tabular-nums" id="active-reject-display">{{ $activeJob->dailyProduction->actual_reject ?? 0 }}</span>
+                                </div>
+                                <div class="flex flex-col gap-2 mt-2">
+                                    <button onclick="stepInput('active-reject-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-xs hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
+                                    </button>
+                                    <div class="flex items-center gap-1">
+                                        <input type="number" id="manual-reject-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2 py-1.5 text-xs text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button onclick="manualStep('active-reject-{{ $activeJob->id }}','manual-reject-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-2.5 py-1.5 rounded-lg bg-red-500 hover:bg-red-400 text-white font-black text-[10px] transition-all active:scale-95">Go</button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -496,70 +473,44 @@
                         <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-3xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
                     </div>
 
-                    <!-- Operator Console Card -->
-                    <div class="p-4 rounded-2xl bg-white border border-slate-200 shadow-sm min-h-[360px] flex flex-col h-full">
-                        <div>
-                            <div class="flex items-center border-b border-slate-200 pb-2 mb-4">
-                                <span class="text-xs sm:text-sm font-black text-slate-600 uppercase tracking-widest">Operator Console</span>
-                            </div>
-
-                            <div id="control-board-actions" class="mt-4">
-                                @if(!$activeJob->started_at && !$isDandori)
-                                    <button onclick="jsStartDandori({{ $activeJob->id }})" class="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-md transition-all flex items-center justify-center gap-2.5 group active:translate-y-0.5">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-                                        MULAI DANDORI (PERSIAPAN)
-                                    </button>
-                                @elseif($isDandori)
-                                    <div class="grid grid-cols-2 gap-3">
-                                        <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                            STOP &amp; LANJUT
-                                        </button>
-                                        @if($openFirstCheck)
-                                            <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                                STOP 1ST CHECK
-                                            </button>
-                                        @else
-                                            <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
-                                                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm0-9c-2.76 0-5 2.24-5 5h2c0-1.66 1.34-3 3-3s3 1.34 3 3c0 2-3 2.5-3 4.5h2c0-1.5 2-2 2-4.5 0-2.76-2.24-5-5-5z"/></svg>
-                                                1ST CHECK
-                                            </button>
-                                        @endif
-                                        <button id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                            DOWNTIME
-                                        </button>
-                                    </div>
-                                @else
-                                    <div class="flex flex-col gap-3">
-                                        <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-3.5 rounded-xl bg-white border border-slate-300 text-slate-600 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 hover:bg-slate-50 hover:border-slate-400 shadow-sm active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-                                            Cek List Downtime
-                                        </button>
-                                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-3.5 rounded-xl bg-red-600/10 border border-red-500/50 text-red-400 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2.5 group hover:bg-red-600 hover:text-white shadow-sm active:translate-y-0.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                                            SELESAIKAN JOB 
-                                        </button>
-                                    </div>
-                                @endif
-                            </div>
+                    <!-- Actions Card (Downtime/TryOut/Break/Checklist combined) -->
+                    @if(!$isDandori && $activeJob->started_at)
+                    <div class="p-3 rounded-2xl bg-white border border-slate-200 shadow-sm">
+                        <div class="flex items-center border-b border-slate-200 pb-2 mb-3">
+                            <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest">Quick Actions</span>
                         </div>
-
-                        @if(!$isDandori && $activeJob->started_at)
-                        <div class="space-y-3 mt-auto pt-3 border-t border-slate-200">
-                            <div class="grid grid-cols-2 gap-3">
-                                <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Downtime</button>
-                                <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-3 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Try Out</button>
-                                <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn col-span-2 w-full py-3 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 text-xs font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Break</button>
-                                <a href="{{ route('operational.dandori', ['job_id' => $activeJob->id, 'line' => $activeJob->line, 'shift' => 'Shift 1']) }}" class="col-span-2 w-full py-3 rounded-xl bg-blue-500/10 border border-blue-500/30 text-blue-400 text-xs font-black uppercase text-center hover:bg-blue-500 hover:text-white transition-all shadow-sm active:translate-y-0.5 flex items-center justify-center">Dandori Mod</a>
-                            </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Downtime</button>
+                            <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Try Out</button>
+                            <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn w-full py-2.5 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 text-xs font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all shadow-sm active:translate-y-0.5">Break</button>
+                            <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-2.5 rounded-xl bg-white border border-slate-300 text-slate-600 text-xs font-black uppercase text-center transition-all flex items-center justify-center gap-1.5 hover:bg-slate-50 hover:border-slate-400 shadow-sm active:translate-y-0.5">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                                Checklist
+                            </button>
                         </div>
-                        @endif
+                    </div>
+                    @endif
+
+                    <!-- SELESAIKAN JOB (paling bawah, besar) -->
+                    @if(!$isDandori && $activeJob->started_at)
+                    <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-5 rounded-2xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white shadow-md active:translate-y-0.5 mt-auto">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                        Selesaikan Job
+                    </button>
+                    @endif
+
+                    <!-- SELESAIKAN JOB (before dandori) -->
+                    @if(!$activeJob->started_at && !$isDandori)
+                    <button onclick="jsStartDandori({{ $activeJob->id }})" class="w-full py-4 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white font-black text-base shadow-md transition-all flex items-center justify-center gap-2.5 group active:translate-y-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                        Mulai Dandori
+                    </button>
+                    @endif
                     </div>
                 </div>
             </div>
-            </div> {{-- end inner grid 9+3 --}}
+
+            </div> {{-- end #active-work-area --}}
             
             {{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
             @if($activeJob->started_at)

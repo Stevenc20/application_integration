@@ -282,6 +282,22 @@ function _isInBreakWindow(now) {
     return null;
 }
 
+function _clearBreakState(jobId) {
+    const job = window.jobMasterData?.[jobId];
+    if (job) {
+        delete job._breakPaused;
+        delete job._frozenTimer;
+    }
+    window._autoBreakActive = false;
+    window._autoBreakDowntimeId = null;
+    window._autoBreakSkipped = false;
+    window._autoBreakEndMin = null;
+    delete window.runningDowntimes?.[`${jobId}_break`];
+    window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes || {}).length;
+    try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
+    _updateBreakUI(jobId, null, false);
+}
+
 function _autoBreakTick() {
     const now = new Date();
     const activeId = window.ProductionConfig?.currentActiveId;
@@ -1861,7 +1877,10 @@ function autoCloseJobDowntimes(jobId) {
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
                 }).then(r => r.json()).then(res => {
-                    if (res.success) delete window.runningDowntimes[key];
+                    if (res.success) {
+                        if (rd.btnType === 'break') _clearBreakState(rd.jobId);
+                        delete window.runningDowntimes[key];
+                    }
                 }).catch(() => {})
             );
         }
@@ -1917,6 +1936,7 @@ async function submitFinalJob() {
         }).then(r => r.json());
 
         if (res.success) {
+            _clearBreakState(id);
             notifyLineStatusChange(jobMasterData[id]?.line);
             if (jobNo) {
                 localStorage.setItem('lkh_completion_toast', jobNo);
@@ -2518,6 +2538,11 @@ function syncBreakStatus() {
         .then(data => {
             const job = jobMasterData[id];
             if (!job) return;
+
+            if (data.status === 'complete' || data.status === 'finished') {
+                if (window._autoBreakActive || job._breakPaused) _clearBreakState(id);
+                return;
+            }
 
             const serverDown = data.active_downtime;
             const clientBreak = window.runningDowntimes?.[`${id}_break`];
