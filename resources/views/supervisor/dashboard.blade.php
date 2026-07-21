@@ -855,7 +855,7 @@ function buildLineCard(line){
 
   const jobRow = `<div class="kpi-row" data-line="${line}" data-desc="JOB">
     <span class="kpi-label">JOB</span>
-    <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span><span class="kpi-subtitle">curr</span></span>
+    <span class="kpi-value">${jobActual} <span class="kpi-subtitle">curr</span> <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
   </div>`;
 
   const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
@@ -1049,7 +1049,7 @@ function updateCards(forceDetail) {
 
     const jobValEl = CELL_CACHE[`${line}-JOB-value`];
     if (jobValEl) {
-      const h = `${meta.jobActual || '0/0'} <span class="kpi-pct">${meta.job && meta.job !== '-' ? meta.job : ''}</span><span class="kpi-subtitle">curr</span>`;
+      const h = `${meta.jobActual || '0/0'} <span class="kpi-subtitle">curr</span> <span class="kpi-pct">${meta.job && meta.job !== '-' ? meta.job : ''}</span>`;
       if (jobValEl.innerHTML !== h) jobValEl.innerHTML = h;
     }
 
