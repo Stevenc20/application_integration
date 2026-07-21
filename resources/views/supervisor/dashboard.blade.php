@@ -484,7 +484,7 @@
 .kpi-subtitle {
   font-size: 0.7rem;
   font-weight: 600;
-  color: #9ca3af;
+  color: #6b7280;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
@@ -502,6 +502,7 @@
   border-bottom: 1px solid #bfdbfe;
 }
 .kpi-row[data-desc="JOB"] .kpi-label { color: #1d4ed8; }
+.kpi-row[data-desc="JOB"] .kpi-pct { color: #2563eb; }
 
 /* STROKE row highlight */
 .kpi-row[data-desc="STROKE"] {
