@@ -440,9 +440,11 @@
   text-align: right;
   word-break: break-word;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 1px;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.3em;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 .kpi-row .kpi-pct {
   font-size: 0.8rem;
@@ -470,6 +472,22 @@
   font-weight: 600;
 }
 .kpi-row-clickable:hover { background: #fef2f2; }
+
+/* Per-press: keep column layout for value + pct */
+.per-press-view .kpi-row .kpi-value {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+/* Subtitle text (e.g. "curr" under JOB) */
+.kpi-subtitle {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #9ca3af;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
 
 /* GSPH row highlight */
 .kpi-row[data-desc="GSPH"] {
@@ -806,7 +824,7 @@ function buildKpiRow(kpi, line, safeLine){
   } else if (isClickable) {
     valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
   } else if(kpi.desc === 'GSPH'){
-    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+    valueHtml = `<span>${kpi.actual}</span>`;
   } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
     valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
   } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
@@ -836,7 +854,7 @@ function buildLineCard(line){
 
   const jobRow = `<div class="kpi-row" data-line="${line}" data-desc="JOB">
     <span class="kpi-label">JOB</span>
-    <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
+    <span class="kpi-value">${jobActual} <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span><span class="kpi-subtitle">curr</span></span>
   </div>`;
 
   const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
@@ -866,10 +884,23 @@ function buildLineCard(line){
     bodyHtml = `<div class="kpi-col-left">${leftHtml}</div><div class="kpi-col-right">${rightHtml}</div>`;
   } else {
     let kpiHtml = jobRow;
-    mainRows.forEach((kpi) => {
+
+    const qtyKpi = mainRows.find(k => k.desc === 'QTY');
+    if (qtyKpi) {
+      const actualNum = Number(qtyKpi.actual || 0).toLocaleString('id-ID');
+      const planNum = Number(qtyKpi.plan || 0).toLocaleString('id-ID');
+      kpiHtml += `<div class="kpi-row kpi-row-clickable" data-line="${line}" data-desc="QTY" id="kpi-QTY-${safeLine}" onclick="openKpiDetailModal('QTY','${line}')">
+        <span class="kpi-label">QTY</span>
+        <span class="kpi-value"><span class="kpi-val-main">${actualNum} / ${planNum}</span></span>
+      </div>`;
+    }
+
+    kpiHtml += strokeRow;
+
+    mainRows.filter(kpi => kpi.desc !== 'QTY').forEach((kpi) => {
       kpiHtml += buildKpiRow(kpi, line, safeLine);
     });
-    kpiHtml += strokeRow;
+
     bodyHtml = kpiHtml;
   }
 
@@ -1017,7 +1048,7 @@ function updateCards(forceDetail) {
 
     const jobValEl = CELL_CACHE[`${line}-JOB-value`];
     if (jobValEl) {
-      const h = `${meta.jobActual || '0/0'} <span class="kpi-pct">${meta.job && meta.job !== '-' ? meta.job : ''}</span>`;
+      const h = `${meta.jobActual || '0/0'} <span class="kpi-pct">${meta.job && meta.job !== '-' ? meta.job : ''}</span><span class="kpi-subtitle">curr</span>`;
       if (jobValEl.innerHTML !== h) jobValEl.innerHTML = h;
     }
 
@@ -1036,14 +1067,18 @@ function updateCards(forceDetail) {
 
       const isClickable = kpi.popup || kpi.actualLink;
       let valueHtml = '';
-      if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+      if (kpi.desc === 'QTY' && !IS_PER_PRESS) {
+        const actualNum = Number(kpi.actual || 0).toLocaleString('id-ID');
+        const planNum = Number(kpi.plan || 0).toLocaleString('id-ID');
+        valueHtml = `<span class="kpi-val-main">${actualNum} / ${planNum}</span>`;
+      } else if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
       } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
       } else if (isClickable) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       } else if(kpi.desc === 'GSPH'){
-        valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+        valueHtml = `<span>${kpi.actual}</span>`;
       } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
         valueHtml = `<span>${kpi.actual}</span>`;
       } else {
