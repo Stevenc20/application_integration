@@ -630,66 +630,67 @@
     @php
         $firstJob = $pendingJobs->first();
     @endphp
-    <div class="bg-slate-900 rounded-3xl p-6 md:p-12 shadow-2xl border-4 border-slate-800 text-white flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[300px]">
-        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.05)_0%,transparent_70%)]"></div>
+    <div class="bg-slate-50 rounded-3xl p-6 md:p-12 shadow-lg shadow-red-900/5 border border-slate-200 text-slate-800 flex flex-col items-center justify-center text-center relative overflow-hidden min-h-[300px]">
+        <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-red-400 to-transparent"></div>
+        <div class="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(239,68,68,0.03)_0%,transparent_70%)]"></div>
         <div class="relative z-10 flex flex-col items-center">
-            <div class="w-20 h-20 rounded-3xl bg-slate-800 flex items-center justify-center mb-6 shadow-xl border border-slate-700">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+            <div class="w-20 h-20 rounded-3xl bg-red-50 border border-red-200 flex items-center justify-center mb-6 shadow-lg shadow-red-900/5">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-red-500 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
             </div>
-            <h2 class="text-2xl font-black text-slate-400 uppercase tracking-widest mb-2">Ready to Start</h2>
-            <p class="text-slate-500 text-sm max-w-md italic font-medium mb-8">Mulai persiapan (Dandori) untuk item pertama sesuai urutan jadwal PPC di bawah.</p>
-            
+            <h2 class="text-2xl font-black text-slate-800 uppercase tracking-widest mb-2">Menunggu Dandori</h2>
+            <p class="text-slate-500 text-sm max-w-md font-medium mb-8">Pilih job dari antrean PPC, lalu mulai proses dandori untuk item pertama.</p>
+
             <div class="w-full max-w-2xl">
                 <div class="flex items-center gap-2 mb-3 ml-1">
-                    <div class="w-1.5 h-4 bg-blue-600 rounded-full"></div>
-                    <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Item Pertama dalam Antrean (Jadwal PPC)</label>
+                    <div class="w-1.5 h-4 bg-red-500 rounded-full"></div>
+                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest">Job Berikutnya</label>
                 </div>
-                <div class="flex flex-col sm:flex-row items-stretch gap-3 bg-slate-800/40 p-3 rounded-[2rem] border border-slate-700/50">
+                <div class="flex flex-col sm:flex-row items-stretch gap-3 bg-white p-3 rounded-[2rem] border border-slate-200 shadow-sm">
                     <div class="flex-1 relative" id="custom-select-container">
                         <input type="hidden" id="standby-job-select" value="{{ $firstJob ? $firstJob->id : '' }}">
-                        <button type="button" onclick="toggleCustomSelect()" id="custom-select-trigger" class="w-full h-14 bg-slate-900/90 border border-slate-700 rounded-2xl px-6 flex items-center justify-between text-sm text-white hover:border-blue-500/50 transition-all outline-none shadow-inner group/select font-bold">
+                        <button type="button" onclick="toggleCustomSelect()" id="custom-select-trigger" class="w-full h-14 bg-white border border-slate-300 rounded-2xl px-6 flex items-center justify-between text-sm text-slate-800 hover:border-red-400 transition-all outline-none shadow-inner group/select font-bold">
                             <span id="custom-select-label">
                                 @if($firstJob)
                                     [{{ $firstJob->job_number }}] {{ $firstJob->job_name }}
                                 @else
-                                    -- Antrean Kosong --
+                                    Tidak ada antrean job
                                 @endif
                             </span>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-slate-500 group-hover/select:text-blue-400 transition-transform duration-300" id="custom-select-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-slate-400 group-hover/select:text-red-500 transition-transform duration-300" id="custom-select-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                         </button>
 
-                        <div id="custom-select-menu" class="hidden absolute bottom-full mb-3 left-0 right-0 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl overflow-hidden z-[110] max-h-60 overflow-y-auto">
-                            <div class="px-4 py-3 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+                        <div id="custom-select-menu" class="hidden absolute bottom-full mb-3 left-0 right-0 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-[110] max-h-60 overflow-y-auto">
+                            <div class="px-4 py-3 border-b border-slate-100 bg-slate-100 flex items-center justify-between">
                                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Urutan Antrean Jadwal PPC</span>
-                                <span class="text-[8px] font-black text-emerald-400 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">Sesuai Urutan</span>
+                                <span class="text-[8px] font-black text-red-500 px-2 py-0.5 rounded-full bg-red-50 border border-red-200">Sesuai Urutan</span>
                             </div>
                             <div class="p-2 space-y-1">
                                 @forelse($pendingJobs as $index => $pj)
-                                <div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-slate-800/30 transition-all group/item cursor-pointer" onclick="selectCustomItem({{ $pj->id }}, '[{{ $pj->job_number }}] {{ addslashes($pj->job_name) }}')">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-800 flex items-center justify-center text-[10px] font-black text-slate-400 group-hover/item:text-white transition-all">
+                                <div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-all group/item cursor-pointer" onclick="selectCustomItem({{ $pj->id }}, '[{{ $pj->job_number }}] {{ addslashes($pj->job_name) }}')">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 group-hover/item:bg-red-100 group-hover/item:text-red-600 transition-all">
                                         {{ $index + 1 }}
                                     </div>
                                     <div class="flex-1 min-w-0 text-left">
                                         <div class="flex items-center justify-between">
-                                            <p class="text-[10px] font-black text-slate-500 uppercase leading-none mb-1 group-hover/item:text-slate-400">{{ $pj->job_number }}</p>
+                                            <p class="text-[10px] font-black text-slate-400 uppercase leading-none mb-1 group-hover/item:text-red-500">{{ $pj->job_number }}</p>
                                             @if($index === 0)
-                                                <span class="text-[8px] font-black text-blue-400 uppercase">Item Pertama (Aktif)</span>
+                                                <span class="text-[8px] font-black text-red-500 uppercase">Item Pertama (Aktif)</span>
                                             @endif
                                         </div>
-                                        <p class="text-xs font-bold text-slate-300 truncate">{{ $pj->job_name }}</p>
+                                        <p class="text-xs font-bold text-slate-700 truncate">{{ $pj->job_name }}</p>
                                     </div>
                                 </div>
                                 @empty
                                 <div class="px-4 py-8 text-center">
-                                    <p class="text-xs text-slate-500 font-bold uppercase tracking-widest">Antrean Kosong</p>
+                                    <p class="text-xs text-slate-400 font-bold uppercase tracking-widest">Tidak ada antrean job</p>
                                 </div>
                                 @endforelse
                             </div>
                         </div>
                     </div>
-                    <button onclick="enqueueJob(document.getElementById('standby-job-select').value)" class="h-14 px-4 md:px-8 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-[10px] md:text-xs shadow-xl shadow-emerald-900/20 transition-all uppercase tracking-widest flex items-center justify-center gap-3 group/btn w-full md:w-auto md:min-w-[200px]">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-                        <span>MULAI PROSES SEKARANG</span>
+                    <button onclick="enqueueJob(document.getElementById('standby-job-select').value)" class="h-14 px-4 md:px-8 rounded-2xl bg-red-600 hover:bg-red-500 text-white font-black text-[10px] md:text-xs shadow-lg shadow-red-600/25 transition-all uppercase tracking-widest flex items-center justify-center gap-3 group/btn w-full md:w-auto md:min-w-[200px]">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span>MULAI DANDORI</span>
                     </button>
                 </div>
             </div>
