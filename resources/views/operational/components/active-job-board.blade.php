@@ -496,10 +496,12 @@
                     </div>
 
                     <!-- Selesaikan Job (flush bottom) -->
-                    <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full mt-auto pt-3 py-4 rounded-xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white active:translate-y-0.5">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
-                        Selesaikan Job
-                    </button>
+                    <div class="mt-auto pt-3 border-t border-slate-200">
+                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-4 rounded-xl bg-red-600/10 border-2 border-red-500/30 text-red-500 font-black text-base uppercase tracking-widest transition-all flex items-center justify-center gap-3 group hover:bg-red-600 hover:text-white active:translate-y-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
+                            Selesaikan Job
+                        </button>
+                    </div>
                 </div>
 
                 @elseif(!$activeJob->started_at && !$isDandori)
