@@ -170,6 +170,8 @@
   .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
   .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
   .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 20px 24px !important; }
+  .per-press-table thead th           { font-size: 1.1rem !important; padding: 16px 24px !important; }
+  .per-press-table tbody td           { font-size: 1.25rem !important; padding: 16px 24px !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
@@ -196,6 +198,8 @@
   .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
   .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
   .per-press-view .detail-toggle      { font-size: 1.3rem !important; padding: 18px 22px !important; }
+  .per-press-table thead th           { font-size: 1.2rem !important; padding: 18px 28px !important; }
+  .per-press-table tbody td           { font-size: 1.4rem !important; padding: 18px 28px !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
@@ -227,6 +231,8 @@
   .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 2.2rem !important; }
   .per-press-view .kpi-col-header     { font-size: 1.4rem !important; padding: 14px 30px !important; }
   .per-press-view .detail-toggle      { font-size: 1.6rem !important; padding: 22px 30px !important; }
+  .per-press-table thead th           { font-size: 1.5rem !important; padding: 22px 36px !important; }
+  .per-press-table tbody td           { font-size: 1.7rem !important; padding: 22px 36px !important; }
 }
 
 /* ── PER-PRESS VIEW (single press, full-width card + big fonts) ─── */
@@ -245,23 +251,85 @@
   letter-spacing: 0.3em;
 }
 .per-press-view .press-card-body {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: block !important;
   padding: 0;
 }
-.per-press-view .kpi-col-left {
-  border-right: 1px solid #e5e7eb;
+.per-press-view .kpi-col-left,
+.per-press-view .kpi-col-right { display: none; }
+
+/* Per-press table */
+.pp-table-wrap { overflow-x: auto; }
+.per-press-table {
+  width: 100%;
+  border-collapse: collapse;
 }
-.per-press-view .kpi-col-header {
-  padding: 10px 20px;
+.per-press-table thead th {
+  padding: 14px 20px;
   font-size: 1rem;
   font-weight: 800;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #9ca3af;
+  letter-spacing: 0.1em;
+  color: #6b7280;
   background: #fafafa;
+  border-bottom: 2px solid #e5e7eb;
+  text-align: left;
+}
+.per-press-table thead th:not(:first-child) { text-align: right; }
+.per-press-table tbody td {
+  padding: 14px 20px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1f2937;
   border-bottom: 1px solid #f3f4f6;
 }
+.per-press-table tbody td:first-child {
+  font-weight: 800;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.per-press-table tbody td:not(:first-child) { text-align: right; }
+.per-press-table tbody tr:hover { background: #f9fafb; }
+.per-press-table tbody tr:last-child td { border-bottom: none; }
+.per-press-table .pp-td-actual { color: #dc2626; font-weight: 900; }
+.per-press-table .pp-td-curr { color: #2563eb; font-weight: 800; }
+.per-press-table .pp-row-job td { background: #eff6ff; border-bottom-color: #bfdbfe; }
+.per-press-table .pp-row-gsph td { background: #f0f9ff; border-bottom-color: #bae6fd; }
+.per-press-table .pp-row-stroke td { background: #f5f3ff; border-bottom-color: #ddd6fe; }
+
+/* Per-press detail section (no toggle, shown directly) */
+.per-press-detail {
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+}
+.per-press-detail .det-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.per-press-detail .det-section-label .label-text {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.per-press-detail .det-section-label .label-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #e5e7eb;
+  color: #6b7280;
+}
+.per-press-detail .det-section-label .label-badge.zero {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.per-press-detail .det-empty { padding: 20px 12px; }
+.per-press-view .kpi-col-left,
+.per-press-view .kpi-col-right { display: none; }
 .per-press-view .kpi-row {
   padding: 16px 20px;
   min-height: 52px;
@@ -869,20 +937,53 @@ function buildLineCard(line){
 
   let bodyHtml = '';
   if (IS_PER_PRESS) {
-    let leftHtml = jobRow;
-    let rightHtml = '';
-    mainRows.forEach((kpi) => {
-      if (LEFT_KPIS.includes(kpi.desc)) {
-        leftHtml += buildKpiRow(kpi, line, safeLine);
+    let tableRows = '';
+    const jobPlan = meta.jobPlan || '0';
+    tableRows += `<tr class="pp-row-job">
+      <td>JOB</td>
+      <td>${jobPlan}</td>
+      <td class="pp-td-actual">${jobActual}</td>
+      <td class="pp-td-curr">${jobLabel !== '-' ? jobLabel : '-'}</td>
+    </tr>`;
+
+    const allKpis = [...mainRows, ...extraRows];
+    const order = ['QTY','GSPH','PROD_T','TOTAL_DT','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME','REPAIR','REJECT'];
+    const sorted = order.map(d => allKpis.find(k => k.desc === d)).filter(Boolean);
+    const remaining = allKpis.filter(k => !order.includes(k.desc));
+    sorted.push(...remaining);
+
+    sorted.forEach(kpi => {
+      if (kpi.desc === 'QTY') {
+        const planNum = Number(kpi.plan || 0).toLocaleString('id-ID');
+        const actualNum = Number(kpi.actual || 0).toLocaleString('id-ID');
+        tableRows += `<tr>
+          <td>QTY</td>
+          <td>${planNum}</td>
+          <td class="pp-td-actual">${actualNum}</td>
+          <td class="pp-td-curr">${kpi.current || '-'}</td>
+        </tr>`;
+        tableRows += `<tr class="pp-row-stroke">
+          <td>STROKE</td>
+          <td>-</td>
+          <td class="pp-td-actual">${strokeDisplay}</td>
+          <td class="pp-td-curr">${currStrokeVal !== '-' ? currStrokeVal : '-'}</td>
+        </tr>`;
       } else {
-        rightHtml += buildKpiRow(kpi, line, safeLine);
+        const rowClass = kpi.desc === 'GSPH' ? ' class="pp-row-gsph"' : '';
+        const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
+        tableRows += `<tr${rowClass}>
+          <td>${label}</td>
+          <td>${kpi.plan || '-'}</td>
+          <td class="pp-td-actual">${kpi.actual}</td>
+          <td class="pp-td-curr">${kpi.current || '-'}</td>
+        </tr>`;
       }
     });
-    leftHtml += strokeRow;
-    extraRows.forEach((kpi) => {
-      rightHtml += buildKpiRow(kpi, line, safeLine);
-    });
-    bodyHtml = `<div class="kpi-col-left">${leftHtml}</div><div class="kpi-col-right">${rightHtml}</div>`;
+
+    bodyHtml = `<div class="pp-table-wrap"><table class="per-press-table">
+      <thead><tr><th>DESC</th><th>PLAN</th><th>ACTUAL</th><th>CURR</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>`;
   } else {
     let kpiHtml = jobRow;
 
@@ -967,6 +1068,25 @@ function buildLineCard(line){
       <span>Belum ada data produksi</span>
     </div>`;
 
+  if (IS_PER_PRESS) {
+    return `<div class="press-card" id="card-${safeLine}">
+      <div class="press-card-header">${line}</div>
+      <div class="press-card-body">${bodyHtml}</div>
+      <div class="per-press-detail">
+        <div class="det-section-label">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+            <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
+            <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+          </svg>
+          <span class="label-text">Detail Produksi</span>
+          <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
+        </div>
+        ${detailTableHtml}
+      </div>
+    </div>`;
+  }
+
   return `<div class="press-card" id="card-${safeLine}">
     <div class="press-card-header">${line}</div>
     <div class="press-card-body">${bodyHtml}</div>
@@ -1033,6 +1153,14 @@ function cacheCards() {
 }
 
 function updateCards(forceDetail) {
+  if (IS_PER_PRESS) {
+    flushCardCache();
+    document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
+    CARDS_CACHED = true;
+    cacheCards();
+    return;
+  }
+
   if (forceDetail || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH) {
     LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
     flushCardCache();
