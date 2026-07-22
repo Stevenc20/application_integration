@@ -445,9 +445,12 @@ async function _triggerAutoBreakEnd(jobId) {
 
             updateTimeline();
             _updateBreakUI(jobId, null, false);
+        } else {
+            _clearBreakState(jobId);
         }
     } catch (e) {
         console.error('AutoBreak end error:', e);
+        _clearBreakState(jobId);
     }
 }
 
@@ -713,7 +716,7 @@ function updateTimeline(forceAll = false) {
                         if (dandoriEndMs > activeStartMs) activeStartMs = dandoriEndMs;
                     }
                 }
-                elapsed = (finalEndTime.getTime() - activeStartMs) / 1000;
+                elapsed = (job.base_seconds || 0) + (finalEndTime.getTime() - activeStartMs) / 1000;
             }
             const realPct = (elapsed / (plannedDurationMs / 1000)) * 100;
 
@@ -1188,6 +1191,10 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             if (lastDandori && lastDandori.end) {
                 effectiveProductionStart = lastDandori.end;
             }
+        }
+
+        if (job.base_seconds > 0 && !hasDandori) {
+            effectiveProductionStart = actualStartMs - (job.base_seconds * 1000);
         }
 
         const pD = Number(plannedDurationArg) || 0;
