@@ -440,6 +440,7 @@ class InputHarianController extends Controller
             'isHistorical'    => $isHistorical,
             'isLocked'        => $isLocked,
             'allJobsDone'     => $allJobsDone,
+            'jobPlans'        => $jobPlans,
             'sessionMap'      => $sessionMap,
             'scheduleContext' => $scheduleContext
         ]);
