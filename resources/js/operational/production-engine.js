@@ -2482,16 +2482,6 @@ window.selectCustomItem = function selectCustomItem(id, label) {
 
 function checkSyncStatus() {
     const config = window.ProductionConfig;
-    const line = config.currentLine || '';
-    fetch(`/operational/active-job?line=${encodeURIComponent(line)}`, { headers: { 'Accept': 'application/json' } }).then(res => res.json()).then(data => {
-        if ((data.running && data.id !== config.currentActiveId) || (!data.running && config.currentActiveId !== null)) {
-            location.reload();
-        }
-    }).catch(() => { });
-}
-
-function syncActualQty() {
-    const config = window.ProductionConfig;
     const id = config.currentActiveId;
     if (!id) return;
     if (window.ActionRunner && window.ActionRunner.locked) return;
@@ -2500,117 +2490,107 @@ function syncActualQty() {
         const age = (Date.now() - new Date(lastInput).getTime()) / 1000;
         if (age < 10) return;
     }
-    fetch(`/operational/job/${id}/qty?date=${config.currentDate || ''}`, { headers: { 'Accept': 'application/json' } }).then(r => r.json()).then(data => {
-        if (!data.success) return;
-        const jd = jobMasterData[id];
-        if (!jd) return;
-        const serverOk = parseInt(data.actual_ok) || 0;
-        const serverRepair = parseInt(data.actual_repair) || 0;
-        const serverReject = parseInt(data.actual_reject) || 0;
-        if (jd.actual_ok !== serverOk) {
-            jd.actual_ok = serverOk;
+
+    fetch(`/operational/job/${id}/sync?date=${config.currentDate || ''}`, {
+        headers: { 'Accept': 'application/json' }
+    }).then(r => r.json()).then(data => {
+        const job = jobMasterData[id];
+        if (!job) return;
+
+        if (data.status === 'complete' || data.status === 'finished') {
+            if (window._autoBreakActive || job._breakPaused) _clearBreakState(id);
+            return;
+        }
+
+        const serverOk = parseInt(data.qty.actual_ok) || 0;
+        const serverRepair = parseInt(data.qty.actual_repair) || 0;
+        const serverReject = parseInt(data.qty.actual_reject) || 0;
+        if (job.actual_ok !== serverOk) {
+            job.actual_ok = serverOk;
             const el = document.getElementById('active-actual-display');
             if (el) el.textContent = serverOk;
             const rowInput = document.getElementById('actual-' + id);
             if (rowInput) rowInput.value = serverOk;
         }
-        if (jd.actual_repair !== serverRepair) {
-            jd.actual_repair = serverRepair;
+        if (job.actual_repair !== serverRepair) {
+            job.actual_repair = serverRepair;
             const el = document.getElementById('active-repair-display');
             if (el) el.textContent = serverRepair;
         }
-        if (jd.actual_reject !== serverReject) {
-            jd.actual_reject = serverReject;
+        if (job.actual_reject !== serverReject) {
+            job.actual_reject = serverReject;
             const el = document.getElementById('active-reject-display');
             if (el) el.textContent = serverReject;
         }
-        updateTimeline();
-    }).catch(() => { });
-}
 
-function syncBreakStatus() {
-    const config = window.ProductionConfig;
-    const id = config.currentActiveId;
-    if (!id || config.isLocked) return;
+        const serverDown = data.downtime;
+        const clientBreak = window.runningDowntimes?.[`${id}_break`];
 
-    fetch(`/operational/job/${id}/status`, { headers: { 'Accept': 'application/json' } })
-        .then(r => r.json())
-        .then(data => {
-            const job = jobMasterData[id];
-            if (!job) return;
-
-            if (data.status === 'complete' || data.status === 'finished') {
-                if (window._autoBreakActive || job._breakPaused) _clearBreakState(id);
-                return;
+        if (serverDown && serverDown.jenis_downtime === 'break time' && !clientBreak && !window._autoBreakActive) {
+            window._autoBreakActive = true;
+            window._autoBreakDowntimeId = serverDown.id;
+            const serverBreakWindow = _isInBreakWindow(new Date());
+            window._autoBreakEndMin = serverBreakWindow ? serverBreakWindow.endMin : null;
+            window.runningDowntimes[`${id}_break`] = {
+                id: serverDown.id,
+                start: new Date(serverDown.start_time),
+                jobId: id,
+                btnType: 'break',
+                dtType: 'break time',
+                problem: 'AUTO BREAK'
+            };
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+            if (job && !job._breakPaused) {
+                let currentSeconds = job.base_seconds || 0;
+                const anchorTime = job.dandori_start ? new Date(job.dandori_start) : (job.started_at ? new Date(job.started_at) : null);
+                if (anchorTime) currentSeconds += Math.floor((Date.now() - anchorTime.getTime()) / 1000);
+                job._frozenTimer = currentSeconds;
+                job._breakPaused = true;
             }
-
-            const serverDown = data.active_downtime;
-            const clientBreak = window.runningDowntimes?.[`${id}_break`];
-            const clientAnyDt = Object.keys(window.runningDowntimes || {}).some(k => k.startsWith(id + '_'));
-
-            if (serverDown && serverDown.jenis_downtime === 'break time' && !clientBreak && !window._autoBreakActive) {
-                window._autoBreakActive = true;
-                window._autoBreakDowntimeId = serverDown.id;
-                const serverBreakWindow = _isInBreakWindow(new Date());
-                window._autoBreakEndMin = serverBreakWindow ? serverBreakWindow.endMin : null;
-                window.runningDowntimes[`${id}_break`] = {
-                    id: serverDown.id,
-                    start: new Date(serverDown.start_time),
-                    jobId: id,
-                    btnType: 'break',
-                    dtType: 'break time',
-                    problem: 'AUTO BREAK'
-                };
-                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-                if (job && !job._breakPaused) {
-                    let currentSeconds = job.base_seconds || 0;
-                    const anchorTime = job.dandori_start ? new Date(job.dandori_start) : (job.started_at ? new Date(job.started_at) : null);
-                    if (anchorTime) currentSeconds += Math.floor((Date.now() - anchorTime.getTime()) / 1000);
-                    job._frozenTimer = currentSeconds;
-                    job._breakPaused = true;
+            updateTimeline();
+            _updateBreakUI(id, 'BREAK TIME', true);
+        } else if (!serverDown && clientBreak && window._autoBreakActive) {
+            delete window.runningDowntimes[`${id}_break`];
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+            if (job) {
+                if (job._breakPaused && job._frozenTimer != null) {
+                    job.base_seconds = job._frozenTimer;
+                    job.started_at = new Date().toISOString();
                 }
-                updateTimeline();
-                _updateBreakUI(id, 'BREAK TIME', true);
-            } else if (!serverDown && clientBreak && window._autoBreakActive) {
-                delete window.runningDowntimes[`${id}_break`];
-                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-                if (job) {
-                    if (job._breakPaused && job._frozenTimer != null) {
-                        job.base_seconds = job._frozenTimer;
-                        job.started_at = new Date().toISOString();
-                    }
-                    delete job._breakPaused;
-                    delete job._frozenTimer;
-                    job.status = 'running';
-                    window.ProductionConfig.currentStatus = 'running';
-                    try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
-                }
-                window._autoBreakActive = false;
-                window._autoBreakDowntimeId = null;
-                window._autoBreakSkipped = false;
-                window._autoBreakEndMin = null;
-                updateTimeline();
-                _updateBreakUI(id, null, false);
-                showToast('Break time selesai, produksi dilanjutkan.', 'success');
-            } else if (!serverDown && !clientBreak && window._autoBreakActive) {
-                window._autoBreakActive = false;
-                window._autoBreakDowntimeId = null;
-                window._autoBreakSkipped = false;
-                window._autoBreakEndMin = null;
+                delete job._breakPaused;
+                delete job._frozenTimer;
+                job.status = 'running';
+                window.ProductionConfig.currentStatus = 'running';
                 try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
-                if (job) {
-                    if (job._breakPaused && job._frozenTimer != null) {
-                        job.base_seconds = job._frozenTimer;
-                        job.started_at = new Date().toISOString();
-                    }
-                    delete job._breakPaused;
-                    delete job._frozenTimer;
-                    job.status = 'running';
-                    window.ProductionConfig.currentStatus = 'running';
-                }
-                _updateBreakUI(id, null, false);
             }
-        }).catch(() => {});
+            window._autoBreakActive = false;
+            window._autoBreakDowntimeId = null;
+            window._autoBreakSkipped = false;
+            window._autoBreakEndMin = null;
+            updateTimeline();
+            _updateBreakUI(id, null, false);
+            showToast('Break time selesai, produksi dilanjutkan.', 'success');
+        } else if (!serverDown && !clientBreak && window._autoBreakActive) {
+            window._autoBreakActive = false;
+            window._autoBreakDowntimeId = null;
+            window._autoBreakSkipped = false;
+            window._autoBreakEndMin = null;
+            try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
+            if (job) {
+                if (job._breakPaused && job._frozenTimer != null) {
+                    job.base_seconds = job._frozenTimer;
+                    job.started_at = new Date().toISOString();
+                }
+                delete job._breakPaused;
+                delete job._frozenTimer;
+                job.status = 'running';
+                window.ProductionConfig.currentStatus = 'running';
+            }
+            _updateBreakUI(id, null, false);
+        }
+
+        updateTimeline();
+    }).catch(() => {});
 }
 
 window.stepInput = function (id, amount, jobId = null) {
@@ -2906,9 +2886,7 @@ function initProductionEngine() {
         updateTimers();
         setInterval(() => updateTimers(), 1000);
         setInterval(() => updateTimeline(false), 3000);
-        setInterval(checkSyncStatus, 5000);
-        setInterval(syncActualQty, 8000);
-        setInterval(syncBreakStatus, 10000);
+        setInterval(checkSyncStatus, 8000);
 
         window.addEventListener('beforeunload', function (e) {
             // Persist break state to sessionStorage for page reload recovery

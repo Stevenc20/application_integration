@@ -220,18 +220,28 @@ class InputHarianController extends Controller
             ->keyBy('job_number');
 
         // AUTO-RESET: Reset stale job_masters that have no active session for today
-        // This handles: running/paused from yesterday, complete from yesterday, etc.
-        foreach ($jobMasters as $jm) {
-            if (strtolower($jm->status ?? '') === 'pending') continue;
-            $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $jm->id)
+        // Batch query instead of N+1 per-job EXISTS
+        $nonPendingIds = $jobMasters->filter(fn($jm) => strtolower($jm->status ?? '') !== 'pending')
+            ->pluck('id')->toArray();
+        if ($nonPendingIds) {
+            $jobIdsWithTodaySession = ProductionSession::whereIn('job_master_id', $nonPendingIds)
                 ->whereDate('work_date', $date)
-                ->exists();
-            if (!$hasTodaySession) {
-                $jm->update([
+                ->pluck('job_master_id')
+                ->toArray();
+            $resetIds = array_diff($nonPendingIds, $jobIdsWithTodaySession);
+            if ($resetIds) {
+                JobMaster::whereIn('id', $resetIds)->update([
                     'status' => 'pending',
                     'started_at' => null,
                     'finished_at' => null,
                 ]);
+                foreach ($jobMasters as $jm) {
+                    if (in_array($jm->id, $resetIds)) {
+                        $jm->status = 'pending';
+                        $jm->started_at = null;
+                        $jm->finished_at = null;
+                    }
+                }
             }
         }
 
@@ -1035,7 +1045,8 @@ class InputHarianController extends Controller
     public function getQty(Request $request, $id)
     {
         $date = $request->get('date') ?: now()->toDateString();
-        $daily = DailyProduction::where('job_master_id', $id)
+        $daily = DailyProduction::select('actual_ok', 'actual_repair', 'actual_reject')
+            ->where('job_master_id', $id)
             ->where('work_date', $date)
             ->first();
 
@@ -1044,6 +1055,51 @@ class InputHarianController extends Controller
             'actual_ok'     => $daily->actual_ok ?? 0,
             'actual_repair' => $daily->actual_repair ?? 0,
             'actual_reject' => $daily->actual_reject ?? 0,
+        ]);
+    }
+
+    public function sync(Request $request, $id)
+    {
+        $date = $request->get('date') ?: now()->toDateString();
+
+        $job = JobMaster::select('id', 'status', 'job_number', 'job_name', 'line')
+            ->where('id', $id)->first();
+
+        $session = ProductionSession::select('id', 'total_seconds', 'start_time', 'status')
+            ->where('job_master_id', $id)
+            ->whereDate('work_date', $date)
+            ->first();
+
+        $daily = DailyProduction::select('actual_ok', 'actual_repair', 'actual_reject')
+            ->where('job_master_id', $id)
+            ->where('work_date', $date)
+            ->first();
+
+        $downtime = Downtime::select('id', 'jenis_downtime', 'start_time')
+            ->where('job_master_id', $id)
+            ->whereNull('finish_time')
+            ->orderByDesc('start_time')
+            ->first();
+
+        $isDandori = $downtime && strtolower($downtime->jenis_downtime) === 'dandori';
+
+        return response()->json([
+            'status'   => $job->status ?? 'pending',
+            'session'  => [
+                'total_seconds' => $session->total_seconds ?? 0,
+                'start_time'    => $session ? Carbon::parse($session->start_time)->toIso8601String() : null,
+            ],
+            'qty' => [
+                'actual_ok'     => $daily->actual_ok ?? 0,
+                'actual_repair' => $daily->actual_repair ?? 0,
+                'actual_reject' => $daily->actual_reject ?? 0,
+            ],
+            'downtime' => $downtime ? [
+                'id'             => $downtime->id,
+                'jenis_downtime' => $downtime->jenis_downtime,
+                'start_time'     => Carbon::parse($downtime->start_time)->toIso8601String(),
+            ] : null,
+            'is_dandori' => $isDandori,
         ]);
     }
 

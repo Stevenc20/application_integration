@@ -437,6 +437,10 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'getQty']
     )->name('job.qty');
 
+    Route::get('/job/{id}/sync',
+        [InputHarianController::class, 'sync']
+    )->name('job.sync');
+
     Route::get('/audit-trail',
         [InputHarianController::class, 'productionAudit']
     )->middleware('feature:audit_trail')->name('audit_trail');
