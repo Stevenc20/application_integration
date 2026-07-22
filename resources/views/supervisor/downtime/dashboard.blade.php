@@ -371,7 +371,7 @@ function openKpiDetailModal(type, line){
         showKpiModalEmpty(); return; 
     }
     const lineData = typeData[line];
-    if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
+    if(!lineData || !lineData.rows || lineData.rows.length === 0) { 
         console.warn(`No rows found for line: ${line} in type: ${type}`);
         showKpiModalEmpty(); return; 
     }

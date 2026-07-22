@@ -252,6 +252,7 @@ class DashboardRealtimeService
         $currDtDies  = 0;
         $currDtMat   = 0;
         $currDtLog   = 0;
+        $currDtProd  = 0;
         if ($runningRecord) {
             $runningJobId = $runningRecord->job_master_id;
             $runningDt = $allDowntimes->where('job_master_id', $runningJobId);
@@ -264,19 +265,23 @@ class DashboardRealtimeService
                 elseif (str_contains($type, 'DIES')) $currDtDies += $dur;
                 elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) $currDtMat += $dur;
                 elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) $currDtLog += $dur;
+                else $currDtProd += $dur;
             }
             $currDtTotal = round($currDtTotal, 1);
             $currDtMach  = round($currDtMach, 1);
             $currDtDies  = round($currDtDies, 1);
             $currDtMat   = round($currDtMat, 1);
             $currDtLog   = round($currDtLog, 1);
+            $currDtProd  = round($currDtProd, 1);
         }
+        $currOvertime = round($currDtMach + $currDtDies + $currDtMat + $currDtLog + $currDtProd, 1);
 
         $dtRows     = [];
         $machRows   = [];
         $diesRows   = [];
         $matRows    = [];
         $logRows    = [];
+        $prodRows   = [];
         $repairRows = [];
         $rejectRows = [];
 
@@ -306,6 +311,8 @@ class DashboardRealtimeService
                 $matRows[] = $row;
             } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
                 $logRows[] = $row;
+            } else {
+                $prodRows[] = $row;
             }
         }
 
@@ -382,24 +389,26 @@ class DashboardRealtimeService
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
 
-        $prodTLabel = round($runtimeMinutes, 2) . ' m';
+        $dtProdLabel = round($dtProdMinutes, 2) . ' m';
         $dtTotalLabel = round($dtTotalMinutes, 2) . ' m';
         $dtMachLabel = round($dtMachMinutes, 2) . ' m';
         $dtDiesLabel = round($dtDiesMinutes, 2) . ' m';
         $dtMatLabel  = round($dtMatMinutes, 2) . ' m';
         $dtLogLabel  = round($dtLogMinutes, 2) . ' m';
+        $overtimeMinutes = round($dtMachMinutes + $dtDiesMinutes + $dtMatMinutes + $dtLogMinutes + $dtProdMinutes, 1);
+        $overtimeLabel = round($overtimeMinutes, 2) . ' m';
 
         $kpi = [
             ['desc'=>'QTY',      'plan'=>(string)$planQty,           'actual'=>(string)$ok,         'actualLink'=>true, 'current'=>$hasRunning ? (string)$currOk : '-'],
             ['desc'=>'GSPH',     'plan'=>(string)$gsphPlan,          'actual'=>(string)$gsph,       'current'=>$hasRunning ? (string)$currGsph : '-'],
-            ['desc'=>'PROD_T',   'plan'=> round($runtimeMinutes+$dtTotalMinutes).' m', 'actual'=>$prodTLabel, 'current'=>$hasRunning ? $currRuntimeMinutes.' m' : '-', 'popup'=>true],
+            ['desc'=>'PROD_T',   'plan'=>'0 m',                      'actual'=>$dtProdLabel,        'current'=>$hasRunning ? $currDtProd.' m' : '-', 'popup'=>true],
             ['desc'=>'TOTAL_DT', 'plan'=>'0 m',                      'actual'=>$dtTotalLabel,       'current'=>$hasRunning ? $currDtTotal.' m' : '-', 'popup'=>true, 'danger'=>$dtTotalMinutes > 0],
             ['desc'=>'MACH_T',   'plan'=>'0 m',                      'actual'=>$dtMachLabel,        'current'=>$hasRunning ? $currDtMach.' m' : '-', 'popup'=>true],
             ['desc'=>'DIES_T',   'plan'=>'0 m',                      'actual'=>$dtDiesLabel,        'current'=>$hasRunning ? $currDtDies.' m' : '-', 'popup'=>true],
             ['desc'=>'MAT_T',    'plan'=>'0 m',                      'actual'=>$dtMatLabel,         'current'=>$hasRunning ? $currDtMat.' m' : '-', 'popup'=>true],
             ['desc'=>'LOG_T',    'plan'=>'0 m',                      'actual'=>$dtLogLabel,         'current'=>$hasRunning ? $currDtLog.' m' : '-', 'popup'=>true],
 
-            ['desc'=>'OVERTIME', 'plan'=>'0 m',                      'actual'=>'0 m',               'current'=>$hasRunning ? '0 m' : '-'],
+            ['desc'=>'OVERTIME', 'plan'=>'0 m',                      'actual'=>$overtimeLabel,      'current'=>$hasRunning ? $currOvertime.' m' : '-', 'popup'=>true],
             ['desc'=>'REPAIR',   'plan'=>'0 pcs',                    'actual'=>$repair.' pcs',      'actualPct'=>($ok>0?round(($repair/$ok)*100,1):0).'%', 'current'=>$hasRunning ? $currRepair.' pcs' : '-', 'popup'=>true],
             ['desc'=>'REJECT',   'plan'=>'0 pcs',                    'actual'=>$reject.' pcs',      'actualPct'=>($ok>0?round(($reject/$ok)*100,1):0).'%', 'current'=>$hasRunning ? $currReject.' pcs' : '-', 'popup'=>true],
         ];
@@ -411,9 +420,10 @@ class DashboardRealtimeService
             'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 2)]],
             'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 2)]],
             'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 2)]],
-            'PROD_T'   => ['type' => 'runtime',  $lineName => ['rows' => $runtimeRows, 'total' => $prodTLabel]],
+            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 2)]],
             'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => $repairRows, 'total' => (string)$repair]],
             'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string)$reject]],
+            'OVERTIME' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($overtimeMinutes, 2)]],
         ];
 
         $jobName = '-';
@@ -500,7 +510,7 @@ class DashboardRealtimeService
             ['desc'=>'MAT_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
             ['desc'=>'LOG_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
 
-            ['desc'=>'OVERTIME', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
+            ['desc'=>'OVERTIME', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-', 'popup'=>true],
             ['desc'=>'REPAIR',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs', 'popup'=>true],
             ['desc'=>'REJECT',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs', 'popup'=>true],
         ];
@@ -511,9 +521,10 @@ class DashboardRealtimeService
             'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
             'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
             'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'PROD_T'   => ['type' => 'runtime',  $lineName => ['rows' => [], 'total' => '0 m']],
+            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
             'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
             'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
+            'OVERTIME' => ['type' => 'dt_summary', $lineName => ['rows' => [], 'total' => '0']],
         ];
         $meta = [
             'job'        => '-',

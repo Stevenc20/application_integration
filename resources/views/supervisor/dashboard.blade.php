@@ -889,23 +889,23 @@ function detailCells(r){
 function cellClass(desc, actual, actPct){
     if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'blink-green':p>=80?'blink-yellow':'blink-red';}
     if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'blink-red':p>2?'blink-yellow':'';}
-    if(['DT','TOTAL_DT','MACH_T','MAT_T','LOG_T','DIES_T'].includes(desc)){const v=parseFloat(actual);return v>30?'blink-red':v>15?'blink-yellow':'';}
+    if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){const v=parseFloat(actual);return v>30?'blink-red':v>15?'blink-yellow':'';}
     return '';
 }
 
 var prevBlinkClass = {};
 
-const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','DT','TOTAL_DT'];
+const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','TOTAL_DT'];
 const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
 const LEFT_KPIS  = ['QTY','GSPH','REPAIR','REJECT'];
-const RIGHT_KPIS = ['DT','TOTAL_DT'];
+const RIGHT_KPIS = ['TOTAL_DT'];
 
 function buildKpiRow(kpi, line, safeLine){
   const isClickable = kpi.popup || kpi.actualLink;
   let valueHtml = '';
   if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
     valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-  } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+  } else if (isClickable && kpi.desc === 'TOTAL_DT') {
     valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
   } else if (isClickable) {
     valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
@@ -913,7 +913,7 @@ function buildKpiRow(kpi, line, safeLine){
     valueHtml = `<span>${kpi.actual}</span>`;
   } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
     valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-  } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
+  } else if(kpi.desc === 'TOTAL_DT'){
     valueHtml = `<span>${kpi.actual}</span>`;
   } else {
     valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
@@ -921,7 +921,7 @@ function buildKpiRow(kpi, line, safeLine){
   const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
   const clickCls = isClickable ? ' kpi-row-clickable' : '';
   const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-  const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
+        const label = kpi.desc;
   return `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
     <span class="kpi-label">${label}</span>
     <span class="kpi-value">${valueHtml}</span>
@@ -964,7 +964,7 @@ function buildLineCard(line){
     </tr>`;
 
     const allKpis = [...mainRows, ...extraRows];
-    const order = ['QTY','GSPH','PROD_T','TOTAL_DT','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME','REPAIR','REJECT'];
+    const order = ['QTY','GSPH','TOTAL_DT','MACH_T','DIES_T','MAT_T','LOG_T','PROD_T','OVERTIME','REPAIR','REJECT'];
     const sorted = order.map(d => allKpis.find(k => k.desc === d)).filter(Boolean);
     const remaining = allKpis.filter(k => !order.includes(k.desc));
     sorted.push(...remaining);
@@ -993,7 +993,7 @@ function buildLineCard(line){
       } else {
         let rowClass = kpi.desc === 'GSPH' ? 'pp-row-gsph' : '';
         if (isClickable) rowClass = 'pp-row-clickable';
-        const label = kpi.desc === 'DT' ? 'DIES TROUBLE' : kpi.desc;
+  const label = kpi.desc;
         tableRows += `<tr class="${rowClass}">
           <td>${label}</td>
           <td>${kpi.plan || '-'}</td>
@@ -1212,13 +1212,13 @@ function updateCards(forceDetail) {
         valueHtml = `<span class="kpi-val-main">${actualNum} / ${planNum}</span>`;
       } else if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
-      } else if (isClickable && (kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT')) {
+  } else if (isClickable && kpi.desc === 'TOTAL_DT') {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
       } else if (isClickable) {
         valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
       } else if(kpi.desc === 'GSPH'){
         valueHtml = `<span>${kpi.actual}</span>`;
-      } else if(kpi.desc === 'DT' || kpi.desc === 'TOTAL_DT'){
+  } else if(kpi.desc === 'TOTAL_DT'){
         valueHtml = `<span>${kpi.actual}</span>`;
       } else {
         valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
@@ -1349,7 +1349,7 @@ function openKpiFromPressDetail(type, line){
         </tbody></table></div>`;
     } else {
       const lineData = typeData[line];
-      if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { showKpiModalEmpty(); return; }
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
 
       if(typeData.type === 'quality'){
         html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
@@ -1394,22 +1394,6 @@ function openKpiFromPressDetail(type, line){
             <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
             <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
           </tr>
-          </tbody></table></div>`;
-      } else if(typeData.type === 'runtime'){
-        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-600"><tr>
-            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
-            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
-            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
-          </tr></thead>
-          <tbody class="divide-y divide-gray-100">
-          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
-            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
-            <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
-          </tr>`).join('')}
-          <tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
-            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
           </tbody></table></div>`;
       } else if(typeData.type === 'idle_detail'){
         html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
@@ -1527,7 +1511,7 @@ function openKpiDetailModal(type, line){
 
     } else {
       const lineData = typeData[line];
-      if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { 
           console.warn(`No rows found for line: ${line} in type: ${type}`);
           showKpiModalEmpty(); return; 
       }
@@ -1577,25 +1561,6 @@ function openKpiDetailModal(type, line){
           <tr class="bg-gray-50 font-black">
             <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
             <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
-          </tr>
-          </tbody></table></div>`;
-
-      } else if(typeData.type === 'runtime'){
-        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-600"><tr>
-            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
-            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
-            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
-          </tr></thead>
-          <tbody class="divide-y divide-gray-100">
-          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
-            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
-            <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
-          </tr>`).join('')}
-          <tr class="bg-gray-50">
-            <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
-            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
           </tr>
           </tbody></table></div>`;
 

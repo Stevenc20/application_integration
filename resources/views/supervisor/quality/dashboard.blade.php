@@ -455,7 +455,7 @@ function openKpiDetailModal(type, line){
         showKpiModalEmpty(); return; 
     }
     const lineData = typeData[line];
-    if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
+    if(!lineData || !lineData.rows || lineData.rows.length === 0) { 
         console.warn(`No rows found for line: ${line} in type: ${type}`);
         showKpiModalEmpty(); return; 
     }
@@ -525,25 +525,6 @@ function openKpiDetailModal(type, line){
         <tr class="bg-gray-50 font-black">
           <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
           <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
-        </tr>
-        </tbody></table></div>`;
-
-    } else if(typeData.type === 'runtime'){
-      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-600"><tr>
-          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
-          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-100">
-        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
-          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
-          <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
-        </tr>`).join('')}
-        <tr class="bg-gray-50">
-          <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
-          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
         </tr>
         </tbody></table></div>`;
 
