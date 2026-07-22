@@ -48,6 +48,15 @@
             $actStartVal = $prodPlan && $prodPlan->act_start ? $prodPlan->act_start : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->format('H:i') : null);
             $actFinishVal = $prodPlan && $prodPlan->act_finish ? $prodPlan->act_finish : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->format('H:i') : null);
 
+            $actEndEstimate = null;
+            if ($actStartVal && $schedStart && $schedFinish) {
+                $ppcStartCalc = \Carbon\Carbon::parse($date . ' ' . $schedStart);
+                $ppcEndCalc = \Carbon\Carbon::parse($date . ' ' . $schedFinish);
+                $tptMinutes = $ppcStartCalc->diffInMinutes($ppcEndCalc);
+                $actualStartCalc = \Carbon\Carbon::parse($date . ' ' . $actStartVal);
+                $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
+            }
+
             $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
             $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time';
         @endphp
@@ -74,7 +83,7 @@
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Act</span>
                             <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actStartVal ?: '--:--' }}</span>
                             <span class="text-slate-300 font-bold text-xs leading-none">—</span>
-                            <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actFinishVal ?: '--:--' }}</span>
+                            <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actEndEstimate ?: '--:--' }}</span>
                         </div>
                         <div class="flex items-center gap-2">
                             <span class="w-px h-4 bg-slate-300"></span>
