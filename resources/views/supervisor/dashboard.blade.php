@@ -127,7 +127,7 @@
 
 <!-- ===== MODAL ===== -->
 <div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeKpiDetailModal()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
         <div class="px-5 py-4 border-b border-red-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
             <div class="flex items-center">
                 <button id="modalBackBtn" onclick="modalGoBack()">
@@ -369,7 +369,7 @@
 .det-scroll {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 320px;
+  max-height: 500px;
   scrollbar-width: thin;
   scrollbar-color: #e5e7eb #f9fafb;
 }
@@ -381,7 +381,7 @@
 .det-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 900px;
+  min-width: 1400px;
   font-size: 11px;
 }
 .det-table thead tr {

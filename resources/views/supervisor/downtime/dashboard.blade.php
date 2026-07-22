@@ -111,7 +111,7 @@
 
 <!-- ===== MODAL ===== -->
 <div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeKpiDetailModal()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
         <div class="px-5 py-4 border-b border-red-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
             <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
             <button onclick="closeKpiDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
