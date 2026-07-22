@@ -1171,7 +1171,7 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
 
         const pD = Number(plannedDurationArg) || 0;
         const planEndTime = Number(planEndTimeArg) || 0;
-        const relativeDeadline = planEndTime || (effectiveProductionStart + pD);
+        const relativeDeadline = effectiveProductionStart + pD;
 
         const appendProduction = (start, end) => {
             if (end <= start) return;
@@ -2590,7 +2590,58 @@ function checkSyncStatus() {
         }
 
         updateTimeline();
+        _saveJobStateToStorage();
     }).catch(() => {});
+}
+
+function _saveJobStateToStorage() {
+    try {
+        const config = window.ProductionConfig;
+        const id = config?.currentActiveId;
+        if (!id) return;
+        const job = window.jobMasterData?.[id];
+        if (!job) return;
+        localStorage.setItem('prod_active_state', JSON.stringify({
+            id: id,
+            status: job.status,
+            actual_ok: job.actual_ok || 0,
+            actual_repair: job.actual_repair || 0,
+            actual_reject: job.actual_reject || 0,
+            started_at: job.started_at,
+            base_seconds: job.base_seconds || 0,
+            tpt: job.tpt || 0,
+            plan_start: job.plan_start,
+            plan_end: job.plan_end,
+            dandori_start: job.dandori_start,
+            first_dandori_start: job.first_dandori_start,
+            line: job.line || '',
+            target_qty: job.target_qty || 0,
+            ts: Date.now()
+        }));
+    } catch (e) {}
+}
+
+function _restoreJobStateFromStorage() {
+    try {
+        const raw = localStorage.getItem('prod_active_state');
+        if (!raw) return false;
+        const cached = JSON.parse(raw);
+        if (!cached || !cached.id) return false;
+        if (Date.now() - (cached.ts || 0) > 300000) return false;
+        const config = window.ProductionConfig;
+        if (!config || config.currentActiveId != cached.id) return false;
+        const job = window.jobMasterData?.[cached.id];
+        if (!job) return false;
+        job.status = cached.status || job.status;
+        job.actual_ok = cached.actual_ok ?? job.actual_ok;
+        job.actual_repair = cached.actual_repair ?? job.actual_repair;
+        job.actual_reject = cached.actual_reject ?? job.actual_reject;
+        if (cached.started_at) job.started_at = cached.started_at;
+        job.base_seconds = cached.base_seconds ?? job.base_seconds;
+        if (cached.dandori_start) job.dandori_start = cached.dandori_start;
+        if (cached.first_dandori_start) job.first_dandori_start = cached.first_dandori_start;
+        return true;
+    } catch (e) { return false; }
 }
 
 window.stepInput = function (id, amount, jobId = null) {
@@ -2882,6 +2933,7 @@ function initProductionEngine() {
             }
         })();
 
+        _restoreJobStateFromStorage();
         updateTimeline(true);
         updateTimers();
         setInterval(() => updateTimers(), 1000);
@@ -2889,6 +2941,7 @@ function initProductionEngine() {
         setInterval(checkSyncStatus, 8000);
 
         window.addEventListener('beforeunload', function (e) {
+            _saveJobStateToStorage();
             // Persist break state to sessionStorage for page reload recovery
             try {
                 const activeId = window.ProductionConfig?.currentActiveId;
