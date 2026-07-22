@@ -696,11 +696,9 @@ function updateTimeline(forceAll = false) {
 
             let elapsed = 0;
             if (jS || firstDandori) {
-                const activeStart = Math.min(
-                    jS ? jS.getTime() : Infinity,
-                    firstDandori ? firstDandori.getTime() : Infinity
-                );
-                elapsed = (finalEndTime.getTime() - activeStart) / 1000;
+                const activeStartMs = jS ? jS.getTime()
+                    : (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime());
+                elapsed = (finalEndTime.getTime() - activeStartMs) / 1000;
             }
             const realPct = (elapsed / (plannedDurationMs / 1000)) * 100;
 

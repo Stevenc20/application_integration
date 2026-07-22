@@ -96,7 +96,7 @@
                                            ? round($totalActBar / $activeJob->target_qty * 100)
                                            : 0;
                             @endphp
-                            <p id="timeline-time-label" class="text-xl sm:text-2xl font-black font-mono {{ $actualPct > 100 ? 'text-red-500 animate-pulse' : 'text-red-500' }} leading-none bg-red-50 px-2.5 py-0.5 rounded-lg">{{ $actualPct }}%</p>
+                            <p id="timeline-time-label" class="text-xl sm:text-2xl font-black font-mono {{ $actualPct > 100 ? 'text-red-500 animate-pulse' : 'text-blue-600' }} leading-none bg-{{ $actualPct > 100 ? 'red' : 'blue' }}-50 px-2.5 py-0.5 rounded-lg">{{ $actualPct }}%</p>
                         </div>
                     </div>
 
