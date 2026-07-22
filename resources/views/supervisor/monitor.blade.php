@@ -394,7 +394,7 @@ function setShift(s) {
     fetchData();
 }
 
-const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DT','MACH_T','MAT_T','LOG_T'];
+const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'];
 
 function pad(n){ return String(n).padStart(2,'0') }
 
@@ -448,7 +448,7 @@ function meta(line,k){ return (LINE_META[line]||{})[k]||'-' }
 function cellClass(desc,actual,actPct){
     if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'bg-green':p>=80?'bg-yellow':'bg-red'}
     if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'bg-red-blink':p>2?'bg-yellow-blink':''}
-    if(['DT','TOTAL_DT','MACH_T','MAT_T','LOG_T'].includes(desc)){const v=parseFloat(actual);return v>30?'bg-red-blink':v>15?'bg-yellow-blink':''}
+    if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T'].includes(desc)){const v=parseFloat(actual);return v>30?'bg-red-blink':v>15?'bg-yellow-blink':''}
     return '';
 }
 
@@ -614,7 +614,7 @@ function renderTable(){
     const actVal = qtyKpi ? parseFloat(qtyKpi.actual) : 0;
     const pct = planVal > 0 ? ((actVal / planVal) * 100).toFixed(2) : '0.00';
 
-    const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DT','MACH_T','MAT_T','LOG_T'];
+    const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'];
     const rightRows = LINE_DETAIL[lineKey] || [];
 
     // CASE A: No detail jobs scheduled -> Make KPI table take 100% full width to prevent empty columns on the right
