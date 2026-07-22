@@ -466,8 +466,8 @@
                 @endphp
 
                 @if(!$activeJob->started_at && !$isDandori)
-                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[220px] flex flex-col h-full">
-                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[260px] flex flex-col h-full">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                         <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
                         <span class="text-[9px] sm:text-[10px] text-amber-500 font-bold uppercase tracking-wider">Pending</span>
                     </div>
@@ -478,8 +478,8 @@
                 </div>
 
                 @elseif($isDandori)
-                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[220px] flex flex-col h-full">
-                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[260px] flex flex-col h-full">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                         <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
                         <div class="flex items-center gap-2">
                             <div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
@@ -487,13 +487,13 @@
                         </div>
                     </div>
 
-                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-3 text-center mb-2 transition-all duration-300">
-                        <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-0.5">{{ $alertTitle }}</p>
+                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center mb-4 transition-all duration-300">
+                        <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-1">{{ $alertTitle }}</p>
                         <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
                     </div>
 
                     <div id="control-board-actions">
-                        <div class="grid grid-cols-2 gap-2">
+                        <div class="grid grid-cols-2 gap-3">
                             <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
                                 Stop &amp; Lanjut
@@ -518,8 +518,8 @@
                 </div>
 
                 @else
-                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[220px] flex flex-col h-full">
-                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-3">
+                <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[260px] flex flex-col h-full">
+                    <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                         <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
                         <div class="flex items-center gap-2">
                             <div class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
@@ -527,12 +527,12 @@
                         </div>
                     </div>
 
-                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-3 text-center mb-2 transition-all duration-300">
-                        <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-0.5">{{ $alertTitle }}</p>
+                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center mb-4 transition-all duration-300">
+                        <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-1">{{ $alertTitle }}</p>
                         <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
                     </div>
 
-                    <div id="control-board-actions" class="flex flex-col gap-2">
+                    <div id="control-board-actions" class="flex flex-col gap-3">
                         <button onclick="openDowntimeReport({{ $activeJob->id }}, null)" class="w-full py-3 rounded-xl bg-white border border-slate-300 text-slate-600 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 hover:bg-slate-50 hover:border-slate-400 active:translate-y-0.5">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                             Cek List Downtime
@@ -543,8 +543,8 @@
                         </button>
                     </div>
 
-                    <div class="mt-auto pt-3 border-t border-slate-200">
-                        <div class="grid grid-cols-2 gap-2">
+                    <div class="mt-auto pt-4 border-t border-slate-200">
+                        <div class="grid grid-cols-2 gap-3">
                             <button type="button" id="downtime-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'downtime', 'downtime')" class="dt-btn w-full py-2.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-black uppercase text-center hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5">Downtime</button>
                             <button type="button" id="tryout-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'tryout', 'try out')" class="to-btn w-full py-2.5 rounded-xl bg-orange-500/10 border border-orange-500/30 text-orange-400 text-xs font-black uppercase text-center hover:bg-orange-500 hover:text-white transition-all active:translate-y-0.5">Try Out</button>
                             <button type="button" id="break-btn-{{ $activeJob->id }}" onclick="handleQuickDowntime({{ $activeJob->id }}, 'break', 'break time')" class="break-btn col-span-2 w-full py-2.5 rounded-xl bg-slate-500/10 border border-slate-500/30 text-slate-400 text-xs font-black uppercase text-center hover:bg-slate-500 hover:text-white transition-all active:translate-y-0.5">Break</button>
