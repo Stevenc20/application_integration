@@ -70,6 +70,14 @@
                             <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
                         </div>
                         <div class="flex items-center gap-2">
+                            <span class="w-px h-4 bg-slate-300"></span>
+                            <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Act</span>
+                            <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actStartVal ?: '--:--' }}</span>
+                            <span class="text-slate-300 font-bold text-xs leading-none">—</span>
+                            <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actFinishVal ?: '--:--' }}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <span class="w-px h-4 bg-slate-300"></span>
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Actual</span>
                             <p id="timeline-time-label" class="text-xl sm:text-2xl font-black font-mono text-red-500 leading-none bg-red-50 px-2.5 py-0.5 rounded-lg">0%</p>
                         </div>
