@@ -197,7 +197,13 @@
                 </span>
             </div>
         @else
-            <div id="timer-{{ $jobId }}" class="font-mono text-2xl font-black text-slate-800 tracking-tighter tabular-nums mb-1">00:00:00</div>
+            @php
+                $timerSecs = $runtime;
+                if (in_array($status, ['running', 'paused']) && !empty($job->job_data->started_at)) {
+                    $timerSecs = $runtime + max(0, \Carbon\Carbon::parse($job->job_data->started_at)->diffInSeconds(now()));
+                }
+            @endphp
+            <div id="timer-{{ $jobId }}" class="font-mono text-2xl font-black text-slate-800 tracking-tighter tabular-nums mb-1">{{ sprintf('%02d:%02d:%02d', intdiv($timerSecs, 3600), intdiv($timerSecs % 3600, 60), $timerSecs % 60) }}</div>
             <div class="flex flex-col items-center gap-1.5">
                 <span id="badge-{{ $jobId }}" class="px-3 py-1 rounded-lg text-[9px] font-black tracking-widest text-white shadow-lg
                     @if($status=='running') bg-green-500 shadow-green-100
@@ -233,13 +239,19 @@
                     <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Production Progress (OK / Repair / Reject)</span>
                     <span class="text-[9px] font-black text-slate-400 bg-slate-100 px-2 py-0.5 rounded tabular-nums border border-slate-200">{{ $job->start_time }} - {{ $job->finish_time }}</span>
                 </div>
-                <div class="relative h-3 w-full bg-slate-100 rounded-full border border-slate-200 shadow-inner overflow-hidden cursor-pointer flex"
-                     onmouseenter="window.showTargetTooltip(event, {{ $jobId }})"
-                     onmouseleave="window.hideTimelineTooltip()">
-                    <div id="row-bar-ok-{{ $jobId }}" class="h-full bg-emerald-500 transition-all duration-500" style="width: 0%"></div>
-                    <div id="row-bar-repair-{{ $jobId }}" class="h-full bg-amber-500 transition-all duration-500" style="width: 0%"></div>
-                    <div id="row-bar-reject-{{ $jobId }}" class="h-full bg-rose-500 transition-all duration-500" style="width: 0%"></div>
-                </div>
+                     <div class="relative h-3 w-full bg-slate-100 rounded-full border border-slate-200 shadow-inner overflow-hidden cursor-pointer flex"
+                         onmouseenter="window.showTargetTooltip(event, {{ $jobId }})"
+                         onmouseleave="window.hideTimelineTooltip()">
+                        @php
+                            $qTarget = max(1, $job->plan ?? 1);
+                            $qOkPct = min(100, $actualOk / $qTarget * 100);
+                            $qRepairPct = min(100, $actualRepair / $qTarget * 100);
+                            $qRejectPct = min(100, $actualReject / $qTarget * 100);
+                        @endphp
+                        <div id="row-bar-ok-{{ $jobId }}" class="h-full bg-emerald-500 transition-all duration-500" style="width: {{ $qOkPct }}%"></div>
+                        <div id="row-bar-repair-{{ $jobId }}" class="h-full bg-amber-500 transition-all duration-500" style="width: {{ $qRepairPct }}%"></div>
+                        <div id="row-bar-reject-{{ $jobId }}" class="h-full bg-rose-500 transition-all duration-500" style="width: {{ $qRejectPct }}%"></div>
+                    </div>
             </div>
 
             <!-- ACTUAL -->
@@ -253,7 +265,7 @@
                             </span>
                         @endif
                     </div>
-                    <span id="pct-{{ $jobId }}" class="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded shadow-sm border border-blue-100 tabular-nums">0%</span>
+                    <span id="pct-{{ $jobId }}" class="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded shadow-sm border border-blue-100 tabular-nums">{{ $job->plan > 0 ? round(($actualOk + $actualRepair + $actualReject) / $job->plan * 100) : 0 }}%</span>
                 </div>
                 <div class="relative h-9 w-full mb-6 group hover:z-[60]">
                     <div class="absolute inset-0 bg-slate-900 rounded-xl border-2 border-slate-800 shadow-2xl overflow-hidden flex items-center">

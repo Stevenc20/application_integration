@@ -88,7 +88,15 @@
                         <div class="flex items-center gap-2">
                             <span class="w-px h-4 bg-slate-300"></span>
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Actual</span>
-                            <p id="timeline-time-label" class="text-xl sm:text-2xl font-black font-mono text-red-500 leading-none bg-red-50 px-2.5 py-0.5 rounded-lg">0%</p>
+                            @php
+                                $totalActBar = ($activeJob->dailyProduction->actual_ok ?? 0)
+                                            + ($activeJob->dailyProduction->actual_repair ?? 0)
+                                            + ($activeJob->dailyProduction->actual_reject ?? 0);
+                                $actualPct = $activeJob->target_qty > 0
+                                           ? round($totalActBar / $activeJob->target_qty * 100)
+                                           : 0;
+                            @endphp
+                            <p id="timeline-time-label" class="text-xl sm:text-2xl font-black font-mono {{ $actualPct > 100 ? 'text-red-500 animate-pulse' : 'text-red-500' }} leading-none bg-red-50 px-2.5 py-0.5 rounded-lg">{{ $actualPct }}%</p>
                         </div>
                     </div>
 
@@ -99,9 +107,15 @@
                     <div class="h-4 w-full bg-slate-100 rounded-full border border-slate-200 overflow-hidden relative cursor-pointer flex"
                          onmouseenter="window.showActiveTargetTooltip(event)"
                          onmouseleave="window.hideTimelineTooltip()">
-                        <div id="timeline-bar-ok" class="h-full bg-emerald-500 transition-all duration-300" style="width: 0%"></div>
-                        <div id="timeline-bar-repair" class="h-full bg-amber-500 transition-all duration-300" style="width: 0%"></div>
-                        <div id="timeline-bar-reject" class="h-full bg-rose-500 transition-all duration-300" style="width: 0%"></div>
+                        @php
+                            $barTarget = max(1, $activeJob->target_qty ?? 1);
+                            $okBarPct = min(100, ($activeJob->dailyProduction->actual_ok ?? 0) / $barTarget * 100);
+                            $repairBarPct = min(100, ($activeJob->dailyProduction->actual_repair ?? 0) / $barTarget * 100);
+                            $rejectBarPct = min(100, ($activeJob->dailyProduction->actual_reject ?? 0) / $barTarget * 100);
+                        @endphp
+                        <div id="timeline-bar-ok" class="h-full bg-emerald-500 transition-all duration-300" style="width: {{ $okBarPct }}%"></div>
+                        <div id="timeline-bar-repair" class="h-full bg-amber-500 transition-all duration-300" style="width: {{ $repairBarPct }}%"></div>
+                        <div id="timeline-bar-reject" class="h-full bg-rose-500 transition-all duration-300" style="width: {{ $rejectBarPct }}%"></div>
                     </div>
 
                     <!-- ACTUAL TIMES MARKERS ABOVE ACTUAL PROGRESS BAR -->
@@ -293,7 +307,22 @@
                     </div>
                     <p id="break-overlay-label" class="text-3xl sm:text-4xl font-black text-slate-700 uppercase tracking-widest mb-2">{{ $activeDowntime->problem ?? 'BREAK TIME' }}</p>
                     <p class="text-sm font-black text-slate-500 uppercase tracking-widest">Istirahat — Timer dijeda</p>
-                    <p id="break-overlay-timer" class="text-5xl sm:text-6xl font-black text-slate-800 mt-6 tabular-nums">00:00:00</p>
+                    <p id="break-overlay-timer" class="text-5xl sm:text-6xl font-black text-slate-800 mt-6 tabular-nums">
+                        @if($isOnBreak && $activeDowntime && $activeDowntime->start_time)
+                            @php
+                                $masterBreak = \App\Models\MasterBreakTime::where('day_name', strtolower(now()->locale('id')->dayName))
+                                    ->where('start_time', '<=', now()->format('H:i:s'))
+                                    ->where('end_time', '>=', now()->format('H:i:s'))
+                                    ->first();
+                                $breakRemaining = $masterBreak
+                                    ? max(0, \Carbon\Carbon::parse(now()->toDateString() . ' ' . $masterBreak->end_time)->diffInSeconds(now()))
+                                    : 0;
+                            @endphp
+                            {{ sprintf('%02d:%02d:%02d', intdiv($breakRemaining, 3600), intdiv($breakRemaining % 3600, 60), $breakRemaining % 60) }}
+                        @else
+                            00:00:00
+                        @endif
+                    </p>
                     <div class="mt-6 px-6 py-3 rounded-2xl bg-amber-50 border border-amber-200 flex items-center gap-3 max-w-md">
                         <div class="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
@@ -506,7 +535,13 @@
 
                     <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center mb-6 transition-all duration-300">
                         <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-1">{{ $alertTitle }}</p>
-                        <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
+                        @php
+                            $dtElapsed1 = 0;
+                            if ($activeDowntime && $activeDowntime->start_time) {
+                                $dtElapsed1 = max(0, \Carbon\Carbon::parse($activeDowntime->start_time)->diffInSeconds(now()));
+                            }
+                        @endphp
+                        <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">{{ sprintf('%02d:%02d:%02d', intdiv($dtElapsed1, 3600), intdiv($dtElapsed1 % 3600, 60), $dtElapsed1 % 60) }}</p>
                     </div>
 
                     <div id="control-board-actions" class="mt-3">
@@ -550,7 +585,13 @@
 
                     <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center mb-6 transition-all duration-300">
                         <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-1">{{ $alertTitle }}</p>
-                        <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">00:00:00</p>
+                        @php
+                            $dtElapsed2 = 0;
+                            if ($activeDowntime && $activeDowntime->start_time) {
+                                $dtElapsed2 = max(0, \Carbon\Carbon::parse($activeDowntime->start_time)->diffInSeconds(now()));
+                            }
+                        @endphp
+                        <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">{{ sprintf('%02d:%02d:%02d', intdiv($dtElapsed2, 3600), intdiv($dtElapsed2 % 3600, 60), $dtElapsed2 % 60) }}</p>
                     </div>
 
                     <div id="control-board-actions" class="flex flex-col gap-3 mt-3">

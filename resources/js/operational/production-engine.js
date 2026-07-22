@@ -1161,9 +1161,8 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             return;
         }
 
-        const firstProdHistory = normalizedHistory.find(h => h.type !== 'dandori' && h.type !== 'setup')?.start;
         const firstAnyHistory = normalizedHistory.length ? normalizedHistory[0].start : null;
-        let effectiveProductionStart = firstProdHistory || actualStartMs || firstAnyHistory || effectiveActualStart;
+        let effectiveProductionStart = actualStartMs || effectiveActualStart || firstAnyHistory || anchor;
 
         if (!effectiveProductionStart || isNaN(effectiveProductionStart)) {
             effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
