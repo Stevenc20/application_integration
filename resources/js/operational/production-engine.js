@@ -696,8 +696,23 @@ function updateTimeline(forceAll = false) {
 
             let elapsed = 0;
             if (jS || firstDandori) {
-                const activeStartMs = jS ? jS.getTime()
+                let activeStartMs = jS ? jS.getTime()
                     : (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime());
+                const jobHistory = window.jobDowntimeHistory[id] || [];
+                const lastDandoriEntry = [...jobHistory]
+                    .filter(h => (h.type || h.jenis_downtime || '').toLowerCase() === 'dandori')
+                    .sort((a, b) => {
+                        const aEnd = a.end || a.finish_time || a.finished_at || 0;
+                        const bEnd = b.end || b.finish_time || b.finished_at || 0;
+                        return bEnd - aEnd;
+                    })[0];
+                if (lastDandoriEntry) {
+                    const dandoriEndRaw = lastDandoriEntry.end || lastDandoriEntry.finish_time || lastDandoriEntry.finished_at;
+                    if (dandoriEndRaw) {
+                        const dandoriEndMs = isNaN(dandoriEndRaw) ? new Date(dandoriEndRaw).getTime() : Number(dandoriEndRaw);
+                        if (dandoriEndMs > activeStartMs) activeStartMs = dandoriEndMs;
+                    }
+                }
                 elapsed = (finalEndTime.getTime() - activeStartMs) / 1000;
             }
             const realPct = (elapsed / (plannedDurationMs / 1000)) * 100;
@@ -1164,6 +1179,15 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
 
         if (!effectiveProductionStart || isNaN(effectiveProductionStart)) {
             effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
+        }
+
+        if (hasDandori && normalizedHistory.length) {
+            const lastDandori = [...normalizedHistory]
+                .filter(h => h.type === 'dandori')
+                .sort((a, b) => b.start - a.start)[0];
+            if (lastDandori && lastDandori.end) {
+                effectiveProductionStart = lastDandori.end;
+            }
         }
 
         const pD = Number(plannedDurationArg) || 0;

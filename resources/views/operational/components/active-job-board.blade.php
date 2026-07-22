@@ -310,12 +310,12 @@
                     <p id="break-overlay-timer" class="text-5xl sm:text-6xl font-black text-slate-800 mt-6 tabular-nums">
                         @if($isOnBreak && $activeDowntime && $activeDowntime->start_time)
                             @php
-                                $masterBreak = \App\Models\MasterBreakTime::where('day_name', strtolower(now()->locale('id')->dayName))
-                                    ->where('start_time', '<=', now()->format('H:i:s'))
-                                    ->where('end_time', '>=', now()->format('H:i:s'))
+                                $masterBreak = \App\Models\MasterBreakTime::where('hari', strtolower(now()->locale('id')->dayName))
+                                    ->where('waktu_mulai', '<=', now()->format('H:i:s'))
+                                    ->where('waktu_selesai', '>=', now()->format('H:i:s'))
                                     ->first();
                                 $breakRemaining = $masterBreak
-                                    ? max(0, \Carbon\Carbon::parse(now()->toDateString() . ' ' . $masterBreak->end_time)->diffInSeconds(now()))
+                                    ? max(0, \Carbon\Carbon::parse(now()->toDateString() . ' ' . $masterBreak->waktu_selesai)->diffInSeconds(now()))
                                     : 0;
                             @endphp
                             {{ sprintf('%02d:%02d:%02d', intdiv($breakRemaining, 3600), intdiv($breakRemaining % 3600, 60), $breakRemaining % 60) }}
