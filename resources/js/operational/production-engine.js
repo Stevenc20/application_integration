@@ -3336,20 +3336,6 @@ window.removeRRImage = function (category, index) {
     window.renderRRPreviews(category);
 };
 
-window.submitRRModalFormLater = function () {
-    if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
-    const type = document.getElementById('rrType').value;
-    const typeUpper = type.charAt(0).toUpperCase() + type.slice(1);
-
-    document.getElementById('rrDefectName').value = typeUpper + ' (Belum Teridentifikasi)';
-    document.getElementById('rrArea').value = '-';
-    document.getElementById('rrRootCause').value = '-';
-    document.getElementById('rrCountermeasure').value = '-';
-
-    // Trigger submit
-    submitRRModalForm(null);
-};
-
 window.submitRRModalForm = async function (event) {
     if (event) event.preventDefault();
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }

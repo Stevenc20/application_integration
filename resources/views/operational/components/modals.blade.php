@@ -221,6 +221,10 @@
             @csrf
             <input type="hidden" id="rrJobId" name="job_master_id" value="">
             <input type="hidden" id="rrType" name="type" value="repair">
+            <div class="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
+                <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                <span class="text-[10px] font-bold text-red-600 uppercase tracking-wider">Field bertanda <span class="text-red-500">*</span> wajib diisi. Data Repair/Reject harus dilengkapi sebelum disimpan.</span>
+            </div>
             
             <div>
                 <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Jumlah (Qty) <span class="text-red-500">*</span></label>
@@ -314,7 +318,6 @@
             </div>
 
             <div class="flex gap-3 pt-2">
-                <button type="button" onclick="submitRRModalFormLater()" class="flex-1 px-4 py-3 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-600 font-black text-xs uppercase tracking-widest transition duration-200">Isi Nanti</button>
                 <button type="submit" class="flex-1 px-4 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-red-600 text-white font-black text-xs uppercase tracking-widest hover:from-orange-600 hover:to-red-700 transition duration-200 shadow-lg shadow-red-100">Laporkan Sekarang</button>
             </div>
         </form>
