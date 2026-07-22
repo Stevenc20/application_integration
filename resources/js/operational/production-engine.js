@@ -1169,8 +1169,7 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         const actualStartMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : null;
 
         const effectiveActualStart = actualStartMs ||
-            (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null) ||
-            (['running', 'complete', 'finished'].includes(s) ? anchor : null);
+            (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null);
 
         if (!effectiveActualStart && !hasDandori && normalizedHistory.length === 0) {
             container.innerHTML = '';
