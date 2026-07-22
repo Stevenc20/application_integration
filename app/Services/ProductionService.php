@@ -9,6 +9,10 @@ use App\Models\Downtime;
 use App\Models\Dandori;
 use App\Models\ProductionLog;
 use App\Models\HambatanJalur;
+use App\Models\RecoveryItem;
+use App\Models\RecoverySchedule;
+use App\Models\User;
+use App\Notifications\ItemTidakTercapaiNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use App\Services\DashboardRealtimeService;
@@ -464,6 +468,75 @@ class ProductionService
                 ]
             );
 
+            // QTY MISMATCH RECOVERY CHECK
+            $mismatch = null;
+            $plan = $job ? $job->getProductionPlanAttribute() : null;
+            $planQty = $plan ? (float)($plan->plan ?? 0) : (float)($job->target_qty ?? 0);
+            $totalProduced = $totalOk + $totalRepair + $totalReject;
+
+            if ($planQty > 0 && $totalProduced < $planQty) {
+                $recoveryQty = $planQty - $totalProduced;
+                $ctDetik = $plan ? (float)($plan->ct_detik ?? 0) : 0;
+                $dct = $plan ? (float)($plan->dct ?? 0) : 0;
+                $durationMinutes = $ctDetik > 0
+                    ? (int)ceil(($ctDetik * $recoveryQty) / 60.0) + $dct
+                    : 0;
+
+                $today = now()->toDateString();
+                $shiftName = $this->getShiftName();
+
+                $schedule = RecoverySchedule::firstOrCreate(
+                    [
+                        'plan_date'  => $today,
+                        'shift_name' => $shiftName,
+                        'press_name' => $job->line ?? '',
+                    ],
+                    ['status' => 'waiting_approval']
+                );
+
+                $recoveryItem = RecoveryItem::firstOrCreate(
+                    [
+                        'recovery_schedule_id' => $schedule->id,
+                        'job_no'               => trim($job->job_number ?? ''),
+                        'press_name'           => $job->line ?? '',
+                    ],
+                    [
+                        'production_plan_id'   => $plan?->id,
+                        'job_master'           => $job->job_number ?? '',
+                        'plan_qty'             => $planQty,
+                        'ok'                   => $totalOk,
+                        'repair'               => $totalRepair,
+                        'reject'               => $totalReject,
+                        'ct_detik'             => $ctDetik,
+                        'dct'                  => $dct,
+                        'reg_active'           => $plan ? (float)($plan->reg_active ?? 0) : 0,
+                        'total_mesin'          => $plan ? (int)($plan->total_mesin ?? 1) : 1,
+                        'status'               => 'waiting_approval',
+                        'original_date'        => $today,
+                        'original_shift_name'  => $shiftName,
+                        'source_date'          => $today,
+                        'source_shift'         => $shiftName,
+                        'actual_qty'           => $totalProduced,
+                        'recovery_qty'         => $recoveryQty,
+                        'duration_minutes'     => $durationMinutes,
+                        'queued_at'            => now(),
+                    ]
+                );
+
+                $ppcUsers = User::whereIn('role', ['ppc', 'admin'])->get();
+                foreach ($ppcUsers as $ppcUser) {
+                    $ppcUser->notify(new ItemTidakTercapaiNotification($job, $recoveryItem));
+                }
+
+                $mismatch = [
+                    'plan_qty'     => $planQty,
+                    'actual_qty'   => $totalProduced,
+                    'recovery_qty' => $recoveryQty,
+                    'job_no'       => $job->job_number ?? '',
+                    'recovery_id'  => $recoveryItem->id,
+                ];
+            }
+
             // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
             if ($nextJobId === 'STOP_SESSION' || $nextJobId === 'FINISH_ONLY') {
                 $resolvedNextJobId = null;
@@ -483,7 +556,7 @@ class ProductionService
 
             $this->signalDashboard($jobId);
 
-            return $runtime;
+            return ['runtime' => $runtime, 'mismatch' => $mismatch];
         });
     }
 
@@ -868,5 +941,11 @@ class ProductionService
         if ($job && $job->line) {
             DashboardRealtimeService::signalUpdate($job->line);
         }
+    }
+
+    private function getShiftName(): string
+    {
+        $hour = (int) now()->format('H');
+        return ($hour >= 7 && $hour < 19) ? 'Shift Pagi' : 'Shift Malam';
     }
 }

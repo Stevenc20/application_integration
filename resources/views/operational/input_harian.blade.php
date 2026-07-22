@@ -43,16 +43,16 @@
             {{-- Akhiri Shift Button --}}
             @if(!isset($isHistorical) || !$isHistorical)
                 @if($isLocked ?? false)
-                <button id="submitShiftBtn" disabled
+                <button id="submitShiftBtnTop" disabled
                     class="flex items-center gap-2 bg-emerald-500/50 text-white/50 font-bold text-sm px-5 py-2.5 rounded-xl shadow-sm border border-emerald-600/20 cursor-not-allowed">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                     </svg>
                     <span>Shift Terkunci</span>
                 </button>
-                @elseif($allJobsDone ?? false)
-                <button id="submitShiftBtn" onclick="submitShift()" 
-                    class="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/10 transition-all border border-orange-600/20">
+                @else
+                <button id="submitShiftBtnTop" onclick="submitShift()" 
+                    class="flex items-center gap-2 {{ ($allJobsDone ?? false) ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10' : 'bg-gradient-to-r from-slate-400 to-slate-500 hover:from-slate-500 hover:to-slate-600 shadow-sm' }} text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all border border-orange-600/20">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
@@ -157,6 +157,47 @@
         </div>
     @else
         @include('operational.components.active-job-board')
+    @endif
+
+    {{-- SHIFT SUBMISSION BANNER --}}
+    @if(!isset($isHistorical) || !$isHistorical)
+    @if(!($isLocked ?? false))
+    <div id="shiftSubmissionBanner" class="mb-6">
+        <div class="bg-white rounded-2xl border {{ ($allJobsDone ?? false) ? 'border-orange-200 bg-orange-50/50' : 'border-gray-200' }} shadow-sm overflow-hidden">
+            <div class="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl {{ ($allJobsDone ?? false) ? 'bg-orange-100' : 'bg-slate-100' }} flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ ($allJobsDone ?? false) ? 'text-orange-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-black {{ ($allJobsDone ?? false) ? 'text-orange-800' : 'text-slate-600' }} uppercase tracking-widest">Akhiri Shift</h3>
+                        <p class="text-[10px] font-bold {{ ($allJobsDone ?? false) ? 'text-orange-600' : 'text-slate-400' }} mt-0.5">
+                            @if($allJobsDone ?? false)
+                                Semua item sudah selesai. Klik untuk finalisasi shift.
+                            @else
+                                @php
+                                    $completedCount = $jobPlans->filter(fn($p) => optional($p->job_data)->status === 'complete')->count();
+                                    $totalJobs = $jobPlans->count();
+                                @endphp
+                                {{ $completedCount }}/{{ $totalJobs }} item selesai. Semua item harus selesai sebelum shift bisa difinalisasi.
+                            @endif
+                        </p>
+                    </div>
+                </div>
+                <button id="submitShiftBtn" onclick="submitShift()" 
+                    class="flex items-center gap-2 {{ ($allJobsDone ?? false) ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10' : 'bg-slate-200 text-slate-400 cursor-not-allowed' }} text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all border {{ ($allJobsDone ?? false) ? 'border-orange-600/20' : 'border-slate-300' }}"
+                    {{ ($allJobsDone ?? false) ? '' : 'disabled' }}>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>{{ ($allJobsDone ?? false) ? 'Akhiri Shift' : 'Menunggu...' }}</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
     @endif
 
     {{-- MAIN TABLE CARD --}}
@@ -361,6 +402,7 @@ window.jobMasterData = {
                 : ($jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 
                     : ($job->act_start ? \Carbon\Carbon::parse($activeDate . ' ' . $job->act_start)->timestamp * 1000 : 'null'))
         }},
+        act_start_ms: {{ $job->act_start ? \Carbon\Carbon::parse($activeDate . ' ' . $job->act_start)->timestamp * 1000 : 'null' }},
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->finish_time)->timestamp * 1000 
@@ -394,6 +436,7 @@ window.jobMasterData = {
                 : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->timestamp * 1000 
                     : ($activeProdPlan && $activeProdPlan->act_start ? \Carbon\Carbon::parse($activeDate . ' ' . $activeProdPlan->act_start)->timestamp * 1000 : 'null'))
         }},
+        act_start_ms: {{ $activeProdPlan && $activeProdPlan->act_start ? \Carbon\Carbon::parse($activeDate . ' ' . $activeProdPlan->act_start)->timestamp * 1000 : 'null' }},
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($activeJob->id) && $sessionMap->get($activeJob->id)?->finish_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($activeJob->id)->finish_time)->timestamp * 1000 
@@ -501,9 +544,18 @@ window._breakSchedule = {!! $breakScheduleData->toJson() !!};
 })();
 
 function submitShift() {
+    const activeJobId = window.ProductionConfig?.currentActiveId;
+    if (activeJobId) {
+        const activeJob = window.jobMasterData?.[activeJobId];
+        const hasDowntime = (window.jobDowntimeHistory?.[activeJobId]?.length > 0) || (Object.keys(window.runningDowntimes || {}).length > 0);
+        if (activeJob && activeJob.status === 'running' && !hasDowntime) {
+            showToast('Item yang sedang berjalan harus mengisi downtime terlebih dahulu sebelum shift bisa difinalisasi.', 'error');
+            return;
+        }
+    }
     showConfirm('Akhiri Shift?', 'Semua data akan difinalisasi.', function () {
         closeConfirmModal();
-        const btn = document.getElementById('submitShiftBtn');
+        const btn = document.getElementById('submitShiftBtn') || document.getElementById('submitShiftBtnTop');
         btn.disabled = true;
         btn.innerHTML = '<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Memvalidasi...';
 

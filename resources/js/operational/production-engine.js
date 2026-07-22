@@ -1166,7 +1166,7 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         };
 
         const hasDandori = !!firstDandori;
-        const actualStartMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : null;
+        const actualStartMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : (job.act_start_ms || null);
 
         const effectiveActualStart = actualStartMs ||
             (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null);
@@ -1177,7 +1177,7 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         }
 
         const firstAnyHistory = normalizedHistory.length ? normalizedHistory[0].start : null;
-        let effectiveProductionStart = actualStartMs || effectiveActualStart || firstAnyHistory || anchor;
+        let effectiveProductionStart = actualStartMs || effectiveActualStart || firstAnyHistory;
 
         if (!effectiveProductionStart || isNaN(effectiveProductionStart)) {
             effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
@@ -1973,8 +1973,13 @@ async function submitFinalJob() {
             const card = document.getElementById('active-job-card');
             if (card) card.style.display = 'none';
             closeFinishModal();
-            showToast('Pekerjaan selesai!', 'success');
-            setTimeout(() => location.reload(), 600);
+            if (res.mismatch) {
+                const m = res.mismatch;
+                showToast(`Item ${m.job_no} tidak tercapai: ${m.actual_qty}/${m.plan_qty} — ${m.recovery_qty} pcs masuk recovery queue`, 'warning', 6000);
+            } else {
+                showToast('Pekerjaan selesai!', 'success');
+            }
+            setTimeout(() => location.reload(), 1200);
         } else {
             showToast(res.message || 'Gagal menyelesaikan', 'danger');
         }
@@ -2485,13 +2490,15 @@ function closeFinishModal() {
     }
 }
 
-function showToast(m, t) {
+function showToast(m, t, dur) {
     const toast = document.getElementById('toast');
     if (!toast) return;
-    toast.className = `fixed top-5 right-5 z-[9999] min-w-[260px] px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all duration-300 transform bg-${t === 'danger' ? 'red-600' : (t === 'info' ? 'blue-600' : 'green-600')}`;
+    const colorMap = { danger: 'red-600', info: 'blue-600', warning: 'amber-500', success: 'green-600' };
+    toast.className = `fixed top-5 right-5 z-[9999] min-w-[260px] px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all duration-300 transform bg-${colorMap[t] || 'green-600'}`;
     toast.innerText = m;
     toast.classList.remove('hidden', 'opacity-0');
-    setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2500);
+    const ms = dur || 2500;
+    setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.classList.add('hidden'), 300); }, ms);
 }
 
 window.toggleCustomSelect = function toggleCustomSelect() {
