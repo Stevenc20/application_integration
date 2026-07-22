@@ -50,9 +50,9 @@ Schedule::command('ppc:process-cutoff')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/ppc-cutoff-scheduler.log'));
 
-// Schedule: auto-archive stuck production data from previous day(s) daily at 07:30
+// Schedule: auto-archive stuck production data from previous day(s) daily at 06:30 (before shift pagi)
 Schedule::command('production:daily-archive')
-    ->dailyAt('07:30')
+    ->dailyAt('06:30')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/daily-archive-scheduler.log'));
 

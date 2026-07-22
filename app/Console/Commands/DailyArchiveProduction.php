@@ -59,7 +59,7 @@ class DailyArchiveProduction extends Command
                 $start = Carbon::parse($dt->start_time);
                 $duration = $start->diffInSeconds($now);
                 $dt->update([
-                    'finish_time' => $now->format('H:i:s'),
+                    'finish_time' => $now->format('Y-m-d H:i:s'),
                     'duration_seconds' => $duration,
                 ]);
                 $stats['downtimes']++;
@@ -87,20 +87,25 @@ class DailyArchiveProduction extends Command
             $this->line("  Dandori: 0 stuck");
         }
 
-        // 4. Force-complete stuck job_masters
-        $stuckJobs = JobMaster::where('started_at', '<', $cutoff->toDateTimeString())
-            ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+        // 4. Reset ALL stale job_masters (running/paused/complete from before cutoff) to pending
+        $stuckJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused', 'complete', 'finished'])
+            ->whereNotIn('id', function ($q) use ($cutoff) {
+                $q->select('job_master_id')
+                    ->from('production_sessions')
+                    ->whereDate('work_date', '>=', $cutoff->toDateString());
+            })
             ->get();
 
         if ($stuckJobs->count() > 0) {
             foreach ($stuckJobs as $job) {
                 $job->update([
-                    'status' => 'complete',
-                    'finished_at' => $now->format('Y-m-d H:i:s'),
+                    'status' => 'pending',
+                    'started_at' => null,
+                    'finished_at' => null,
                 ]);
                 $stats['jobs']++;
             }
-            $this->info("  Jobs: {$stats['jobs']} force-complete");
+            $this->info("  Jobs: {$stats['jobs']} reset to pending");
         } else {
             $this->line("  Jobs: 0 stuck");
         }
