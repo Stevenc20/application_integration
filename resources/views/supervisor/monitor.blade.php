@@ -427,7 +427,7 @@ function fetchData(){
         fetch(`{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`).then(r=>r.json()),
         fetch(`{{ route('supervisor.overview.lineStatus') }}`).then(r=>r.json()),
     ]).then(([kpi,det,sts])=>{
-        const h=JSON.stringify(kpi.line_kpi)+JSON.stringify(det.detail)+JSON.stringify(sts.line_statuses);
+        const h=JSON.stringify(kpi.line_kpi)+JSON.stringify(kpi.line_meta)+JSON.stringify(det.detail)+JSON.stringify(sts.line_statuses);
         if(h===LAST_HASH) return;
         LAST_HASH=h;
         LINE_KPI=kpi.line_kpi||{};
@@ -904,6 +904,9 @@ function renderTable(){
 
 fetchData();
 setInterval(fetchData,5000);
+document.addEventListener('visibilitychange',function(){
+    if(!document.hidden){LAST_HASH='';fetchData();}
+});
 </script>
 </body>
 </html>
