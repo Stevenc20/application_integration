@@ -113,7 +113,7 @@
             </select>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Pareto Chart</h3><div class="overflow-x-auto"><canvas id="paretoChart" style="min-width:400px;height:200px"></canvas></div></div>
+            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pareto Chart</h3><canvas id="paretoChart" style="height:150px;width:100%"></canvas></div>
             <div class="dm-card">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Breakdown</h3>
@@ -252,27 +252,19 @@ async function loadPareto() {
 
     document.getElementById('paretoTopCount').textContent = items.length + ' top categories';
 
-    let listHtml = '';
+    let listHtml = `<table class="w-full text-sm"><thead><tr class="text-left text-xs text-slate-400 uppercase tracking-widest border-b border-slate-200">
+        <th class="py-1 pr-2">#</th><th class="py-1 pr-2">Item</th><th class="py-1 pr-2">${valueLabel}</th><th class="py-1 pr-2">%</th><th class="py-1 pr-2">Cum</th>
+    </tr></thead><tbody>`;
     items.forEach((item, i) => {
-        const pct = item.pct;
-        const color = pct >= 20 ? '#dc2626' : pct >= 10 ? '#f59e0b' : '#2563eb';
-        listHtml += `<div class="flex items-center gap-3">
-            <span class="text-xs font-bold text-slate-400 w-5">${i + 1}</span>
-            <div class="flex-1">
-                <div class="flex justify-between text-sm mb-1">
-                    <span class="font-medium text-slate-700">${item[labelKey]}</span>
-                    <span class="font-bold text-slate-800">${item[valueKey]} ${valueLabel} (${item.pct}%)</span>
-                </div>
-                <div class="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-                    <div class="dm-pareto-bar" style="width:${item.cumulative}%;background:${color}"></div>
-                </div>
-                <div class="flex justify-between text-xs text-slate-400 mt-0.5">
-                    <span>${item.cumulative}% cumulative</span>
-                    <span>${item.count || ''} ${item.count ? 'occurrences' : ''}</span>
-                </div>
-            </div>
-        </div>${i < items.length - 1 ? '<hr class="border-slate-100 my-2">' : ''}`;
+        listHtml += `<tr class="border-b border-slate-100 text-xs">
+            <td class="py-1 pr-2 font-bold text-slate-400">${i + 1}</td>
+            <td class="py-1 pr-2 font-medium text-slate-700">${item[labelKey]}</td>
+            <td class="py-1 pr-2 font-bold text-slate-800">${item[valueKey]}</td>
+            <td class="py-1 pr-2 text-slate-600">${item.pct}%</td>
+            <td class="py-1 pr-2 text-slate-400">${item.cumulative}%</td>
+        </tr>`;
     });
+    listHtml += '</tbody></table>';
     document.getElementById('paretoList').innerHTML = listHtml;
 
     if (paretoChartInstance) paretoChartInstance.destroy();
