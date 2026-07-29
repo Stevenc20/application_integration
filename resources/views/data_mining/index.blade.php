@@ -64,7 +64,7 @@
             <div class="dm-card"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trend</span><p class="text-base font-black mt-0.5" id="trendDirection">-</p></div>
             <div class="dm-card"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Points</span><p class="text-base font-black text-slate-800 mt-0.5" id="trendPoints">-</p></div>
         </div>
-         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:300px;height:100px"></canvas></div></div>
+         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:300px;height:200px"></canvas></div></div>
     </div>
 
     <div id="tab-anomaly" class="tab-content hidden">
@@ -100,22 +100,25 @@
 
     <div id="tab-pareto" class="tab-content hidden">
         <div class="flex gap-2 mb-3">
-            <select id="paretoType" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
+            <select id="paretoType" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
                 <option value="downtime">Downtime</option>
                 <option value="defect">Defect</option>
             </select>
-            <select id="paretoDays" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
-                <option value="7">7H</option>
-                <option value="30" selected>30H</option>
-                <option value="90">90H</option>
+            <select id="paretoDays" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
+                <option value="7">7 Hari</option>
+                <option value="30" selected>30 Hari</option>
+                <option value="90">90 Hari</option>
             </select>
         </div>
-        <div class="dm-card">
-            <div class="flex items-center justify-between mb-2">
-                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Pareto</h3>
-                <span class="dm-badge bg-blue-100 text-blue-700" id="paretoTopCount">-</span>
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pareto Chart</h3><div class="overflow-x-auto"><canvas id="paretoChart" style="min-width:400px;height:200px"></canvas></div></div>
+            <div class="dm-card">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Breakdown</h3>
+                    <span class="dm-badge bg-blue-100 text-blue-700" id="paretoTopCount">-</span>
+                </div>
+                <div id="paretoList"></div>
             </div>
-            <div id="paretoList"></div>
         </div>
     </div>
 </div>
@@ -123,6 +126,7 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 let trendChartInstance = null;
+let paretoChartInstance = null;
 
 document.querySelectorAll('.dm-tab').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -166,9 +170,9 @@ async function loadTrend() {
     const dir = data.summary.trend_direction;
     const change = data.summary.trend_change_pct;
     const el = document.getElementById('trendDirection');
-    if (dir === 'up') { el.textContent = `↑ ${change}%`; el.className = 'text-2xl font-black mt-1 text-emerald-600'; }
-    else if (dir === 'down') { el.textContent = `↓ ${Math.abs(change)}%`; el.className = 'text-2xl font-black mt-1 text-red-600'; }
-    else { el.textContent = '→ Stable'; el.className = 'text-2xl font-black mt-1 text-slate-500'; }
+    if (dir === 'up') { el.textContent = `↑ ${change}%`; el.className = 'text-base font-black mt-0.5 text-emerald-600'; }
+    else if (dir === 'down') { el.textContent = `↓ ${Math.abs(change)}%`; el.className = 'text-base font-black mt-0.5 text-red-600'; }
+    else { el.textContent = '→ Stable'; el.className = 'text-base font-black mt-0.5 text-slate-500'; }
     document.getElementById('trendPoints').textContent = data.summary.data_points ?? '-';
 
     if (trendChartInstance) trendChartInstance.destroy();
@@ -244,21 +248,44 @@ async function loadPareto() {
     const resp = await fetch(`{{ url('data-mining/pareto') }}/${type}?days=${days}`);
     if (!resp.ok) { document.getElementById('paretoList').innerHTML = '<p class="text-red-400">Gagal memuat data</p>'; return; }
     const data = await resp.json();
-    const items = (data[type] || data.categories || []).slice(0, 3);
+    const items = (data[type] || data.categories || []).slice(0, 5);
     const labelKey = type === 'defect' ? 'defect_name' : 'jenis_downtime';
     const valueKey = type === 'defect' ? 'total_qty' : 'total_minutes';
     const valueLabel = type === 'defect' ? 'Qty' : 'Minutes';
 
     document.getElementById('paretoTopCount').textContent = items.length + ' top categories';
 
-    let listHtml = '';
+    let listHtml = `<table class="w-full text-xs"><thead><tr class="text-left text-slate-400 border-b border-slate-200">
+        <th class="py-0.5 pr-1">#</th><th class="py-0.5 pr-1">Item</th><th class="py-0.5 pr-1 text-right">${valueLabel}</th><th class="py-0.5 pr-1 text-right">%</th><th class="py-0.5 pr-1 text-right">Cum</th>
+    </tr></thead><tbody>`;
     items.forEach((item, i) => {
-        listHtml += `<div class="flex justify-between text-xs py-0.5 border-b border-slate-100">
-            <span class="font-medium text-slate-700">${i+1}. ${item[labelKey]}</span>
-            <span class="font-bold text-slate-800">${item[valueKey]} ${valueLabel} <span class="text-slate-400 font-normal">(${item.pct}%, cum ${item.cumulative}%)</span></span>
-        </div>`;
+        listHtml += `<tr class="border-b border-slate-100">
+            <td class="py-0.5 pr-1 font-bold text-slate-400">${i + 1}</td>
+            <td class="py-0.5 pr-1 font-medium text-slate-700">${item[labelKey]}</td>
+            <td class="py-0.5 pr-1 font-bold text-slate-800 text-right">${item[valueKey]}</td>
+            <td class="py-0.5 pr-1 text-slate-600 text-right">${item.pct}%</td>
+            <td class="py-0.5 pr-1 text-slate-400 text-right">${item.cumulative}%</td>
+        </tr>`;
     });
+    listHtml += '</tbody></table>';
     document.getElementById('paretoList').innerHTML = listHtml;
+
+    if (paretoChartInstance) paretoChartInstance.destroy();
+    const ctx = document.getElementById('paretoChart').getContext('2d');
+    paretoChartInstance = new Chart(ctx, {
+        type: 'bar', data: {
+            labels: items.map(i => i[labelKey]),
+            datasets: [
+                { label: valueLabel, data: items.map(i => i[valueKey]), backgroundColor: items.map(i => i.pct >= 20 ? '#dc2626' : i.pct >= 10 ? '#f59e0b' : '#2563eb'), borderRadius: 4 },
+                { label: 'Cumulative %', data: items.map(i => i.cumulative), type: 'line', borderColor: '#1e293b', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#1e293b', yAxisID: 'y1' },
+            ]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
+            scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: valueLabel } }, y1: { position: 'right', beginAtZero: true, max: 100, grid: { display: false }, title: { display: true, text: '%' } }, x: { grid: { display: false } } }
+        }
+    });
 }
 
 function showError(tab) {
