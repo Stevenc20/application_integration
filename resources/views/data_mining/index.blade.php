@@ -20,7 +20,7 @@
     .dm-card {
         background: white; border: 1px solid #e2e8f0; border-radius: 14px;
         padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
-        transition: all 0.2s ease; position: relative; overflow: hidden;
+        transition: all 0.2s ease; position: relative;
     }
     .dm-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
     .dm-badge {
@@ -66,7 +66,7 @@
             <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Trend</span><p class="text-2xl font-black mt-1" id="trendDirection">-</p></div>
             <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Data Points</span><p class="text-2xl font-black text-slate-800 mt-1" id="trendPoints">-</p></div>
         </div>
-         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:400px;height:260px"></canvas></div></div>
+         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:350px;height:220px"></canvas></div></div>
     </div>
 
     <div id="tab-anomaly" class="tab-content hidden">
@@ -113,7 +113,7 @@
             </select>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Pareto Chart</h3><div class="overflow-x-auto"><canvas id="paretoChart" style="min-width:500px;height:250px"></canvas></div></div>
+            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Pareto Chart</h3><div class="overflow-x-auto"><canvas id="paretoChart" style="min-width:400px;height:200px"></canvas></div></div>
             <div class="dm-card">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Breakdown</h3>
@@ -245,12 +245,12 @@ async function loadPareto() {
     const resp = await fetch(`{{ route('data_mining.pareto', '') }}/${type}?days=${days}`);
     if (!resp.ok) { document.getElementById('paretoList').innerHTML = '<p class="text-red-400">Gagal memuat data</p>'; return; }
     const data = await resp.json();
-    const items = data[type] || data.categories || [];
+    const items = (data[type] || data.categories || []).slice(0, 5);
     const labelKey = type === 'defect' ? 'defect_name' : 'jenis_downtime';
     const valueKey = type === 'defect' ? 'total_qty' : 'total_minutes';
     const valueLabel = type === 'defect' ? 'Qty' : 'Minutes';
 
-    document.getElementById('paretoTopCount').textContent = data.top_categories?.length + ' top categories';
+    document.getElementById('paretoTopCount').textContent = items.length + ' top categories';
 
     let listHtml = '';
     items.forEach((item, i) => {
