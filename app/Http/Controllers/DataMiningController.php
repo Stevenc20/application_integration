@@ -7,7 +7,7 @@ use Illuminate\Support\Facades\Http;
 
 class DataMiningController extends Controller
 {
-    protected string $pythonUrl = 'http://127.0.0.1:8001';
+    protected string $pythonUrl = 'http://172.17.0.1:8001';
 
     public function index()
     {
