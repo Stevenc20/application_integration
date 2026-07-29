@@ -994,6 +994,20 @@ Route::middleware(['auth', 'role:production'])->prefix('production')->name('prod
 });
 
 // ======================
+// DATA MINING
+// ======================
+Route::middleware(['auth', 'feature:data_mining'])
+    ->prefix('data-mining')
+    ->name('data_mining.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\DataMiningController::class, 'index'])->name('index');
+        Route::get('/trend/{metric}', [\App\Http\Controllers\DataMiningController::class, 'getTrend'])->name('trend');
+        Route::get('/anomaly', [\App\Http\Controllers\DataMiningController::class, 'getAnomaly'])->name('anomaly');
+        Route::get('/pareto/{type}', [\App\Http\Controllers\DataMiningController::class, 'getPareto'])->name('pareto');
+        Route::get('/summary', [\App\Http\Controllers\DataMiningController::class, 'getSummary'])->name('summary');
+    });
+
+// ======================
 // SHARED GSPH API (accessible by all authenticated roles)
 // ======================
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {

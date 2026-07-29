@@ -43,6 +43,7 @@ class FeaturePermissionSeeder extends Seeder
             ['feature_code' => 'trouble_history',         'feature_name' => 'Trouble History',        'group_name' => 'Trouble'],
             ['feature_code' => 'hambatan_jalur',          'feature_name' => 'Hambatan Jalur',         'group_name' => 'Hambatan Jalur'],
             ['feature_code' => 'production_analytics',    'feature_name' => 'Production Analytics',   'group_name' => 'Analytics'],
+            ['feature_code' => 'data_mining',             'feature_name' => 'Data Mining',            'group_name' => 'Analytics'],
         ];
 
         $allRoles = ['admin', 'supervisor', 'ppc', 'foreman', 'operator', 'leader', 'quality', 'production', 'manager', 'kadiv', 'direktur', 'presdir', 'superadmin', 'hambatan', 'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi'];
