@@ -27,9 +27,7 @@
         display: inline-block; padding: 3px 10px; border-radius: 20px;
         font-size: 10px; font-weight: 700; letter-spacing: 0.02em;
     }
-    .anomaly-row { transition: all 0.2s ease; }
     .anomaly-row:hover { background: #fef2f2; }
-    .dm-pareto-bar { height: 28px; border-radius: 6px; transition: width 0.8s cubic-bezier(.4,0,.2,1); }
 </style>
 
 <div class="dm-page">
@@ -125,7 +123,6 @@
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
 <script>
 let trendChartInstance = null;
-let paretoChartInstance = null;
 
 document.querySelectorAll('.dm-tab').forEach(btn => {
     btn.addEventListener('click', function() {
@@ -176,29 +173,34 @@ async function loadTrend() {
 
     if (trendChartInstance) trendChartInstance.destroy();
     const ctx = document.getElementById('trendChart').getContext('2d');
-    const labels = data.daily.map(d => d.date);
     const mainValue = data.daily[0]?.efficiency !== undefined ? 'efficiency' :
                       data.daily[0]?.reject_rate !== undefined ? 'reject_rate' :
                       data.daily[0]?.total_minutes !== undefined ? 'total_minutes' : null;
     const mainLabel = metric === 'efficiency' ? 'Efficiency %' : metric === 'reject' ? 'Reject Rate %' : 'Downtime (min)';
 
+    const chartData = data.daily;
+    const maxPoints = 14;
+    const sampled = chartData.length > maxPoints
+        ? chartData.filter((_, i) => i % Math.ceil(chartData.length / maxPoints) === 0 || i === chartData.length - 1)
+        : chartData;
+
     const datasets = [{
-        label: mainLabel, data: data.daily.map(d => d[mainValue]), borderColor: '#2563eb',
+        label: mainLabel, data: sampled.map(d => d[mainValue]), borderColor: '#2563eb',
         backgroundColor: 'rgba(37,99,235,0.1)', fill: true, tension: 0.3, pointRadius: 3,
     }];
-    if (data.daily[0]?.sma_7) {
+    if (sampled[0]?.sma_7) {
         datasets.push({
-            label: 'SMA-7', data: data.daily.map(d => d.sma_7), borderColor: '#059669',
+            label: 'SMA-7', data: sampled.map(d => d.sma_7), borderColor: '#059669',
             borderDash: [6, 3], pointRadius: 0, tension: 0.3,
         });
     }
 
     trendChartInstance = new Chart(ctx, {
-        type: 'line', data: { labels, datasets },
+        type: 'line', data: { labels: sampled.map(d => d.date), datasets },
         options: {
             responsive: true, maintainAspectRatio: false,
             plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-            scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false }, ticks: { maxTicksLimit: 20 } } }
+            scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' } }, x: { grid: { display: false }, ticks: { maxTicksLimit: 10 } } }
         }
     });
 }
