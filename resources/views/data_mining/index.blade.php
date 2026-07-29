@@ -55,9 +55,9 @@
                 <option value="downtime">Downtime</option>
             </select>
             <select id="trendDays" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
-                <option value="30">30 Hari</option>
-                <option value="90" selected>90 Hari</option>
-                <option value="180">180 Hari</option>
+                <option value="14">14 Hari</option>
+                <option value="30" selected>30 Hari</option>
+                <option value="90">90 Hari</option>
             </select>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
@@ -66,7 +66,7 @@
             <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Trend</span><p class="text-2xl font-black mt-1" id="trendDirection">-</p></div>
             <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Data Points</span><p class="text-2xl font-black text-slate-800 mt-1" id="trendPoints">-</p></div>
         </div>
-         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:600px;height:280px"></canvas></div></div>
+         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:400px;height:260px"></canvas></div></div>
     </div>
 
     <div id="tab-anomaly" class="tab-content hidden">
