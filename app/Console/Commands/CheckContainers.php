@@ -17,7 +17,6 @@ class CheckContainers extends Command
     {
         $containers = $this->fetchContainers();
         if ($containers === null) {
-            $this->warn('Docker socket not available');
             return Command::SUCCESS;
         }
 
@@ -84,13 +83,22 @@ class CheckContainers extends Command
     private function fetchContainers(): ?array
     {
         if (!file_exists($this->socketPath)) {
+            $this->warn("Socket file not found at {$this->socketPath}");
+            return null;
+        }
+
+        $transports = stream_get_transports();
+        if (!in_array('unix', $transports)) {
+            $this->warn('unix transport not supported: ' . implode(',', $transports));
             return null;
         }
 
         $errno = 0;
         $errstr = '';
-        $fp = @stream_socket_client('unix://' . $this->socketPath, $errno, $errstr, 5);
+        $uri = 'unix://' . $this->socketPath;
+        $fp = @stream_socket_client($uri, $errno, $errstr, 5);
         if (!$fp) {
+            $this->warn("stream_socket_client failed: [$errno] $errstr");
             return null;
         }
 
