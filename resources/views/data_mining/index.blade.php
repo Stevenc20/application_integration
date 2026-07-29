@@ -66,7 +66,7 @@
             <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Trend</span><p class="text-2xl font-black mt-1" id="trendDirection">-</p></div>
             <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Data Points</span><p class="text-2xl font-black text-slate-800 mt-1" id="trendPoints">-</p></div>
         </div>
-        <div class="dm-card"><canvas id="trendChart" height="100"></canvas></div>
+         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:600px;height:280px"></canvas></div></div>
     </div>
 
     <div id="tab-anomaly" class="tab-content hidden">
@@ -113,7 +113,7 @@
             </select>
         </div>
         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Pareto Chart</h3><canvas id="paretoChart" height="120"></canvas></div>
+            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-3">Pareto Chart</h3><div class="overflow-x-auto"><canvas id="paretoChart" style="min-width:500px;height:250px"></canvas></div></div>
             <div class="dm-card">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Breakdown</h3>
