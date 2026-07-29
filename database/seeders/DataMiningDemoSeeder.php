@@ -7,6 +7,7 @@ use App\Models\JobMaster;
 use App\Models\RepairRejectLog;
 use Carbon\Carbon;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class DataMiningDemoSeeder extends Seeder
 {
@@ -54,7 +55,9 @@ class DataMiningDemoSeeder extends Seeder
 
     private function seedDowntimes(array $jobs, Carbon $now): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
         Downtime::truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         $downtimeWeights = [
             'Setting Dies' => 25, 'Trouble Mesin' => 20, 'Material NG' => 15,
@@ -118,7 +121,9 @@ class DataMiningDemoSeeder extends Seeder
 
     private function seedRepairRejects(array $jobs, Carbon $now): void
     {
+        DB::statement('SET FOREIGN_KEY_CHECKS=0');
         RepairRejectLog::truncate();
+        DB::statement('SET FOREIGN_KEY_CHECKS=1');
 
         $defectWeights = [
             'Scratch' => 20, 'Dent' => 15, 'Burry' => 15, 'Short Mould' => 12,
