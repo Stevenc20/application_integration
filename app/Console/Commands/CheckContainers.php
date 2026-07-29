@@ -114,9 +114,18 @@ class CheckContainers extends Command
         }
         fclose($fp);
 
+        $this->info('Raw response length: ' . strlen($raw));
+        $this->info('Raw response: ' . substr($raw, 0, 500));
+
         $parts = explode("\r\n\r\n", $raw, 2);
         $body = $parts[1] ?? '';
 
-        return json_decode($body, true);
+        $decoded = json_decode($body, true);
+        if (json_last_error() !== JSON_ERROR_NONE) {
+            $this->warn('JSON decode error: ' . json_last_error_msg());
+        }
+        $this->info('Decoded count: ' . (is_array($decoded) ? count($decoded) : 'not array'));
+
+        return $decoded;
     }
 }
