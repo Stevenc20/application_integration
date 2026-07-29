@@ -84,3 +84,9 @@ Schedule::command('network:clean-logs --days=30')
     ->dailyAt('04:00')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/network-cleanup-scheduler.log'));
+
+// Schedule: scan common ports every 5 minutes
+Schedule::command('network:scan-ports')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/network-portscan-scheduler.log'));

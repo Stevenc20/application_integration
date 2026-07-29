@@ -22,6 +22,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         $middleware->append(\App\Http\Middleware\NetworkAccessLogger::class);
+        $middleware->append(\App\Http\Middleware\SecurityHeadersMiddleware::class);
 
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,

@@ -319,8 +319,8 @@ Route::get('/', function(){
 })->name('landing');
 
 // login
-Route::get('/login', [AuthController::class, 'login'])->name('login');
-Route::post('/login', [AuthController::class, 'loginProcess'])->name('login.process');
+Route::get('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:10,1');
+Route::post('/login', [AuthController::class, 'loginProcess'])->name('login.process')->middleware('throttle:5,1');
 
 // MONITORING
 Route::prefix('monitoring')
@@ -1026,3 +1026,14 @@ Route::middleware(['auth', 'feature:data_mining'])
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::get('/gsph', [\App\Http\Controllers\Api\GrafikController::class, 'gsph']);
 });
+
+// ======================
+// SECURITY DASHBOARD
+// ======================
+Route::middleware(['auth', 'feature:security'])
+    ->prefix('security')
+    ->name('security.')
+    ->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\SecurityController::class, 'index'])->name('dashboard');
+        Route::get('/logs', [\App\Http\Controllers\SecurityController::class, 'logs'])->name('logs');
+    });

@@ -236,6 +236,16 @@
     </li>
     @endif
 
+    <!-- Security Dashboard -->
+    @if(auth()->user()->hasFeature('security'))
+    <li class="menu-item">
+        <a href="{{ route('security.dashboard') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ request()->routeIs('security.*') ? 'bg-primary-red text-white shadow-md shadow-red-200' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
+            <svg class="w-5 h-5 {{ request()->routeIs('security.*') ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+            <span class="font-semibold tracking-wide">Security</span>
+        </a>
+    </li>
+    @endif
+
     <!-- Quality Control -->
     <li class="menu-item relative">
         <a href="javascript:void(0);" class="menu-toggle flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {{ $qualityActive ? 'bg-red-50 text-primary-red' : 'text-gray-600 hover:bg-gray-50' }}">
