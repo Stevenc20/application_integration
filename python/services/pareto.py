@@ -16,7 +16,7 @@ def pareto_breakdown(items, value_key, label_key):
         cumulative += pct
         entry = {
             label_key: item[label_key],
-            value: round(val, 1),
+            value_key: round(val, 1),
             'pct': round(pct, 1),
             'cumulative': round(cumulative, 1),
         }
