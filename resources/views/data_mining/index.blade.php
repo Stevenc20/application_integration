@@ -18,8 +18,8 @@
         box-shadow: 0 4px 14px rgba(30,41,59,0.25);
     }
     .dm-card {
-        background: white; border: 1px solid #e2e8f0; border-radius: 14px;
-        padding: 18px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+        background: white; border: 1px solid #e2e8f0; border-radius: 10px;
+        padding: 12px 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
         transition: all 0.2s ease; position: relative;
     }
     .dm-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); transform: translateY(-1px); }
@@ -33,7 +33,7 @@
 </style>
 
 <div class="dm-page">
-    <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center justify-between mb-4">
         <div>
             <h1 class="text-2xl font-black text-slate-800 tracking-tight">Data Mining</h1>
             <p class="text-sm text-slate-400 mt-1">Analisis pola, deteksi anomali, dan insight produksi berbasis data</p>
@@ -41,7 +41,7 @@
         <div class="flex gap-2" id="summaryBanner"></div>
     </div>
 
-    <div class="flex gap-2 mb-6 border-b border-slate-200 pb-2">
+    <div class="flex gap-2 mb-3 border-b border-slate-200 pb-2">
         <button class="dm-tab active" data-tab="trend">Trend</button>
         <button class="dm-tab" data-tab="anomaly">Anomaly</button>
         <button class="dm-tab" data-tab="pareto">Pareto</button>
@@ -101,26 +101,24 @@
     </div>
 
     <div id="tab-pareto" class="tab-content hidden">
-        <div class="flex gap-2 mb-4">
-            <select id="paretoType" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
+        <div class="flex gap-2 mb-3">
+            <select id="paretoType" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
                 <option value="downtime">Downtime</option>
                 <option value="defect">Defect</option>
             </select>
-            <select id="paretoDays" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
-                <option value="7">7 Hari</option>
-                <option value="30" selected>30 Hari</option>
-                <option value="90">90 Hari</option>
+            <select id="paretoDays" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
+                <option value="7">7H</option>
+                <option value="30" selected>30H</option>
+                <option value="90">90H</option>
             </select>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div class="dm-card"><h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Pareto Chart</h3><canvas id="paretoChart" style="height:150px;width:100%"></canvas></div>
-            <div class="dm-card">
-                <div class="flex items-center justify-between mb-3">
-                    <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Breakdown</h3>
-                    <span class="dm-badge bg-blue-100 text-blue-700" id="paretoTopCount">-</span>
-                </div>
-                <div id="paretoList" class="space-y-2"></div>
+        <div class="dm-card">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Pareto</h3>
+                <span class="dm-badge bg-blue-100 text-blue-700" id="paretoTopCount">-</span>
             </div>
+            <canvas id="paretoChart" style="height:120px;width:100%"></canvas>
+            <div id="paretoList"></div>
         </div>
     </div>
 </div>
@@ -245,23 +243,23 @@ async function loadPareto() {
     const resp = await fetch(`{{ route('data_mining.pareto', '') }}/${type}?days=${days}`);
     if (!resp.ok) { document.getElementById('paretoList').innerHTML = '<p class="text-red-400">Gagal memuat data</p>'; return; }
     const data = await resp.json();
-    const items = (data[type] || data.categories || []).slice(0, 5);
+    const items = (data[type] || data.categories || []).slice(0, 3);
     const labelKey = type === 'defect' ? 'defect_name' : 'jenis_downtime';
     const valueKey = type === 'defect' ? 'total_qty' : 'total_minutes';
     const valueLabel = type === 'defect' ? 'Qty' : 'Minutes';
 
     document.getElementById('paretoTopCount').textContent = items.length + ' top categories';
 
-    let listHtml = `<table class="w-full text-sm"><thead><tr class="text-left text-xs text-slate-400 uppercase tracking-widest border-b border-slate-200">
-        <th class="py-1 pr-2">#</th><th class="py-1 pr-2">Item</th><th class="py-1 pr-2">${valueLabel}</th><th class="py-1 pr-2">%</th><th class="py-1 pr-2">Cum</th>
+    let listHtml = `<table class="w-full text-xs"><thead><tr class="text-left text-slate-400 border-b border-slate-200">
+        <th class="py-0.5 pr-1">#</th><th class="py-0.5 pr-1">Item</th><th class="py-0.5 pr-1 text-right">${valueLabel}</th><th class="py-0.5 pr-1 text-right">%</th><th class="py-0.5 pr-1 text-right">Cum</th>
     </tr></thead><tbody>`;
     items.forEach((item, i) => {
-        listHtml += `<tr class="border-b border-slate-100 text-xs">
-            <td class="py-1 pr-2 font-bold text-slate-400">${i + 1}</td>
-            <td class="py-1 pr-2 font-medium text-slate-700">${item[labelKey]}</td>
-            <td class="py-1 pr-2 font-bold text-slate-800">${item[valueKey]}</td>
-            <td class="py-1 pr-2 text-slate-600">${item.pct}%</td>
-            <td class="py-1 pr-2 text-slate-400">${item.cumulative}%</td>
+        listHtml += `<tr class="border-b border-slate-100">
+            <td class="py-0.5 pr-1 font-bold text-slate-400">${i + 1}</td>
+            <td class="py-0.5 pr-1 font-medium text-slate-700">${item[labelKey]}</td>
+            <td class="py-0.5 pr-1 font-bold text-slate-800 text-right">${item[valueKey]}</td>
+            <td class="py-0.5 pr-1 text-slate-600 text-right">${item.pct}%</td>
+            <td class="py-0.5 pr-1 text-slate-400 text-right">${item.cumulative}%</td>
         </tr>`;
     });
     listHtml += '</tbody></table>';
@@ -273,14 +271,13 @@ async function loadPareto() {
         type: 'bar', data: {
             labels: items.map(i => i[labelKey]),
             datasets: [
-                { label: valueLabel, data: items.map(i => i[valueKey]), backgroundColor: items.map(i => i.pct >= 20 ? '#dc2626' : i.pct >= 10 ? '#f59e0b' : '#2563eb'), borderRadius: 4 },
-                { label: 'Cumulative %', data: items.map(i => i.cumulative), type: 'line', borderColor: '#1e293b', borderWidth: 2, pointRadius: 4, pointBackgroundColor: '#1e293b', yAxisID: 'y1' },
+                { label: valueLabel, data: items.map(i => i[valueKey]), backgroundColor: ['#dc2626','#f59e0b','#2563eb'], borderRadius: 4, barThickness: 24 },
             ]
         },
         options: {
             responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 } } } },
-            scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, title: { display: true, text: valueLabel } }, y1: { position: 'right', beginAtZero: true, max: 100, grid: { display: false }, title: { display: true, text: '%' } }, x: { grid: { display: false } } }
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 } } }, x: { grid: { display: false }, ticks: { font: { size: 9 } } } }
         }
     });
 }
