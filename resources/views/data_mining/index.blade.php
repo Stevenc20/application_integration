@@ -48,39 +48,39 @@
     </div>
 
     <div id="tab-trend" class="tab-content">
-        <div class="flex gap-2 mb-4">
-            <select id="trendMetric" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
+        <div class="flex gap-2 mb-2">
+            <select id="trendMetric" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
                 <option value="efficiency">Efficiency</option>
-                <option value="reject">Reject Rate</option>
+                <option value="reject">Reject</option>
                 <option value="downtime">Downtime</option>
             </select>
-            <select id="trendDays" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
-                <option value="14" selected>14 Hari</option>
-                <option value="30">30 Hari</option>
-                <option value="90">90 Hari</option>
+            <select id="trendDays" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
+                <option value="7" selected>7H</option>
+                <option value="14">14H</option>
+                <option value="30">30H</option>
             </select>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
-            <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Current</span><p class="text-2xl font-black text-slate-800 mt-1" id="trendCurrent">-</p></div>
-            <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Average</span><p class="text-2xl font-black text-slate-800 mt-1" id="trendAvg">-</p></div>
-            <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Trend</span><p class="text-2xl font-black mt-1" id="trendDirection">-</p></div>
-            <div class="dm-card"><span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Data Points</span><p class="text-2xl font-black text-slate-800 mt-1" id="trendPoints">-</p></div>
+        <div class="grid grid-cols-4 gap-2 mb-3">
+            <div class="dm-card"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Current</span><p class="text-base font-black text-slate-800 mt-0.5" id="trendCurrent">-</p></div>
+            <div class="dm-card"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Average</span><p class="text-base font-black text-slate-800 mt-0.5" id="trendAvg">-</p></div>
+            <div class="dm-card"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Trend</span><p class="text-base font-black mt-0.5" id="trendDirection">-</p></div>
+            <div class="dm-card"><span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Points</span><p class="text-base font-black text-slate-800 mt-0.5" id="trendPoints">-</p></div>
         </div>
-         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:350px;height:220px"></canvas></div></div>
+         <div class="dm-card"><div class="overflow-x-auto"><canvas id="trendChart" style="min-width:300px;height:100px"></canvas></div></div>
     </div>
 
     <div id="tab-anomaly" class="tab-content hidden">
-        <div class="flex gap-2 mb-4">
-            <select id="anomalyMetric" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
-                <option value="all">Semua Metrik</option>
+        <div class="flex gap-2 mb-2">
+            <select id="anomalyMetric" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
+                <option value="all">All</option>
                 <option value="efficiency">Efficiency</option>
-                <option value="reject">Reject Rate</option>
+                <option value="reject">Reject</option>
                 <option value="downtime">Downtime</option>
             </select>
-            <select id="anomalyDays" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
-                <option value="7">7 Hari</option>
-                <option value="30" selected>30 Hari</option>
-                <option value="90">90 Hari</option>
+            <select id="anomalyDays" class="px-2 py-1 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 bg-white">
+                <option value="7">7H</option>
+                <option value="30" selected>30H</option>
+                <option value="90">90H</option>
             </select>
         </div>
         <div class="dm-card">
