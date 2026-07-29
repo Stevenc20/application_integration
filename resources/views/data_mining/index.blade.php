@@ -55,8 +55,8 @@
                 <option value="downtime">Downtime</option>
             </select>
             <select id="trendDays" class="px-3 py-2 border border-slate-200 rounded-lg text-sm font-medium text-slate-600 bg-white">
-                <option value="14">14 Hari</option>
-                <option value="30" selected>30 Hari</option>
+                <option value="14" selected>14 Hari</option>
+                <option value="30">30 Hari</option>
                 <option value="90">90 Hari</option>
             </select>
         </div>
@@ -117,7 +117,6 @@
                 <h3 class="text-xs font-bold text-slate-400 uppercase tracking-widest">Pareto</h3>
                 <span class="dm-badge bg-blue-100 text-blue-700" id="paretoTopCount">-</span>
             </div>
-            <canvas id="paretoChart" style="height:120px;width:100%"></canvas>
             <div id="paretoList"></div>
         </div>
     </div>
@@ -250,36 +249,14 @@ async function loadPareto() {
 
     document.getElementById('paretoTopCount').textContent = items.length + ' top categories';
 
-    let listHtml = `<table class="w-full text-xs"><thead><tr class="text-left text-slate-400 border-b border-slate-200">
-        <th class="py-0.5 pr-1">#</th><th class="py-0.5 pr-1">Item</th><th class="py-0.5 pr-1 text-right">${valueLabel}</th><th class="py-0.5 pr-1 text-right">%</th><th class="py-0.5 pr-1 text-right">Cum</th>
-    </tr></thead><tbody>`;
+    let listHtml = '';
     items.forEach((item, i) => {
-        listHtml += `<tr class="border-b border-slate-100">
-            <td class="py-0.5 pr-1 font-bold text-slate-400">${i + 1}</td>
-            <td class="py-0.5 pr-1 font-medium text-slate-700">${item[labelKey]}</td>
-            <td class="py-0.5 pr-1 font-bold text-slate-800 text-right">${item[valueKey]}</td>
-            <td class="py-0.5 pr-1 text-slate-600 text-right">${item.pct}%</td>
-            <td class="py-0.5 pr-1 text-slate-400 text-right">${item.cumulative}%</td>
-        </tr>`;
+        listHtml += `<div class="flex justify-between text-xs py-0.5 border-b border-slate-100">
+            <span class="font-medium text-slate-700">${i+1}. ${item[labelKey]}</span>
+            <span class="font-bold text-slate-800">${item[valueKey]} ${valueLabel} <span class="text-slate-400 font-normal">(${item.pct}%, cum ${item.cumulative}%)</span></span>
+        </div>`;
     });
-    listHtml += '</tbody></table>';
     document.getElementById('paretoList').innerHTML = listHtml;
-
-    if (paretoChartInstance) paretoChartInstance.destroy();
-    const ctx = document.getElementById('paretoChart').getContext('2d');
-    paretoChartInstance = new Chart(ctx, {
-        type: 'bar', data: {
-            labels: items.map(i => i[labelKey]),
-            datasets: [
-                { label: valueLabel, data: items.map(i => i[valueKey]), backgroundColor: ['#dc2626','#f59e0b','#2563eb'], borderRadius: 4, barThickness: 24 },
-            ]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, grid: { color: '#f1f5f9' }, ticks: { font: { size: 9 } } }, x: { grid: { display: false }, ticks: { font: { size: 9 } } } }
-        }
-    });
 }
 
 function showError(tab) {
