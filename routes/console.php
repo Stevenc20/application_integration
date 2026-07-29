@@ -66,3 +66,21 @@ Schedule::command('break:auto')
     ->everyMinute()
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/auto-break-scheduler.log'));
+
+// Schedule: check Docker containers every 5 minutes
+Schedule::command('network:check-containers')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/network-containers-scheduler.log'));
+
+// Schedule: measure network latency every 5 minutes
+Schedule::command('network:measure-latency')
+    ->everyFiveMinutes()
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/network-latency-scheduler.log'));
+
+// Schedule: clean old network logs daily at 4 AM
+Schedule::command('network:clean-logs --days=30')
+    ->dailyAt('04:00')
+    ->onOneServer()
+    ->appendOutputTo(storage_path('logs/network-cleanup-scheduler.log'));

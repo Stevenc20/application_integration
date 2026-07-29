@@ -21,6 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
                 | Request::HEADER_X_FORWARDED_PROTO
         );
 
+        $middleware->append(\App\Http\Middleware\NetworkAccessLogger::class);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\RoleMiddleware::class,
             'feature' => \App\Http\Middleware\FeatureMiddleware::class,

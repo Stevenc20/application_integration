@@ -994,6 +994,19 @@ Route::middleware(['auth', 'role:production'])->prefix('production')->name('prod
 });
 
 // ======================
+// NETWORK MONITOR
+// ======================
+Route::middleware(['auth', 'feature:network_monitor'])
+    ->prefix('network-monitor')
+    ->name('network_monitor.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\NetworkMonitorController::class, 'index'])->name('index');
+        Route::get('/containers', [\App\Http\Controllers\NetworkMonitorController::class, 'containers'])->name('containers');
+        Route::get('/logs', [\App\Http\Controllers\NetworkMonitorController::class, 'logs'])->name('logs');
+        Route::get('/latency', [\App\Http\Controllers\NetworkMonitorController::class, 'latency'])->name('latency');
+    });
+
+// ======================
 // DATA MINING
 // ======================
 Route::middleware(['auth', 'feature:data_mining'])

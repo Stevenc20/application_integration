@@ -227,6 +227,16 @@
     </li>
     @endif
 
+    <!-- Network Monitor -->
+    @if(auth()->user()->hasFeature('network_monitor'))
+    <li class="menu-item">
+        <a href="{{ route('network_monitor.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ request()->routeIs('network_monitor.*') ? 'bg-primary-red text-white shadow-md shadow-red-200' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ request()->routeIs('network_monitor.*') ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7a2 2 0 012-2h12a2 2 0 012 2M4 7h16m-7 4h-2a1 1 0 00-1 1v2a1 1 0 001 1h2a1 1 0 001-1v-2a1 1 0 00-1-1z"/></svg>
+            <span class="font-semibold tracking-wide">Network Monitor</span>
+        </a>
+    </li>
+    @endif
+
     <!-- Quality Control -->
     <li class="menu-item relative">
         <a href="javascript:void(0);" class="menu-toggle flex items-center justify-between px-4 py-3 rounded-xl transition-all duration-200 {{ $qualityActive ? 'bg-red-50 text-primary-red' : 'text-gray-600 hover:bg-gray-50' }}">
