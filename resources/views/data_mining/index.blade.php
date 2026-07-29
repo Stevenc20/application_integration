@@ -156,7 +156,7 @@ async function loadSummary() {
 async function loadTrend() {
     const metric = document.getElementById('trendMetric').value;
     const days = document.getElementById('trendDays').value;
-    const resp = await fetch(`{{ route('data_mining.trend', '') }}/${metric}?days=${days}`);
+    const resp = await fetch(`{{ url('data-mining/trend') }}/${metric}?days=${days}`);
     if (!resp.ok) { showError('trend'); return; }
     const data = await resp.json();
     if (!data.summary) return;
@@ -241,7 +241,7 @@ async function loadAnomaly() {
 async function loadPareto() {
     const type = document.getElementById('paretoType').value;
     const days = document.getElementById('paretoDays').value;
-    const resp = await fetch(`{{ route('data_mining.pareto', '') }}/${type}?days=${days}`);
+    const resp = await fetch(`{{ url('data-mining/pareto') }}/${type}?days=${days}`);
     if (!resp.ok) { document.getElementById('paretoList').innerHTML = '<p class="text-red-400">Gagal memuat data</p>'; return; }
     const data = await resp.json();
     const items = (data[type] || data.categories || []).slice(0, 3);
