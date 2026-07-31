@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use App\Models\User;
 
 class AuthController extends Controller
@@ -41,6 +43,11 @@ class AuthController extends Controller
 
         Auth::login($user);
         $request->session()->regenerate();
+
+        // Clear RateLimiter throttle keys on successful login
+        $throttleKey = Str::lower($request->input('nrp')) . '|' . $request->ip();
+        RateLimiter::clear($throttleKey);
+        RateLimiter::clear('login:' . $request->ip());
 
         // ======================
         // REDIRECT ROLE CLEAN
@@ -84,6 +91,8 @@ class AuthController extends Controller
     // ======================
     public function logout(Request $request)
     {
+        RateLimiter::clear('login:' . $request->ip());
+
         Auth::logout();
 
         $request->session()->invalidate();

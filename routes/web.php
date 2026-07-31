@@ -319,7 +319,7 @@ Route::get('/', function(){
 })->name('landing');
 
 // login
-Route::get('/login', [AuthController::class, 'login'])->name('login')->middleware('throttle:10,1');
+Route::get('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/login', [AuthController::class, 'loginProcess'])->name('login.process')->middleware('throttle:5,1');
 
 // MONITORING
@@ -364,12 +364,7 @@ Route::prefix('monitoring')
     });
 
 // logout
-Route::get('/logout', function () {
-    auth()->logout();
-    session()->invalidate();
-    session()->regenerateToken();
-    return redirect('/login');
-})->name('logout');
+Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------
