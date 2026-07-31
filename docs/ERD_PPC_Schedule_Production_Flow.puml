@@ -1,0 +1,578 @@
+@startuml ERD_PPC_Schedule_Production_Flow
+
+!theme plain
+skinparam linetype polyline
+skinparam classAttributeIconSize 0
+skinparam wrapWidth 250
+skinparam classFontSize 11
+skinparam classAttributeFontSize 9
+skinparam packageFontSize 12
+skinparam packageStyle rectangle
+skinparam nodesep 40
+skinparam ranksep 60
+skinparam padding 4
+skinparam defaultTextAlignment left
+skinparam shadowing false
+
+skinparam class {
+  BackgroundColor<<master>> #FEFECE
+  BackgroundColor<<schedule>> #DDEEFF
+  BackgroundColor<<flow>> #E8F5E9
+  BackgroundColor<<breaktime>> #FFF3E0
+  BackgroundColor<<downtime>> #FCE4EC
+  BackgroundColor<<quality>> #F3E5F5
+  BackgroundColor<<changeover>> #E0F7FA
+  BorderColor #555555
+  ArrowColor #333333
+  BorderThickness 1.5
+}
+
+title <b>ERD - PPC Schedule & Production Flow</b>\nPT. IPPI - Stamping Manufacturing\n
+
+' ================================================================
+'  1. PPC - MASTER DATA
+' ================================================================
+
+package "PPC - MASTER DATA" #FEFECE {
+
+  class line_masters <<master>> {
+    id : bigint <<PK>>
+    ---
+    line_code : varchar (UNIQUE)
+    line_name : varchar
+    production_start : time [null]
+    production_end : time [null]
+    capacity : int = 0
+    machine_count : int = 0
+    shift : varchar = 'Pagi'
+    description : text [null]
+    status : enum(active|inactive|maintenance)
+    deleted_at : timestamp [null]
+  }
+
+  class job_masters <<master>> {
+    id : bigint <<PK>>
+    ---
+    job_number : varchar (UNIQUE)
+    job_name : varchar
+    line : varchar [null]
+    capacity : int = 0
+    target_qty : int = 0
+    status : varchar = 'pending'
+    sequence_no : int = 0
+    started_at : timestamp [null]
+    finished_at : timestamp [null]
+    plan_start : timestamp [null]
+    plan_end : timestamp [null]
+  }
+
+  class job_processes <<master>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint <<FK>>
+    sequence_no : int = 1
+    process_name : varchar
+    standard_minutes : int = 0
+    status : varchar = 'pending'
+  }
+}
+
+' ================================================================
+'  2. PPC - SCHEDULE (dipecah jadi 2 class: iden & operasional)
+' ================================================================
+
+package "PPC - SCHEDULE" #DDEEFF {
+
+  class production_plans <<schedule>> {
+    id : bigint <<PK>>
+    === IDENTITAS ===
+    line_master_id : bigint <<FK>>
+    plan_date : date <<IDX>>
+    shift_name : varchar [null] <<IDX>>
+    press_name : varchar [null] <<IDX>>
+    row_no : int [null]
+    row_type : varchar = 'job' <<IDX>>
+    source_type : varchar(20) = 'ppc'
+    recovery_id : bigint [null] <<FK>>
+    === JOB INFO ===
+    job_no : varchar [null]
+    job_master : varchar [null]
+    each_part : varchar [null]
+    type_plt : varchar [null]
+    === QTY ===
+    target_qty : int = 0
+    plan : float [null]
+    ok : float = 0
+    repair : float = 0
+    reject : float = 0
+    qty_plt : float [null]
+    keb_mtl : float [null]
+    total_plt : float [null]
+    total_pcs : float = 0
+    === MESIN ===
+    total_mesin : int = 1
+    p1 : bool = false
+    p2 : bool = false
+    p3 : bool = false
+    p4 : bool = false
+    a1 : int [null]
+    a2 : int [null]
+    a3 : int [null]
+    a4 : int [null]
+    === KALKULASI ===
+    ct_detik : float [null]
+    process_time : float [null]
+    reg_active : float = 0
+    dct : float = 0
+    mct : float = 0
+    plan_dct : float [null]
+    tpt : float [null]
+    gsph_item : float [null]
+    tpt_total : float [null]
+    dt_menit : int = 0
+    === WAKTU ===
+    start_time : varchar [null]
+    finish_time : varchar [null]
+    act_start : varchar [null]
+    act_finish : varchar [null]
+    === LAINNYA ===
+    hari : varchar [null]
+    tgl : varchar [null]
+    jam : varchar [null]
+    revisi : varchar [null]
+    keterangan : text [null]
+    status : enum(pending|approved|completed)
+    notes : text [null]
+    === SPLIT ===
+    parent_job_id : bigint [null]
+    split_group : varchar [null]
+    session_no : int [null]
+    original_plan : float [null]
+    remaining_plan : float [null]
+  }
+
+  class schedule_stampings <<schedule>> {
+    id : bigint <<PK>>
+    === IDENTITAS ===
+    upload_date : varchar <<IDX>>
+    press_name : varchar <<IDX>>
+    shift_name : varchar <<IDX>>
+    hari : varchar [null]
+    tgl : varchar [null]
+    jam : varchar [null]
+    revisi : varchar [null]
+    sect_head_ppc : varchar [null]
+    row_no : int [null]
+    row_type : varchar = 'job'
+    sort_order : int [null]
+    === JOB INFO ===
+    job_no : varchar [null] <<IDX>>
+    job_master : varchar [null]
+    each_part : varchar [null]
+    type_plt : varchar [null]
+    === QTY ===
+    plan : decimal(10,2) [null]
+    ok : decimal(10,2) [null]
+    repair : decimal(10,2) [null]
+    reject : decimal(10,2) [null]
+    qty_plt : decimal(10,2) [null]
+    keb_mtl : decimal(10,2) [null]
+    total_plt : decimal(10,2) [null]
+    total_pcs : int [null]
+    === MESIN ===
+    total_mesin : int [null]
+    a1 : int [null]
+    a2 : int [null]
+    a3 : int [null]
+    a4 : int [null]
+    === KALKULASI ===
+    ct_detik : decimal(10,3) [null]
+    process_time : decimal(10,3) [null]
+    reg_active : decimal(10,3) [null]
+    dct : decimal(10,3) [null]
+    mct : decimal(10,3) [null]
+    plan_dct : decimal(10,3) [null]
+    tpt : decimal(10,2) [null]
+    gsph_item : decimal(10,4) [null]
+    tpt_total : decimal(10,2) [null]
+    dt_menit : int [null]
+    === WAKTU ===
+    start_time : varchar [null]
+    finish_time : varchar [null]
+    act_start : varchar [null]
+    act_finish : varchar [null]
+    keterangan : varchar [null]
+  }
+
+  class master_stampings <<master>> {
+    id : bigint <<PK>>
+    ---
+    proses_line : varchar [null]
+    mach : varchar [null]
+    job_no : varchar [null] <<IDX>>
+    job_master : varchar [null] <<IDX>>
+    part_no : varchar [null]
+    irm_number : varchar [null]
+    part_name : varchar [null]
+    qty_unit : decimal(10,2) [null]
+    total : decimal(10,2) [null]
+    type_pallet : varchar [null]
+    qty_pallet : decimal(10,2) [null]
+    ct_detik : decimal(10,3) [null]
+    dct : decimal(10,3) [null]
+    reg_active : decimal(10,3) [null]
+    mct : decimal(10,3) [null]
+    tpt : decimal(10,2) [null]
+    customer : varchar [null]
+    remarks : varchar [null]
+    is_shift_pagi : bool = false
+    is_shift_malam : bool = false
+  }
+
+  class recovery_schedules <<schedule>> {
+    id : bigint <<PK>>
+    ---
+    plan_date : date <<IDX>>
+    shift_name : varchar <<IDX>>
+    press_name : varchar [null]
+    status : enum(waiting_approval|
+              approved|rejected|scheduled)
+    approved_by : bigint <<FK>> [null]
+    approved_at : timestamp [null]
+    rejected_by : bigint <<FK>> [null]
+    rejected_at : timestamp [null]
+    notes : text [null]
+  }
+
+  class recovery_items <<schedule>> {
+    id : bigint <<PK>>
+    ---
+    recovery_schedule_id : bigint <<FK>>
+    production_plan_id : bigint <<FK>>
+    job_no : varchar [null]
+    job_master : varchar [null]
+    press_name : varchar [null]
+    plan_qty : int
+    ok : int [null]
+    repair : int [null]
+    reject : int [null]
+    ct_detik : decimal(10,3) [null]
+    dct : decimal(10,3) [null]
+    reg_active : decimal(10,3) [null]
+    total_mesin : int [null]
+    source_date : date [null]
+    source_shift : varchar [null]
+    actual_qty : int [null]
+    recovery_qty : int [null]
+    duration_minutes : int [null]
+    queued_at : timestamp [null]
+    rejected_at : timestamp [null]
+    rejected_by : bigint <<FK>> [null]
+    rejection_notes : text [null]
+    target_date : date [null]
+    status : varchar
+    sort_order : int [null]
+    original_row_no : int [null]
+  }
+
+  class schedule_revisions <<schedule>> {
+    id : bigint <<PK>>
+    ---
+    plan_date : date
+    shift_name : varchar
+    action : varchar
+    snapshot_before : json [null]
+    snapshot_after : json [null]
+    created_by : bigint <<FK>>
+  }
+}
+
+' ================================================================
+'  3. BREAKTIME
+' ================================================================
+
+package "BREAKTIME" #FFF3E0 {
+
+  class master_break_times <<breaktime>> {
+    id : bigint <<PK>>
+    ---
+    hari : varchar(20) = 'semua'
+    waktu_mulai : time
+    waktu_selesai : time
+    type : varchar(30) = 'istirahat'
+    label : varchar [null]
+    shift : varchar [null]
+    is_active : bool = true
+    sort_order : smallint = 0
+  }
+
+  class break_times <<breaktime>> {
+    id : bigint <<PK>>
+    ---
+    nama_istirahat : varchar
+    shift : varchar [null]
+    hari : varchar [null]
+    waktu_mulai : time
+    waktu_selesai : time
+  }
+}
+
+' ================================================================
+'  4. PRODUCTION FLOW
+' ================================================================
+
+package "PRODUCTION FLOW" #E8F5E9 {
+
+  class production_sessions <<flow>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint <<FK>>
+    work_date : date
+    start_time : timestamp [null]
+    pause_time : timestamp [null]
+    finish_time : timestamp [null]
+    total_seconds : int = 0
+    status : enum(idle|running|
+              paused|finished)
+  }
+
+  class daily_productions <<flow>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint <<FK>>
+    work_date : date
+    line : varchar [null]
+    shift : varchar [null]
+    target_qty : int = 0
+    actual_qty : int = 0
+    actual_ok : int = 0
+    actual_repair : int = 0
+    actual_reject : int = 0
+    reject_qty : int = 0
+    repair_qty : int = 0
+    runtime_seconds : int = 0
+    downtime_seconds : int = 0
+    efficiency : decimal(5,2) = 0
+    remarks : text [null]
+    saved_by : bigint [null]
+    status : varchar = 'open'
+  }
+
+  class production_logs <<flow>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint
+    ok_qty : int = 0
+    repair_qty : int = 0
+    reject_qty : int = 0
+  }
+
+  class production_targets <<flow>> {
+    id : bigint <<PK>>
+    ---
+    target_date : date
+    job_id : bigint <<FK>> [null]
+    process_type : varchar
+    shift : varchar
+    target_qty : int
+  }
+}
+
+' ================================================================
+'  5. DOWNTIME & MACHINE
+' ================================================================
+
+package "DOWNTIME & MACHINE" #FCE4EC {
+
+  class machines <<master>> {
+    id : bigint <<PK>>
+    ---
+    name : varchar
+    line : varchar
+  }
+
+  class machine_logs <<downtime>> {
+    id : bigint <<PK>>
+    ---
+    machine_id : bigint <<FK>>
+    status : enum(running|
+              downtime|maintenance)
+    downtime_start : timestamp [null]
+    downtime_end : timestamp [null]
+  }
+
+  class downtimes <<downtime>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint <<FK>>
+    jenis_downtime : varchar
+    problem : text [null]
+    penyebab : text [null]
+    action : text [null]
+    pic : varchar [null]
+    start_time : datetime [null]
+    finish_time : datetime [null]
+    duration_seconds : int = 0
+  }
+
+  class hambatan_jalur <<downtime>> {
+    id : bigint <<PK>>
+    ---
+    downtime_id : bigint <<FK>>
+    line_name : varchar [null]
+    mesin : varchar [null]
+    job_no : varchar [null]
+    nama_part : varchar [null]
+    jenis_hambatan : varchar(20) [null]
+    sub_jenis : varchar(20) [null]
+    problem : text [null]
+    penyebab : text [null]
+    penanggulangan : text [null]
+    pic_hambatan : varchar [null]
+    waktu : datetime [null]
+    status : varchar(20) = 'open'
+    signature_image : longText [null]
+    signed_at : datetime [null]
+    signed_by : bigint <<FK>> [null]
+    leader_signature_image : longText [null]
+    leader_signed_at : datetime [null]
+    leader_signed_by : bigint <<FK>> [null]
+  }
+}
+
+' ================================================================
+'  6. QUALITY (REPAIR / REJECT)
+' ================================================================
+
+package "QUALITY" #F3E5F5 {
+
+  class repair_reject_logs <<quality>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint <<FK>>
+    type : enum(repair|reject)
+    sketch_no : varchar [null]
+    repair_category : varchar [null]
+    defect_name : varchar
+    qty_a : decimal(10,2) = 0
+    qty_b : decimal(10,2) [null]
+    pcs_number : varchar(255) [null]
+    area_problem : varchar [null]
+    root_cause : text [null]
+    countermeasure : text [null]
+    created_by : bigint <<FK>> [null]
+  }
+
+  class repair_reject_images <<quality>> {
+    id : bigint <<PK>>
+    ---
+    repair_reject_log_id : bigint <<FK>>
+    image_path : varchar
+    image_type : varchar(10) [null]
+  }
+}
+
+' ================================================================
+'  7. CHANGEOVER (DANDORI)
+' ================================================================
+
+package "CHANGEOVER (DANDORI)" #E0F7FA {
+
+  class dandoris <<changeover>> {
+    id : bigint <<PK>>
+    ---
+    previous_job_id : bigint [null]
+    next_job_id : bigint [null]
+    line : varchar [null]
+    shift : varchar [null]
+    activity : varchar = 'Changeover'
+    jenis_dandori : varchar(30) [null]
+    start_time : timestamp [null]
+    finish_time : timestamp [null]
+    duration_minutes : decimal(10,2) = 0
+    work_date : date
+    created_by : bigint [null]
+    job_process_id : bigint [null]
+  }
+
+  class dandori_sessions <<changeover>> {
+    id : bigint <<PK>>
+    ---
+    job_master_id : bigint
+    job_number : varchar
+    job_name : varchar
+    line : varchar [null]
+    shift : varchar [null]
+    status : varchar = 'waiting'
+    start_time : timestamp [null]
+    finish_time : timestamp [null]
+    total_minutes : decimal(10,2) = 0
+    created_by : bigint [null]
+  }
+
+  class dandori_groups <<changeover>> {
+    id : bigint <<PK>>
+    ---
+    session_id : bigint
+    group_name : varchar
+    sequence_no : int = 1
+    status : varchar = 'waiting'
+    start_time : timestamp [null]
+    finish_time : timestamp [null]
+    total_minutes : decimal(10,2) = 0
+  }
+
+  class dandori_details <<changeover>> {
+    id : bigint <<PK>>
+    ---
+    group_id : bigint
+    activity_name : varchar
+    sequence_no : int = 1
+    status : varchar = 'waiting'
+    start_time : timestamp [null]
+    finish_time : timestamp [null]
+    duration_minutes : decimal(10,2) = 0
+    remarks : text [null]
+  }
+}
+
+' ================================================================
+'  RELATIONSHIPS
+' ================================================================
+
+' --- PPC Schedule ---
+line_masters ||--o{ production_plans : "line_master_id"
+job_masters ||--o{ job_processes : "job_master_id (cascade)"
+job_masters ||--o{ production_plans : "job_no = job_number"
+job_masters ||--o{ schedule_stampings : "job_no"
+job_masters ||--o{ master_stampings : "job_no"
+
+production_plans ||--o| recovery_items : "recovery_id"
+recovery_schedules ||--o{ recovery_items : "recovery_schedule_id (cascade)"
+recovery_items }o--|| production_plans : "production_plan_id"
+
+' --- Production Flow ---
+job_masters ||--o{ production_sessions : "job_master_id (cascade)"
+job_masters ||--o{ daily_productions : "job_master_id (cascade)"
+job_masters ||--o{ production_logs : "job_master_id"
+job_masters ||--o{ downtimes : "job_master_id (cascade)"
+job_masters ||--o{ repair_reject_logs : "job_master_id (cascade)"
+job_masters ||--o{ dandori_sessions : "job_master_id"
+job_masters ||--o{ dandoris : "next_job_id"
+
+' --- Downtime & Machine ---
+machines ||--o{ machine_logs : "machine_id (cascade)"
+downtimes ||--o{ hambatan_jalur : "downtime_id (cascade)"
+
+' --- Quality ---
+repair_reject_logs ||--o{ repair_reject_images : "repair_reject_log_id (cascade)"
+
+' --- Changeover ---
+dandori_sessions ||--o{ dandori_groups : "session_id"
+dandori_groups ||--o{ dandori_details : "group_id"
+
+' --- Breaktime (logical) ---
+master_break_times ..> production_plans : "hari + shift"
+break_times ..> production_plans : "hari + shift"
+
+@enduml

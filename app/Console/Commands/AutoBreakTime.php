@@ -22,14 +22,15 @@ class AutoBreakTime extends Command
         $now = Carbon::now();
         $today = $now->toDateString();
         $currentHour = (int) $now->format('H');
-        $currentDay = strtolower($now->format('l'));
+        $currentDayIndo = MasterBreakTime::getIndonesianDayName($now);
+        $currentDayEn = strtolower($now->format('l'));
         $currentMinutes = $now->hour * 60 + $now->minute;
 
         $shiftName = ($currentHour >= 7 && $currentHour < 19) ? 'Shift Pagi' : 'Shift Malam';
 
         $breaks = MasterBreakTime::where('is_active', true)
-            ->where(function ($q) use ($currentDay) {
-                $q->where('hari', $currentDay)->orWhere('hari', 'semua');
+            ->where(function ($q) use ($currentDayIndo, $currentDayEn) {
+                $q->whereIn('hari', [$currentDayIndo, $currentDayEn])->orWhere('hari', 'semua');
             })
             ->where(function ($q) use ($shiftName) {
                 $q->where('shift', $shiftName)->orWhereNull('shift');
@@ -40,9 +41,19 @@ class AutoBreakTime extends Command
             return 0;
         }
 
-        $runningJobs = JobMaster::where('status', 'running')
+        $runningJobs = JobMaster::where(function ($q) {
+                $q->where('status', 'running')
+                  ->orWhere(function ($q2) {
+                      $q2->where('status', 'paused')
+                         ->whereHas('downtimes', function ($q3) {
+                             $q3->whereNull('finish_time')
+                                ->where('jenis_downtime', 'break time');
+                         });
+                  });
+            })
             ->whereHas('productionSessions', function ($q) use ($today) {
-                $q->where('work_date', $today)->where('status', 'running');
+                $q->where('work_date', $today)
+                  ->whereIn('status', ['running', 'paused']);
             })
             ->get();
 
@@ -118,7 +129,7 @@ class AutoBreakTime extends Command
                     ->where('status', 'paused')
                     ->first();
                 if ($session) {
-                    $session->update(['status' => 'running', 'start_time' => $now]);
+                    $session->update(['status' => 'running']);
                 }
 
                 JobMaster::where('id', $job->id)->update(['status' => 'running']);

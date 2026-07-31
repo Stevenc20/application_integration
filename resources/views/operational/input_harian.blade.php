@@ -508,11 +508,11 @@ window.jobDowntimeHistory = {
 
 // ——— AUTO BREAK TIME SCHEDULE ———
 @php
-    $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
-    $bDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
+    $bDayIndo = \App\Models\MasterBreakTime::getIndonesianDayName(now());
+    $bDayEn = strtolower(now()->format('l'));
     $bShift = ((int) now()->format('H') >= 7 && (int) now()->format('H') < 19) ? 'Shift Pagi' : 'Shift Malam';
     $breakScheduleData = \App\Models\MasterBreakTime::where('is_active', true)
-        ->where(function($q) use ($bDay) { $q->where('hari', $bDay)->orWhere('hari', 'semua'); })
+        ->where(function($q) use ($bDayIndo, $bDayEn) { $q->whereIn('hari', [$bDayIndo, $bDayEn])->orWhere('hari', 'semua'); })
         ->where(function($q) use ($bShift) { $q->where('shift', $bShift)->orWhereNull('shift'); })
         ->orderBy('sort_order')
         ->get()

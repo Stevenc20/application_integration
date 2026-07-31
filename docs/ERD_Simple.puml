@@ -1,0 +1,280 @@
+@startuml
+
+left to right direction
+
+skinparam linetype polyline
+skinparam shadowing false
+skinparam wrapWidth 140
+skinparam classFontSize 11
+skinparam classAttributeFontSize 10
+
+title ERD - PPC Schedule & Production Flow
+
+' ════════════════════════════════════
+'  KOLUMN 1: MASTER DATA
+' ════════════════════════════════════
+
+package "MASTER DATA" {
+  class line_masters {
+    id : bigint PK
+    --
+    line_code : varchar UK
+    line_name : varchar
+    shift : varchar
+    status : enum
+  }
+  class job_masters {
+    id : bigint PK
+    --
+    job_number : varchar UK
+    job_name : varchar
+    target_qty : int
+    status : varchar
+  }
+  class machines {
+    id : bigint PK
+    --
+    name : varchar
+    line : varchar
+  }
+  class master_break_times {
+    id : bigint PK
+    --
+    hari : varchar
+    shift : varchar
+    waktu_mulai : time
+    waktu_selesai : time
+    type : varchar
+  }
+}
+
+' ════════════════════════════════════
+'  KOLUMN 2: SCHEDULE
+' ════════════════════════════════════
+
+package "PPC SCHEDULE" {
+  class job_processes {
+    id : bigint PK
+    --
+    job_master_id : bigint FK
+    process_name : varchar
+    standard_minutes : int
+  }
+  class master_stampings {
+    id : bigint PK
+    --
+    job_no : varchar
+    part_no : varchar
+    part_name : varchar
+  }
+  class production_plans {
+    id : bigint PK
+    --
+    line_master_id : bigint FK
+    plan_date : date
+    shift_name : varchar
+    press_name : varchar
+    job_no : varchar
+    plan : float
+    ok : float
+    repair : float
+    reject : float
+  }
+  class schedule_stampings {
+    id : bigint PK
+    --
+    upload_date : varchar
+    press_name : varchar
+    shift_name : varchar
+    job_no : varchar
+  }
+  class recovery_schedules {
+    id : bigint PK
+    --
+    plan_date : date
+    shift_name : varchar
+    status : enum
+  }
+  class recovery_items {
+    id : bigint PK
+    --
+    recovery_schedule_id : bigint FK
+    production_plan_id : bigint FK
+    job_no : varchar
+  }
+}
+
+' ════════════════════════════════════
+'  KOLUMN 3: PRODUCTION FLOW
+' ════════════════════════════════════
+
+package "PRODUCTION FLOW" {
+  class production_sessions {
+    id : bigint PK
+    --
+    job_master_id : bigint FK
+    work_date : date
+    start_time : timestamp
+    finish_time : timestamp
+    status : enum
+  }
+  class daily_productions {
+    id : bigint PK
+    --
+    job_master_id : bigint FK
+    work_date : date
+    actual_ok : int
+    actual_repair : int
+    actual_reject : int
+    efficiency : decimal
+  }
+  class production_logs {
+    id : bigint PK
+    --
+    job_master_id : bigint
+    ok_qty : int
+    repair_qty : int
+    reject_qty : int
+  }
+}
+
+' ════════════════════════════════════
+'  KOLUMN 4: DOWNTIME & QUALITY
+' ════════════════════════════════════
+
+package "DOWNTIME" {
+  class machine_logs {
+    id : bigint PK
+    --
+    machine_id : bigint FK
+    status : enum
+    downtime_start : timestamp
+    downtime_end : timestamp
+  }
+  class downtimes {
+    id : bigint PK
+    --
+    job_master_id : bigint FK
+    jenis_downtime : varchar
+    problem : text
+    duration_seconds : int
+  }
+  class hambatan_jalur {
+    id : bigint PK
+    --
+    downtime_id : bigint FK
+    line_name : varchar
+    mesin : varchar
+    jenis_hambatan : varchar
+    status : varchar
+  }
+}
+
+package "QUALITY" {
+  class repair_reject_logs {
+    id : bigint PK
+    --
+    job_master_id : bigint FK
+    type : enum
+    defect_name : varchar
+    qty_a : decimal
+    root_cause : text
+  }
+  class repair_reject_images {
+    id : bigint PK
+    --
+    repair_reject_log_id : bigint FK
+    image_path : varchar
+  }
+}
+
+' ════════════════════════════════════
+'  KOLUMN 5: CHANGEOVER
+' ════════════════════════════════════
+
+package "CHANGEOVER" {
+  class dandoris {
+    id : bigint PK
+    --
+    previous_job_id : bigint
+    next_job_id : bigint
+    duration_minutes : decimal
+    work_date : date
+  }
+  class dandori_sessions {
+    id : bigint PK
+    --
+    job_master_id : bigint
+    total_minutes : decimal
+  }
+  class dandori_groups {
+    id : bigint PK
+    --
+    session_id : bigint FK
+    group_name : varchar
+    total_minutes : decimal
+  }
+  class dandori_details {
+    id : bigint PK
+    --
+    group_id : bigint FK
+    activity_name : varchar
+    duration_minutes : decimal
+  }
+}
+
+' ════════════════════════════════════
+'  RELATIONS
+' ════════════════════════════════════
+
+' -- K1: Master -> K2: Schedule --
+line_masters "1" -- "0..*" production_plans
+job_masters "1" -- "0..*" job_processes
+job_masters "1" -- "0..*" production_plans
+job_masters "1" -- "0..*" schedule_stampings
+job_masters "1" -- "0..*" master_stampings
+
+' -- K2: Schedule internal --
+recovery_schedules "1" -- "0..*" recovery_items
+recovery_items "0..1" -- "1" production_plans
+
+' -- K1: Master -> K3: Flow --
+job_masters "1" -- "0..*" production_sessions
+job_masters "1" -- "0..*" daily_productions
+job_masters "1" -- "0..*" production_logs
+
+' -- K1: Master -> K4: Downtime --
+machines "1" -- "0..*" machine_logs
+job_masters "1" -- "0..*" downtimes
+downtimes "1" -- "0..*" hambatan_jalur
+
+' -- K1: Master -> K4: Quality --
+job_masters "1" -- "0..*" repair_reject_logs
+repair_reject_logs "1" -- "0..*" repair_reject_images
+
+' -- K1: Master -> K5: Changeover --
+job_masters "1" -- "0..*" dandori_sessions
+job_masters "1" -- "0..*" dandoris
+dandori_sessions "1" -- "0..*" dandori_groups
+dandori_groups "1" -- "0..*" dandori_details
+
+' -- Breaktime logical --
+master_break_times ..> production_plans
+
+' -- Hidden layout order --
+line_masters --[hidden]-- job_masters
+job_masters --[hidden]-- machines
+machines --[hidden]-- master_break_times
+job_processes --[hidden]-- production_plans
+production_plans --[hidden]-- schedule_stampings
+schedule_stampings --[hidden]-- recovery_schedules
+production_sessions --[hidden]-- daily_productions
+daily_productions --[hidden]-- production_logs
+machine_logs --[hidden]-- downtimes
+downtimes --[hidden]-- hambatan_jalur
+repair_reject_logs --[hidden]-- repair_reject_images
+dandoris --[hidden]-- dandori_sessions
+dandori_sessions --[hidden]-- dandori_groups
+dandori_groups --[hidden]-- dandori_details
+
+@enduml

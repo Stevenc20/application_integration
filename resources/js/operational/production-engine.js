@@ -1167,16 +1167,22 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
 
         const hasDandori = !!firstDandori;
         const actualStartMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : (job.act_start_ms || null);
+        const firstAnyHistory = normalizedHistory.length ? normalizedHistory[0].start : null;
 
-        const effectiveActualStart = actualStartMs ||
+        let effectiveActualStart = actualStartMs ||
             (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null);
+
+        if (!effectiveActualStart || isNaN(effectiveActualStart)) {
+            effectiveActualStart = firstDandori
+                ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime())
+                : (actualStartMs || firstAnyHistory || Number(job.plan_start) || anchor);
+        }
 
         if (!effectiveActualStart && !hasDandori && normalizedHistory.length === 0) {
             container.innerHTML = '';
             return;
         }
 
-        const firstAnyHistory = normalizedHistory.length ? normalizedHistory[0].start : null;
         let effectiveProductionStart = actualStartMs || effectiveActualStart || firstAnyHistory;
 
         if (!effectiveProductionStart || isNaN(effectiveProductionStart)) {
@@ -1192,13 +1198,18 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             }
         }
 
-        if (job.base_seconds > 0 && !hasDandori) {
+        if (job.base_seconds > 0 && !hasDandori && actualStartMs) {
             effectiveProductionStart = actualStartMs - (job.base_seconds * 1000);
         }
 
-        const pD = Number(plannedDurationArg) || 0;
-        const planEndTime = Number(planEndTimeArg) || 0;
-        const relativeDeadline = effectiveProductionStart + pD;
+        // TPT Plan-based Overtime: calculate deadline using job.tpt (in minutes) if available
+        let plannedTptMs = 0;
+        if (job && job.tpt && Number(job.tpt) > 0) {
+            plannedTptMs = Number(job.tpt) * 60 * 1000;
+        } else {
+            plannedTptMs = Number(plannedDurationArg) || 0;
+        }
+        const relativeDeadline = (effectiveProductionStart && plannedTptMs > 0) ? (effectiveProductionStart + plannedTptMs) : null;
 
         const appendProduction = (start, end) => {
             if (end <= start) return;

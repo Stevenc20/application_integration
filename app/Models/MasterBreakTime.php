@@ -55,4 +55,20 @@ class MasterBreakTime extends Model
 
         return sprintf('%02d:%02d', $h, $m);
     }
+
+    public static function getIndonesianDayName(?\Carbon\Carbon $date = null): string
+    {
+        $date = $date ?? \Carbon\Carbon::now();
+        $english = strtolower($date->format('l'));
+        $map = [
+            'monday'    => 'senin',
+            'tuesday'   => 'selasa',
+            'wednesday' => 'rabu',
+            'thursday'  => 'kamis',
+            'friday'    => 'jumat',
+            'saturday'  => 'sabtu',
+            'sunday'    => 'minggu',
+        ];
+        return $map[$english] ?? $english;
+    }
 }
