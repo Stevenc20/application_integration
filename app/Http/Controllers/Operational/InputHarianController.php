@@ -467,6 +467,8 @@ class InputHarianController extends Controller
         
         $plans = $planQuery->orderBy('row_no')->get();
 
+        $currentIdentifiers = [];
+
         foreach ($plans as $seq => $plan) {
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
@@ -477,6 +479,7 @@ class InputHarianController extends Controller
 
             // Pastikan identifier UNIK per baris rencana (untuk support split production)
             $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
+            $currentIdentifiers[] = $identifier;
 
             $existing = \App\Models\JobMaster::where('job_number', $identifier)->first();
 
@@ -513,6 +516,29 @@ class InputHarianController extends Controller
                     'job_number' => $identifier,
                     'status'     => 'pending',
                 ]));
+            }
+        }
+
+        // AUTO-RESET ORPHAN JOBS: Reset status job lama di line ini yang tidak ada di jadwal PPC baru
+        $planLines = $plans->pluck('press_name')->filter()->unique()->toArray();
+        if (!empty($planLines)) {
+            $orphanJobs = \App\Models\JobMaster::whereIn('line', $planLines)
+                ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                ->whereNotIn('job_number', $currentIdentifiers)
+                ->get();
+
+            foreach ($orphanJobs as $orphan) {
+                $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $orphan->id)
+                    ->whereDate('work_date', $date)
+                    ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                    ->exists();
+                if (!$hasTodaySession) {
+                    $orphan->update([
+                        'status' => 'pending',
+                        'started_at' => null,
+                        'finished_at' => null,
+                    ]);
+                }
             }
         }
     }

@@ -785,6 +785,9 @@ class ProductionPlanController extends Controller
 
             @unlink($dataPath);
 
+            // Invalidate syncPlanToJobMaster cache after import so new PPC plans immediately sync to JobMaster
+            \Illuminate\Support\Facades\Cache::flush();
+
             \Log::info('[IMPORT] Baseline saved — no timeline regeneration (per SRS Step 1)', [
                 'date' => $parsedDate,
                 'imported' => $imported,

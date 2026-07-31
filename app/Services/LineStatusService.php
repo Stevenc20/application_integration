@@ -22,13 +22,44 @@ class LineStatusService
             return [];
         }
 
-        // 1. All running/paused jobs grouped by line
-        $allRunningJobs = JobMaster::whereIn('line', $activeLines)
+        // 1. All running/paused jobs grouped by line (validating session/plan relevance)
+        $allRunningJobsRaw = JobMaster::whereIn('line', $activeLines)
             ->whereIn('status', ['running', 'paused'])
-            ->get()
-            ->groupBy('line');
+            ->get();
 
-        $allJobIds = $allRunningJobs->flatten()->pluck('id');
+        $validRunningJobs = $allRunningJobsRaw->filter(function ($job) use ($today, $shiftText) {
+            $hasSession = ProductionSession::where('job_master_id', $job->id)
+                ->whereDate('work_date', $today)
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(status)'), ['running', 'paused'])
+                ->exists();
+            if ($hasSession) return true;
+
+            $hasLog = ProductionLog::where('job_master_id', $job->id)
+                ->whereDate('created_at', $today)
+                ->exists();
+            if ($hasLog) return true;
+
+            $hasDowntime = Downtime::where('job_master_id', $job->id)
+                ->whereNull('finish_time')
+                ->whereDate('start_time', $today)
+                ->exists();
+            if ($hasDowntime) return true;
+
+            // If no active session/log/downtime today, verify if it belongs to today's PPC plan
+            $planExists = \App\Models\ProductionPlan::whereDate('plan_date', $today)
+                ->where('shift_name', 'like', $shiftText . '%')
+                ->where('row_type', 'job')
+                ->where(function ($q) use ($job) {
+                    $jobNoPart = explode('-', $job->job_number)[0];
+                    $q->where('job_no', 'like', $jobNoPart . '%')
+                      ->orWhere('job_master', $job->job_name);
+                })->exists();
+
+            return $planExists;
+        });
+
+        $allRunningJobs = $validRunningJobs->groupBy('line');
+        $allJobIds = $validRunningJobs->pluck('id');
 
         // 2. Active downtimes (machine/process issues) across all jobs
         $activeDowntimeJobIds = [];
