@@ -989,9 +989,9 @@ Route::middleware(['auth', 'role:production'])->prefix('production')->name('prod
 });
 
 // ======================
-// NETWORK MONITOR
+// NETWORK MONITOR (ADMIN & SUPERADMIN ONLY)
 // ======================
-Route::middleware(['auth', 'feature:network_monitor'])
+Route::middleware(['auth', 'role:admin,superadmin', 'feature:network_monitor'])
     ->prefix('network-monitor')
     ->name('network_monitor.')
     ->group(function () {
@@ -1023,9 +1023,9 @@ Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
 });
 
 // ======================
-// SECURITY DASHBOARD
+// SECURITY DASHBOARD (ADMIN & SUPERADMIN ONLY)
 // ======================
-Route::middleware(['auth', 'feature:security'])
+Route::middleware(['auth', 'role:admin,superadmin', 'feature:security'])
     ->prefix('security')
     ->name('security.')
     ->group(function () {

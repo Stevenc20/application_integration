@@ -50,6 +50,8 @@ class FeaturePermissionSeeder extends Seeder
 
         $allRoles = ['admin', 'supervisor', 'ppc', 'foreman', 'operator', 'leader', 'quality', 'production', 'manager', 'kadiv', 'direktur', 'presdir', 'superadmin', 'hambatan', 'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi'];
 
+        $adminOnlyFeatures = ['network_monitor', 'security'];
+
         foreach ($features as $f) {
             $feature = Feature::firstOrCreate(
                 ['feature_code' => $f['feature_code']],
@@ -57,11 +59,16 @@ class FeaturePermissionSeeder extends Seeder
             );
 
             foreach ($allRoles as $role) {
-                RoleFeature::firstOrCreate([
+                $isEnabled = true;
+                if (in_array($f['feature_code'], $adminOnlyFeatures) && !in_array($role, ['admin', 'superadmin'])) {
+                    $isEnabled = false;
+                }
+
+                RoleFeature::updateOrCreate([
                     'role' => $role,
                     'feature_id' => $feature->id,
                 ], [
-                    'enabled' => true,
+                    'enabled' => $isEnabled,
                 ]);
             }
         }
