@@ -57,7 +57,7 @@
                 $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
             }
 
-            $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
+            $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
             $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time';
         @endphp
 

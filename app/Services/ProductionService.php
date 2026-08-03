@@ -568,6 +568,24 @@ class ProductionService
     public function startDowntime($jobId, array $data)
     {
         return DB::transaction(function () use ($jobId, $data) {
+            $now = now();
+
+            // Auto-stop any open 1st Check / Dandori records at the exact time Downtime is clicked
+            Dandori::where('next_job_id', $jobId)
+                ->whereNull('finish_time')
+                ->update([
+                    'finish_time' => $now,
+                    'duration_minutes' => DB::raw("ROUND(TIMESTAMPDIFF(SECOND, start_time, '{$now}') / 60, 2)")
+                ]);
+
+            Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', 'dandori')
+                ->whereNull('finish_time')
+                ->update([
+                    'finish_time' => $now,
+                    'duration_seconds' => DB::raw("TIMESTAMPDIFF(SECOND, start_time, '{$now}')")
+                ]);
+
             $downtime = Downtime::create([
                 'job_master_id' => $jobId,
                 'jenis_downtime' => $data['jenis_downtime'],
@@ -575,7 +593,7 @@ class ProductionService
                 'penyebab' => $data['penyebab'],
                 'action' => $data['action'],
                 'pic' => $data['pic'],
-                'start_time' => now()
+                'start_time' => $now
             ]);
 
             $this->syncHambatanJalur($downtime);

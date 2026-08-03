@@ -168,22 +168,15 @@ class LineStatusService
                 continue;
             }
 
-            // 5. PRODUCTION — If running session exists AND operator has saved qty today,
-            //    the line is in production even if dandori record wasn't properly closed
-            if (array_intersect($lineJobIds, $activeSessionJobIds) && in_array($line, $linesWithProductionLog)) {
-                $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
-                continue;
-            }
-
-            // 6. SETUP (non-1st-check dandori, no production activity yet)
-            if (in_array($line, $linesWithSetup)) {
-                $statuses[$line] = ['label' => 'SETUP', 'color' => 'amber', 'pulse' => true];
-                continue;
-            }
-
-            // 7. PRODUCTION (running session without dandori — started via startJob directly)
+            // 5. PRODUCTION — Active running session on this line
             if (array_intersect($lineJobIds, $activeSessionJobIds)) {
                 $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
+                continue;
+            }
+
+            // 6. SETUP (non-1st-check dandori, no active running session yet)
+            if (in_array($line, $linesWithSetup)) {
+                $statuses[$line] = ['label' => 'SETUP', 'color' => 'amber', 'pulse' => true];
                 continue;
             }
 
