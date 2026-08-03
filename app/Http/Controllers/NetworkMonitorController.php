@@ -79,7 +79,12 @@ class NetworkMonitorController extends Controller
 
     public function latency()
     {
-        $latencies = NetworkLatency::where('measured_at', '>=', Carbon::now()->subHours(24))
+        $validTargets = NetworkContainer::pluck('container_name')
+            ->concat(['Cloudflare DNS (1.1.1.1)', 'Google DNS (8.8.8.8)', 'Local Gateway'])
+            ->toArray();
+
+        $latencies = NetworkLatency::whereIn('target', $validTargets)
+            ->where('measured_at', '>=', Carbon::now()->subHours(24))
             ->orderBy('measured_at')
             ->get();
 

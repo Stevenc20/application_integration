@@ -24,6 +24,11 @@ class CheckContainers extends Command
 
         foreach ($containers as $c) {
             $name = ltrim($c['Names'][0] ?? '', '/');
+
+            if (!$this->isProjectContainer($c, $name)) {
+                continue;
+            }
+
             $statusText = $c['Status'] ?? '';
             $state = $c['State'] ?? 'unknown';
 
@@ -73,11 +78,42 @@ class CheckContainers extends Command
             );
         }
 
-        NetworkContainer::whereNotIn('container_name', $seen)
-            ->update(['status' => 'removed', 'last_checked_at' => Carbon::now()]);
+        // PURGE NON-PROJECT CONTAINERS: Delete any container not belonging to application_integration
+        NetworkContainer::whereNotIn('container_name', $seen)->delete();
 
-        $this->info('Checked ' . count($seen) . ' containers');
+        $this->info('Checked ' . count($seen) . ' project containers');
         return Command::SUCCESS;
+    }
+
+    private function isProjectContainer(array $c, string $name): bool
+    {
+        $labels = $c['Labels'] ?? [];
+        $composeProject = strtolower($labels['com.docker.compose.project'] ?? '');
+        $targetProject = strtolower(env('DOCKER_PROJECT_NAME', 'application_integration'));
+
+        if ($composeProject && (str_contains($composeProject, 'application_integration') || str_contains($composeProject, 'application-integration') || $composeProject === $targetProject)) {
+            return true;
+        }
+
+        $lowerName = strtolower($name);
+        if (str_contains($lowerName, 'application_integration') || str_contains($lowerName, 'application-integration')) {
+            return true;
+        }
+
+        $workingDir = strtolower($labels['com.docker.compose.project.working_dir'] ?? '');
+        if ($workingDir && (str_contains($workingDir, 'application_integration') || str_contains($workingDir, 'application-integration'))) {
+            return true;
+        }
+
+        if ($targetProject !== 'application_integration' && str_contains($lowerName, $targetProject)) {
+            return true;
+        }
+
+        if (preg_match('/^(application_integration|app|nginx|db|python|redis|web)[_-]/i', $name) && (empty($composeProject) || $composeProject === $targetProject)) {
+            return true;
+        }
+
+        return false;
     }
 
     private function fetchContainers(): ?array
