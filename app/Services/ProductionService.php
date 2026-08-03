@@ -570,14 +570,22 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $data) {
             $now = now();
 
-            // Auto-stop any open 1st Check / Dandori records at the exact time Downtime is clicked
-            Dandori::where('next_job_id', $jobId)
+            // Check if 1st Check was active before downtime was triggered
+            $openFirstCheck = Dandori::where('next_job_id', $jobId)
+                ->where('jenis_dandori', '1st_check')
                 ->whereNull('finish_time')
-                ->update([
-                    'finish_time' => $now,
-                    'duration_minutes' => DB::raw("ROUND(TIMESTAMPDIFF(SECOND, start_time, '{$now}') / 60, 2)")
-                ]);
+                ->first();
 
+            if ($openFirstCheck) {
+                // Pause 1st Check and save flag so it automatically resumes after downtime finishes
+                \Illuminate\Support\Facades\Cache::put('was_in_first_check_' . $jobId, true, 86400);
+                $openFirstCheck->update([
+                    'finish_time' => $now,
+                    'duration_minutes' => round(Carbon::parse($openFirstCheck->start_time)->diffInSeconds($now) / 60, 2)
+                ]);
+            }
+
+            // Close any open dandori downtime
             Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
@@ -597,6 +605,25 @@ class ProductionService
             ]);
 
             $this->syncHambatanJalur($downtime);
+
+            // Send notification reminder to Supervisor & Leaders
+            try {
+                $job = JobMaster::find($jobId);
+                $lineName = $job->line ?? 'Line';
+                $jobName = $job->job_name ?? 'Item';
+                $recipients = \App\Models\User::whereIn(DB::raw('LOWER(role)'), ['supervisor', 'spv', 'leader', 'leader a', 'leader b', 'leader c', 'leader d', 'admin', 'superadmin'])->get();
+                foreach ($recipients as $recipient) {
+                    \App\Models\Notification::create([
+                        'user_id' => $recipient->id,
+                        'type'    => 'downtime_reminder',
+                        'title'   => "Reminder Detail Downtime — {$lineName}",
+                        'message' => "Terjadi downtime {$data['jenis_downtime']} pada item {$jobName} ({$lineName}). Mohon periksa & lengkapi laporan detail downtime.",
+                        'is_read' => false,
+                    ]);
+                }
+            } catch (\Exception $e) {
+                // Ignore notification failure if table absent
+            }
 
             $this->signalDashboard($jobId);
 
@@ -676,6 +703,13 @@ class ProductionService
                 ['job_master_id' => $downtime->job_master_id, 'work_date' => now()->toDateString()],
                 ['downtime_seconds' => $totalDowntime]
             );
+
+            // AUTO-RESUME 1st Check if it was paused when downtime was triggered
+            $jobId = $downtime->job_master_id;
+            if (\Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $jobId)) {
+                \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $jobId);
+                $this->startFirstCheck($jobId);
+            }
 
             $this->signalDashboard($downtime->job_master_id);
 

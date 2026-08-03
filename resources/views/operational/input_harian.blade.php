@@ -156,6 +156,33 @@
             </div>
         </div>
     @else
+        @php
+            $unfilledDowntimes = collect();
+            if (isset($activeJob) && $activeJob) {
+                $unfilledDowntimes = \App\Models\Downtime::where('job_master_id', $activeJob->id)
+                    ->whereNotNull('finish_time')
+                    ->where('jenis_downtime', '!=', 'dandori')
+                    ->where(function($q) {
+                        $q->whereNull('problem')->orWhere('problem', '')->orWhere('problem', '-')
+                          ->orWhereNull('penyebab')->orWhere('penyebab', '')->orWhere('penyebab', '-');
+                    })
+                    ->get();
+            }
+        @endphp
+
+        @if($unfilledDowntimes->isNotEmpty())
+        <div class="bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm animate-pulse">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center font-black text-lg shrink-0">!</div>
+                <div>
+                    <h4 class="text-sm font-black text-amber-800 uppercase tracking-wider">Reminder Laporan Downtime (Group Leader / Supervisor)</h4>
+                    <p class="text-xs font-bold text-amber-700 mt-0.5">Terdapat {{ $unfilledDowntimes->count() }} kejadian Downtime yang belum diisi detailnya (Problem/Penyebab/Action). Mohon periksa &amp; lengkapi laporan.</p>
+                </div>
+            </div>
+            <button onclick="openDowntimeReport({{ $activeJob->id }}, {{ $unfilledDowntimes->first()->id }})" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow transition whitespace-nowrap">Isi Detail Downtime Sekarang</button>
+        </div>
+        @endif
+
         @include('operational.components.active-job-board')
     @endif
 
