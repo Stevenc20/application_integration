@@ -128,10 +128,11 @@ class InputHarianController extends Controller
             }
         }
 
-        // SYNC: Pastikan JobMaster terupdate dari Jadwal (cached 60s supaya tidak O(N) write tiap reload)
-        $syncCacheKey = 'sync_plan_' . $date . '_' . \Illuminate\Support\Str::slug($currentShift);
+        // SYNC: Pastikan JobMaster terupdate dari Jadwal (cached 60s per line supaya kilat & hemat query)
+        $lineSlug = \Illuminate\Support\Str::slug($lineFilter ?: 'all');
+        $syncCacheKey = 'sync_plan_' . $date . '_' . \Illuminate\Support\Str::slug($currentShift) . '_' . $lineSlug;
         if (!\Illuminate\Support\Facades\Cache::has($syncCacheKey)) {
-            $this->syncPlanToJobMaster($date, $currentShift);
+            $this->syncPlanToJobMaster($date, $currentShift, $lineFilter);
             \Illuminate\Support\Facades\Cache::put($syncCacheKey, true, 60);
         }
 
@@ -446,7 +447,7 @@ class InputHarianController extends Controller
         ]);
     }
 
-    private function syncPlanToJobMaster($date, $shift)
+    private function syncPlanToJobMaster($date, $shift, $lineFilter = null)
     {
         // Tentukan Shift Terbaru (Revisi Terakhir)
         $latestShiftName = $shift;
@@ -464,42 +465,71 @@ class InputHarianController extends Controller
         if ($shift !== 'all') {
             $planQuery->where('shift_name', $latestShiftName);
         }
+
+        if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
+            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+            $planQuery->whereRaw("
+                REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+            ", ["%{$normalized}%"]);
+        }
         
         $plans = $planQuery->orderBy('row_no')->get();
 
-        $currentIdentifiers = [];
+        if ($plans->isEmpty()) {
+            return;
+        }
 
+        $currentIdentifiersMap = [];
         foreach ($plans as $seq => $plan) {
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
-            
             if (blank($jn) && blank($jm)) continue;
             if ($plan->row_type === 'break') continue;
             if (in_array($jn, ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) continue;
 
-            // Pastikan identifier UNIK per baris rencana (untuk support split production)
             $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
-            $currentIdentifiers[] = $identifier;
+            $currentIdentifiersMap[$plan->id] = $identifier;
+        }
 
-            $existing = \App\Models\JobMaster::where('job_number', $identifier)->first();
+        $currentIdentifiers = array_values($currentIdentifiersMap);
+        if (empty($currentIdentifiers)) {
+            return;
+        }
+
+        // BATCH QUERY 1: Fetch all existing JobMasters in 1 single query
+        $existingJobMasters = \App\Models\JobMaster::whereIn('job_number', $currentIdentifiers)
+            ->get()
+            ->keyBy('job_number');
+
+        // BATCH QUERY 2: Pre-fetch active session IDs for today in 1 single query
+        $existingIds = $existingJobMasters->pluck('id')->filter()->toArray();
+        $sessionsTodayJobIds = [];
+        if (!empty($existingIds)) {
+            $sessionsTodayJobIds = \App\Models\ProductionSession::whereIn('job_master_id', $existingIds)
+                ->whereDate('work_date', $date)
+                ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                ->pluck('job_master_id')
+                ->toArray();
+        }
+
+        foreach ($plans as $seq => $plan) {
+            if (!isset($currentIdentifiersMap[$plan->id])) continue;
+            $identifier = $currentIdentifiersMap[$plan->id];
+            $existing = $existingJobMasters->get($identifier);
 
             $data = [
                 'job_name'    => $plan->job_master ?: ($plan->job_no ?: 'UNKNOWN JOB'),
                 'line'        => $plan->press_name ?? 'PRESS A',
                 'target_qty'  => (int) ($plan->plan ?? 0),
-                'sequence_no' => $plan->row_no ?? ($seq + 1), // Gunakan row_no asli dari Excel
+                'sequence_no' => $plan->row_no ?? ($seq + 1),
                 'plan_start'  => $plan->start_time ? (str_contains($plan->start_time, '-') ? Carbon::parse($plan->start_time)->startOfMinute() : Carbon::parse($date . ' ' . $plan->start_time)->startOfMinute()) : null,
                 'plan_end'    => $plan->finish_time ? (str_contains($plan->finish_time, '-') ? Carbon::parse($plan->finish_time)->startOfMinute() : Carbon::parse($date . ' ' . $plan->finish_time)->startOfMinute()) : null,
                 'capacity'    => (int) ($plan->qty_plt ?? 0),
             ];
 
             if ($existing) {
-                // AUTO-RESET: Jika status running/paused tapi ga ada session hari ini → reset ke pending
                 if (in_array(strtolower($existing->status), ['running', 'paused'])) {
-                    $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $existing->id)
-                        ->whereDate('work_date', $date)
-                        ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
-                        ->exists();
+                    $hasTodaySession = in_array($existing->id, $sessionsTodayJobIds);
                     if (!$hasTodaySession) {
                         $existing->update(array_merge($data, ['status' => 'pending', 'started_at' => null, 'finished_at' => null]));
                         continue;
@@ -519,7 +549,7 @@ class InputHarianController extends Controller
             }
         }
 
-        // AUTO-RESET ORPHAN JOBS: Reset status job lama di line ini yang tidak ada di jadwal PPC baru
+        // BATCH AUTO-RESET ORPHAN JOBS: Single batch query & update for orphan jobs
         $planLines = $plans->pluck('press_name')->filter()->unique()->toArray();
         if (!empty($planLines)) {
             $orphanJobs = \App\Models\JobMaster::whereIn('line', $planLines)
@@ -527,13 +557,17 @@ class InputHarianController extends Controller
                 ->whereNotIn('job_number', $currentIdentifiers)
                 ->get();
 
-            foreach ($orphanJobs as $orphan) {
-                $hasTodaySession = \App\Models\ProductionSession::where('job_master_id', $orphan->id)
+            if ($orphanJobs->isNotEmpty()) {
+                $orphanIds = $orphanJobs->pluck('id')->toArray();
+                $activeOrphanSessionIds = \App\Models\ProductionSession::whereIn('job_master_id', $orphanIds)
                     ->whereDate('work_date', $date)
                     ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
-                    ->exists();
-                if (!$hasTodaySession) {
-                    $orphan->update([
+                    ->pluck('job_master_id')
+                    ->toArray();
+
+                $resetOrphanIds = array_diff($orphanIds, $activeOrphanSessionIds);
+                if (!empty($resetOrphanIds)) {
+                    \App\Models\JobMaster::whereIn('id', $resetOrphanIds)->update([
                         'status' => 'pending',
                         'started_at' => null,
                         'finished_at' => null,
