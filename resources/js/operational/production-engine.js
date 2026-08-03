@@ -736,7 +736,7 @@ function updateTimeline(forceAll = false) {
                         if (dandoriEndMs > activeStartMs) activeStartMs = dandoriEndMs;
                     }
                 }
-                elapsed = (job.base_seconds || 0) + (finalEndTime.getTime() - activeStartMs) / 1000;
+                elapsed = Math.max(0, (finalEndTime.getTime() - activeStartMs) / 1000);
             }
             const realPct = (elapsed / (plannedDurationMs / 1000)) * 100;
 
@@ -1219,10 +1219,6 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             if (lastDandori && lastDandori.end) {
                 effectiveProductionStart = lastDandori.end;
             }
-        }
-
-        if (job.base_seconds > 0 && !hasDandori && actualStartMs) {
-            effectiveProductionStart = actualStartMs - (job.base_seconds * 1000);
         }
 
         // TPT Plan-based Overtime: calculate deadline using job.tpt (in minutes) if available
