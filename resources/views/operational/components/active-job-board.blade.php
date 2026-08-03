@@ -42,10 +42,9 @@
 
             $openFirstCheck = \App\Models\Dandori::where('next_job_id', $activeJob->id)->whereNull('finish_time')->orderByDesc('start_time')->first();
             $openDandori = \App\Models\Downtime::where('job_master_id', $activeJob->id)->where('jenis_downtime', 'dandori')->whereNull('finish_time')->first();
-            $hasDandoriHistory = \App\Models\Dandori::where('next_job_id', $activeJob->id)->exists() || \App\Models\Downtime::where('job_master_id', $activeJob->id)->where('jenis_downtime', 'dandori')->exists();
             $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
             
-            $isDandori = $openDandori || $openFirstCheck || $hasDandoriHistory || $wasInFirstCheck;
+            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null) || $wasInFirstCheck;
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($activeJob->started_at ?? null);
 
