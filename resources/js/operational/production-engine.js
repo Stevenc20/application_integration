@@ -1686,10 +1686,23 @@ async function _startDandoriDowntime(jobId) {
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
 
             // Button → STOP DOWNTIME
-            const btn = document.getElementById(`dandori-dt-btn-${jobId}`);
+            const btn = document.getElementById(`dandori_dt-btn-${jobId}`);
             if (btn) {
-                btn.className = btn.className.replace('bg-red-500/10', 'bg-red-500').replace('border-red-500/30', 'border-red-600').replace('text-red-400', 'text-white');
+                btn.className = btn.className.replace('bg-red-500/10', 'bg-red-500').replace('border-red-500/30', 'border-red-600').replace('text-red-500', 'text-white');
                 btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg> STOP DOWNTIME';
+            }
+
+            // ——— 3.5 CLOSE STALE 1st CHECK SEGMENT — server paused it; keep timeline/badge correct ———
+            const fcKey = `${jobId}_firstcheck`;
+            const fcRd = window.runningDowntimes?.[fcKey];
+            if (fcRd) {
+                if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
+                window.jobDowntimeHistory[jobId].push({
+                    start: fcRd.start.getTime(),
+                    end: startTime.getTime(),
+                    type: '1st_check'
+                });
+                delete window.runningDowntimes[fcKey];
             }
 
             // ——— 4. UPDATE STATUS BADGE → DOWNTIME (set directly, no regex) ———
@@ -1772,7 +1785,7 @@ async function _finishDandoriDowntime(jobId) {
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
 
             // Reset dandori-dt toggle button back to idle
-            const dtBtn = document.getElementById(`dandori-dt-btn-${jobId}`);
+            const dtBtn = document.getElementById(`dandori_dt-btn-${jobId}`);
             if (dtBtn) {
                 dtBtn.className = 'col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer';
                 dtBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Downtime';

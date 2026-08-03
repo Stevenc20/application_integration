@@ -580,12 +580,12 @@
 
                             {{-- Baris 2: Downtime (selalu tampil, hanya berubah text/warna) --}}
                             @if($hasActiveNonDandoriDt)
-                                <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-600 border border-red-700 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 cursor-pointer">
+                                <button type="button" id="dandori_dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-600 border border-red-700 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 cursor-pointer">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                     Selesai Downtime
                                 </button>
                             @else
-                                <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer">
+                                <button type="button" id="dandori_dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                     Downtime
                                 </button>
