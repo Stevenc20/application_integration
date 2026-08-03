@@ -124,21 +124,21 @@
 
         <!-- HEADER / LOGO -->
         <div class="app-brand demo flex items-center justify-between">
-            <a href="{{ route($dashboardRoute) }}" class="flex items-center pr-1 app-brand-link">
+            <a href="{{ route($dashboardRoute) }}" class="flex items-center pr-1 app-brand-link" aria-label="Dashboard PT IPPI">
                 <span class="flex pr-3">
-                    <img class="w-12" src="{{ asset('images/ippi_logo.png') }}" alt="Logo IPPI">
+                    <img class="w-12" src="{{ asset('images/ippi_logo.png') }}" width="60" height="38" alt="Logo PT IPPI" loading="eager">
                 </span>
                 <span class="font-semibold text-lg text-gray-800">PT IPPI</span>
             </a>
             
             <div class="flex items-center gap-1">
                 <!-- Tombol Minimize (Desktop Only) -->
-                <button id="sidebarMinimize" class="text-gray-400 hover:text-primary-red focus:outline-none transition-colors p-1" title="Minimize sidebar" type="button">
+                <button id="sidebarMinimize" aria-label="Minimize Sidebar" class="text-gray-400 hover:text-primary-red focus:outline-none transition-colors p-1" title="Minimize sidebar" type="button">
                     <span class="sidebar-minimize-icon font-bold text-lg" style="display:inline-block">&#x276E;</span>
                 </button>
                 <!-- Tombol Close (Khusus Mobile) -->
-                <button id="sidebarClose" class="md:hidden text-gray-400 hover:text-red-600 focus:outline-none transition-colors">
-                    <i class="fas fa-times text-xl"></i>
+                <button id="sidebarClose" aria-label="Tutup Sidebar Mobile" class="md:hidden text-gray-400 hover:text-red-600 focus:outline-none transition-colors">
+                    <i class="fas fa-times text-xl" aria-hidden="true"></i>
                 </button>
             </div>
         </div>
