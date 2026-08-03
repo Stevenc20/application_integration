@@ -1747,6 +1747,16 @@ async function _finishDandoriDowntime(jobId) {
         }).then(r => r.json());
 
         if (res.success) {
+            // Langsung update badge STATUS → 1ST CHECK (purple) sebelum reload
+            const sc = document.getElementById('realtime-status-container');
+            const st = document.getElementById('realtime-status-text');
+            const sp = document.getElementById('realtime-status-ping');
+            const sd = document.getElementById('realtime-status-dot');
+            if (sc) sc.className = 'px-4 py-3 mt-3.5 rounded-2xl border bg-purple-500/10 border-purple-500/20 flex items-center justify-between transition-all duration-300';
+            if (st) { st.className = 'text-sm font-black text-purple-400 uppercase tracking-widest'; st.textContent = '1ST CHECK'; }
+            if (sp) sp.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-500 opacity-75';
+            if (sd) sd.className = 'relative inline-flex rounded-full h-2 w-2 bg-purple-500';
+
             showToast('Downtime selesai, melanjutkan 1st Check...', 'success');
             setTimeout(() => { window.location.reload(); }, 800);
         } else {

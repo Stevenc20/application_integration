@@ -592,6 +592,25 @@
                             @endif
                         </div>
                     </div>
+
+                    {{-- Seed JS state dari server saat page load --}}
+                    @if($hasActiveNonDandoriDt && $activeDowntime)
+                    <script>
+                        (function() {
+                            if (!window.runningDowntimes) window.runningDowntimes = {};
+                            const key = '{{ $activeJob->id }}_dandori_dt';
+                            if (!window.runningDowntimes[key]) {
+                                window.runningDowntimes[key] = {
+                                    id: {{ $activeDowntime->id }},
+                                    start: new Date('{{ \Carbon\Carbon::parse($activeDowntime->start_time)->toIso8601String() }}'),
+                                    jobId: {{ $activeJob->id }},
+                                    btnType: 'dandori_dt',
+                                    dtType: '{{ strtolower($activeDowntime->jenis_downtime) }}'
+                                };
+                            }
+                        })();
+                    </script>
+                    @endif
                 </div>
 
                 @else
