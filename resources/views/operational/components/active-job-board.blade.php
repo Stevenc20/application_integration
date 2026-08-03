@@ -50,8 +50,8 @@
                 ->first();
             $openDandori = \App\Models\Downtime::where('job_master_id', $activeJob->id)->where('jenis_downtime', 'dandori')->whereNull('finish_time')->first();
             $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
-            
-            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null) || $wasInFirstCheck;
+            // $isDandori = true as long as job is in pre-production phase (no started_at yet), OR active 1st check/dandori record
+            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null) || $wasInFirstCheck || ($hasActiveNonDandoriDt && !$activeJob->started_at);
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($activeJob->started_at ?? null);
 
@@ -535,8 +535,16 @@
                     <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                         <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
                         <div class="flex items-center gap-2">
-                            <div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
-                            <span class="text-[9px] sm:text-[10px] text-amber-500 font-bold uppercase tracking-wider">{{ $openFirstCheck ? '1st Check' : 'Dandori' }}</span>
+                            @if($hasActiveNonDandoriDt)
+                                <div class="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></div>
+                                <span class="text-[9px] sm:text-[10px] text-red-500 font-bold uppercase tracking-wider">Downtime</span>
+                            @elseif($openFirstCheck)
+                                <div class="w-1.5 h-1.5 rounded-full bg-purple-500 animate-pulse"></div>
+                                <span class="text-[9px] sm:text-[10px] text-purple-500 font-bold uppercase tracking-wider">1st Check</span>
+                            @else
+                                <div class="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></div>
+                                <span class="text-[9px] sm:text-[10px] text-amber-500 font-bold uppercase tracking-wider">Dandori</span>
+                            @endif
                         </div>
                     </div>
 
@@ -552,34 +560,38 @@
                     </div>
 
                     <div id="control-board-actions" class="mt-3">
-                        <div class="grid grid-cols-2 gap-3">
-                            <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-1.5 group active:translate-y-0.5 cursor-pointer">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                Stop &amp; Lanjut Produksi
-                            </button>
-                            @if($openFirstCheck || $wasInFirstCheck)
-                                <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-1.5 group active:translate-y-0.5 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                    Stop 1st Check
-                                </button>
-                            @else
-                                <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-1.5 group active:translate-y-0.5 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 11.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm0-9c-2.76 0-5 2.24-5 5h2c0-1.66 1.34-3 3-3s3 1.34 3 3c0 2-3 2.5-3 4.5h2c0-1.5 2-2 2-4.5 0-2.76-2.24-5-5-5z"/></svg>
-                                    1st Check
-                                </button>
-                            @endif
-                            @if($hasActiveNonDandoriDt)
-                                <button type="button" id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-600 border border-red-700 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 group cursor-pointer animate-pulse">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                        @if($hasActiveNonDandoriDt)
+                            {{-- DOWNTIME ACTIVE: hanya tampil Selesai Downtime full-width --}}
+                            <div class="flex flex-col gap-3">
+                                <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="w-full py-4 rounded-xl bg-red-600 border border-red-700 text-white font-black text-base uppercase tracking-wider flex items-center justify-center gap-3 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                     Selesai Downtime
                                 </button>
-                            @else
-                                <button type="button" id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 group cursor-pointer">
+                            </div>
+                        @else
+                            {{-- NORMAL: Stop & Lanjut + 1st Check, dan Downtime di bawah --}}
+                            <div class="grid grid-cols-2 gap-3">
+                                <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5 cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                    Stop &amp; Lanjut
+                                </button>
+                                @if($openFirstCheck)
+                                    <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5 cursor-pointer">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                        Stop 1st Check
+                                    </button>
+                                @else
+                                    <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5 cursor-pointer">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                                        1st Check
+                                    </button>
+                                @endif
+                                <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                     Downtime
                                 </button>
-                            @endif
-                        </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
 
