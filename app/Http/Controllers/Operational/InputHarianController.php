@@ -1145,7 +1145,7 @@ class InputHarianController extends Controller
             ->where('work_date', $date)
             ->first();
 
-        $downtime = Downtime::select('id', 'jenis_downtime', 'start_time', 'problem')
+        $downtime = Downtime::select('id', 'jenis_downtime', 'start_time', 'problem', 'pic')
             ->where('job_master_id', $id)
             ->whereNull('finish_time')
             ->orderByDesc('start_time')

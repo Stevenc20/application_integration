@@ -407,7 +407,7 @@ async function _triggerAutoBreakEnd(jobId) {
 
             if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
             const dt = res.downtime;
-            if (dt) {
+            if (dt && !window.jobDowntimeHistory[jobId].some(h => h.id != null && String(h.id) === String(dt.id))) {
                 window.jobDowntimeHistory[jobId].push({
                     start: new Date(dt.start_time).getTime(),
                     end: dt.finish_time ? new Date(dt.finish_time).getTime() : Date.now(),
@@ -538,7 +538,8 @@ function _updateBreakUI(jobId, label, isPaused) {
                 window._autoBreakDowntimeId = h.id;
                 const activeBreakWindow = _isInBreakWindow(new Date());
                 window._autoBreakEndMin = activeBreakWindow ? activeBreakWindow.endMin : null;
-            } else if (!window.runningDowntimes?.[`${activeId}_break`]) {
+            }
+            if (!window.runningDowntimes?.[`${activeId}_break`]) {
                 window.runningDowntimes[`${activeId}_break`] = {
                     id: h.id,
                     start: new Date(h.start || Date.now()),
@@ -548,7 +549,7 @@ function _updateBreakUI(jobId, label, isPaused) {
                     problem: h.problem || ''
                 };
                 window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-                _updateBreakUI(activeId, 'BREAK', true);
+                _updateBreakUI(activeId, isAutoBreak ? 'BREAK TIME' : 'BREAK', true);
             }
             break;
         }
@@ -699,6 +700,10 @@ function updateTimeline(forceAll = false) {
                 jS = new Date(jF.getTime() - (job.base_seconds * 1000));
                 job.started_at = jS.getTime();
             }
+
+            // Preserve the original production start (started_at is re-pointed to
+            // break-end on resume, so keep the first-seen value for the timeline).
+            if (jS && !job._trueStartedAt) job._trueStartedAt = jS.getTime();
 
             const historyStarts = Object.values(jobDowntimeHistory[id] || {}).map(h => {
                 const s = h.start || h.start_time;
@@ -1203,28 +1208,32 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         };
 
         const hasDandori = !!firstDandori;
-        const actualStartMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : (job.act_start_ms || null);
+        const jSMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : null;
+        const dandoriMs = hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null;
         const firstAnyHistory = normalizedHistory.length ? normalizedHistory[0].start : null;
 
-        let effectiveActualStart = actualStartMs ||
-            (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null);
+        // True production start: prefer anchors that are NOT re-pointed after a break.
+        // started_at is reset to break-end on resume, so relying on jS alone makes the
+        // pre-break segments (production/downtime) disappear from the timeline.
+        const trueStartCandidates = [
+            job.act_start_ms || null,
+            job.first_dandori_start || null,
+            dandoriMs,
+            job._trueStartedAt || null,
+            jSMs,
+            firstAnyHistory
+        ].filter(v => v && !isNaN(v));
 
-        if (!effectiveActualStart || isNaN(effectiveActualStart)) {
-            effectiveActualStart = firstDandori
-                ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime())
-                : (actualStartMs || firstAnyHistory || Number(job.plan_start) || anchor);
-        }
+        const effectiveActualStart = trueStartCandidates.length
+            ? Math.min(...trueStartCandidates)
+            : (Number(job.plan_start) || anchor);
 
         if (!effectiveActualStart && !hasDandori && normalizedHistory.length === 0) {
             container.innerHTML = '';
             return;
         }
 
-        let effectiveProductionStart = actualStartMs || effectiveActualStart || firstAnyHistory;
-
-        if (!effectiveProductionStart || isNaN(effectiveProductionStart)) {
-            effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
-        }
+        let effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
 
         if (normalizedHistory.length) {
             const lastDandori = [...normalizedHistory]
@@ -2097,6 +2106,7 @@ async function startQuickDowntime(jobId, btnType, dtType) {
                         auto: false
                     }));
                 } catch (e) {}
+                _updateBreakUI(jobId, 'BREAK', true);
             }
         }
     });
@@ -2630,6 +2640,17 @@ function checkSyncStatus() {
             updateTimeline();
             _updateBreakUI(id, serverBreakIsAuto ? 'BREAK TIME' : 'BREAK', true);
         } else if (!serverDown && clientBreak && window._autoBreakActive) {
+            // Keep the finished break visible on the timeline before removing it
+            if (!window.jobDowntimeHistory[id]) window.jobDowntimeHistory[id] = [];
+            if (!window.jobDowntimeHistory[id].some(h => h.id != null && String(h.id) === String(clientBreak.id))) {
+                window.jobDowntimeHistory[id].push({
+                    start: clientBreak.start.getTime(),
+                    end: Date.now(),
+                    type: clientBreak.dtType || 'break time',
+                    id: clientBreak.id,
+                    problem: clientBreak.problem || ''
+                });
+            }
             delete window.runningDowntimes[`${id}_break`];
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
             if (job) {
