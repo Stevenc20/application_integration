@@ -37,8 +37,11 @@
         <div class="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-red-500/3 to-transparent"></div>
         
         @php 
-            $isDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first();
-            $openFirstCheck = $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && !$d->finish_time)->first();
+            $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
+            $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
+
+            $isDandori = !$hasActiveNonDandoriDt ? $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() : null;
+            $openFirstCheck = !$hasActiveNonDandoriDt ? $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && !$d->finish_time)->first() : null;
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($activeJob->started_at ?? null);
 
@@ -57,7 +60,6 @@
                 $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
             }
 
-            $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
             $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time';
         @endphp
 
@@ -475,7 +477,7 @@
             <!-- Operator Console (Right Area) -->
             <div class="lg:col-span-3">
                 @php
-                    $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->first();
+                    $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
                     $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
                     $alertBg = 'bg-red-500/10 border-red-500/30';
                     $alertText = 'text-red-500';
@@ -502,11 +504,11 @@
                         $alertTitle = 'Try Out';
                         $alertDesc = 'TRY OUT MESIN / DIES';
                     } elseif ($activeDowntime) {
-                        $alertTitle = 'DOWNTIME';
+                        $alertTitle = 'DOWNTIME - ' . strtoupper($activeDowntime->jenis_downtime);
                         if (!empty($activeDowntime->problem) && !in_array($activeDowntime->problem, ['-', 'MENUNGGU PROSES MULAI (IDLE TIME)'])) {
                             $alertDesc = strtoupper($activeDowntime->problem);
                         } else {
-                            $alertDesc = 'DOWNTIME';
+                            $alertDesc = 'DOWNTIME ' . strtoupper($activeDowntime->jenis_downtime);
                         }
                     }
                 @endphp
