@@ -612,17 +612,25 @@ class ProductionService
                 $lineName = $job->line ?? 'Line';
                 $jobName = $job->job_name ?? 'Item';
                 $recipients = \App\Models\User::whereIn(DB::raw('LOWER(role)'), ['supervisor', 'spv', 'leader', 'leader a', 'leader b', 'leader c', 'leader d', 'admin', 'superadmin'])->get();
-                foreach ($recipients as $recipient) {
-                    \App\Models\Notification::create([
-                        'user_id' => $recipient->id,
-                        'type'    => 'downtime_reminder',
-                        'title'   => "Reminder Detail Downtime — {$lineName}",
-                        'message' => "Terjadi downtime {$data['jenis_downtime']} pada item {$jobName} ({$lineName}). Mohon periksa & lengkapi laporan detail downtime.",
-                        'is_read' => false,
-                    ]);
+                if (\Illuminate\Support\Facades\Schema::hasTable('notifications')) {
+                    foreach ($recipients as $recipient) {
+                        DB::table('notifications')->insert([
+                            'id'              => (string) \Illuminate\Support\Str::uuid(),
+                            'type'            => 'App\Notifications\DowntimeReminderNotification',
+                            'notifiable_type' => 'App\Models\User',
+                            'notifiable_id'   => $recipient->id,
+                            'data'            => json_encode([
+                                'message' => "Terjadi downtime {$data['jenis_downtime']} pada item {$jobName} ({$lineName}). Mohon periksa & lengkapi laporan detail downtime.",
+                                'line'    => $lineName,
+                                'job_id'  => $jobId
+                            ]),
+                            'created_at'      => $now,
+                            'updated_at'      => $now
+                        ]);
+                    }
                 }
-            } catch (\Exception $e) {
-                // Ignore notification failure if table absent
+            } catch (\Throwable $e) {
+                // Gracefully catch any notification error so Downtime creation never fails
             }
 
             $this->signalDashboard($jobId);
