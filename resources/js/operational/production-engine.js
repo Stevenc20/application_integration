@@ -627,7 +627,24 @@ function updateTimeline(forceAll = false) {
                 </span>
                 STOP ${rd.btnType.toUpperCase()} (${timeStr})
             </span>`;
-            btn.className = "w-full py-4 rounded-xl bg-red-600 text-white border-red-700 text-xs font-black uppercase animate-pulse scale-105 shadow-lg shadow-red-900/50 transition-all";
+            btn.className = (btn.className
+                .replace('bg-red-500/10', 'bg-red-600')
+                .replace('bg-orange-500/10', 'bg-red-600')
+                .replace('bg-slate-500/10', 'bg-red-600')
+                .replace('border-red-500/30', 'border-red-700')
+                .replace('border-orange-500/30', 'border-red-700')
+                .replace('border-slate-500/30', 'border-red-700')
+                .replace('text-red-400', 'text-white')
+                .replace('text-red-500', 'text-white')
+                .replace('text-orange-400', 'text-white')
+                .replace('text-slate-400', 'text-white')
+                .replace('hover:bg-red-500', '')
+                .replace('hover:bg-orange-500', '')
+                .replace('hover:bg-slate-500', '')
+                .replace('hover:text-white', '')
+                .replace('hover:border-red-400', '')
+                .replace(/\s+/g, ' ')
+                .trim() + ' animate-pulse');
         }
 
         const activeTimer = document.getElementById(`active-downtime-timer-${rd.jobId}`);
@@ -2143,7 +2160,7 @@ function resetDowntimeButtons(jobId) {
         const btn = document.getElementById(`${c.id}-btn-${jobId}`);
         if (btn) {
             btn.innerHTML = c.label;
-            btn.className = `py-2 rounded-lg ${c.bg} border ${c.border} ${c.text} text-[9px] font-black uppercase ${c.hover} hover:text-white transition-all`;
+            btn.className = `w-full py-2.5 rounded-xl ${c.bg} border ${c.border} ${c.text} text-xs font-black uppercase flex items-center justify-center gap-1.5 ${c.hover} hover:text-white transition-all active:translate-y-0.5 cursor-pointer`;
         }
     });
 }
