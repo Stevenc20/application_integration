@@ -40,8 +40,11 @@
             $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
             $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
 
-            $isDandori = !$hasActiveNonDandoriDt ? $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() : null;
-            $openFirstCheck = !$hasActiveNonDandoriDt ? $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && !$d->finish_time)->first() : null;
+            $openFirstCheck = $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && !$d->finish_time)->first();
+            $openDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first();
+            $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
+            
+            $isDandori = $openDandori || $openFirstCheck || $wasInFirstCheck || !$activeJob->started_at;
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($activeJob->started_at ?? null);
 
@@ -182,19 +185,9 @@
                     $statusText = 'text-emerald-400';
                     $statusPulseColor = 'bg-emerald-500';
 
-                    if ($activeDowntime) {
+                    if ($hasActiveNonDandoriDt) {
                         $dtType = strtolower($activeDowntime->jenis_downtime);
-                        if ($dtType === 'dandori' && $openFirstCheck) {
-                            $statusLabel = '1ST CHECK';
-                            $statusBg = 'bg-purple-500/10 border-purple-500/20';
-                            $statusText = 'text-purple-400';
-                            $statusPulseColor = 'bg-purple-500';
-                        } elseif ($dtType === 'dandori') {
-                            $statusLabel = 'DANDORI';
-                            $statusBg = 'bg-amber-500/10 border-amber-500/20';
-                            $statusText = 'text-amber-400';
-                            $statusPulseColor = 'bg-amber-500';
-                        } elseif ($dtType === 'break time') {
+                        if ($dtType === 'break time') {
                             $statusLabel = 'BREAK';
                             $statusBg = 'bg-slate-500/10 border-slate-500/20';
                             $statusText = 'text-slate-400';
@@ -210,11 +203,16 @@
                             $statusText = 'text-rose-400';
                             $statusPulseColor = 'bg-rose-500';
                         }
-                    } elseif ($openFirstCheck) {
+                    } elseif ($openFirstCheck || $wasInFirstCheck) {
                         $statusLabel = '1ST CHECK';
                         $statusBg = 'bg-purple-500/10 border-purple-500/20';
                         $statusText = 'text-purple-400';
                         $statusPulseColor = 'bg-purple-500';
+                    } elseif ($openDandori) {
+                        $statusLabel = 'DANDORI';
+                        $statusBg = 'bg-amber-500/10 border-amber-500/20';
+                        $statusText = 'text-amber-400';
+                        $statusPulseColor = 'bg-amber-500';
                     } elseif (!$activeJob->started_at) {
                         $statusLabel = 'PENDING';
                         $statusBg = 'bg-slate-100 border-slate-200';
@@ -566,11 +564,17 @@
                                     <svg xmlns="http://http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 fill-current" viewBox="0 0 24 24"><path d="M18 13h-5v5c0 .55-.45 1-1 1s-1-.45-1-1v-5H6c-.55 0-1-.45-1-1s.45-1 1-1h5V6c0-.55.45-1 1-1s1 .45 1 1v5h5c.55 0 1 .45 1 1s-.45 1-1 1z"/></svg>
                                 </button>
                             @endif
-                            <button id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 group cursor-pointer">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                                Downtime
-                                <svg xmlns="http://http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 fill-current" viewBox="0 0 24 24"><path d="M18 13h-5v5c0 .55-.45 1-1 1s-1-.45-1-1v-5H6c-.55 0-1-.45-1-1s.45-1 1-1h5V6c0-.55.45-1 1-1s1 .45 1 1v5h5c.55 0 1 .45 1 1s-.45 1-1 1z"/></svg>
-                            </button>
+                            @if($hasActiveNonDandoriDt)
+                                <button type="button" id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-600 border border-red-700 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 group cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                    Selesai Downtime
+                                </button>
+                            @else
+                                <button type="button" id="dandori-dt-btn-{{ $activeJob->id }}" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 group cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                                    Input Downtime
+                                </button>
+                            @endif
                         </div>
                     </div>
                 </div>
