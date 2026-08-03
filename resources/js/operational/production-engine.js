@@ -379,7 +379,8 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
                         downtimeId: window._autoBreakDowntimeId,
                         endMin: breakInfo.endMin || null,
                         label: breakInfo.label || 'AUTO BREAK',
-                        startedAt: Date.now()
+                        startedAt: Date.now(),
+                        auto: true
                     }));
                 } catch (e) {}
             }
@@ -519,10 +520,7 @@ function _updateBreakUI(jobId, label, isPaused) {
     const history = window.jobDowntimeHistory?.[activeId] || [];
     for (const h of history) {
         if (!h.end && h.type === 'break time') {
-            window._autoBreakActive = true;
-            window._autoBreakDowntimeId = h.id;
-            const activeBreakWindow = _isInBreakWindow(new Date());
-            window._autoBreakEndMin = activeBreakWindow ? activeBreakWindow.endMin : null;
+            const isAutoBreak = (h.pic || '') === 'AUTO BREAK';
             const job = window.jobMasterData?.[activeId];
             if (job && !job._breakPaused) {
                 let currentSeconds = job.base_seconds || 0;
@@ -535,6 +533,23 @@ function _updateBreakUI(jobId, label, isPaused) {
                 job._frozenTimer = currentSeconds;
                 job._breakPaused = true;
             }
+            if (isAutoBreak) {
+                window._autoBreakActive = true;
+                window._autoBreakDowntimeId = h.id;
+                const activeBreakWindow = _isInBreakWindow(new Date());
+                window._autoBreakEndMin = activeBreakWindow ? activeBreakWindow.endMin : null;
+            } else if (!window.runningDowntimes?.[`${activeId}_break`]) {
+                window.runningDowntimes[`${activeId}_break`] = {
+                    id: h.id,
+                    start: new Date(h.start || Date.now()),
+                    jobId: activeId,
+                    btnType: 'break',
+                    dtType: 'break time',
+                    problem: h.problem || ''
+                };
+                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+                _updateBreakUI(activeId, 'BREAK', true);
+            }
             break;
         }
     }
@@ -546,20 +561,22 @@ function _updateBreakUI(jobId, label, isPaused) {
             if (saved && saved.jobId && saved.downtimeId) {
                 const job = window.jobMasterData?.[saved.jobId];
                 if (job && !job._breakPaused && (job.status === 'running' || job.status === 'paused')) {
-                    window._autoBreakActive = true;
-                    window._autoBreakDowntimeId = saved.downtimeId;
-                    window._autoBreakEndMin = saved.endMin || null;
+                    const isAutoBreak = saved.auto !== false;
+                    if (isAutoBreak) {
+                        window._autoBreakActive = true;
+                        window._autoBreakDowntimeId = saved.downtimeId;
+                        window._autoBreakEndMin = saved.endMin || null;
+                    }
                     job._frozenTimer = saved.frozenTimer;
                     job._breakPaused = true;
 
-                    const typeMap = { 'break time': 'break' };
                     window.runningDowntimes[`${saved.jobId}_break`] = {
                         id: saved.downtimeId,
                         start: new Date(saved.startedAt),
                         jobId: saved.jobId,
                         btnType: 'break',
                         dtType: 'break time',
-                        problem: saved.label || 'AUTO BREAK'
+                        problem: saved.label || (isAutoBreak ? 'AUTO BREAK' : '')
                     };
                     window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
                     _updateBreakUI(saved.jobId, saved.label, true);
@@ -2076,7 +2093,8 @@ async function startQuickDowntime(jobId, btnType, dtType) {
                         frozenTimer: currentSeconds,
                         downtimeId: res.downtime.id,
                         label: dtType.toUpperCase(),
-                        startedAt: Date.now()
+                        startedAt: Date.now(),
+                        auto: false
                     }));
                 } catch (e) {}
             }
@@ -2584,19 +2602,22 @@ function checkSyncStatus() {
 
         const serverDown = data.downtime;
         const clientBreak = window.runningDowntimes?.[`${id}_break`];
+        const serverBreakIsAuto = !!(serverDown && serverDown.jenis_downtime === 'break time' && (serverDown.pic || '') === 'AUTO BREAK');
 
         if (serverDown && serverDown.jenis_downtime === 'break time' && !clientBreak && !window._autoBreakActive) {
-            window._autoBreakActive = true;
-            window._autoBreakDowntimeId = serverDown.id;
-            const serverBreakWindow = _isInBreakWindow(new Date());
-            window._autoBreakEndMin = serverBreakWindow ? serverBreakWindow.endMin : null;
+            if (serverBreakIsAuto) {
+                window._autoBreakActive = true;
+                window._autoBreakDowntimeId = serverDown.id;
+                const serverBreakWindow = _isInBreakWindow(new Date());
+                window._autoBreakEndMin = serverBreakWindow ? serverBreakWindow.endMin : null;
+            }
             window.runningDowntimes[`${id}_break`] = {
                 id: serverDown.id,
                 start: new Date(serverDown.start_time),
                 jobId: id,
                 btnType: 'break',
                 dtType: 'break time',
-                problem: 'AUTO BREAK'
+                problem: serverBreakIsAuto ? 'AUTO BREAK' : (serverDown.problem || '')
             };
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
             if (job && !job._breakPaused) {
@@ -2607,7 +2628,7 @@ function checkSyncStatus() {
                 job._breakPaused = true;
             }
             updateTimeline();
-            _updateBreakUI(id, 'BREAK TIME', true);
+            _updateBreakUI(id, serverBreakIsAuto ? 'BREAK TIME' : 'BREAK', true);
         } else if (!serverDown && clientBreak && window._autoBreakActive) {
             delete window.runningDowntimes[`${id}_break`];
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;

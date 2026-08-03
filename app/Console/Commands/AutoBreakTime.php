@@ -105,7 +105,7 @@ class AutoBreakTime extends Command
                 $this->log('AUTO BREAK START', $job->job_number, $matchedBreak->label, $now->format('H:i:s'));
                 $breakCount++;
 
-            } elseif (!$inBreakWindow && $activeBreak) {
+            } elseif (!$inBreakWindow && $activeBreak && ($activeBreak->pic ?? '') === 'AUTO BREAK') {
                 $startTime = Carbon::parse($activeBreak->start_time);
                 $duration = abs($now->diffInSeconds($startTime));
 

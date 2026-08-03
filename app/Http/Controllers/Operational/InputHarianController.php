@@ -1184,6 +1184,7 @@ class InputHarianController extends Controller
                 'jenis_downtime' => $downtime->jenis_downtime,
                 'start_time'     => Carbon::parse($downtime->start_time)->toIso8601String(),
                 'problem'        => $downtime->problem,
+                'pic'            => $downtime->pic,
             ] : null,
             'is_dandori' => $isDandori,
             'open_first_check' => $openFirstCheck ? [

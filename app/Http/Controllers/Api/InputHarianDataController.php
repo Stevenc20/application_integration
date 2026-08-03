@@ -143,6 +143,7 @@ class InputHarianDataController extends Controller
                         : null,
                     'type' => $dt->jenis_downtime,
                     'problem' => $dt->problem,
+                    'pic' => $dt->pic,
                 ];
             }
             foreach ($jd->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check') as $d) {
@@ -174,6 +175,7 @@ class InputHarianDataController extends Controller
                     'btnType' => $btnType,
                     'dtType' => $rdt->jenis_downtime,
                     'problem' => $rdt->problem ?? '',
+                    'pic' => $rdt->pic ?? '',
                 ];
             }
 
