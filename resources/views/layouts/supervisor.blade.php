@@ -4,16 +4,17 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    <meta name="description" content="Aplikasi MES Integration Input Harian Produksi Stamping - PT IPPI. Realtime monitoring, job tracking, dan laporan shift produksi.">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>@yield('title', 'Supervisor Dashboard')</title>
     
-    <!-- DNS Prefetch + Preconnect CDNs FIRST so browser connects early -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <!-- DNS Prefetch & Font Preloading for fast LCP & FCP -->
     <link rel="dns-prefetch" href="https://code.jquery.com">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://unpkg.com">
-    <!-- Legacy JS (100% compatible all browsers - no ES modules) -->
+    <link rel="preload" href="https://unpkg.com/boxicons@2.1.4/fonts/boxicons.woff2" as="font" type="font/woff2" crossorigin>
+
     @php
         $buildCssUrl = '';
         $polyfillsLegacy = '';
@@ -38,6 +39,7 @@
     @endphp
 
     <style>
+        @font-face { font-display: swap; }
         *,*::before,*::after{box-sizing:border-box}
         html,body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
         body{background-color:#f9fafb;color:#374151;display:flex;height:100dvh;overflow:hidden}
@@ -52,10 +54,10 @@
         <link rel="stylesheet" href="{{ $buildCssUrl }}">
     @endif
     @if($polyfillsLegacy)
-        <script src="{{ $polyfillsLegacy }}"></script>
+        <script src="{{ $polyfillsLegacy }}" defer></script>
     @endif
     @if($appLegacy)
-        <script src="{{ $appLegacy }}"></script>
+        <script src="{{ $appLegacy }}" defer></script>
     @endif
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet"></noscript>
