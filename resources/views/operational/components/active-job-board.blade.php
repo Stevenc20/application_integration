@@ -40,7 +40,14 @@
             $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)->whereNull('finish_time')->orderByDesc('start_time')->first();
             $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
 
-            $openFirstCheck = \App\Models\Dandori::where('next_job_id', $activeJob->id)->whereNull('finish_time')->orderByDesc('start_time')->first();
+            $openFirstCheck = \App\Models\Dandori::where('next_job_id', $activeJob->id)
+                ->whereNull('finish_time')
+                ->where(function($q) {
+                    $q->where('jenis_dandori', '1st_check')
+                      ->orWhere('activity', '1ST CHECK');
+                })
+                ->orderByDesc('start_time')
+                ->first();
             $openDandori = \App\Models\Downtime::where('job_master_id', $activeJob->id)->where('jenis_downtime', 'dandori')->whereNull('finish_time')->first();
             $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
             
