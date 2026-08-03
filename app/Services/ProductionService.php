@@ -713,15 +713,22 @@ class ProductionService
             );
 
             // AUTO-RESUME 1st Check if it was paused when downtime was triggered
+            $firstCheckResumed = false;
+            $resumedFirstCheck = null;
             $jobId = $downtime->job_master_id;
             if (\Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $jobId)) {
                 \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $jobId);
-                $this->startFirstCheck($jobId);
+                $resumedFirstCheck = $this->startFirstCheck($jobId);
+                $firstCheckResumed = true;
             }
 
             $this->signalDashboard($downtime->job_master_id);
 
-            return $downtime;
+            return [
+                'downtime' => $downtime,
+                'first_check_resumed' => $firstCheckResumed,
+                'resumed_first_check' => $resumedFirstCheck,
+            ];
         });
     }
 
@@ -1000,6 +1007,7 @@ class ProductionService
         $job = JobMaster::find($jobId);
         if ($job && $job->line) {
             DashboardRealtimeService::signalUpdate($job->line);
+            DashboardRealtimeService::signalOperators($job->line);
         }
     }
 

@@ -436,6 +436,10 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'sync']
     )->name('job.sync');
 
+    Route::get('/realtime/stream',
+        [InputHarianController::class, 'streamLine']
+    )->name('realtime.stream');
+
     Route::get('/audit-trail',
         [InputHarianController::class, 'productionAudit']
     )->middleware('feature:audit_trail')->name('audit_trail');

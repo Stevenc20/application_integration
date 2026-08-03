@@ -1747,6 +1747,37 @@ async function _finishDandoriDowntime(jobId) {
         }).then(r => r.json());
 
         if (res.success) {
+            const finishTime = new Date();
+
+            // ——— Close the downtime segment in local state → bar cuts instantly ———
+            if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
+            window.jobDowntimeHistory[jobId].push({
+                start: rd.start.getTime(),
+                end: finishTime.getTime(),
+                type: 'downtime'
+            });
+            delete window.runningDowntimes[key];
+
+            // ——— If server auto-resumed 1st Check, draw the running purple segment ———
+            if (res.first_check_resumed && res.resumed_first_check && res.resumed_first_check.id) {
+                window.runningDowntimes[`${jobId}_firstcheck`] = {
+                    id: res.resumed_first_check.id,
+                    start: new Date(res.resumed_first_check.start_time),
+                    jobId: jobId,
+                    btnType: 'firstcheck',
+                    dtType: '1st_check'
+                };
+            }
+
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+
+            // Reset dandori-dt toggle button back to idle
+            const dtBtn = document.getElementById(`dandori-dt-btn-${jobId}`);
+            if (dtBtn) {
+                dtBtn.className = 'col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer';
+                dtBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Downtime';
+            }
+
             // Langsung update badge STATUS → 1ST CHECK (purple) sebelum reload
             const sc = document.getElementById('realtime-status-container');
             const st = document.getElementById('realtime-status-text');
@@ -1758,6 +1789,9 @@ async function _finishDandoriDowntime(jobId) {
             if (sd) sd.className = 'relative inline-flex rounded-full h-2 w-2 bg-purple-500';
 
             showToast('Downtime selesai, melanjutkan 1st Check...', 'success');
+            updateLostTimeDisplay(jobId);
+            notifyLineStatusChange(jobMasterData[jobId]?.line);
+            updateTimeline();
             setTimeout(() => { window.location.reload(); }, 800);
         } else {
             showToast(res.message || 'Gagal mengakhiri downtime', 'danger');
@@ -2589,7 +2623,147 @@ function checkSyncStatus() {
 
         updateTimeline();
         _saveJobStateToStorage();
+
+        // ——— DANDORI / 1ST CHECK / DOWNTIME reconciliation (self-heal without refresh) ———
+        _reconcileDandoriDowntimeState(id, data, job);
     }).catch(() => {});
+}
+
+function _reconcileDandoriDowntimeState(id, data, job) {
+    try {
+        if (window._autoBreakActive) return;
+
+        const fcKey = `${id}_firstcheck`;
+        const clientFC = window.runningDowntimes?.[fcKey];
+        const serverFC = data.open_first_check;
+
+        const danKey = `${id}_dandori`;
+        const clientDan = window.runningDowntimes?.[danKey];
+        const serverDan = data.open_dandori;
+
+        const serverDt = data.downtime && !data.is_dandori ? data.downtime : null;
+
+        // 1) 1st check: server open → ensure client has it; server closed → close client segment
+        if (serverFC && !clientFC) {
+            window.runningDowntimes[fcKey] = {
+                id: serverFC.id,
+                start: new Date(serverFC.start_time),
+                jobId: id,
+                btnType: 'firstcheck',
+                dtType: '1st_check'
+            };
+            if (job && !job.first_check_start) job.first_check_start = new Date(serverFC.start_time);
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+        } else if (!serverFC && clientFC) {
+            if (!window.jobDowntimeHistory[id]) window.jobDowntimeHistory[id] = [];
+            window.jobDowntimeHistory[id].push({ start: clientFC.start.getTime(), end: Date.now(), type: '1st_check' });
+            delete window.runningDowntimes[fcKey];
+            if (job) delete job.first_check_start;
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+        }
+
+        // 2) dandori: server open → ensure client has it; server closed → close client segment
+        if (serverDan && !clientDan) {
+            window.runningDowntimes[danKey] = {
+                id: serverDan.id,
+                start: new Date(serverDan.start_time),
+                jobId: id,
+                btnType: 'dandori',
+                dtType: 'dandori'
+            };
+            if (job && !job.dandori_start) job.dandori_start = new Date(serverDan.start_time);
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+        } else if (!serverDan && clientDan) {
+            if (!window.jobDowntimeHistory[id]) window.jobDowntimeHistory[id] = [];
+            window.jobDowntimeHistory[id].push({ start: clientDan.start.getTime(), end: Date.now(), type: 'dandori' });
+            delete window.runningDowntimes[danKey];
+            if (job) delete job.dandori_start;
+            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+        }
+
+        // 3) non-dandori downtime: server open (match by server id) → ensure client has it
+        if (serverDt) {
+            const matched = Object.keys(window.runningDowntimes || {}).some(k =>
+                k.startsWith(id + '_') && window.runningDowntimes[k].id == serverDt.id
+            );
+            if (!matched) {
+                const btnType = String(serverDt.jenis_downtime || 'downtime').toLowerCase() === 'try out' ? 'tryout' : 'downtime';
+                window.runningDowntimes[`${id}_${btnType}`] = {
+                    id: serverDt.id,
+                    start: new Date(serverDt.start_time),
+                    jobId: id,
+                    btnType: btnType,
+                    dtType: serverDt.jenis_downtime
+                };
+                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+            }
+        }
+
+        // 4) client has open non-break segments but server has nothing open → close them
+        if (!serverDt && !serverDan && !serverFC) {
+            const dtKeys = Object.keys(window.runningDowntimes || {}).filter(k =>
+                k.startsWith(id + '_') && k !== `${id}_break`
+            );
+            if (dtKeys.length > 0) {
+                const nowMs = Date.now();
+                for (const k of dtKeys) {
+                    const r = window.runningDowntimes[k];
+                    if (!window.jobDowntimeHistory[id]) window.jobDowntimeHistory[id] = [];
+                    window.jobDowntimeHistory[id].push({ start: r.start.getTime(), end: nowMs, type: r.dtType || 'downtime' });
+                    delete window.runningDowntimes[k];
+                }
+                window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+                window.resetDowntimeButtons && window.resetDowntimeButtons(id);
+            }
+        }
+
+        // 5) sync started_at from server when client doesn't have it yet
+        if (data.started_at && job && !job.started_at) {
+            job.started_at = data.started_at;
+        }
+
+        if (serverFC || serverDan || serverDt || (!serverDt && !serverDan && !serverFC && (clientFC || clientDan))) {
+            updateTimeline();
+            _saveJobStateToStorage();
+        }
+    } catch (e) {
+        console.warn('RECONCILE DANDORI/DT failed:', e);
+    }
+}
+
+function _initRealtimeStream() {
+    try {
+        const config = window.ProductionConfig;
+        let line = String(config.currentLine || '').trim();
+        if (!line) {
+            const job = config.currentActiveId ? window.jobMasterData?.[config.currentActiveId] : null;
+            line = String((job && job.line) || '').trim();
+        }
+        if (!line) return;
+
+        const url = `/operational/realtime/stream?line=${encodeURIComponent(line)}`;
+        if (window._opRealtimeStream && window._opRealtimeStream.url === url) return;
+
+        if (window._opRealtimeStream) window._opRealtimeStream.close();
+
+        const es = new EventSource(url);
+        window._opRealtimeStream = es;
+
+        es.onmessage = function (e) {
+            if (window.ActionRunner && window.ActionRunner.locked) return;
+            try {
+                const data = JSON.parse(e.data);
+                if (data && data.type === 'update') {
+                    checkSyncStatus();
+                }
+            } catch (err) {}
+        };
+        es.onerror = function () {
+            // EventSource auto-reconnects on its own
+        };
+    } catch (e) {
+        console.warn('REALTIME STREAM init failed:', e);
+    }
 }
 
 function _saveJobStateToStorage() {
@@ -2937,6 +3111,8 @@ function initProductionEngine() {
         setInterval(() => updateTimers(), 1000);
         setInterval(() => updateTimeline(false), 3000);
         setInterval(checkSyncStatus, 8000);
+
+        _initRealtimeStream();
 
         window.addEventListener('beforeunload', function (e) {
             _saveJobStateToStorage();

@@ -460,6 +460,18 @@ class DashboardRealtimeService
         }
     }
 
+    public static function signalOperators(string $line): void
+    {
+        if ($line) {
+            Cache::put("op_update_{$line}", now()->timestamp, 30);
+        }
+    }
+
+    public static function hasOperatorUpdate(string $line): bool
+    {
+        return Cache::has("op_update_{$line}");
+    }
+
     public static function getUpdatedLines(): array
     {
         $lines = [];

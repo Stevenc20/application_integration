@@ -16,6 +16,7 @@ use App\Models\ShiftSubmission;
 use Illuminate\Support\Facades\DB;
 use App\Services\ProductionService;
 use App\Services\DashboardRealtimeService;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InputHarianController extends Controller
 {
@@ -1004,13 +1005,15 @@ class InputHarianController extends Controller
         try {
             $dt = Downtime::find($id);
             if ($dt) $this->guardLockedShift($dt->job_master_id);
-            $downtime = $this->productionService->finishDowntime($id);
-            if (!$downtime) {
+            $result = $this->productionService->finishDowntime($id);
+            if (!$result || !$result['downtime']) {
                 return response()->json(['success' => false, 'message' => 'Downtime not found']);
             }
             return response()->json([
                 'success' => true,
-                'downtime' => $downtime
+                'downtime' => $result['downtime'],
+                'first_check_resumed' => $result['first_check_resumed'] ?? false,
+                'resumed_first_check' => $result['resumed_first_check'] ?? null,
             ]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
@@ -1124,7 +1127,7 @@ class InputHarianController extends Controller
     {
         $date = $request->get('date') ?: now()->toDateString();
 
-        $job = JobMaster::select('id', 'status', 'job_number', 'job_name', 'line')
+        $job = JobMaster::select('id', 'status', 'job_number', 'job_name', 'line', 'started_at')
             ->where('id', $id)->first();
 
         $session = ProductionSession::select('id', 'total_seconds', 'start_time', 'status')
@@ -1137,16 +1140,31 @@ class InputHarianController extends Controller
             ->where('work_date', $date)
             ->first();
 
-        $downtime = Downtime::select('id', 'jenis_downtime', 'start_time')
+        $downtime = Downtime::select('id', 'jenis_downtime', 'start_time', 'problem')
             ->where('job_master_id', $id)
             ->whereNull('finish_time')
             ->orderByDesc('start_time')
+            ->first();
+
+        $openFirstCheck = Dandori::where('next_job_id', $id)
+            ->whereNull('finish_time')
+            ->where(function ($q) {
+                $q->where('jenis_dandori', '1st_check')
+                  ->orWhere('activity', '1ST CHECK');
+            })
+            ->orderByDesc('start_time')
+            ->first();
+
+        $openDandori = Downtime::where('job_master_id', $id)
+            ->where('jenis_downtime', 'dandori')
+            ->whereNull('finish_time')
             ->first();
 
         $isDandori = $downtime && strtolower($downtime->jenis_downtime) === 'dandori';
 
         return response()->json([
             'status'   => $job->status ?? 'pending',
+            'started_at' => $job->started_at ? Carbon::parse($job->started_at)->toIso8601String() : null,
             'session'  => [
                 'total_seconds' => $session->total_seconds ?? 0,
                 'start_time'    => $session ? Carbon::parse($session->start_time)->toIso8601String() : null,
@@ -1160,9 +1178,77 @@ class InputHarianController extends Controller
                 'id'             => $downtime->id,
                 'jenis_downtime' => $downtime->jenis_downtime,
                 'start_time'     => Carbon::parse($downtime->start_time)->toIso8601String(),
+                'problem'        => $downtime->problem,
             ] : null,
             'is_dandori' => $isDandori,
+            'open_first_check' => $openFirstCheck ? [
+                'id'         => $openFirstCheck->id,
+                'start_time' => Carbon::parse($openFirstCheck->start_time)->toIso8601String(),
+            ] : null,
+            'open_dandori' => $openDandori ? [
+                'id'         => $openDandori->id,
+                'start_time' => Carbon::parse($openDandori->start_time)->toIso8601String(),
+            ] : null,
+            'was_in_first_check' => \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $id),
         ]);
+    }
+
+    public function streamLine(): StreamedResponse
+    {
+        $lineFilter = request('line', '');
+        $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+
+        $response = new StreamedResponse(function () use ($lineFilter, $normalized) {
+            ob_implicit_flush(true);
+
+            header('Content-Type: text/event-stream');
+            header('Cache-Control: no-cache');
+            header('Connection: keep-alive');
+            header('X-Accel-Buffering: no');
+
+            // Semua raw line values (press_name) yang match filter operator page.
+            // Sinyal operator di-emit per $job->line, jadi kita cek semua yang relevan.
+            $rawLines = [];
+            if ($normalized) {
+                $rawLines = JobMaster::whereRaw("
+                    REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+                ", ["%{$normalized}%"])->distinct()->pluck('line')->toArray();
+            }
+
+            $maxLoops = 30; // ~60 detik per koneksi; EventSource reconnect otomatis
+
+            for ($i = 0; $i < $maxLoops; $i++) {
+                if (connection_aborted()) break;
+
+                $signaled = false;
+                foreach ($rawLines as $rawLine) {
+                    if ($rawLine && DashboardRealtimeService::hasOperatorUpdate($rawLine)) {
+                        $signaled = true;
+                    }
+                }
+
+                if ($signaled) {
+                    echo "data: " . json_encode([
+                        'type' => 'update',
+                        'line' => $lineFilter,
+                    ]) . "\n\n";
+                } else {
+                    echo ": keepalive\n\n";
+                }
+
+                if (ob_get_level() > 0) ob_flush();
+                flush();
+
+                sleep(2);
+            }
+        });
+
+        $response->headers->set('Content-Type', 'text/event-stream');
+        $response->headers->set('Cache-Control', 'no-cache');
+        $response->headers->set('Connection', 'keep-alive');
+        $response->headers->set('X-Accel-Buffering', 'no');
+
+        return $response;
     }
 
     public function submitShift(Request $request, $lineId)
