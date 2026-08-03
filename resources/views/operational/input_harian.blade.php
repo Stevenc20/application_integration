@@ -496,12 +496,12 @@ window.jobDowntimeHistory = {
                 'problem' => $dt->problem
             ];
         })->toArray(),
-        $jd->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && $d->finish_time)->map(function($d){
+        $jd->dandoris->filter(fn($d) => $d->finish_time)->map(function($d){
             return [
                 'id' => 'fc_'.$d->id,
                 'start' => \Carbon\Carbon::parse($d->start_time)->timestamp * 1000,
                 'end' => \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000,
-                'type' => '1st_check',
+                'type' => (strtolower($d->jenis_dandori ?? '') === '1st_check' || strtolower($d->activity ?? '') === '1st check') ? '1st_check' : 'dandori',
                 'problem' => null
             ];
         })->toArray()
@@ -520,12 +520,12 @@ window.jobDowntimeHistory = {
                 'problem' => $dt->problem
             ];
         })->toArray(),
-        $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && $d->finish_time)->map(function($d){
+        $activeJob->dandoris->filter(fn($d) => $d->finish_time)->map(function($d){
             return [
                 'id' => 'fc_'.$d->id,
                 'start' => \Carbon\Carbon::parse($d->start_time)->timestamp * 1000,
                 'end' => \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000,
-                'type' => '1st_check',
+                'type' => (strtolower($d->jenis_dandori ?? '') === '1st_check' || strtolower($d->activity ?? '') === '1st check') ? '1st_check' : 'dandori',
                 'problem' => null
             ];
         })->toArray()
