@@ -290,7 +290,11 @@ class InputHarianController extends Controller
             $statusB = strtolower($b->job_data?->status ?? $b->status ?? 'pending') === 'running' ? 0 : 1;
 
             if ($statusA === $statusB) {
-                return $a->row_no <=> $b->row_no;
+                $pressCmp = strnatcasecmp((string) ($a->press_name ?? ''), (string) ($b->press_name ?? ''));
+                if ($pressCmp !== 0) {
+                    return $pressCmp;
+                }
+                return ($a->row_no ?? 0) <=> ($b->row_no ?? 0);
             }
             return $statusA <=> $statusB;
         })->values();
@@ -391,7 +395,8 @@ class InputHarianController extends Controller
             })
             ->get()
             ->sortBy(function($job) use ($scheduledJobNumbers) {
-                return array_search($job->job_number, $scheduledJobNumbers);
+                $position = array_search($job->job_number, $scheduledJobNumbers);
+                return $position === false ? PHP_INT_MAX : $position;
             })
             ->values();
 

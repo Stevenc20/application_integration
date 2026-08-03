@@ -84,7 +84,7 @@ class ReportController extends Controller
         $plans = app(\App\Services\BreakTimelineValidator::class)->filterValidPlans($plans);
 
         // LKH mirrors production_plans (PPC master) — no separate timeline engine
-        $plans = $plans->sortBy(fn ($p) => $p->row_no ?? PHP_INT_MAX)->values();
+        $plans = $plans->sortBy(fn ($p) => [strtolower((string) ($p->press_name ?? '')), $p->row_no ?? PHP_INT_MAX])->values();
 
         // ── MERGE BREAK SPLITS: exclude children, load their data separately ──
         $childPlans = \App\Models\ProductionPlan::whereIn('parent_job_id', $plans->pluck('id')->filter())

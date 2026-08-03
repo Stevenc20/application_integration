@@ -1872,6 +1872,7 @@ window.finishJob = function finishJob(id, jobNumber, jobName) {
             if (filtered.length > 0) {
                 const group = document.createElement('optgroup');
                 group.label = 'Pilih Item Spesifik';
+                filtered.sort((a, b) => (a.sequence_no ?? 0) - (b.sequence_no ?? 0));
                 filtered.forEach(j => {
                     const opt = document.createElement('option');
                     opt.value = j.id;
