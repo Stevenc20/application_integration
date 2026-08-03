@@ -175,7 +175,7 @@
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-600 flex items-center justify-center font-black text-lg shrink-0">!</div>
                 <div>
-                    <h4 class="text-sm font-black text-amber-800 uppercase tracking-wider">Reminder Laporan Downtime (Group Leader / Supervisor)</h4>
+                    <h4 class="text-sm font-black text-amber-800 uppercase tracking-wider">Reminder Laporan Downtime</h4>
                     <p class="text-xs font-bold text-amber-700 mt-0.5">Terdapat {{ $unfilledDowntimes->count() }} kejadian Downtime yang belum diisi detailnya (Problem/Penyebab/Action). Mohon periksa &amp; lengkapi laporan.</p>
                 </div>
             </div>
