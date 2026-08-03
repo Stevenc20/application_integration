@@ -703,7 +703,10 @@ function updateTimeline(forceAll = false) {
                     : (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime());
                 const jobHistory = window.jobDowntimeHistory[id] || [];
                 const lastDandoriEntry = [...jobHistory]
-                    .filter(h => (h.type || h.jenis_downtime || '').toLowerCase() === 'dandori')
+                    .filter(h => {
+                        const t = (h.type || h.jenis_downtime || h.jenis_dandori || '').toLowerCase();
+                        return t === 'dandori' || t === '1st_check' || t === '1st check';
+                    })
                     .sort((a, b) => {
                         const aEnd = a.end || a.finish_time || a.finished_at || 0;
                         const bEnd = b.end || b.finish_time || b.finished_at || 0;
@@ -1189,9 +1192,12 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
         }
 
-        if (hasDandori && normalizedHistory.length) {
+        if (normalizedHistory.length) {
             const lastDandori = [...normalizedHistory]
-                .filter(h => h.type === 'dandori')
+                .filter(h => {
+                    const t = (h.type || h.jenis_downtime || h.jenis_dandori || '').toLowerCase();
+                    return t === 'dandori' || t === '1st_check' || t === '1st check';
+                })
                 .sort((a, b) => b.start - a.start)[0];
             if (lastDandori && lastDandori.end) {
                 effectiveProductionStart = lastDandori.end;
