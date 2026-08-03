@@ -560,38 +560,37 @@
                     </div>
 
                     <div id="control-board-actions" class="mt-3">
-                        @if($hasActiveNonDandoriDt)
-                            {{-- DOWNTIME ACTIVE: hanya tampil Selesai Downtime full-width --}}
-                            <div class="flex flex-col gap-3">
-                                <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="w-full py-4 rounded-xl bg-red-600 border border-red-700 text-white font-black text-base uppercase tracking-wider flex items-center justify-center gap-3 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <div class="grid grid-cols-2 gap-3">
+                            {{-- Baris 1: Stop & Lanjut + 1st Check/Stop 1st Check --}}
+                            <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                Stop &amp; Lanjut
+                            </button>
+                            @if($openFirstCheck)
+                                <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                                    Stop 1st Check
+                                </button>
+                            @else
+                                <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
+                                    1st Check
+                                </button>
+                            @endif
+
+                            {{-- Baris 2: Downtime (selalu tampil, hanya berubah text/warna) --}}
+                            @if($hasActiveNonDandoriDt)
+                                <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3.5 rounded-xl bg-red-600 border border-red-700 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-red-900/20 hover:bg-red-700 transition-all active:translate-y-0.5 cursor-pointer">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                     Selesai Downtime
                                 </button>
-                            </div>
-                        @else
-                            {{-- NORMAL: Stop & Lanjut + 1st Check, dan Downtime di bawah --}}
-                            <div class="grid grid-cols-2 gap-3">
-                                <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5 cursor-pointer">
-                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                    Stop &amp; Lanjut
-                                </button>
-                                @if($openFirstCheck)
-                                    <button onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5 cursor-pointer">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                        Stop 1st Check
-                                    </button>
-                                @else
-                                    <button onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-purple-500 hover:bg-purple-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 group active:translate-y-0.5 cursor-pointer">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
-                                        1st Check
-                                    </button>
-                                @endif
+                            @else
                                 <button type="button" onclick="handleDandoriDowntime({{ $activeJob->id }})" class="col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                                     Downtime
                                 </button>
-                            </div>
-                        @endif
+                            @endif
+                        </div>
                     </div>
                 </div>
 
