@@ -1692,22 +1692,26 @@ async function _startDandoriDowntime(jobId) {
                 btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg> STOP DOWNTIME';
             }
 
-            // ——— 4. UPDATE STATUS BADGE → DOWNTIME ———
+            // ——— 4. UPDATE STATUS BADGE → DOWNTIME (set directly, no regex) ———
             const sc = document.getElementById('realtime-status-container');
             const st = document.getElementById('realtime-status-text');
             const sp = document.getElementById('realtime-status-ping');
             const sd = document.getElementById('realtime-status-dot');
+            // Simpan state asli sebelum diubah (hanya sekali)
             if (!window._origDandoriStatus) {
                 window._origDandoriStatus = {
-                    containerClass: sc?.className || '', textClass: st?.className || '',
-                    textContent: st?.textContent || '', pingClass: sp?.className || '',
+                    containerClass: sc?.className || '',
+                    textClass: st?.className || '',
+                    textContent: st?.textContent?.trim() || '',
+                    pingClass: sp?.className || '',
                     dotClass: sd?.className || ''
                 };
             }
-            if (sc) sc.className = window._origDandoriStatus.containerClass.replace(/bg-amber-500\/10/g, 'bg-rose-500/10').replace(/border-amber-500\/20/g, 'border-rose-500/20');
-            if (st) { st.className = window._origDandoriStatus.textClass.replace(/text-amber-400/g, 'text-rose-400'); st.textContent = 'DOWNTIME'; }
-            if (sp) sp.className = window._origDandoriStatus.pingClass.replace(/bg-amber-500/g, 'bg-rose-500');
-            if (sd) sd.className = window._origDandoriStatus.dotClass.replace(/bg-amber-500/g, 'bg-rose-500');
+            // Set langsung ke warna DOWNTIME (rose) — tidak pakai regex agar tidak gagal dari state purple/1st check
+            if (sc) sc.className = 'px-4 py-3 mt-3.5 rounded-2xl border bg-rose-500/10 border-rose-500/20 flex items-center justify-between transition-all duration-300';
+            if (st) { st.className = 'text-sm font-black text-rose-400 uppercase tracking-widest'; st.textContent = 'DOWNTIME'; }
+            if (sp) sp.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-500 opacity-75';
+            if (sd) sd.className = 'relative inline-flex rounded-full h-2 w-2 bg-rose-500';
 
             // ——— 5. UPDATE ALERT BOX → DOWNTIME ———
             const alertBox = document.getElementById('active-downtime-alert-box');
@@ -1776,15 +1780,15 @@ async function _finishDandoriDowntime(jobId) {
                 delete window._origDandoriStatus;
             }
 
-            // ——— 3. RESTORE ALERT BOX → DANDORI ———
+            // ——— 3. RESTORE ALERT BOX → 1ST CHECK (purple) ———
             const alertBox = document.getElementById('active-downtime-alert-box');
             const alertTitle = document.getElementById('active-downtime-title');
             if (alertBox) {
-                alertBox.className = alertBox.className.replace(/bg-red-500\/10/g, 'bg-amber-500/10').replace(/border-red-500\/30/g, 'border-amber-500/30');
+                alertBox.className = alertBox.className.replace(/bg-red-500\/10/g, 'bg-purple-500/10').replace(/border-red-500\/30/g, 'border-purple-500/30');
             }
             if (alertTitle) {
-                alertTitle.className = alertTitle.className.replace(/text-red-500/g, 'text-amber-500');
-                alertTitle.textContent = 'Dandori (Persiapan)';
+                alertTitle.className = alertTitle.className.replace(/text-red-500/g, 'text-purple-400');
+                alertTitle.textContent = '1ST CHECK';
             }
 
             // ——— 4. RESUME DANDORI on server ———
