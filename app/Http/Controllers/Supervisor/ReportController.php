@@ -18,6 +18,34 @@ class ReportController extends Controller
 {
     public function dailyProduction(Request $request)
     {
+        $data = $this->buildDailyProductionData($request);
+
+        // Excel export
+        if ($request->query('format') === 'excel') {
+            $export = new LkhActualExport(
+                jobsData: $data['jobsData'],
+                totals: $data['totals'],
+                summary: $data['summary'],
+                lineName: $data['selectedLineName'],
+                shiftName: $data['latestShiftName'],
+                date: $data['date'],
+                signatureStatus: $data['signatureStatus'],
+                shiftDisplayStart: $data['shiftDisplayStart'],
+                shiftDisplayEnd: $data['shiftDisplayEnd'],
+            );
+            return $export->download();
+        }
+
+        return view('reports.daily_production', $data);
+    }
+
+    /**
+     * Build all data needed to render the daily production (LKH) report.
+     *
+     * @return array<string, mixed>
+     */
+    private function buildDailyProductionData(Request $request): array
+    {
         // 1. Line Filters (Flexible & Normalization)
         $lineNamesUnique = \App\Models\LineMaster::select('line_name')->distinct()->pluck('line_name');
         
@@ -932,23 +960,11 @@ class ReportController extends Controller
             $prevSigned = $signed;
         }
 
-        // Excel export
-        if ($request->query('format') === 'excel') {
-            $export = new LkhActualExport(
-                jobsData: $jobsData,
-                totals: $totals,
-                summary: $summary,
-                lineName: $selectedLineName,
-                shiftName: $latestShiftName,
-                date: $date,
-                signatureStatus: $signatureStatus,
-                shiftDisplayStart: $shiftDisplayStart,
-                shiftDisplayEnd: $shiftDisplayEnd,
-            );
-            return $export->download();
-        }
+        $userRole = strtolower(auth()->user()?->role ?? '');
+        $canEdit = in_array($userRole, ['foreman', 'superadmin']);
+        $ttdLocked = count($signedRoles) > 0;
 
-        return view('reports.daily_production', compact(
+        return compact(
             'jobsData',
             'totals',
             'summary',
@@ -960,8 +976,125 @@ class ReportController extends Controller
             'operationalHours',
             'shiftDisplayStart',
             'shiftDisplayEnd',
-            'signatureStatus'
-        ));
+            'signatureStatus',
+            'canEdit',
+            'ttdLocked'
+        );
+    }
+
+    /**
+     * Batch-edit actual (actual_ok/repair/reject & act_start/act_finish) on the LKH report.
+     * Foreman-only (plus superadmin); locked once any signature exists for the work date.
+     *
+     * @return \Illuminate\Http\JsonResponse
+     */
+    public function updateLkhCells(Request $request)
+    {
+        $userRole = strtolower(auth()->user()?->role ?? '');
+        if (!in_array($userRole, ['foreman', 'superadmin'])) {
+            return response()->json(['error' => 'Anda tidak berhak mengedit data LKH'], 403);
+        }
+
+        $date = $request->input('date');
+        $updates = $request->input('updates', []);
+
+        if (!$date || !is_array($updates) || count($updates) === 0) {
+            return response()->json(['error' => 'Payload tidak valid'], 422);
+        }
+        $date = \Carbon\Carbon::parse($date)->toDateString();
+
+        $ttdLocked = \App\Models\Signature::where('work_date', $date)->exists();
+        if ($ttdLocked) {
+            return response()->json(['error' => 'Edit terkunci karena TTD sudah diisi'], 422);
+        }
+
+        $qtyFields = [
+            'actual_good'   => 'actual_ok',
+            'actual_repair' => 'actual_repair',
+            'actual_reject' => 'actual_reject',
+        ];
+        $timeFields = [
+            'actual_start'  => 'act_start',
+            'actual_finish' => 'act_finish',
+        ];
+        $allowed = array_merge(array_keys($qtyFields), array_keys($timeFields));
+
+        $audits = [];
+
+        DB::transaction(function () use ($updates, $allowed, $qtyFields, $timeFields, $date, &$audits) {
+            foreach ($updates as $u) {
+                $planId = (int) ($u['plan_id'] ?? 0);
+                $field = $u['field'] ?? '';
+                $value = trim((string) ($u['value'] ?? ''));
+
+                if ($planId <= 0 || !in_array($field, $allowed)) {
+                    continue;
+                }
+
+                $plan = ProductionPlan::find($planId);
+                if (!$plan) {
+                    continue;
+                }
+
+                $audit = [
+                    'plan_id'   => $planId,
+                    'field'     => $field,
+                    'edited_by' => auth()->id(),
+                    'edited_at' => now(),
+                ];
+
+                if (isset($timeFields[$field])) {
+                    if (!preg_match('/^\d{1,2}:\d{2}$/', $value)) {
+                        continue;
+                    }
+                    $newTime = \Carbon\Carbon::parse($value)->format('H:i');
+                    $audit['old_value'] = $plan->{$timeFields[$field]};
+                    $audit['new_value'] = $newTime;
+                    $plan->{$timeFields[$field]} = $newTime;
+                    $plan->save();
+                    $audits[] = $audit;
+                    continue;
+                }
+
+                $jn = trim($plan->job_no ?? '');
+                $jm = trim($plan->job_master ?? '');
+                $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+                $job = \App\Models\JobMaster::where('job_number', $identifier)->first();
+                if (!$job) {
+                    continue;
+                }
+                $dp = $job->dailyProduction;
+                if (!$dp) {
+                    $dp = new \App\Models\DailyProduction();
+                    $dp->job_master_id = $job->id;
+                    $dp->work_date = $date;
+                }
+
+                $col = $qtyFields[$field];
+                $newQty = max(0, (int) $value);
+                $audit['old_value'] = (string) $dp->getRawOriginal($col);
+                $audit['new_value'] = (string) $newQty;
+                $dp->{$col} = $newQty;
+                $dp->actual_qty = $dp->actual_ok + $dp->actual_repair + $dp->actual_reject;
+                $dp->save();
+                $audits[] = $audit;
+            }
+        });
+
+        if (count($audits) === 0) {
+            return response()->json(['error' => 'Tidak ada perubahan yang valid disimpan'], 422);
+        }
+
+        \App\Models\LkhCorrection::insert($audits);
+
+        $data = $this->buildDailyProductionData($request);
+        $html = view('reports.partials.lkh_update_fragments', $data)->render();
+
+        return response()->json([
+            'success' => true,
+            'message' => count($audits) . ' sel berhasil diperbarui',
+            'html'    => $html,
+        ]);
     }
 
     public function performance(Request $request)
