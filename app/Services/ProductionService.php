@@ -438,8 +438,9 @@ class ProductionService
 
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
                 // Finalisasi: replace semua log dengan nilai final
+                $workDate = $session?->work_date ?? now()->toDateString();
                 ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())
+                    ->whereDate('created_at', $workDate)
                     ->delete();
                 ProductionLog::create([
                     'job_master_id' => $jobId,

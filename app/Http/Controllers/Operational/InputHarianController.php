@@ -834,64 +834,6 @@ class InputHarianController extends Controller
         }
     }
 
-    public function nextList($id)
-    {
-        $current = JobMaster::find($id);
-
-        if (!$current) {
-            return response()->json([]);
-        }
-
-        $jobs = JobMaster::where('id', '!=', $id)
-            ->whereIn('status', ['pending', 'paused', 'running'])
-            ->where('line', $current->line)
-            ->orderBy('sequence_no')
-            ->orderBy('job_number')
-            ->get();
-
-        $formatted = $jobs->map(function($j) {
-            return [
-                'id' => $j->id,
-                'job_number' => $j->job_number,
-                'job_name' => $j->job_name,
-                'line' => $j->line,
-                'target_qty' => $j->target_qty,
-                'label' => "{$j->job_name} - {$j->job_number} (" . ($j->target_qty ?: 0) . " pcs)"
-            ];
-        });
-
-        return response()->json($formatted);
-    }
-    
-    public function nextProcess(Request $request, $id)
-    {
-        $this->guardLockedShift($id);
-        $nextJobId = $request->get('next_job_id');
-        $skipIdle = filter_var($request->get('skip_idle', true), FILTER_VALIDATE_BOOLEAN);
-        
-        // 1. Finish the current job and optionally start the next one
-        $this->productionService->finishJob($id, $nextJobId, $skipIdle);
-
-        // 2. Get the next job
-        $next = $this->productionService->getNextJob($id, $request->next_id);
-
-        if ($next) {
-            $this->productionService->startJob($next->id);
-
-            return response()->json([
-                'success' => true,
-                'message' => 'Next process: '.$next->job_number,
-                'next_id' => $next->id
-            ]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Semua job selesai'
-        ]);
-    }
-
-
     public function activeJob(Request $request)
     {
         $lineFilter = $request->get('line');
@@ -1259,6 +1201,7 @@ class InputHarianController extends Controller
 
     public function submitShift(Request $request, $lineId)
     {
+        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $lineId) {
         try {
             $date = $request->get('date', now()->toDateString());
             $shift = $request->get('shift');
@@ -1293,8 +1236,37 @@ class InputHarianController extends Controller
                 'remain' => [],
             ];
 
+            // ── BATCH LOAD: All parent JobMasters + children in 3 queries instead of N*3 ──
+            $parentPlans = $plans->filter(fn($p) => !$p->parent_job_id);
+            $parentIdentifiers = $parentPlans->map(function($p) {
+                $jn = trim($p->job_no ?? '');
+                $jm = trim($p->job_master ?? '');
+                if (blank($jn) && blank($jm)) return null;
+                return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            })->filter()->values()->toArray();
+
+            $parentJobMasters = \App\Models\JobMaster::whereIn('job_number', $parentIdentifiers)
+                ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                ->get()
+                ->keyBy('job_number');
+
+            $parentIds = $parentPlans->pluck('id')->filter()->values()->toArray();
+            $childPlansMap = \App\Models\ProductionPlan::whereIn('parent_job_id', $parentIds)
+                ->get()
+                ->groupBy('parent_job_id');
+
+            $childIdentifiers = $childPlansMap->flatten()->map(function($c) {
+                $cjn = trim($c->job_no ?? '');
+                return $cjn ? ($cjn . '-' . $c->id) : null;
+            })->filter()->values()->toArray();
+
+            $childJobMasters = \App\Models\JobMaster::whereIn('job_number', $childIdentifiers)
+                ->with(['downtimes', 'repairRejects'])
+                ->get()
+                ->keyBy('job_number');
+
+            // ── VALIDATION LOOP: Use batch-loaded lookups ──
             foreach ($plans as $plan) {
-                // Skip children — they are checked inside the parent loop
                 if ($plan->parent_job_id) continue;
 
                 $jn = trim($plan->job_no ?? '');
@@ -1302,26 +1274,19 @@ class InputHarianController extends Controller
                 if (blank($jn) && blank($jm)) continue;
                 $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
 
-                $jobMaster = \App\Models\JobMaster::where('job_number', $identifier)
-                    ->with(['dailyProduction', 'downtimes', 'repairRejects'])
-                    ->first();
-
+                $jobMaster = $parentJobMasters->get($identifier);
                 if (!$jobMaster) continue;
 
-                // Collect parent + children JobMasters for comprehensive check
                 $allJms = collect([$jobMaster]);
-                $children = \App\Models\ProductionPlan::where('parent_job_id', $plan->id)->get();
+                $children = $childPlansMap->get($plan->id, collect());
                 foreach ($children as $child) {
                     $childKey = trim($child->job_no ?? '') . '-' . $child->id;
-                    $childJm = \App\Models\JobMaster::where('job_number', $childKey)
-                        ->with(['downtimes', 'repairRejects'])
-                        ->first();
+                    $childJm = $childJobMasters->get($childKey);
                     if ($childJm) $allJms->push($childJm);
                 }
 
                 $itemName = $plan->job_no ?: $plan->job_master;
 
-                // Check DT on all JobMasters (parent + children)
                 foreach ($allJms as $jm) {
                     foreach ($jm->downtimes ?? [] as $dt) {
                         if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
@@ -1337,10 +1302,7 @@ class InputHarianController extends Controller
                             ];
                         }
                     }
-                }
 
-                // Check Repair & Reject on all JobMasters + cek actual tanpa RR record
-                foreach ($allJms as $jm) {
                     foreach ($jm->repairRejects ?? [] as $rr) {
                         if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
                             $key = $rr->type === 'reject' ? 'reject' : 'repair';
@@ -1375,10 +1337,20 @@ class InputHarianController extends Controller
                         }
                     }
                 }
+            }
 
-        }
+        // Check Remain — use batch-loaded lookups
+        $remainIdentifiers = $parentPlans->map(function($p) {
+            $pJn = trim($p->job_no ?? '');
+            $pJmStr = trim($p->job_master ?? '');
+            if (blank($pJn) && blank($pJmStr)) return null;
+            return $pJn ? ($pJn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($pJmStr) . '-' . $p->id);
+        })->filter()->values()->toArray();
 
-        // Check Remain — skip children & breaks
+        $remainJobMasters = \App\Models\JobMaster::whereIn('job_number', $remainIdentifiers)
+            ->get()
+            ->keyBy('job_number');
+
         foreach ($plans as $p) {
             if ($p->parent_job_id) continue;
             if (($p->row_type ?? 'job') === 'break') continue;
@@ -1386,7 +1358,7 @@ class InputHarianController extends Controller
             $pJmStr = trim($p->job_master ?? '');
             if (blank($pJn) && blank($pJmStr)) continue;
             $pIdent = $pJn ? ($pJn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($pJmStr) . '-' . $p->id);
-            $pJm = \App\Models\JobMaster::where('job_number', $pIdent)->first();
+            $pJm = $remainJobMasters->get($pIdent);
             if (!$pJm) {
                 $issues['remain'][] = [
                     'item'          => $p->job_no ?: $p->job_master,
@@ -1394,7 +1366,7 @@ class InputHarianController extends Controller
                     'job_master_id' => null,
                     'plan_id'       => $p->id,
                 ];
-            } elseif (in_array(strtolower($pJm->status), ['running', 'pending'])) {
+            } elseif (in_array(strtolower($pJm->status), ['running', 'pending', 'paused'])) {
                 $issues['remain'][] = [
                     'item'          => $p->job_no ?: $p->job_master,
                     'issue'         => "Status masih {$pJm->status}",
@@ -1445,6 +1417,7 @@ class InputHarianController extends Controller
                 'message' => $e->getMessage(),
             ], 500);
         }
+        });
     }
 
     public function productionAudit(Request $request)

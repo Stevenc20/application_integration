@@ -446,19 +446,6 @@ Route::middleware(['auth'])
 
     /*
     ====================================================
-    NEXT PROCESS
-    ====================================================
-    */
-    Route::get('/job/{id}/next-list',
-        [InputHarianController::class, 'nextList']
-    )->name('job.next_list');
-
-    Route::post('/job/{id}/next-process',
-        [InputHarianController::class, 'nextProcess']
-    )->name('job.next_process');
-
-    /*
-    ====================================================
     TIMER REALTIME
     ====================================================
     */
