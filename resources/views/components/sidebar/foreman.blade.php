@@ -58,7 +58,7 @@
                 <li>
                     <a href="{{ route('supervisor.dashboard', ['line' => $sl->line_name]) }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ $isLineActive ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                        <span>Dashboard {{ $sl->line_name }}</span>
+                        <span>{{ $sl->line_name }}</span>
                     </a>
                 </li>
             @endforeach
