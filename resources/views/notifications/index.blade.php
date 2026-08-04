@@ -4,7 +4,7 @@
 
 @section('content')
 <div class="mb-3">
-    <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('overview') }}" class="inline-flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-red-600 transition-colors">
+    <a href="{{ url()->previous() !== url()->current() ? url()->previous() : route('supervisor.overview') }}" class="inline-flex items-center gap-1 text-sm font-semibold text-gray-500 hover:text-red-600 transition-colors">
         <i class="bx bx-arrow-back text-lg"></i>
         Kembali
     </a>
