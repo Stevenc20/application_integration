@@ -6,6 +6,7 @@ use App\Models\ProductionPlan;
 use App\Services\BreakTimelineValidator;
 use App\Services\TimelineGenerationService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
 
 uses(RefreshDatabase::class);
 
@@ -82,6 +83,20 @@ function bpBreak(array $overrides = []): ProductionPlan
     return ProductionPlan::create(array_merge($defaults, $overrides));
 }
 
+function bpFilterBreakRows(Collection $plans): Collection
+{
+    $validator = app(BreakTimelineValidator::class);
+
+    $keptIds = $plans
+        ->groupBy(fn ($p) => (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? ''))
+        ->flatMap(fn (Collection $group) => $validator->filterOverlappingBreaks(
+            $validator->filterValidPlans($group)
+        ))
+        ->pluck('id');
+
+    return $plans->filter(fn ($p) => $keptIds->contains($p->id))->values();
+}
+
 // ──────────────── BreakTimelineValidator span filtering ────────────────
 
 describe('BreakTimelineValidator span filtering', function () {
@@ -143,7 +158,8 @@ describe('BreakTimelineValidator span filtering', function () {
         bpPlan(['press_name' => 'PA', 'row_no' => 10, 'start_time' => '17:10', 'finish_time' => '17:32']);
         $breakA = bpBreak(['press_name' => 'PA', 'job_no' => 'ISTIRAHAT SORE', 'start_time' => '18:00', 'finish_time' => '18:30', 'dct' => 30]);
 
-        // Press B: 17:00–18:30 (DOES reach 18:00)
+        // Press B: jobs segmented around the break (17:00–18:00, 18:30–19:00)
+        // so SORE 18:00–18:30 legitimately sits between two jobs.
         LineMaster::firstOrCreate(
             ['line_code' => 'PB'],
             ['line_name' => 'PB', 'kapasitas' => 100, 'type_line' => 'printing']
@@ -155,12 +171,12 @@ describe('BreakTimelineValidator span filtering', function () {
             'shift_name' => 'Shift Pagi',
             'press_name' => 'PB',
             'hari' => 'kamis',
-            'row_no' => 10,
+            'row_no' => 9,
             'row_type' => 'job',
             'job_no' => 'PB-001',
             'job_master' => 'PB JOB',
             'start_time' => '17:00',
-            'finish_time' => '18:30',
+            'finish_time' => '18:00',
             'dct' => 5,
             'source_type' => 'ppc',
         ]);
@@ -179,17 +195,70 @@ describe('BreakTimelineValidator span filtering', function () {
             'dct' => 30,
             'source_type' => 'ppc',
         ]);
+        ProductionPlan::create([
+            'line_master_id' => $lmB,
+            'plan_date' => '2026-06-25',
+            'shift_name' => 'Shift Pagi',
+            'press_name' => 'PB',
+            'hari' => 'kamis',
+            'row_no' => 11,
+            'row_type' => 'job',
+            'job_no' => 'PB-002',
+            'job_master' => 'PB JOB 2',
+            'start_time' => '18:30',
+            'finish_time' => '19:00',
+            'dct' => 5,
+            'source_type' => 'ppc',
+        ]);
 
         // Simulate controller behaviour: group by press+shift, filter each group
         $plans = ProductionPlan::whereDate('plan_date', '2026-06-25')->get();
-        $validator = app(BreakTimelineValidator::class);
-        $kept = $plans
-            ->groupBy(fn ($p) => (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? ''))
-            ->flatMap(fn ($group) => $validator->filterValidPlans($group))
-            ->pluck('id');
+        $filtered = bpFilterBreakRows($plans);
 
-        expect($kept->contains($breakA->id))->toBeFalse();
-        expect($kept->contains($breakB->id))->toBeTrue();
+        expect($filtered->pluck('id')->contains($breakA->id))->toBeFalse();
+        expect($filtered->pluck('id')->contains($breakB->id))->toBeTrue();
+    });
+
+    test('drops a break that overlaps a running job (reported PRESS A case)', function () {
+        // Reported data 2026-08-05: SORE break row kept morning times 09:49–10:19
+        // which overlaps job IB-094 WIP (09:49–10:34). Real breaks sit between jobs.
+        bpPlan(['row_no' => 3, 'job_no' => 'XP-0078', 'start_time' => '08:59', 'finish_time' => '09:49']);
+        bpPlan(['row_no' => 4, 'job_no' => 'IB-094 WIP', 'start_time' => '09:49', 'finish_time' => '10:34']);
+        bpPlan(['row_no' => 6, 'job_no' => 'T4023', 'start_time' => '11:45', 'finish_time' => '12:01']);
+        $breakSore = bpBreak(['row_no' => 20, 'job_no' => 'ISTIRAHAT SORE', 'start_time' => '09:49', 'finish_time' => '10:19', 'dct' => 30]);
+        $breakSiang = bpBreak(['row_no' => 7, 'job_no' => 'ISTIRAHAT SIANG', 'start_time' => '12:01', 'finish_time' => '12:41', 'dct' => 40]);
+
+        $plans = ProductionPlan::whereDate('plan_date', '2026-06-25')->get();
+        $filtered = bpFilterBreakRows($plans);
+
+        expect($filtered->pluck('id')->contains($breakSore->id))->toBeFalse();
+        expect($filtered->pluck('id')->contains($breakSiang->id))->toBeTrue();
+    });
+
+    test('keeps a break that sits exactly between two jobs', function () {
+        bpPlan(['row_no' => 1, 'start_time' => '17:10', 'finish_time' => '17:20']);
+        $break = bpBreak(['row_no' => 2, 'job_no' => 'CLEANING', 'start_time' => '17:20', 'finish_time' => '17:30', 'dct' => 10]);
+        bpPlan(['row_no' => 3, 'start_time' => '17:30', 'finish_time' => '17:40']);
+
+        $plans = ProductionPlan::whereDate('plan_date', '2026-06-25')->get();
+        $filtered = bpFilterBreakRows($plans);
+
+        expect($filtered->pluck('id')->contains($break->id))->toBeTrue();
+    });
+
+    test('single long job spanning a break time hides that break', function () {
+        // Edge case accepted: a lone job running across the break hour leaves
+        // no room to place the break between jobs, so it is hidden.
+        $job = bpPlan(['row_no' => 10, 'start_time' => '17:10', 'finish_time' => '18:40']);
+        $job2 = bpPlan(['row_no' => 11, 'start_time' => '18:40', 'finish_time' => '19:00']);
+        $break = bpBreak(['job_no' => 'ISTIRAHAT SORE', 'start_time' => '18:00', 'finish_time' => '18:30', 'dct' => 30]);
+
+        $plans = ProductionPlan::whereDate('plan_date', '2026-06-25')->get();
+        $filtered = bpFilterBreakRows($plans);
+
+        expect($filtered->pluck('id')->contains($break->id))->toBeFalse();
+        expect($filtered->pluck('id')->contains($job->id))->toBeTrue();
+        expect($filtered->pluck('id')->contains($job2->id))->toBeTrue();
     });
 });
 

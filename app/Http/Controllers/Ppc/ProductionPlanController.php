@@ -326,7 +326,9 @@ class ProductionPlanController extends Controller
                 return (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? '');
             })
             ->flatMap(function (Collection $group) use ($validator) {
-                return $validator->filterValidPlans($group);
+                return $validator->filterOverlappingBreaks(
+                    $validator->filterValidPlans($group)
+                );
             })
             ->pluck('id')
             ->flip();

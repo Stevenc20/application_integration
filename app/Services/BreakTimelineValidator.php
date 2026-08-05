@@ -107,6 +107,59 @@ class BreakTimelineValidator
     }
 
     /**
+     * Drop breaks whose time slot overlaps a running job. Legitimate breaks in
+     * these schedules always sit BETWEEN jobs; a break that overlaps a job's
+     * [start, finish] is corrupt Excel data (e.g. an ISTIRAHAT SORE row whose
+     * time cells were left at morning values). Jobs are never dropped here.
+     *
+     * @param Collection<ProductionPlan> $plans
+     * @return Collection<ProductionPlan>
+     */
+    public function filterOverlappingBreaks(Collection $plans): Collection
+    {
+        $jobRanges = [];
+
+        foreach ($plans as $p) {
+            if (($p->row_type ?? 'job') !== 'job') {
+                continue;
+            }
+            if (empty($p->start_time) || empty($p->finish_time)) {
+                continue;
+            }
+
+            $jobRanges[] = [
+                'start'  => $this->timeToMinutes($p->start_time),
+                'finish' => $this->finishToMinutes($p->start_time, $p->finish_time),
+            ];
+        }
+
+        if (empty($jobRanges)) {
+            return $plans;
+        }
+
+        return $plans->filter(function ($plan) use ($jobRanges) {
+            if (($plan->row_type ?? 'job') !== 'break') {
+                return true;
+            }
+            if (empty($plan->start_time) || empty($plan->finish_time)) {
+                return true;
+            }
+
+            $breakStart  = $this->timeToMinutes($plan->start_time);
+            $breakFinish = $this->timeToMinutes($plan->finish_time);
+
+            foreach ($jobRanges as $range) {
+                // Strict overlap: the break cuts into a running job's window
+                if ($breakStart < $range['finish'] && $breakFinish > $range['start']) {
+                    return false;
+                }
+            }
+
+            return true;
+        })->values();
+    }
+
+    /**
      * Convert time to minutes with consistent midnight-crossover handling.
      * All times within a batch are normalized against a reference hour.
      * If a time follows a midnight-crossover pattern (hours < 7 after hours >= 12),
