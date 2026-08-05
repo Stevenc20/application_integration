@@ -1970,7 +1970,81 @@ function autoCloseJobDowntimes(jobId) {
     });
 }
 
+function escHtml(str) {
+    return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#039;');
+}
+
+function getSkippedJobs() {
+    const id = window.currentFinishId;
+    if (!id) return [];
+    const nextJobId = document.getElementById('nextSelect')?.value;
+    if (!nextJobId || nextJobId === 'FINISH_ONLY' || nextJobId === 'STOP_SESSION') return [];
+    const current = window.jobMasterData && window.jobMasterData[id];
+    if (!current) return [];
+    const currentLine = (current.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '');
+    const curRow = Number(current.row_no) || 0;
+    const next = (window._pendingJobsData || []).find(j => String(j.id) === String(nextJobId));
+    if (!next) return [];
+    const nextRow = Number(next.row_no) || 0;
+    if (!curRow || nextRow <= curRow) return [];
+    return (window._pendingJobsData || []).filter(j => {
+        if (String(j.id) === String(id) || String(j.id) === String(nextJobId)) return false;
+        const jLine = (j.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '');
+        if (jLine !== currentLine) return false;
+        const r = Number(j.row_no) || 0;
+        return r > curRow && r < nextRow;
+    });
+}
+
+function openSkipConfirmModal(skipped) {
+    const list = document.getElementById('skipItemList');
+    if (!list) return;
+    list.innerHTML = skipped.map(j => `
+        <div class="border border-amber-200 bg-amber-50/50 rounded-xl p-3">
+            <div class="font-bold text-sm text-gray-800">${escHtml(j.job_name || '')} <span class="text-gray-500 font-semibold">(${escHtml(j.job_number || '')})</span></div>
+            <div class="flex flex-wrap gap-x-5 gap-y-1.5 mt-2.5">
+                <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer">
+                    <input type="radio" name="skip-${j.id}" value="recovery" checked> Tidak tercapai → Recovery
+                </label>
+                <label class="flex items-center gap-1.5 text-xs font-semibold text-gray-600 cursor-pointer">
+                    <input type="radio" name="skip-${j.id}" value="continue"> Dilanjut pindah jam
+                </label>
+            </div>
+        </div>
+    `).join('');
+    const modal = document.getElementById('skipConfirmModal');
+    if (modal) { modal.classList.remove('hidden'); modal.classList.add('flex'); }
+}
+
+function closeSkipConfirmModal() {
+    const modal = document.getElementById('skipConfirmModal');
+    if (modal) { modal.classList.add('hidden'); modal.classList.remove('flex'); }
+}
+
+function confirmSkipSubmit() {
+    const checked = document.querySelectorAll('#skipItemList input[type="radio"]:checked');
+    const skippedActions = {};
+    checked.forEach(r => { skippedActions[r.name.replace('skip-', '')] = r.value; });
+    closeSkipConfirmModal();
+    doSubmitFinalJob(skippedActions);
+}
+
 async function submitFinalJob() {
+    if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
+    const id = window.currentFinishId;
+    if (!id) return;
+
+    const skipped = getSkippedJobs();
+    if (skipped.length > 0) {
+        openSkipConfirmModal(skipped);
+        return;
+    }
+    await doSubmitFinalJob({});
+}
+
+async function doSubmitFinalJob(skippedActions) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     const id = window.currentFinishId;
     const nextJobId = document.getElementById('nextSelect').value;
@@ -2009,7 +2083,8 @@ async function submitFinalJob() {
                 skip_idle: false,
                 ok_qty: finalOk,
                 repair_qty: finalRepair,
-                reject_qty: finalReject
+                reject_qty: finalReject,
+                skipped_actions: skippedActions || {}
             })
         }).then(r => r.json());
 
@@ -2027,6 +2102,8 @@ async function submitFinalJob() {
             if (res.mismatch) {
                 const m = res.mismatch;
                 showToast(`Item ${m.job_no} tidak tercapai: ${m.actual_qty}/${m.plan_qty} — ${m.recovery_qty} pcs masuk recovery queue`, 'warning', 6000);
+            } else if (res.skipped && res.skipped.length > 0) {
+                showToast(`${res.skipped.length} item dilewati sudah diproses sesuai pilihan`, 'info', 6000);
             } else {
                 showToast('Pekerjaan selesai!', 'success');
             }
@@ -3046,6 +3123,8 @@ window.showConfirm = showConfirm;
 window.closeConfirmModal = closeConfirmModal;
 window.openFinishModal = openFinishModal;
 window.closeFinishModal = closeFinishModal;
+window.closeSkipConfirmModal = closeSkipConfirmModal;
+window.confirmSkipSubmit = confirmSkipSubmit;
 window.showToast = showToast;
 window.toggleCustomSelect = toggleCustomSelect;
 window.selectCustomItem = selectCustomItem;

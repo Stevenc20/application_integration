@@ -208,6 +208,7 @@
                         @php
                             $statusColors = [
                                 'waiting_approval' => 'bg-amber-100 text-amber-700',
+                                'continue'         => 'bg-blue-100 text-blue-700',
                                 'in_production'    => 'bg-purple-100 text-purple-700',
                                 'approved'         => 'bg-sky-100 text-sky-700',
                                 'rejected'         => 'bg-rose-100 text-rose-700',
@@ -226,6 +227,9 @@
                                     break;
                                 case 'waiting_approval':
                                     $keterangan = 'Menunggu approval. Belum masuk antrian produksi.';
+                                    break;
+                                case 'continue':
+                                    $keterangan = 'Dilanjut pindah jam — otomatis dijadwalkan ke shift berikutnya saat cut-off.';
                                     break;
                                 case 'approved':
                                     $keterangan = 'Disetujui. Menunggu dijadwalkan oleh scheduler pada shift berikutnya.';

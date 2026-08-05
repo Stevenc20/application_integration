@@ -46,7 +46,7 @@ class RecoveryController extends Controller
 
         $items = $query->paginate(50)->withQueryString();
         $presses = RecoveryItem::distinct()->pluck('press_name')->sort()->values();
-        $statuses = ['waiting_approval', 'approved', 'rejected', 'scheduled', 'in_production', 'completed'];
+        $statuses = ['waiting_approval', 'continue', 'approved', 'rejected', 'scheduled', 'in_production', 'completed'];
         $queueCount = RecoveryItem::pending()->count();
 
         return view('ppc.recovery.index', compact('items', 'presses', 'statuses', 'tab', 'queueCount'));
@@ -163,7 +163,7 @@ class RecoveryController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Cut-off selesai: {$stats['created']} recovery item dibuat, {$stats['skipped']} dilewati.",
+            'message' => "Cut-off selesai: {$stats['created']} recovery item dibuat, {$stats['skipped']} dilewati, {$stats['carried']} dilanjut pindah jam.",
             'stats'   => $stats,
         ]);
     }

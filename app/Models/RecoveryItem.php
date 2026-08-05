@@ -65,6 +65,11 @@ class RecoveryItem extends Model
         return $q->where('status', 'waiting_approval');
     }
 
+    public function scopeContinue($q)
+    {
+        return $q->where('status', 'continue');
+    }
+
     public function scopeApproved($q)
     {
         return $q->where('status', 'approved');

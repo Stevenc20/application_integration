@@ -422,6 +422,16 @@ class InputHarianController extends Controller
             })
             ->values();
 
+        // Annotate pending jobs with their PPC row order so the frontend can
+        // detect items that are skipped when the operator jumps the queue.
+        $planByJobNumber = $plans->keyBy(fn ($p) => (trim($p->job_no ?? '') ?: 'AUTO-' . \Illuminate\Support\Str::slug($p->job_master ?? '')) . '-' . $p->id);
+        $pendingJobs = $pendingJobs->map(function ($job) use ($planByJobNumber) {
+            $plan = $planByJobNumber->get(trim($job->job_number ?? ''));
+            $job->row_no       = $plan ? (int) $plan->row_no : null;
+            $job->plan_job_no  = $plan ? trim($plan->job_no ?? '') : null;
+            return $job;
+        })->values();
+
         $scheduleContext = ($lineFilter ?: 'SEMUA LINE') . ' &bull; ' . strtoupper($currentShift === 'all' ? 'SEMUA SHIFT' : $currentShift);
 
         // DEBUG: Mastiin data yang dibaca beneran dari ProductionPlan terbaru
@@ -748,12 +758,14 @@ class InputHarianController extends Controller
             $finalOk = $request->json('ok_qty');
             $finalRepair = $request->json('repair_qty');
             $finalReject = $request->json('reject_qty');
-            $result = $this->productionService->finishJob($id, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject);
+            $skippedActions = $request->json('skipped_actions') ?? $request->input('skipped_actions', []);
+            $result = $this->productionService->finishJob($id, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions);
 
             return response()->json([
                 'success' => true,
                 'runtime_seconds' => $result['runtime'],
                 'mismatch' => $result['mismatch'],
+                'skipped' => $result['skipped'] ?? [],
             ]);
         } catch (\Throwable $e) {
             \Log::error("Failed to finish job $id: " . $e->getMessage(), [

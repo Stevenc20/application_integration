@@ -444,7 +444,8 @@ window.jobMasterData = {
         dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         tpt: {{ (float)($job->tpt ?? 0) }},
-        line: "{{ $job->press_name ?? '' }}"
+        line: "{{ $job->press_name ?? '' }}",
+        row_no: {{ $job->row_no ?? 0 }}
     },
     @endif
     @endforeach
@@ -478,7 +479,8 @@ window.jobMasterData = {
         dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         tpt: {{ (float)($activeJob->productionPlans->first()?->tpt ?? 0) }},
-        line: "{{ $activeJob->line ?? '' }}"
+        line: "{{ $activeJob->line ?? '' }}",
+        row_no: {{ $activeProdPlan?->row_no ?? 0 }}
     },
     @endif
 };

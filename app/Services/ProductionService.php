@@ -403,9 +403,9 @@ class ProductionService
     /**
      * Finish a job and sync metrics.
      */
-    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null)
+    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null, $skippedActions = [])
     {
-        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject) {
+        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions) {
             // Auto-close any active downtimes for this job
             Downtime::where('job_master_id', $jobId)
                 ->whereNull('finish_time')
@@ -469,73 +469,29 @@ class ProductionService
                 ]
             );
 
-            // QTY MISMATCH RECOVERY CHECK
-            $mismatch = null;
-            $plan = $job ? $job->getProductionPlanAttribute() : null;
-            $planQty = $plan ? (float)($plan->plan ?? 0) : (float)($job->target_qty ?? 0);
-            $totalProduced = $totalOk + $totalRepair + $totalReject;
+            // QTY MISMATCH RECOVERY CHECK (current job)
+            $mismatch = $this->createRecoveryItem($job, 'waiting_approval', true, [
+                'ok'     => $totalOk,
+                'repair' => $totalRepair,
+                'reject' => $totalReject,
+            ]);
 
-            if ($planQty > 0 && $totalProduced < $planQty) {
-                $recoveryQty = $planQty - $totalProduced;
-                $ctDetik = $plan ? (float)($plan->ct_detik ?? 0) : 0;
-                $dct = $plan ? (float)($plan->dct ?? 0) : 0;
-                $durationMinutes = $ctDetik > 0
-                    ? (int)ceil(($ctDetik * $recoveryQty) / 60.0) + $dct
-                    : 0;
-
-                $today = now()->toDateString();
-                $shiftName = $this->getShiftName();
-
-                $schedule = RecoverySchedule::firstOrCreate(
-                    [
-                        'plan_date'  => $today,
-                        'shift_name' => $shiftName,
-                        'press_name' => $job->line ?? '',
-                    ],
-                    ['status' => 'waiting_approval']
-                );
-
-                $recoveryItem = RecoveryItem::firstOrCreate(
-                    [
-                        'recovery_schedule_id' => $schedule->id,
-                        'job_no'               => trim($job->job_number ?? ''),
-                        'press_name'           => $job->line ?? '',
-                    ],
-                    [
-                        'production_plan_id'   => $plan?->id,
-                        'job_master'           => $job->job_number ?? '',
-                        'plan_qty'             => $planQty,
-                        'ok'                   => $totalOk,
-                        'repair'               => $totalRepair,
-                        'reject'               => $totalReject,
-                        'ct_detik'             => $ctDetik,
-                        'dct'                  => $dct,
-                        'reg_active'           => $plan ? (float)($plan->reg_active ?? 0) : 0,
-                        'total_mesin'          => $plan ? (int)($plan->total_mesin ?? 1) : 1,
-                        'status'               => 'waiting_approval',
-                        'original_date'        => $today,
-                        'original_shift_name'  => $shiftName,
-                        'source_date'          => $today,
-                        'source_shift'         => $shiftName,
-                        'actual_qty'           => $totalProduced,
-                        'recovery_qty'         => $recoveryQty,
-                        'duration_minutes'     => $durationMinutes,
-                        'queued_at'            => now(),
-                    ]
-                );
-
-                $ppcUsers = User::whereIn('role', ['ppc', 'admin'])->get();
-                foreach ($ppcUsers as $ppcUser) {
-                    $ppcUser->notify(new ItemTidakTercapaiNotification($job, $recoveryItem));
+            // SKIPPED ITEMS (jumped over by picking a next job that skips PPC order)
+            $skipped = [];
+            foreach ((array) $skippedActions as $jobMasterId => $action) {
+                $skippedJob = JobMaster::find($jobMasterId);
+                if (!$skippedJob) {
+                    continue;
                 }
-
-                $mismatch = [
-                    'plan_qty'     => $planQty,
-                    'actual_qty'   => $totalProduced,
-                    'recovery_qty' => $recoveryQty,
-                    'job_no'       => $job->job_number ?? '',
-                    'recovery_id'  => $recoveryItem->id,
-                ];
+                $isContinue = strtolower((string) $action) === 'continue';
+                $item = $this->createRecoveryItem(
+                    $skippedJob,
+                    $isContinue ? 'continue' : 'waiting_approval',
+                    !$isContinue
+                );
+                if ($item) {
+                    $skipped[] = $item;
+                }
             }
 
             // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
@@ -557,8 +513,96 @@ class ProductionService
 
             $this->signalDashboard($jobId);
 
-            return ['runtime' => $runtime, 'mismatch' => $mismatch];
+            return ['runtime' => $runtime, 'mismatch' => $mismatch, 'skipped' => $skipped];
         });
+    }
+
+    /**
+     * Create a recovery item for a job whose plan was not reached.
+     *
+     * @param string $status 'waiting_approval' (needs leader) or 'continue' (dilanjut pindah jam)
+     */
+    private function createRecoveryItem($job, string $status, bool $notify = true, ?array $quantities = null): ?array
+    {
+        if (!$job) {
+            return null;
+        }
+
+        $plan = $job->getProductionPlanAttribute();
+        $planQty = $plan ? (float)($plan->plan ?? 0) : (float)($job->target_qty ?? 0);
+
+        $totalOk     = $quantities ? (float)($quantities['ok'] ?? 0) : (float)($job->dailyProduction?->actual_ok ?? 0);
+        $totalRepair = $quantities ? (float)($quantities['repair'] ?? 0) : (float)($job->dailyProduction?->actual_repair ?? 0);
+        $totalReject = $quantities ? (float)($quantities['reject'] ?? 0) : (float)($job->dailyProduction?->actual_reject ?? 0);
+        $totalProduced = $totalOk + $totalRepair + $totalReject;
+
+        if ($planQty <= 0 || $totalProduced >= $planQty) {
+            return null;
+        }
+
+        $recoveryQty = $planQty - $totalProduced;
+        $ctDetik = $plan ? (float)($plan->ct_detik ?? 0) : 0;
+        $dct = $plan ? (float)($plan->dct ?? 0) : 0;
+        $durationMinutes = $ctDetik > 0
+            ? (int)ceil(($ctDetik * $recoveryQty) / 60.0) + $dct
+            : 0;
+
+        $today = now()->toDateString();
+        $shiftName = $this->getShiftName();
+
+        $schedule = RecoverySchedule::firstOrCreate(
+            [
+                'plan_date'  => $today,
+                'shift_name' => $shiftName,
+                'press_name' => $job->line ?? '',
+            ],
+            ['status' => 'waiting_approval']
+        );
+
+        $recoveryItem = RecoveryItem::firstOrCreate(
+            [
+                'recovery_schedule_id' => $schedule->id,
+                'job_no'               => trim($job->job_number ?? ''),
+                'press_name'           => $job->line ?? '',
+            ],
+            [
+                'production_plan_id'   => $plan?->id,
+                'job_master'           => $job->job_number ?? '',
+                'plan_qty'             => $planQty,
+                'ok'                   => $totalOk,
+                'repair'               => $totalRepair,
+                'reject'               => $totalReject,
+                'ct_detik'             => $ctDetik,
+                'dct'                  => $dct,
+                'reg_active'           => $plan ? (float)($plan->reg_active ?? 0) : 0,
+                'total_mesin'          => $plan ? (int)($plan->total_mesin ?? 1) : 1,
+                'status'               => $status,
+                'original_date'        => $today,
+                'original_shift_name'  => $shiftName,
+                'source_date'          => $today,
+                'source_shift'         => $shiftName,
+                'actual_qty'           => $totalProduced,
+                'recovery_qty'         => $recoveryQty,
+                'duration_minutes'     => $durationMinutes,
+                'queued_at'            => now(),
+            ]
+        );
+
+        if ($notify) {
+            $ppcUsers = User::whereIn('role', ['ppc', 'admin'])->get();
+            foreach ($ppcUsers as $ppcUser) {
+                $ppcUser->notify(new ItemTidakTercapaiNotification($job, $recoveryItem));
+            }
+        }
+
+        return [
+            'plan_qty'     => $planQty,
+            'actual_qty'   => $totalProduced,
+            'recovery_qty' => $recoveryQty,
+            'job_no'       => $job->job_number ?? '',
+            'recovery_id'  => $recoveryItem->id,
+            'status'       => $status,
+        ];
     }
 
     // autoStartNextJobAsIdle removed — flow langsung Dandori
