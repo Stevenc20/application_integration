@@ -136,7 +136,11 @@
                 @if($status == 'running' && !($isLocked ?? false))
                     <div class="flex flex-col gap-1.5">
                         <input type="number" id="actual-{{ $jobId }}" onchange="manualInput(this.id, {{ $jobId }})" value="{{ $actualOk }}" placeholder="0" class="w-full bg-transparent border-b border-blue-100 font-black text-blue-600 outline-none text-xs text-center transition-all">
+                        @if(($job->qty_plt ?? 0) > 0)
                         <button onclick="stepInput('actual-{{ $jobId }}', {{ $job->qty_plt ?? 0 }}, {{ $jobId }})" class="w-full py-1.5 rounded bg-emerald-500 text-white text-[8px] font-black hover:bg-emerald-600 transition-all">PLT ({{ $job->qty_plt ?? 0 }})</button>
+                        @else
+                        <button type="button" disabled class="w-full py-1.5 rounded bg-slate-200 text-slate-400 text-[8px] font-black transition-all cursor-not-allowed" title="qty_plt kosong (0) di PPC">PLT (0)</button>
+                        @endif
                     </div>
                 @else
                     <span class="font-black text-slate-400 text-xs">{{ number_format($actualOk) }}</span>

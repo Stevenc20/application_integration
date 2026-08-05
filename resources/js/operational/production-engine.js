@@ -2390,13 +2390,12 @@ function saveJob(id, source) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
 
     let actualEl = document.getElementById('actual-' + id);
-    let activeActualEl = document.getElementById('active-actual-' + id);
     let repairEl = document.getElementById('repair-' + id);
     let activeRepairEl = document.getElementById('active-repair-' + id);
     let rejectEl = document.getElementById('reject-' + id);
     let activeRejectEl = document.getElementById('active-reject-' + id);
 
-    let newActual = (actualEl ? (parseInt(actualEl.value) || 0) : 0) + (activeActualEl ? (parseInt(activeActualEl.value) || 0) : 0);
+    let newActual = (actualEl ? (parseInt(actualEl.value) || 0) : 0);
 
     if (source !== 'actual') {
         let repairDelta = (repairEl ? (parseInt(repairEl.value) || 0) : 0) + (activeRepairEl ? (parseInt(activeRepairEl.value) || 0) : 0);
@@ -2433,9 +2432,8 @@ function saveJob(id, source) {
 
     performSave(id, actualDelta, 0, 0);
 
-    // Set row input to current value, clear active board input
+    // Set row input to current value
     if (actualEl) actualEl.value = jobMasterData[id]?.actual_ok || '';
-    if (activeActualEl) activeActualEl.value = '';
 }
 
 function saveActiveJob() {
@@ -2445,16 +2443,29 @@ function saveActiveJob() {
 
 async function performSave(id, ok, repair, reject) {
     await window.ActionRunner.run('Save Log', async () => {
-        let success = false;
         try {
-            const data = await fetch(`/operational/job/${id}/save-log`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
-                body: JSON.stringify({ ok_qty: ok, repair_qty: repair, reject_qty: reject, date: window.ProductionConfig.currentDate })
-            }).then(r => r.json());
-            success = data.success;
+            let resp;
+            try {
+                resp = await fetch(`/operational/job/${id}/save-log`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
+                    body: JSON.stringify({ ok_qty: ok, repair_qty: repair, reject_qty: reject, date: window.ProductionConfig.currentDate })
+                });
+            } catch (netErr) {
+                showToast('Gagal terhubung ke server, coba lagi.', 'danger');
+                _registerSaveFailure(id, ok);
+                return;
+            }
+
+            let data = {};
+            try {
+                data = await resp.json();
+            } catch (e) {
+                data = { success: false, message: 'Server mengembalikan respons tidak valid (' + (resp.status || '?') + ').' };
+            }
 
             if (data.success) {
+                window._saveFailStreak = 0;
                 showToast('Data Production Log Saved!', 'success');
                 window.ProductionConfig.lastInputAt = new Date().toISOString();
                 if (data.runtime_seconds != null && jobMasterData[id]) {
@@ -2481,14 +2492,61 @@ async function performSave(id, ok, repair, reject) {
                     }
                 }
                 notifyLineStatusChange(jobMasterData[id]?.line);
+                return;
             }
-        } finally {
-            if (!success && jobMasterData[id]) {
-                jobMasterData[id].actual_ok -= ok;
-                updateTimeline();
+
+            // ——— SAVE DITOLAK / ERROR ———
+            const msg = data.message || _saveErrorMessage(resp && resp.status);
+            showToast(msg, 'danger', 4000);
+            window.ProductionConfig.lastInputAt = new Date().toISOString();
+
+            if (data.locked === true || /dikunci|terkunci|locked/i.test(msg)) {
+                window.ProductionConfig.isLocked = true;
+                setTimeout(() => location.reload(), 1500);
+                return;
             }
+
+            _registerSaveFailure(id, ok);
+        } catch (e) {
+            showToast('Terjadi kesalahan: ' + ((e && e.message) || e), 'danger');
+            _registerSaveFailure(id, ok);
         }
     });
+}
+
+function _registerSaveFailure(id, ok) {
+    // Sinkronkan dari server (sumber kebenaran) alih-alih rollback buta.
+    if (jobMasterData[id]) {
+        fetch(`/operational/job/${id}/sync?date=${encodeURIComponent(window.ProductionConfig.currentDate || '')}`, {
+            headers: { 'Accept': 'application/json' }
+        }).then(r => r.json()).then(s => {
+            if (s && s.qty) {
+                jobMasterData[id].actual_ok = parseInt(s.qty.actual_ok) || 0;
+                jobMasterData[id].actual_repair = parseInt(s.qty.actual_repair) || 0;
+                jobMasterData[id].actual_reject = parseInt(s.qty.actual_reject) || 0;
+                const el = document.getElementById('active-actual-display');
+                if (el) el.textContent = jobMasterData[id].actual_ok;
+                const rowInput = document.getElementById('actual-' + id);
+                if (rowInput) rowInput.value = jobMasterData[id].actual_ok;
+                updateTimeline();
+            }
+        }).catch(() => {
+            jobMasterData[id].actual_ok = Math.max(0, (parseInt(jobMasterData[id].actual_ok) || 0) - ok);
+            updateTimeline();
+        });
+    }
+
+    window._saveFailStreak = (window._saveFailStreak || 0) + 1;
+    if (window._saveFailStreak >= 3) {
+        showToast('Terjadi kegagalan berulang — memuat ulang halaman...', 'warning', 3000);
+        setTimeout(() => location.reload(), 1500);
+    }
+}
+
+function _saveErrorMessage(status) {
+    if (status === 403) return 'Shift sudah dikunci. Data tidak dapat diubah.';
+    if (status === 419) return 'Sesi berakhir, mohon muat ulang halaman.';
+    return 'Gagal menyimpan data, coba lagi.';
 }
 
 function showConfirm(title, text, callback) {
@@ -2910,6 +2968,7 @@ window.stepInput = function (id, amount, jobId = null) {
                 return;
             }
             if (amount === 0) {
+                showToast('Nilai PLT kosong (0), tidak ada yang ditambahkan.', 'warning', 3000);
                 if (input) input.value = '';
                 return;
             }

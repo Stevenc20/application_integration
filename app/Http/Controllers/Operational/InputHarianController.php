@@ -29,23 +29,45 @@ class InputHarianController extends Controller
 
     public function saveProductionLog(Request $request, $id)
     {
-        $this->guardLockedShift($id);
-        $workDate = $request->get('date') ?: now()->toDateString();
-        $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
+        try {
+            $this->guardLockedShift($id);
+        } catch (\App\Exceptions\ShiftLockedException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+                'locked'  => true,
+            ], 403);
+        }
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Log input saved',
-            'total_ok' => $result['actualQty'],
-            'efficiency' => $result['efficiency'],
-            'runtime_seconds' => $result['runtime_seconds'] ?? 0,
-            'log' => [
-                'time' => $result['log']->created_at->format('H:i'),
-                'ok' => $result['log']->ok_qty,
-                'repair' => $result['log']->repair_qty,
-                'reject' => $result['log']->reject_qty,
-            ]
-        ]);
+        try {
+            $workDate = $request->get('date') ?: now()->toDateString();
+            $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Log input saved',
+                'total_ok' => $result['actualQty'],
+                'efficiency' => $result['efficiency'],
+                'runtime_seconds' => $result['runtime_seconds'] ?? 0,
+                'log' => [
+                    'time' => $result['log']->created_at->format('H:i'),
+                    'ok' => $result['log']->ok_qty,
+                    'repair' => $result['log']->repair_qty,
+                    'reject' => $result['log']->reject_qty,
+                ]
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error("Save log gagal untuk job {$id}: " . $e->getMessage(), [
+                'exception' => $e,
+                'trace'     => $e->getTraceAsString(),
+                'payload'   => $request->all(),
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menyimpan data: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     public function index(Request $request)
@@ -830,7 +852,7 @@ class InputHarianController extends Controller
         ])->exists();
 
         if ($locked) {
-            throw new \Exception('Shift sudah dikunci. Data tidak dapat diubah.');
+            throw new \App\Exceptions\ShiftLockedException('Shift sudah dikunci. Data tidak dapat diubah.');
         }
     }
 

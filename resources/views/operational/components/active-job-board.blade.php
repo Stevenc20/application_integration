@@ -405,10 +405,12 @@
                                 <input type="hidden" id="active-actual-{{ $activeJob->id }}" value="0">
                                 <div class="flex flex-col gap-2 mt-2">
                                     <div class="flex gap-1.5">
+                                        @if(($activeJob->capacity ?? 0) > 0)
                                         <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition-all active:scale-95 shadow-sm shadow-emerald-200 flex items-center justify-center gap-1.5">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
                                             PLT ({{ $activeJob->capacity ?? 0 }})
                                         </button>
+                                        @endif
                                         <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                         </button>
