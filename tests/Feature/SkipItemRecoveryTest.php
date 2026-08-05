@@ -235,3 +235,60 @@ describe('cut-off carry forward', function () {
         expect($item->fresh()->status)->toBe('completed');
     });
 });
+
+describe('stale plan id resolution', function () {
+    beforeEach(function () {
+        Carbon::setTestNow('2026-06-25 10:00:00');
+    });
+
+    test('stale embedded plan id falls back to the current plan without crashing', function () {
+        Notification::fake();
+        srPpcUser();
+
+        $plan = srPlan(801, 'GT-2518', 100);
+        $job = JobMaster::create([
+            'job_number' => 'GT-2518-99999',
+            'job_name' => 'K-1041',
+            'line' => 'LINE-A',
+            'target_qty' => 100,
+            'capacity' => 100,
+            'status' => 'running',
+            'sequence_no' => 1,
+        ]);
+        srRunningSession($job);
+
+        $result = (new ProductionService())->finishJob($job->id, null, false, 75, 0, 0);
+
+        $item = RecoveryItem::where('job_no', $job->job_number)->first();
+        expect($item)->not->toBeNull();
+        expect($item->production_plan_id)->toBe($plan->id);
+        expect((float) $item->recovery_qty)->toBe(25.0);
+        expect($job->fresh()->status)->toBe('complete');
+        expect($result['mismatch'])->not->toBeNull();
+    });
+
+    test('unresolvable plan still finishes the job and creates a recovery item without a plan link', function () {
+        Notification::fake();
+        srPpcUser();
+
+        $job = JobMaster::create([
+            'job_number' => 'LOST-99999',
+            'job_name' => 'Item Tidak Dijadwalkan',
+            'line' => 'LINE-A',
+            'target_qty' => 100,
+            'capacity' => 100,
+            'status' => 'running',
+            'sequence_no' => 1,
+        ]);
+        srRunningSession($job);
+
+        (new ProductionService())->finishJob($job->id, null, false, 60, 0, 0);
+
+        $item = RecoveryItem::where('job_no', $job->job_number)->first();
+        expect($item)->not->toBeNull();
+        expect($item->production_plan_id)->toBeNull();
+        expect((float) $item->recovery_qty)->toBe(40.0);
+        expect($item->status)->toBe('waiting_approval');
+        expect($job->fresh()->status)->toBe('complete');
+    });
+});

@@ -9,12 +9,14 @@ use App\Models\Downtime;
 use App\Models\Dandori;
 use App\Models\ProductionLog;
 use App\Models\HambatanJalur;
+use App\Models\ProductionPlan;
 use App\Models\RecoveryItem;
 use App\Models\RecoverySchedule;
 use App\Models\User;
 use App\Notifications\ItemTidakTercapaiNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Services\DashboardRealtimeService;
 
 class ProductionService
@@ -528,7 +530,18 @@ class ProductionService
             return null;
         }
 
-        $plan = $job->getProductionPlanAttribute();
+        $today = now()->toDateString();
+        $shiftName = $this->getShiftName();
+
+        $plan = $this->resolvePlanForJob($job, $today, $shiftName);
+        if (!$plan) {
+            Log::warning("Recovery item created without production_plan_id (plan not resolvable)", [
+                'job_id' => $job->id,
+                'job_number' => $job->job_number,
+                'date' => $today,
+                'shift' => $shiftName,
+            ]);
+        }
         $planQty = $plan ? (float)($plan->plan ?? 0) : (float)($job->target_qty ?? 0);
 
         $totalOk     = $quantities ? (float)($quantities['ok'] ?? 0) : (float)($job->dailyProduction?->actual_ok ?? 0);
@@ -546,9 +559,6 @@ class ProductionService
         $durationMinutes = $ctDetik > 0
             ? (int)ceil(($ctDetik * $recoveryQty) / 60.0) + $dct
             : 0;
-
-        $today = now()->toDateString();
-        $shiftName = $this->getShiftName();
 
         $schedule = RecoverySchedule::firstOrCreate(
             [
@@ -603,6 +613,74 @@ class ProductionService
             'recovery_id'  => $recoveryItem->id,
             'status'       => $status,
         ];
+    }
+
+    /**
+     * Resolve the ProductionPlan linked to a job.
+     *
+     * job_number carries the plan id as a trailing segment (JOB_NO-PLAN_ID or
+     * AUTO-SLUG-PLAN_ID). PPC re-imports renumber plan rows, so that embedded id
+     * can go stale. We verify the parsed id against the job, and fall back to a
+     * match on job_no / job_master for the current shift when it no longer exists.
+     */
+    private function resolvePlanForJob($job, string $date, string $shiftName): ?ProductionPlan
+    {
+        if (!$job) {
+            return null;
+        }
+
+        $jobNumber = trim((string) $job->job_number);
+        $line = $job->line ?? '';
+
+        $parts = explode('-', $jobNumber);
+        $suffix = (string) end($parts);
+
+        if ($suffix !== '' && is_numeric($suffix)) {
+            $planId = (int) $suffix;
+            $prefix = substr($jobNumber, 0, -(strlen($suffix) + 1));
+
+            $plan = ProductionPlan::find($planId);
+            if ($plan && $this->planBelongsToJob($plan, $job, $prefix)) {
+                return $plan;
+            }
+        } else {
+            $prefix = $jobNumber;
+        }
+
+        // Fallback: current plan on the same press & shift, matched by job_no/job_master
+        $query = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('row_type', 'job');
+
+        if ($line !== '') {
+            $query->where('press_name', $line);
+        }
+
+        $query->where(function ($q) use ($prefix, $job) {
+            $q->whereRaw('TRIM(job_no) = ?', [$prefix]);
+            if (trim((string) $job->job_name) !== '') {
+                $q->orWhereRaw('TRIM(job_master) = ?', [trim((string) $job->job_name)]);
+            }
+        });
+
+        return $query->orderBy('row_no')->first();
+    }
+
+    private function planBelongsToJob(ProductionPlan $plan, $job, string $prefix): bool
+    {
+        $samePress = $this->normalizePress($plan->press_name ?? '') !== ''
+            && $this->normalizePress($plan->press_name ?? '') === $this->normalizePress($job->line ?? '');
+        $sameJobNo = trim((string) $plan->job_no) !== ''
+            && strcasecmp(trim((string) $plan->job_no), $prefix) === 0;
+        $sameMaster = trim((string) $job->job_name) !== ''
+            && strcasecmp(trim((string) $plan->job_master ?? ''), trim((string) $job->job_name)) === 0;
+
+        return $samePress || $sameJobNo || $sameMaster;
+    }
+
+    private function normalizePress(string $press): string
+    {
+        return strtoupper(trim(str_replace(['PRESS ', 'LINE ', 'Line ', 'Press '], '', $press)));
     }
 
     // autoStartNextJobAsIdle removed — flow langsung Dandori
@@ -973,69 +1051,66 @@ class ProductionService
         $jobMaster = \App\Models\JobMaster::find($jobId);
         if (!$jobMaster) return;
 
-        // Ekstrak Plan ID dari job_number (Format: JOB_NO-PLAN_ID atau AUTO-SLUG-PLAN_ID)
-        $parts = explode('-', $jobMaster->job_number);
-        $planId = end($parts);
+        $plan = $this->resolvePlanForJob($jobMaster, now()->toDateString(), $this->getShiftName());
+        if (!$plan) return;
 
-        if (is_numeric($planId)) {
-            $updateData = [];
+        $updateData = [];
 
-            if ($status !== null) {
-                $mappedStatus = strtolower($status);
-                if ($mappedStatus === 'running' || $mappedStatus === 'paused') {
-                    $mappedStatus = 'approved';
-                } elseif ($mappedStatus === 'complete') {
-                    $mappedStatus = 'completed';
-                }
-
-                if (in_array($mappedStatus, ['pending', 'approved', 'completed'])) {
-                    $updateData['status'] = $mappedStatus;
-                }
+        if ($status !== null) {
+            $mappedStatus = strtolower($status);
+            if ($mappedStatus === 'running' || $mappedStatus === 'paused') {
+                $mappedStatus = 'approved';
+            } elseif ($mappedStatus === 'complete') {
+                $mappedStatus = 'completed';
             }
 
-            // Jika salah satu kuantitas bernilai null, ambil secara dinamis dari database harian
-            if ($ok === null || $repair === null || $reject === null) {
-                $daily = \App\Models\DailyProduction::where('job_master_id', $jobId)
-                    ->whereDate('work_date', now()->toDateString())
-                    ->first();
-                if ($daily) {
-                    $ok = $ok ?? $daily->actual_qty;
-                    $repair = $repair ?? ($daily->actual_repair ?: $daily->repair_qty);
-                    $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
-                } else {
-                    $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', now())->sum('ok_qty');
-                    $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', now())->sum('repair_qty');
-                    $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', now())->sum('reject_qty');
-                }
+            if (in_array($mappedStatus, ['pending', 'approved', 'completed'])) {
+                $updateData['status'] = $mappedStatus;
             }
+        }
 
-            $updateData['ok'] = (float) ($ok ?? 0);
-            $updateData['repair'] = (float) ($repair ?? 0);
-            $updateData['reject'] = (float) ($reject ?? 0);
-
-            // Sync actual times to PPC
-            if ($jobMaster->started_at) {
-                $updateData['act_start'] = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+        // Jika salah satu kuantitas bernilai null, ambil secara dinamis dari database harian
+        if ($ok === null || $repair === null || $reject === null) {
+            $daily = \App\Models\DailyProduction::where('job_master_id', $jobId)
+                ->whereDate('work_date', now()->toDateString())
+                ->first();
+            if ($daily) {
+                $ok = $ok ?? $daily->actual_qty;
+                $repair = $repair ?? ($daily->actual_repair ?: $daily->repair_qty);
+                $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
+            } else {
+                $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                    ->whereDate('created_at', now())->sum('ok_qty');
+                $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                    ->whereDate('created_at', now())->sum('repair_qty');
+                $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                    ->whereDate('created_at', now())->sum('reject_qty');
             }
-            if ($jobMaster->finished_at) {
-                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
-            } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
-                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
-            }
+        }
 
-            \App\Models\ProductionPlan::where('id', $planId)->update($updateData);
+        $updateData['ok'] = (float) ($ok ?? 0);
+        $updateData['repair'] = (float) ($repair ?? 0);
+        $updateData['reject'] = (float) ($reject ?? 0);
 
-            // Recovery Lock: if this plan has a recovery_id and ok > 0,
-            // set the RecoveryItem status to in_production automatically
-            $plan = \App\Models\ProductionPlan::find($planId);
-            if ($plan && $plan->recovery_id && (float)($plan->ok ?? 0) > 0) {
-                \App\Models\RecoveryItem::where('id', $plan->recovery_id)
-                    ->where('status', 'scheduled')
-                    ->update(['status' => 'in_production']);
-            }
+        // Sync actual times to PPC
+        if ($jobMaster->started_at) {
+            $updateData['act_start'] = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+        }
+        if ($jobMaster->finished_at) {
+            $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
+        } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
+            $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
+        }
+
+        $plan->update($updateData);
+
+        // Recovery Lock: if this plan has a recovery_id and ok > 0,
+        // set the RecoveryItem status to in_production automatically
+        $plan->refresh();
+        if ($plan->recovery_id && (float)($plan->ok ?? 0) > 0) {
+            \App\Models\RecoveryItem::where('id', $plan->recovery_id)
+                ->where('status', 'scheduled')
+                ->update(['status' => 'in_production']);
         }
     }
 
