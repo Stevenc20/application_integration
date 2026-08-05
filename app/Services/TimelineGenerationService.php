@@ -893,9 +893,35 @@ foreach ($breakWindows as $idx => $b) {
             return;
         }
 
+        // Active job span for this press/shift — breaks are only injected when
+        // the schedule actually reaches them.
+        $spanQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('row_type', 'job')
+            ->whereNotNull('start_time');
+        $this->applyPressFilter($spanQuery, $pressName);
+        $spanJobs = $spanQuery->get();
+
+        if ($spanJobs->isEmpty()) {
+            return;
+        }
+
+        $firstJobStartMin = $spanJobs->min(function ($job) {
+            return $this->spanStartMinutes($job->start_time);
+        });
+        $lastJobFinishMin = $spanJobs->max(function ($job) {
+            return $this->spanFinishMinutes($job->start_time, $job->finish_time);
+        });
+
         foreach ($breakWindows as $b) {
             $label = strtoupper(trim($b['label']));
-            
+
+            // Skip breaks outside the active job span (schedule never reaches them)
+            $breakStartMin = $this->spanStartMinutes($b['start']);
+            if ($breakStartMin < $firstJobStartMin || $breakStartMin > $lastJobFinishMin) {
+                continue;
+            }
+
             // Check if there is already a break row with this label or start time
             $existsQuery = ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $shiftName)
@@ -921,6 +947,43 @@ foreach ($breakWindows as $idx => $b) {
                 $this->insertBreakRow($date, $shiftName, $pressName, $lineMasterId, $hari, $b, $rowNo);
             }
         }
+    }
+
+    /**
+     * Normalize a time to minutes with the same midnight-crossover handling
+     * used by BreakTimelineValidator (times before 07:00 get +24h).
+     */
+    private function spanStartMinutes(?string $time): int
+    {
+        if (!$time) {
+            return 0;
+        }
+
+        $time = str_replace('.', ':', trim($time));
+        $parts = explode(':', $time);
+        $hours = (int) ($parts[0] ?? 0);
+        $minutes = (int) ($parts[1] ?? 0);
+
+        if ($hours < 7) {
+            $hours += 24;
+        }
+
+        return ($hours * 60) + $minutes;
+    }
+
+    /**
+     * Normalize a finish time consistently with its start time so finish > start.
+     */
+    private function spanFinishMinutes(?string $startTime, ?string $finishTime): int
+    {
+        $startMin = $this->spanStartMinutes($startTime);
+        $finishMin = $this->spanStartMinutes($finishTime);
+
+        if ($startMin > $finishMin) {
+            $finishMin += 24 * 60;
+        }
+
+        return $finishMin;
     }
 
 

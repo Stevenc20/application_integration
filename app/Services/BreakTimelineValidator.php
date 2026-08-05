@@ -24,8 +24,20 @@ class BreakTimelineValidator
             return collect();
         }
 
+        // Only timed jobs define the active span (null start_time = pending/overflow item)
+        $jobsWithTime = $jobs->filter(function ($job) {
+            return !empty($job->start_time);
+        });
+
+        if ($jobsWithTime->isEmpty()) {
+            // No reachable schedule — keep non-break rows but drop breaks
+            return $plans->filter(function ($plan) {
+                return ($plan->row_type ?? 'job') !== 'break';
+            })->values();
+        }
+
         // SORT JOBS
-        $sortedJobs = $jobs->sortBy(function ($job) {
+        $sortedJobs = $jobsWithTime->sortBy(function ($job) {
             return $this->timeToMinutes($job->start_time);
         });
 

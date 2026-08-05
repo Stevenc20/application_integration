@@ -12,8 +12,10 @@ use App\Models\JobMaster;
 use App\Models\MasterStamping;
 use App\Models\RecoveryItem;
 use App\Models\RecoverySchedule;
+use App\Services\BreakTimelineValidator;
 use App\Services\ExcelScheduleParser;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\DB;
 
@@ -141,6 +143,9 @@ class ProductionPlanController extends Controller
             ->orderBy('row_no', 'asc')
             ->get();
 
+        // Hide breaks the schedule never reaches (outside active job span), per press+shift
+        $allPlans = $this->filterBreakRows($allPlans);
+
         // =====================================
         // QUERY 2: DISPLAY ROWS (for table, with drag-drop)
         // Exclude total_finish, note, summary, and ghost rows
@@ -168,6 +173,9 @@ class ProductionPlanController extends Controller
                   });
             })
             ->get();
+
+        // Hide breaks the schedule never reaches (outside active job span), per press+shift
+        $plans = $this->filterBreakRows($plans);
 
         // =====================================
         // TOTAL FINISH ROW (from ALL data, so sums are accurate)
@@ -302,6 +310,30 @@ class ProductionPlanController extends Controller
             'ppc.planning.production_plan',
             compact('plans', 'lines', 'date', 'currentPress', 'totalFinishRow', 'cardSummaries', 'currentShift', 'availableShifts', 'totalJobs', 'activeFilters', 'pendingRecoveries', 'pendingRecoveryItems', 'overflowItems', 'overflowByPress', 'overflowCount', 'pressMeta', 'boundaryOverflowIds')
         );
+    }
+
+    /**
+     * Drop break rows that fall outside the active job span of their press+shift,
+     * so a break never shows up when the schedule doesn't actually reach it.
+     * Preserves the original ordering of the collection.
+     */
+    private function filterBreakRows(Collection $plans): Collection
+    {
+        $validator = app(BreakTimelineValidator::class);
+
+        $keptIds = $plans
+            ->groupBy(function ($p) {
+                return (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? '');
+            })
+            ->flatMap(function (Collection $group) use ($validator) {
+                return $validator->filterValidPlans($group);
+            })
+            ->pluck('id')
+            ->flip();
+
+        return $plans->filter(function ($p) use ($keptIds) {
+            return $keptIds->has($p->id);
+        })->values();
     }
 
     public function import(Request $request)
