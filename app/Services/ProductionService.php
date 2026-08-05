@@ -489,7 +489,9 @@ class ProductionService
                 $item = $this->createRecoveryItem(
                     $skippedJob,
                     $isContinue ? 'continue' : 'waiting_approval',
-                    !$isContinue
+                    true,
+                    null,
+                    true
                 );
                 if ($item) {
                     $skipped[] = $item;
@@ -524,7 +526,7 @@ class ProductionService
      *
      * @param string $status 'waiting_approval' (needs leader) or 'continue' (dilanjut pindah jam)
      */
-    private function createRecoveryItem($job, string $status, bool $notify = true, ?array $quantities = null): ?array
+    private function createRecoveryItem($job, string $status, bool $notify = true, ?array $quantities = null, bool $markSkipped = false): ?array
     {
         if (!$job) {
             return null;
@@ -551,6 +553,10 @@ class ProductionService
 
         if ($planQty <= 0 || $totalProduced >= $planQty) {
             return null;
+        }
+
+        if ($markSkipped && $plan) {
+            $plan->update(['skipped_at' => now()]);
         }
 
         $recoveryQty = $planQty - $totalProduced;
@@ -1055,6 +1061,7 @@ class ProductionService
         if (!$plan) return;
 
         $updateData = [];
+        $mappedStatus = null;
 
         if ($status !== null) {
             $mappedStatus = strtolower($status);
@@ -1091,6 +1098,12 @@ class ProductionService
         $updateData['ok'] = (float) ($ok ?? 0);
         $updateData['repair'] = (float) ($repair ?? 0);
         $updateData['reject'] = (float) ($reject ?? 0);
+
+        // If this plan is being worked on again, clear the skipped (TIDAK TERCAPAI) marker
+        if ($mappedStatus === 'approved' || $mappedStatus === 'completed'
+            || (float)($ok ?? 0) > 0 || (float)($repair ?? 0) > 0 || (float)($reject ?? 0) > 0) {
+            $updateData['skipped_at'] = null;
+        }
 
         // Sync actual times to PPC
         if ($jobMaster->started_at) {

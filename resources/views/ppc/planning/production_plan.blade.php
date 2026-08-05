@@ -595,7 +595,11 @@
                                             $totalOutput = ($plan->ok ?? 0) + ($plan->repair ?? 0) + ($plan->reject ?? 0);
                                             $planQty = $plan->plan ?? 0;
                                             
-                                            if ($totalOutput == 0) {
+                                            if (!is_null($plan->skipped_at)) {
+                                                $statusLabel = 'TIDAK TERCAPAI';
+                                                $statusColor = 'bg-red-100 text-red-700 border-red-200';
+                                                $dotColor = 'bg-red-500';
+                                            } elseif ($totalOutput == 0) {
                                                 $statusLabel = 'PENDING';
                                                 $statusColor = 'bg-amber-100 text-amber-700 border-amber-200';
                                                 $dotColor = 'bg-amber-500';

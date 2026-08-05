@@ -30,6 +30,11 @@ class ItemTidakTercapaiNotification extends Notification
         $planQty = $this->recoveryItem->plan_qty ?? 0;
         $actualQty = $this->recoveryItem->actual_qty ?? 0;
         $recoveryQty = $this->recoveryItem->recovery_qty ?? 0;
+        $status = strtolower((string) $this->recoveryItem->status);
+
+        $message = $status === 'continue'
+            ? "Item {$this->job->job_number} dilewati (skip): tercapai {$actualQty}/{$planQty}. Dilanjut ke shift berikutnya."
+            : "Item {$this->job->job_number} tidak tercapai: {$actualQty}/{$planQty}. Sisa {$recoveryQty} pcs masuk recovery queue.";
 
         return [
             'job_id'        => $this->job->id,
@@ -39,7 +44,7 @@ class ItemTidakTercapaiNotification extends Notification
             'plan_qty'      => $planQty,
             'actual_qty'    => $actualQty,
             'recovery_qty'  => $recoveryQty,
-            'message'       => "Item {$this->job->job_number} tidak tercapai: {$actualQty}/{$planQty}. Sisa {$recoveryQty} pcs masuk recovery queue.",
+            'message'       => $message,
         ];
     }
 }

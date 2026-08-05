@@ -114,12 +114,14 @@ describe('finishJob skipped actions', function () {
         expect($item->status)->toBe('waiting_approval');
         expect((float) $item->recovery_qty)->toBe(40.0);
 
+        expect($plan->fresh()->skipped_at)->toBeNull();
+
         Notification::assertSentTo($user, ItemTidakTercapaiNotification::class);
     });
 
-    test('skipped item flagged "continue" is queued without notifying PPC', function () {
+    test('skipped item flagged "continue" is queued, marked skipped, and notifies PPC', function () {
         Notification::fake();
-        srPpcUser();
+        $user = srPpcUser();
 
         $currentPlan = srPlan(601, 'JOB-CUR', 0);
         $current = srJob('JOB-CUR', $currentPlan->id, 'LINE-A', 'running');
@@ -128,7 +130,7 @@ describe('finishJob skipped actions', function () {
         $skippedPlan = srPlan(602, 'JOB-SKIP', 50);
         $skipped = srJob('JOB-SKIP', $skippedPlan->id, 'LINE-A', 'pending');
 
-        $result = (new ProductionService())->finishJob($current->id, null, false, null, null, null, [$skipped->id => 'continue']);
+        $result = (new ProductionService())->finishJob($current->id, 'FINISH_ONLY', false, null, null, null, [$skipped->id => 'continue']);
 
         $item = RecoveryItem::where('job_no', $skipped->job_number)->first();
         expect($item)->not->toBeNull();
@@ -136,7 +138,9 @@ describe('finishJob skipped actions', function () {
         expect((float) $item->recovery_qty)->toBe(50.0);
         expect($result['skipped'])->toHaveCount(1);
 
-        Notification::assertNothingSent();
+        expect($skippedPlan->fresh()->skipped_at)->not->toBeNull();
+
+        Notification::assertSentTo($user, ItemTidakTercapaiNotification::class);
     });
 
     test('skipped item flagged "recovery" is queued as waiting_approval and notifies PPC', function () {
@@ -150,13 +154,34 @@ describe('finishJob skipped actions', function () {
         $skippedPlan = srPlan(612, 'JOB-SKIP2', 80);
         $skipped = srJob('JOB-SKIP2', $skippedPlan->id, 'LINE-A', 'pending');
 
-        (new ProductionService())->finishJob($current->id, null, false, null, null, null, [$skipped->id => 'recovery']);
+        (new ProductionService())->finishJob($current->id, 'FINISH_ONLY', false, null, null, null, [$skipped->id => 'recovery']);
 
         $item = RecoveryItem::where('job_no', $skipped->job_number)->first();
         expect($item)->not->toBeNull();
         expect($item->status)->toBe('waiting_approval');
 
+        expect($skippedPlan->fresh()->skipped_at)->not->toBeNull();
+
         Notification::assertSentTo($user, ItemTidakTercapaiNotification::class);
+    });
+});
+
+describe('skipped marker on production plan', function () {
+    beforeEach(function () {
+        Carbon::setTestNow('2026-06-25 10:00:00');
+    });
+
+    test('starting a previously-skipped job clears the skipped marker', function () {
+        Notification::fake();
+        srPpcUser();
+
+        $skippedPlan = srPlan(621, 'JOB-REWORK', 50, 'LINE-A', ['skipped_at' => now()]);
+        $skipped = srJob('JOB-REWORK', $skippedPlan->id, 'LINE-A', 'pending');
+
+        (new ProductionService())->startJob($skipped->id);
+
+        expect($skippedPlan->fresh()->skipped_at)->toBeNull();
+        expect($skippedPlan->fresh()->status)->toBe('approved');
     });
 });
 

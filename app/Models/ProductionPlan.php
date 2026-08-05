@@ -63,6 +63,7 @@ class ProductionPlan extends Model
         'remaining_plan',
         'recovery_id',
         'source_type',
+        'skipped_at',
     ];
 
     protected $casts = [
@@ -91,7 +92,8 @@ class ProductionPlan extends Model
         'parent_job_id' => 'integer',
         'session_no'   => 'integer',
         'original_plan' => 'float',
-        'remaining_plan' => 'float'
+        'remaining_plan' => 'float',
+        'skipped_at'   => 'datetime',
     ];
 
     public function line()
