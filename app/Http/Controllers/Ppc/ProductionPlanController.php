@@ -319,23 +319,7 @@ class ProductionPlanController extends Controller
      */
     private function filterBreakRows(Collection $plans): Collection
     {
-        $validator = app(BreakTimelineValidator::class);
-
-        $keptIds = $plans
-            ->groupBy(function ($p) {
-                return (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? '');
-            })
-            ->flatMap(function (Collection $group) use ($validator) {
-                return $validator->filterOverlappingBreaks(
-                    $validator->filterValidPlans($group)
-                );
-            })
-            ->pluck('id')
-            ->flip();
-
-        return $plans->filter(function ($p) use ($keptIds) {
-            return $keptIds->has($p->id);
-        })->values();
+        return app(BreakTimelineValidator::class)->filterBreakRows($plans);
     }
 
     public function import(Request $request)

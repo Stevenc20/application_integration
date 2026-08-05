@@ -16,6 +16,7 @@ use App\Models\ShiftSubmission;
 use Illuminate\Support\Facades\DB;
 use App\Services\ProductionService;
 use App\Services\DashboardRealtimeService;
+use App\Services\BreakTimelineValidator;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InputHarianController extends Controller
@@ -201,6 +202,10 @@ class InputHarianController extends Controller
         // DISABLE PAGINATION temporarily for MES Stabilization as requested
         // INDUSTRIAL SORTING: Sort by original PPC upload order first (row_no)
         $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
+
+        // Hide breaks the schedule never reaches (same logic as PPC planning),
+        // so a phantom ISTIRAHAT row never appears in the operator queue.
+        $plans = app(BreakTimelineValidator::class)->filterBreakRows($plans);
 
         // ── MERGE BREAK SPLITS ──
         $parentIds = $plans->pluck('id');

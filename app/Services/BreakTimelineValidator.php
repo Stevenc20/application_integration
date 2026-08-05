@@ -8,6 +8,33 @@ use Illuminate\Support\Collection;
 class BreakTimelineValidator
 {
     /**
+     * Drop break rows that fall outside the active job span of their press+shift,
+     * so a break never shows up when the schedule doesn't actually reach it.
+     * Preserves the original ordering of the collection.
+     *
+     * @param Collection<ProductionPlan> $plans
+     * @return Collection<ProductionPlan>
+     */
+    public function filterBreakRows(Collection $plans): Collection
+    {
+        $keptIds = $plans
+            ->groupBy(function ($p) {
+                return (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? '');
+            })
+            ->flatMap(function (Collection $group) {
+                return $this->filterOverlappingBreaks(
+                    $this->filterValidPlans($group)
+                );
+            })
+            ->pluck('id')
+            ->flip();
+
+        return $plans->filter(function ($p) use ($keptIds) {
+            return $keptIds->has($p->id);
+        })->values();
+    }
+
+    /**
      * Filter valid jobs & breaks.
      *
      * @param Collection<ProductionPlan> $plans
