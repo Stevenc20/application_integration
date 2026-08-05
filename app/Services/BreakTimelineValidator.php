@@ -134,10 +134,12 @@ class BreakTimelineValidator
     }
 
     /**
-     * Drop breaks whose time slot overlaps a running job. Legitimate breaks in
-     * these schedules always sit BETWEEN jobs; a break that overlaps a job's
-     * [start, finish] is corrupt Excel data (e.g. an ISTIRAHAT SORE row whose
-     * time cells were left at morning values). Jobs are never dropped here.
+     * Drop breaks that overlap a running job. Real schedules carve breaks OUT
+     * of a job (e.g. Y-1561 11:34–12:56 with ISTIRAHAT SIANG 12:00–12:40 inside,
+     * then Y-1561 resumes 12:40–12:56), so overlap alone is NOT corruption.
+     * A break is only dropped when it overlaps a job AND no job resumes at the
+     * break's finish time — the signature of corrupt rows (e.g. an ISTIRAHAT
+     * SORE whose time cells were left at morning values). Jobs are never dropped.
      *
      * @param Collection<ProductionPlan> $plans
      * @return Collection<ProductionPlan>
@@ -145,6 +147,7 @@ class BreakTimelineValidator
     public function filterOverlappingBreaks(Collection $plans): Collection
     {
         $jobRanges = [];
+        $jobStarts = [];
 
         foreach ($plans as $p) {
             if (($p->row_type ?? 'job') !== 'job') {
@@ -158,13 +161,14 @@ class BreakTimelineValidator
                 'start'  => $this->timeToMinutes($p->start_time),
                 'finish' => $this->finishToMinutes($p->start_time, $p->finish_time),
             ];
+            $jobStarts[] = $this->normalizeTime($p->start_time);
         }
 
         if (empty($jobRanges)) {
             return $plans;
         }
 
-        return $plans->filter(function ($plan) use ($jobRanges) {
+        return $plans->filter(function ($plan) use ($jobRanges, $jobStarts) {
             if (($plan->row_type ?? 'job') !== 'break') {
                 return true;
             }
@@ -178,12 +182,22 @@ class BreakTimelineValidator
             foreach ($jobRanges as $range) {
                 // Strict overlap: the break cuts into a running job's window
                 if ($breakStart < $range['finish'] && $breakFinish > $range['start']) {
+                    // Carve-out: a job resumes exactly when the break ends → legit
+                    if (in_array($this->normalizeTime($plan->finish_time), $jobStarts, true)) {
+                        return true;
+                    }
+
                     return false;
                 }
             }
 
             return true;
         })->values();
+    }
+
+    private function normalizeTime(?string $time): string
+    {
+        return str_replace('.', ':', trim((string) $time));
     }
 
     /**

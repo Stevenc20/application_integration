@@ -235,6 +235,20 @@ describe('BreakTimelineValidator span filtering', function () {
         expect($filtered->pluck('id')->contains($breakSiang->id))->toBeTrue();
     });
 
+    test('keeps a break carved out of a running job when the job resumes at break end', function () {
+        // Real Excel pattern: job Y-1561 11:34–12:56 with ISTIRAHAT SIANG
+        // 12:00–12:40 inside, then Y-1561 resumes 12:40–12:56. Overlap alone
+        // must not hide the break.
+        bpPlan(['row_no' => 6, 'job_no' => 'Y-1561', 'start_time' => '11:34', 'finish_time' => '12:56']);
+        $breakSiang = bpBreak(['row_no' => 7, 'job_no' => 'ISTIRAHAT SIANG', 'start_time' => '12:00', 'finish_time' => '12:40', 'dct' => 40]);
+        bpPlan(['row_no' => 8, 'job_no' => 'Y-1561', 'start_time' => '12:40', 'finish_time' => '12:56']);
+
+        $plans = ProductionPlan::whereDate('plan_date', '2026-06-25')->get();
+        $filtered = bpFilterBreakRows($plans);
+
+        expect($filtered->pluck('id')->contains($breakSiang->id))->toBeTrue();
+    });
+
     test('keeps a break that sits exactly between two jobs', function () {
         bpPlan(['row_no' => 1, 'start_time' => '17:10', 'finish_time' => '17:20']);
         $break = bpBreak(['row_no' => 2, 'job_no' => 'CLEANING', 'start_time' => '17:20', 'finish_time' => '17:30', 'dct' => 10]);

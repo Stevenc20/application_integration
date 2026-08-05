@@ -76,3 +76,33 @@ test('input harian hides a phantom break the schedule never reaches, keeps legit
     expect($ids)->toContain($legitBreak->id);
     expect($ids)->not->toContain($phantomBreak->id);
 });
+
+test('input harian keeps a break carved out of a running job', function () {
+    Carbon::setTestNow('2026-08-05 10:00:00');
+    ihLineMaster();
+
+    $job1 = ihPlan(['job_no' => 'IH-JOB-A', 'job_master' => 'IH JOB A', 'row_no' => 1, 'start_time' => '11:34', 'finish_time' => '12:56']);
+    $carvedBreak = ihPlan(['row_type' => 'break', 'job_no' => 'ISTIRAHAT SIANG', 'row_no' => 2, 'start_time' => '12:00', 'finish_time' => '12:40']);
+    $job1Cont = ihPlan(['job_no' => 'IH-JOB-A', 'job_master' => 'IH JOB A', 'row_no' => 3, 'start_time' => '12:40', 'finish_time' => '12:56']);
+
+    $user = User::create([
+        'name'     => 'Tester',
+        'nrp'      => 'IH-002',
+        'password' => bcrypt('secret'),
+        'role'     => 'superadmin',
+    ]);
+
+    $response = $this->actingAs($user)->get(route('operational.input_harian', [
+        'date'  => '2026-08-05',
+        'shift' => 'Shift Pagi',
+    ]));
+
+    $response->assertOk();
+
+    $jobs = $response->viewData('jobs');
+    $ids = collect($jobs)->pluck('id');
+
+    expect($ids)->toContain($job1->id);
+    expect($ids)->toContain($job1Cont->id);
+    expect($ids)->toContain($carvedBreak->id);
+});
