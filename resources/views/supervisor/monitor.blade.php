@@ -452,7 +452,11 @@ function cellClass(desc,actual,actPct){
         return p>=100?'bg-green':p>=80?'bg-yellow':'bg-red';
     }
     if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'bg-red-blink':p>2?'bg-yellow-blink':''}
-    if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){const v=parseFloat(actual);return v>30?'bg-red-blink':v>15?'bg-yellow-blink':''}
+    if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){
+        const v=parseFloat(actual);
+        if(isNaN(v) || v<=0) return '';
+        return 'bg-red-blink';
+    }
     return '';
 }
 
