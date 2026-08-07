@@ -747,7 +747,11 @@ function renderTable(){
             const desc = leftRows[leftIdx];
             const span = leftRowSpans[leftIdx];
             
-            leftBodyHtml += `<td class="desc-cell" rowspan="${span}">${desc}</td>`;
+            let descHtml = desc;
+            if(desc === 'GSPH') {
+                descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
+            }
+            leftBodyHtml += `<td class="desc-cell" rowspan="${span}">${descHtml}</td>`;
 
             if (desc === 'JOB') {
                 leftBodyHtml += `<td class="val-plan" rowspan="${span}">${meta(lineKey,'jobPlan')}</td>`;
@@ -755,7 +759,7 @@ function renderTable(){
                 leftBodyHtml += `<td class="val-actual" rowspan="${span}" style="border-right:none;">${meta(lineKey,'jobActual')}</td>`;
             } else if (desc === 'STROKE') {
                 const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
-                leftBodyHtml += `<td class="val-plan" rowspan="${span}">-</td>`;
+                leftBodyHtml += `<td class="val-plan" rowspan="${span}">${meta(lineKey,'strokePlan')||'-'}</td>`;
                 leftBodyHtml += `<td class="val-curr" rowspan="${span}">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
                 leftBodyHtml += `<td class="val-actual" rowspan="${span}" style="border-right:none;">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
             } else {
