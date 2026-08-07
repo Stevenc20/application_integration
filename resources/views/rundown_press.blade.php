@@ -169,10 +169,10 @@
                 </div>
             </form>
 
-            {{-- Hidden Upload Form --}}
-            <form action="{{ route('rundown_press.upload') }}" method="POST" enctype="multipart/form-data" id="uploadPressForm" class="hidden">
+            {{-- Hidden Upload Form (Safe from browser blocks & nesting bugs) --}}
+            <form action="{{ route('rundown_press.upload') }}" method="POST" enctype="multipart/form-data" id="uploadPressForm" style="position:absolute; width:1px; height:1px; overflow:hidden; opacity:0; z-index:-1;">
                 @csrf
-                <input type="file" name="excel_file" id="press_excel_input" accept=".xlsx,.xls,.xlsm" onchange="this.form.submit()" onclick="this.value=null">
+                <input type="file" name="excel_file" id="press_excel_input" accept=".xlsx,.xls,.xlsm" onchange="document.getElementById('uploadPressForm').submit()" onclick="this.value=null">
             </form>
         </div>
 
