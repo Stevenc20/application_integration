@@ -233,7 +233,6 @@ def main():
                     continue
                 if job_str in ('JOB NO', 'SCHEDULE', 'DELIVERY', 'STAMPING', 'JOB NO SCHEDULE', 'JOB NO DELIVERY', 'JOB NO STAMPING'):
                     continue
-                # Skip summary/notes/total rows
                 SKIP_KEYWORDS = ('TOTAL', 'SUBTOTAL', 'GRAND', 'JUMLAH', 'CATATAN', 'NOTE', 'NOTES', 'REMARK', 'SUMMARY', 'KETERANGAN', '*', 'RUNDOWN STOK', 'BLANKING')
                 if any(kw in job_str for kw in SKIP_KEYWORDS):
                     continue
@@ -243,6 +242,14 @@ def main():
                     return row[c]
 
                 no_val        = gcol_raw(col_no)
+
+                # Validate col_no is numeric (filters summary/notes/hidden rows)
+                if no_val is not None:
+                    try:
+                        int(float(str(no_val).strip()))
+                    except (ValueError, TypeError):
+                        continue
+
                 job_delivery  = gcol_raw(col_job_deliv)
                 job_stamping  = gcol_raw(col_job_stamp)
                 keterangan    = gcol_raw(col_keterangan)
@@ -268,18 +275,6 @@ def main():
                 act_prod      = safe_float(act_prod_val) if act_prod_val is not None else None
                 stok_akhir    = safe_float(stok_akhir_val)
                 strength      = safe_float(strength_val)
-
-                # Validate col_no is numeric (filters summary/notes/hidden rows with text in NO column)
-                if no_val is not None:
-                    try:
-                        int(float(str(no_val).strip()))
-                    except (ValueError, TypeError):
-                        continue  # col_no bukan angka → baris summary/notes
-
-                # Skip rows where all key data columns are empty/zero (hidden or empty rows)
-                if all(v in (None, 0, 0.0) for v in [mdfo, order, plan_day, plan_night, act_prod, stok_akhir]):
-                    if not maker and not cust and not stock_awal:
-                        continue
 
                 if strength == 0 and pcs_day > 0 and stok_akhir != 0:
                     strength = round(stok_akhir / pcs_day, 4)

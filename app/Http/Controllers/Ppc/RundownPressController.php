@@ -228,12 +228,7 @@ class RundownPressController extends Controller
                         ];
                     }
 
-                    // Deduplicate by job_no, keep last occurrence per job_no
-                    $deduped = [];
-                    foreach ($rows as $row) {
-                        $deduped[strtoupper(trim($row['job_no']))] = $row;
-                    }
-                    $rows = array_values($deduped);
+                    // (Removed deduplication by job_no to match PPLC reference behavior)
 
                     foreach (array_chunk($rows, 100) as $chunk) {
                         RundownPress::insert($chunk);
