@@ -486,7 +486,11 @@ function renderAllLines(){
         let b='';
         const cellMap={};
         KPI_ROWS.forEach(desc=>{
-            b+=`<tr id="row-${desc}"><td class="desc-cell">${desc}</td>`;
+            let descHtml = desc;
+            if(desc === 'GSPH') {
+                descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
+            }
+            b+=`<tr id="row-${desc}"><td class="desc-cell">${descHtml}</td>`;
             LINES.forEach((line,li)=>{
                 ['plan','curr','actual'].forEach((col,ci)=>{
                     const id=`cell-${desc}-${li}-${col}`;
@@ -536,7 +540,7 @@ function updateAllCells(){
                 setText(getCell('actual'),meta(line,'jobActual'));
             }else if(desc==='STROKE'){
                 const s=meta(line,'stroke'),cs=meta(line,'currStroke');
-                setText(getCell('plan'),'-');
+                setText(getCell('plan'),meta(line,'strokePlan')||'-');
                 setText(getCell('curr'),cs==='-'?'-':Number(cs||0).toLocaleString('id-ID'));
                 setText(getCell('actual'),s==='-'?'-':Number(s).toLocaleString('id-ID'));
             }else{
@@ -650,7 +654,11 @@ function renderTable(){
         let b = '';
         leftRows.forEach(desc => {
             b += '<tr>';
-            b += `<td class="desc-cell" style="width:25%; max-width:none;">${desc}</td>`;
+            let descHtml = desc;
+            if(desc === 'GSPH') {
+                descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
+            }
+            b += `<td class="desc-cell" style="width:25%; max-width:none;">${descHtml}</td>`;
 
             if (desc === 'JOB') {
                 b += `<td class="val-plan">${meta(lineKey,'jobPlan')}</td>`;
@@ -658,7 +666,7 @@ function renderTable(){
                 b += `<td class="val-actual">${meta(lineKey,'jobActual')}</td>`;
             } else if (desc === 'STROKE') {
                 const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
-                b += `<td class="val-plan">-</td>`;
+                b += `<td class="val-plan">${meta(lineKey,'strokePlan')||'-'}</td>`;
                 b += `<td class="val-curr">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
                 b += `<td class="val-actual">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
             } else {

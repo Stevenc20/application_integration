@@ -384,12 +384,12 @@ class DashboardRealtimeService
 
         $runtimeMinutes = round(array_sum(array_map(fn($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 1);
 
-        $gsph = ProductionMetricsService::gsph($ok, max($runtimeMinutes, 30));
+        $gsph = ProductionMetricsService::gsph($ok, max($runtimeMinutes, 1));
         $currRuntimeMinutes = round($currRuntime / 60, 1);
-        $currGsph = $hasRunning ? ProductionMetricsService::gsph($currOk, max($currRuntimeMinutes, 30)) : 0;
+        $currGsph = $hasRunning ? ProductionMetricsService::gsph($currOk, max($currRuntimeMinutes, 1)) : 0;
 
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
-        $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
+        $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 1));
 
         $dtProdLabel = round($dtProdMinutes, 2) . ' m';
         $dtTotalLabel = round($dtTotalMinutes, 2) . ' m';
@@ -447,6 +447,7 @@ class DashboardRealtimeService
             'jobPlan'    => (string) $totalJobs,
             'jobActual'  => $jobActual,
             'stroke'     => (string) $totalStroke,
+            'strokePlan' => (string) $planQty,
             'currStroke' => (string) $currStroke,
         ];
 
@@ -545,6 +546,7 @@ class DashboardRealtimeService
             'jobPlan'    => '0',
             'jobActual'  => '0/0',
             'stroke'     => '0',
+            'strokePlan' => '0',
         ];
         return compact('kpi', 'detailData', 'meta');
     }
