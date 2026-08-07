@@ -154,10 +154,14 @@
 
                     {{-- Right Actions --}}
                     <div class="flex items-center gap-3">
-                        <label for="press_excel_input" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-4 rounded-xl transition-all flex items-center gap-2 text-sm shadow-sm cursor-pointer h-[38px]">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                            Upload Excel
-                        </label>
+                        <form action="{{ route('rundown_press.upload') }}" method="POST" enctype="multipart/form-data" id="uploadPressForm">
+                            @csrf
+                            <input type="file" name="excel_file" id="press_excel_input" class="hidden" accept=".xlsx,.xls,.xlsm" onchange="this.form.submit()" onclick="this.value=null">
+                            <label for="press_excel_input" class="bg-slate-800 hover:bg-slate-900 text-white font-bold py-2 px-4 rounded-xl transition-all flex items-center gap-2 text-sm shadow-sm cursor-pointer h-[38px] mb-0 inline-flex">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                                Upload Excel
+                            </label>
+                        </form>
 
                         @if($hasData && $selectedSheet)
                         <button type="button" id="syncStampingBtn" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-2 px-4 rounded-xl transition-all flex items-center gap-2 text-sm shadow-sm h-[38px]" onclick="syncStokToStamping('{{ $selectedSheet }}')">
@@ -167,10 +171,6 @@
                         @endif
                     </div>
                 </div>
-            </form>
-            <form action="{{ route('rundown_press.upload') }}" method="POST" enctype="multipart/form-data" id="uploadPressForm" class="hidden">
-                @csrf
-                <input type="file" name="excel_file" id="press_excel_input" accept=".xlsx,.xls,.xlsm" onchange="this.form.submit()" onclick="this.value=null">
             </form>
         </div>
 
