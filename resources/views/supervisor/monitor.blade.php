@@ -133,12 +133,12 @@
         .status-tryout{background:#3b82f6!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-1stcheck{background:#a855f7!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
 
-        @keyframes blink-red{0%,100%{background:#ef4444!important;color:#fff!important}50%{background:#fff!important;color:#ef4444!important}}
-        @keyframes blink-yellow{0%,100%{background:#eab308!important;color:#000!important}50%{background:#fff!important;color:#eab308!important}}
-        @keyframes blink-green{0%,100%{background:#22c55e!important;color:#fff!important}50%{background:#fff!important;color:#22c55e!important}}
-        .bg-red-blink{animation:blink-red .8s ease-in-out infinite!important}
-        .bg-yellow-blink{animation:blink-yellow 1.2s ease-in-out infinite!important}
-        .bg-green-blink{animation:blink-green .6s ease-in-out 3!important}
+        @keyframes blink-red{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes blink-yellow{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes blink-green{0%,100%{opacity:1}50%{opacity:0.3}}
+        .bg-red-blink{background:#ef4444!important;color:#fff!important;animation:blink-red .8s ease-in-out infinite!important}
+        .bg-yellow-blink{background:#eab308!important;color:#000!important;animation:blink-yellow .8s ease-in-out infinite!important}
+        .bg-green-blink{background:#22c55e!important;color:#fff!important;animation:blink-green .8s ease-in-out infinite!important}
 
         .large-table th,.large-table td{
             padding:6px 4px!important;
