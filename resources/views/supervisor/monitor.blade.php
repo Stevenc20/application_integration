@@ -446,7 +446,11 @@ function kv(line,desc){
 function meta(line,k){ return (LINE_META[line]||{})[k]||'-' }
 
 function cellClass(desc,actual,actPct){
-    if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'bg-green':p>=80?'bg-yellow':'bg-red'}
+    if(desc==='GSPH'){
+        const p=parseFloat(actPct||actual);
+        if(p===0 || isNaN(p)) return '';
+        return p>=100?'bg-green':p>=80?'bg-yellow':'bg-red';
+    }
     if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'bg-red-blink':p>2?'bg-yellow-blink':''}
     if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){const v=parseFloat(actual);return v>30?'bg-red-blink':v>15?'bg-yellow-blink':''}
     return '';
