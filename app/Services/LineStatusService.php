@@ -14,7 +14,10 @@ class LineStatusService
     public static function getStatuses(int $shift = 1): array
     {
         $shiftText = $shift === 1 ? 'Shift Pagi' : 'Shift Malam';
-        $today = now()->toDateString();
+        
+        // Use logical work_date: if before 07:30, it belongs to yesterday's night shift
+        $now = now();
+        $today = ($now->format('H:i') < '07:30') ? $now->copy()->subDay()->toDateString() : $now->toDateString();
         $activeLines = LineMaster::where('status', 'active')
             ->select('line_name')->distinct()->pluck('line_name');
 
@@ -104,23 +107,25 @@ class LineStatusService
                 ->toArray();
         }
 
-        // 6. Active dandoris across all running jobs (split 1st check vs setup)
-        $linesWithFirstCheck = [];
-        $linesWithSetup = [];
-        $allDandoris = collect();
-        if ($allJobIds->isNotEmpty()) {
-            $allDandoris = Dandori::whereIn('next_job_id', $allJobIds->toArray())
-                ->whereNull('finish_time')
-                ->where('work_date', $today)
-                ->get();
-        }
+        // 6. Active 1st checks (directly from dandoris table)
+        // Ignoring Job status to ensure 1st check always appears if active
+        $linesWithFirstCheck = Dandori::whereNull('finish_time')
+            ->where('work_date', $today)
+            ->where(function($q) {
+                $q->where('jenis_dandori', '1st_check')->orWhere('jenis_dandori', '1st check');
+            })
+            ->pluck('line')
+            ->toArray();
 
-        foreach ($allDandoris as $d) {
-            if (strtolower($d->jenis_dandori ?? '') === '1st_check' || strtolower($d->jenis_dandori ?? '') === '1st check') {
-                $linesWithFirstCheck[] = $d->line;
-            } else {
-                $linesWithSetup[] = $d->line;
-            }
+        // 6b. Active SETUP (from downtimes table with jenis_downtime = 'dandori')
+        $activeSetupJobIds = [];
+        if ($allJobIds->isNotEmpty()) {
+            $activeSetupJobIds = Downtime::whereIn('job_master_id', $allJobIds)
+                ->whereNull('finish_time')
+                ->whereDate('start_time', $today)
+                ->where('jenis_downtime', 'dandori')
+                ->pluck('job_master_id')
+                ->toArray();
         }
 
         // 7. Jobs with actual production activity (ProductionLog saved today)
@@ -168,15 +173,15 @@ class LineStatusService
                 continue;
             }
 
-            // 5. PRODUCTION — Active running session on this line
-            if (array_intersect($lineJobIds, $activeSessionJobIds)) {
-                $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
+            // 5. SETUP (dandori downtime active)
+            if (array_intersect($lineJobIds, $activeSetupJobIds)) {
+                $statuses[$line] = ['label' => 'SETUP', 'color' => 'amber', 'pulse' => true];
                 continue;
             }
 
-            // 6. SETUP (non-1st-check dandori, no active running session yet)
-            if (in_array($line, $linesWithSetup)) {
-                $statuses[$line] = ['label' => 'SETUP', 'color' => 'amber', 'pulse' => true];
+            // 6. PRODUCTION — Active running session on this line
+            if (array_intersect($lineJobIds, $activeSessionJobIds)) {
+                $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
                 continue;
             }
 
