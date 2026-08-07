@@ -732,59 +732,43 @@ function renderTable(){
 
     // CASE B: Split screen but seamlessly touching (gap: 0px) with matched rowspans
     const maxRows = Math.max(leftRows.length, rightRows.length);
-    const leftRowSpans = [];
-    const baseSpan = Math.floor(maxRows / leftRows.length);
-    const remainder = maxRows % leftRows.length;
-    for (let i = 0; i < leftRows.length; i++) {
-        leftRowSpans.push(baseSpan + (i < remainder ? 1 : 0));
-    }
-
-    const leftRowStarts = [];
-    let currentStart = 0;
-    for (let i = 0; i < leftRows.length; i++) {
-        leftRowStarts.push(currentStart);
-        currentStart += leftRowSpans[i];
-    }
-
     // Build left side HTML
     let leftBodyHtml = '';
-    for (let i = 0; i < maxRows; i++) {
+    for (let i = 0; i < leftRows.length; i++) {
         leftBodyHtml += '<tr>';
-        const leftIdx = leftRowStarts.indexOf(i);
-        if (leftIdx !== -1) {
-            const desc = leftRows[leftIdx];
-            const span = leftRowSpans[leftIdx];
-            
-            let descHtml = desc;
-            if(desc === 'GSPH') {
-                descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
-            }
-            leftBodyHtml += `<td class="desc-cell" rowspan="${span}">${descHtml}</td>`;
+        const desc = leftRows[i];
+        
+        let descHtml = desc;
+        if(desc === 'GSPH') {
+            descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
+        }
+        leftBodyHtml += `<td class="desc-cell">${descHtml}</td>`;
 
-            if (desc === 'JOB') {
-                leftBodyHtml += `<td class="val-plan" rowspan="${span}">${meta(lineKey,'jobPlan')}</td>`;
-                leftBodyHtml += `<td class="val-curr" rowspan="${span}">${meta(lineKey,'job')}</td>`;
-                leftBodyHtml += `<td class="val-actual" rowspan="${span}" style="border-right:none;">${meta(lineKey,'jobActual')}</td>`;
-            } else if (desc === 'STROKE') {
-                const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
-                leftBodyHtml += `<td class="val-plan" rowspan="${span}">${meta(lineKey,'strokePlan')||'-'}</td>`;
-                leftBodyHtml += `<td class="val-curr" rowspan="${span}">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
-                leftBodyHtml += `<td class="val-actual" rowspan="${span}" style="border-right:none;">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
+        if (desc === 'JOB') {
+            leftBodyHtml += `<td class="val-plan">${meta(lineKey,'jobPlan')}</td>`;
+            leftBodyHtml += `<td class="val-curr">${meta(lineKey,'job')}</td>`;
+            leftBodyHtml += `<td class="val-actual" style="border-right:none;">${meta(lineKey,'jobActual')}</td>`;
+        } else if (desc === 'STROKE') {
+            const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
+            leftBodyHtml += `<td class="val-plan">${meta(lineKey,'strokePlan')||'-'}</td>`;
+            leftBodyHtml += `<td class="val-curr">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
+            leftBodyHtml += `<td class="val-actual" style="border-right:none;">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
+        } else {
+            const k = kv(lineKey, desc);
+            if (k) {
+                const cls = cellClass(desc, k.actual, k.actualPct);
+                const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
+                leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
+                leftBodyHtml += `<td class="val-curr">${k.current||'-'}</td>`;
+                leftBodyHtml += `<td class="val-actual ${cls}" style="border-right:none;">${k.actual||'-'}${pctVal}</td>`;
             } else {
-                const k = kv(lineKey, desc);
-                if (k) {
-                    const cls = cellClass(desc, k.actual, k.actualPct);
-                    const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
-                    leftBodyHtml += `<td class="val-plan" rowspan="${span}">${k.plan||'-'}</td>`;
-                    leftBodyHtml += `<td class="val-curr" rowspan="${span}">${k.current||'-'}</td>`;
-                    leftBodyHtml += `<td class="val-actual ${cls}" rowspan="${span}" style="border-right:none;">${k.actual||'-'}${pctVal}</td>`;
-                } else {
-                    leftBodyHtml += `<td rowspan="${span}">-</td><td rowspan="${span}">-</td><td rowspan="${span}" style="border-right:none;">-</td>`;
-                }
+                leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
         }
         leftBodyHtml += '</tr>';
     }
+
+
 
     // Build right side HTML
     let rightBodyHtml = '';
@@ -813,7 +797,7 @@ function renderTable(){
                 ${dtCell(pt)}
                 ${dtCell(dn)}
                 ${dtCell(iq)}
-                ${dtCell(dw)}
+                ${dtCell(dw, j.downtime > 0 ? 'background-color:#ef4444; color:#fff; font-weight:700; animation:blink-red .8s ease-in-out infinite' : '')}
                 ${dtCell(tp, 'color:#2563eb;font-weight:700')}
                 ${dtCell(j.plan_finish)}
                 ${dtCell(j.actual_finish)}
