@@ -711,6 +711,7 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->group(function () {
 
     // Dashboard Stock
     Route::get('/stock', [StockController::class, 'index'])->name('stock.index');
+    Route::post('/stock/upload', [StockController::class, 'upload'])->name('stock.upload');
 
     // Rundown Stock
     Route::get('/rundown-stock', [RundownController::class, 'index'])->name('rundown.index');

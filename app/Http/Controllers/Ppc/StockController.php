@@ -225,14 +225,20 @@ class StockController extends Controller
             $scriptPath = base_path('python/read_xlsm.py');
             if (!file_exists($scriptPath)) return back()->with('error', 'Script python/read_xlsm.py tidak ditemukan.');
 
-            // Jalankan Python — stderr dipisah agar tidak campur JSON
-            $cmd    = escapeshellcmd($python) . ' ' . escapeshellarg($scriptPath) . ' ' . escapeshellarg($fullPath);
-            $output = shell_exec($cmd . ' 2>NUL');  // Windows: buang stderr
-
-            if (!$output) {
-                // Fallback: coba tanpa redirect
-                $output = shell_exec($cmd . ' 2>&1');
+            // Jalankan Python via proc_open (lebih reliable, avoid PATH issues)
+            $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $process = @proc_open([$python, $scriptPath, $fullPath], $desc, $pipes);
+            if (!is_resource($process)) {
+                return back()->with('error', 'Gagal menjalankan Python script.');
             }
+            fclose($pipes[0]);
+            $output = stream_get_contents($pipes[1]);
+            $stderr = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($process);
+
+            if (!$output) $output = $stderr;
 
             if (!$output) return back()->with('error', 'Python tidak menghasilkan output.');
 
@@ -460,10 +466,32 @@ class StockController extends Controller
 
     private function findPython(): ?string
     {
-        foreach (['python', 'python3', 'py'] as $cmd) {
-            $test = shell_exec("{$cmd} --version 2>&1");
-            if ($test && str_contains($test, 'Python 3')) return $cmd;
+        $candidates = ['python', 'python3', 'py'];
+
+        // Add common Windows absolute paths
+        $appData     = getenv('LOCALAPPDATA') ?: getenv('APPDATA');
+        $userProfile = getenv('USERPROFILE') ?: getenv('HOME');
+
+        foreach (['Python312', 'Python311', 'Python310', 'Python39', 'Python38'] as $ver) {
+            $candidates[] = 'C:\\Python' . substr($ver, 6) . '\\python.exe';
+            if ($appData)     $candidates[] = $appData . '\\Programs\\Python\\' . $ver . '\\python.exe';
+            if ($userProfile) $candidates[] = $userProfile . '\\AppData\\Local\\Programs\\Python\\' . $ver . '\\python.exe';
         }
+
+        foreach ($candidates as $cmd) {
+            $desc = [0 => ['pipe', 'r'], 1 => ['pipe', 'w'], 2 => ['pipe', 'w']];
+            $process = @proc_open([$cmd, '--version'], $desc, $pipes);
+            if (!is_resource($process)) continue;
+            fclose($pipes[0]);
+            $out = stream_get_contents($pipes[1]);
+            $err = stream_get_contents($pipes[2]);
+            fclose($pipes[1]);
+            fclose($pipes[2]);
+            proc_close($process);
+            $combined = ($out ?? '') . ($err ?? '');
+            if (str_contains($combined, 'Python 3')) return $cmd;
+        }
+
         return null;
     }
 }
