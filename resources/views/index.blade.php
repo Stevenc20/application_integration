@@ -466,6 +466,19 @@
                 </div>
             </div>
 
+            <div class="upload-area">
+                <div style="flex:1;">
+                    <span style="display:block; font-size:11px; font-weight:700; color:#475569; margin-bottom:4px; text-transform:uppercase;">Update Data Stock</span>
+                    <form action="{{ route('stock.upload') }}" method="POST" enctype="multipart/form-data" id="stockUploadForm" style="display:flex; align-items:center; gap:8px;">
+                        @csrf
+                        <input type="file" name="excel_file" id="excel_file" accept=".xlsx, .xls, .xlsm" required style="font-size:11px; width:100%; max-width:200px;">
+                        <button type="submit" class="btn-upload">
+                            <span class="material-icons">upload_file</span>
+                            UPLOAD
+                        </button>
+                    </form>
+                </div>
+            </div>
 
         </div>
 
