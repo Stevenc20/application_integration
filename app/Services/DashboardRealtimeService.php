@@ -149,7 +149,7 @@ class DashboardRealtimeService
         $reject  = (int) $dailyRecords->sum('actual_reject');
 
         $runningRecord = $dailyRecords->first(function ($dp) {
-            return $dp->jobMaster && in_array($dp->jobMaster->status, ['running', 'paused']);
+            return $dp->jobMaster && in_array(strtolower($dp->jobMaster->status), ['running', 'paused']);
         });
 
         if (!$runningRecord) {
@@ -166,7 +166,7 @@ class DashboardRealtimeService
             })->first();
         }
 
-        $hasRunning = $runningRecord !== null && $runningRecord->jobMaster && in_array($runningRecord->jobMaster->status, ['running', 'paused']);
+        $hasRunning = $runningRecord !== null && $runningRecord->jobMaster && in_array(strtolower($runningRecord->jobMaster->status), ['running', 'paused']);
         $currOk     = $hasRunning ? (int) $runningRecord->actual_ok : 0;
         $currRepair = $hasRunning ? (int) $runningRecord->actual_repair : 0;
         $currReject = $hasRunning ? (int) $runningRecord->actual_reject : 0;
@@ -176,19 +176,19 @@ class DashboardRealtimeService
         foreach ($dailyRecords as $dp) {
             $dpRuntime = (float) $dp->runtime_seconds;
             if ($dpRuntime <= 0 && $dp->jobMaster) {
-                if ($dp->jobMaster->status === 'running') {
+                if (strtolower($dp->jobMaster->status) === 'running') {
                     $session = \App\Models\ProductionSession::where('job_master_id', $dp->job_master_id)
                         ->where('work_date', $workDate)
                         ->first();
                     if ($session && $session->start_time) {
                         $dpRuntime = (float) $session->total_seconds;
-                        if ($session->status === 'running') {
+                        if (strtolower($session->status) === 'running') {
                             $dpRuntime += abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($session->start_time)));
                         }
                     } elseif ($dp->jobMaster->started_at) {
                         $dpRuntime = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
                     }
-                } elseif ($dp->jobMaster->status === 'paused') {
+                } elseif (strtolower($dp->jobMaster->status) === 'paused') {
                     $session = \App\Models\ProductionSession::where('job_master_id', $dp->job_master_id)
                         ->where('work_date', $workDate)
                         ->first();
@@ -352,19 +352,19 @@ class DashboardRealtimeService
             ];
             $jobRuntimeSeconds = (float) $dp->runtime_seconds;
             if ($jobRuntimeSeconds <= 0 && $job) {
-                if ($job->status === 'running') {
+                if (strtolower($job->status) === 'running') {
                     $session = \App\Models\ProductionSession::where('job_master_id', $job->id)
                         ->where('work_date', $workDate)
                         ->first();
                     if ($session && $session->start_time) {
                         $jobRuntimeSeconds = (float) $session->total_seconds;
-                        if ($session->status === 'running') {
+                        if (strtolower($session->status) === 'running') {
                             $jobRuntimeSeconds += abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($session->start_time)));
                         }
                     } elseif ($job->started_at) {
                         $jobRuntimeSeconds = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($job->started_at)));
                     }
-                } elseif ($job->status === 'paused') {
+                } elseif (strtolower($job->status) === 'paused') {
                     $pSession = \App\Models\ProductionSession::where('job_master_id', $job->id)
                         ->where('work_date', $workDate)
                         ->first();
@@ -435,7 +435,7 @@ class DashboardRealtimeService
         }
 
         $totalJobs = $plans->count();
-        $finishedJobs = $dailyRecords->filter(fn($dp) => $dp->jobMaster && in_array($dp->jobMaster->status, ['finished', 'complete', 'closed']))->count();
+        $finishedJobs = $dailyRecords->filter(fn($dp) => $dp->jobMaster && in_array(strtolower($dp->jobMaster->status), ['finished', 'complete', 'closed']))->count();
         $jobActual = $finishedJobs . '/' . $totalJobs;
 
         $totalStroke = $ok + $repair + $reject;
