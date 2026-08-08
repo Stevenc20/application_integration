@@ -28,6 +28,17 @@ class InputHarianController extends Controller
         $this->productionService = $productionService;
     }
 
+    private function getLogicalDate($requestDate = null)
+    {
+        if ($requestDate) {
+            return $requestDate;
+        }
+        $now = now();
+        // If before 07:30 AM, it belongs to yesterday's night shift
+        return ($now->format('H:i') < '07:30') ? $now->copy()->subDay()->toDateString() : $now->toDateString();
+    }
+
+
     public function saveProductionLog(Request $request, $id)
     {
         try {
@@ -41,7 +52,7 @@ class InputHarianController extends Controller
         }
 
         try {
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $this->getLogicalDate($request->get('date'));
             $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
 
             return response()->json([
@@ -98,7 +109,7 @@ class InputHarianController extends Controller
 
         // LOGIKA TANGGAL PRODUKSI (Work Date)
         $hour = (int) now()->format('H');
-        $date = $request->get('date') ?: (($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString());
+        $date = $this->getLogicalDate($request->get('date'));
 
         // Smart fallback: jika auto-detected Malam+kemarin kosong, cek Pagi+hari ini
         // (supaya PPC pre-load jam 5 pagi langsung muncul tanpa ganti filter manual)
@@ -121,7 +132,7 @@ class InputHarianController extends Controller
 
         // SAFEGUARD: hanya izinkan akses ke tanggal produksi aktif (hari ini atau kemarin jika sebelum jam 7)
         // Data tanggal lewat sudah otomatis di-cleanup oleh scheduler dan tersimpan di Production Analytics
-        $activeDate = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
+        $activeDate = $this->getLogicalDate();
         if ($request->has('date') && $request->get('date') < $activeDate) {
             return redirect()->route('operational.input_harian', array_merge(
                 $request->except('date'),
@@ -648,7 +659,7 @@ class InputHarianController extends Controller
                     return response()->json(['success' => false, 'message' => 'Sedang break time, item tidak bisa dipindahkan ke dandori.'], 400);
                 }
             }
-            $workDate = now()->toDateString();
+            $workDate = $this->getLogicalDate();
             $downtime = $this->productionService->startDandori($id, $workDate);
             return response()->json(['success' => true, 'downtime' => $downtime]);
         } catch (\Throwable $e) {
@@ -670,7 +681,7 @@ class InputHarianController extends Controller
                     return response()->json(['success' => false, 'message' => 'Sedang break time, tidak bisa start dandori.'], 400);
                 }
             }
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $this->getLogicalDate($request->get('date'));
             $downtime = $this->productionService->startDandori($id, $workDate);
             return response()->json(['success' => true, 'downtime' => $downtime]);
         } catch (\Throwable $e) {
@@ -699,7 +710,7 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $this->getLogicalDate($request->get('date'));
             $dandori = $this->productionService->startFirstCheck($id, $workDate);
             return response()->json(['success' => true, 'dandori' => $dandori]);
         } catch (\Throwable $e) {
@@ -858,7 +869,7 @@ class InputHarianController extends Controller
         ", ["%{$normalized}%"])->first();
         if (!$lineMaster) return;
 
-        $date = request()->header('X-Date') ?: request('date', now()->toDateString());
+        $date = $this->getLogicalDate(request()->header('X-Date') ?: request('date'));
         $shift = $this->getShiftFromRequest();
         $shiftVal = str_contains(strtoupper($shift), 'MALAM') ? 2 : 1;
 
@@ -1095,7 +1106,7 @@ class InputHarianController extends Controller
 
     public function getQty(Request $request, $id)
     {
-        $date = $request->get('date') ?: now()->toDateString();
+        $date = $this->getLogicalDate($request->get('date'));
         $daily = DailyProduction::select('actual_ok', 'actual_repair', 'actual_reject')
             ->where('job_master_id', $id)
             ->where('work_date', $date)
@@ -1111,7 +1122,7 @@ class InputHarianController extends Controller
 
     public function sync(Request $request, $id)
     {
-        $date = $request->get('date') ?: now()->toDateString();
+        $date = $this->getLogicalDate($request->get('date'));
 
         $job = JobMaster::select('id', 'status', 'job_number', 'job_name', 'line', 'started_at')
             ->where('id', $id)->first();
@@ -1242,7 +1253,7 @@ class InputHarianController extends Controller
     {
         return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $lineId) {
         try {
-            $date = $request->get('date', now()->toDateString());
+            $date = $this->getLogicalDate($request->get('date'));
             $shift = $request->get('shift');
 
             $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
@@ -1461,7 +1472,7 @@ class InputHarianController extends Controller
 
     public function productionAudit(Request $request)
     {
-        $date = $request->get('date') ?: now()->toDateString();
+        $date = $this->getLogicalDate($request->get('date'));
 
         $jobIds = collect();
         $jobIds = $jobIds->concat(
