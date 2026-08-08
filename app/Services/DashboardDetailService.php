@@ -21,7 +21,7 @@ class DashboardDetailService
     public function getLineDetail(string $lineName, string $date, int $shift): array
     {
         $planShiftText = self::SHIFT_MAP[$shift] ?? 'Shift Pagi';
-        $workDate = $shift === 2 ? Carbon::parse($date)->subDay()->toDateString() : $date;
+        $workDate = $date;
 
         $normalizedPress = strtoupper(preg_replace('/^(PRESS|LINE)\s*/i', '', $lineName));
 

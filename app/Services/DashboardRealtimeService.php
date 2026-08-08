@@ -29,12 +29,12 @@ class DashboardRealtimeService
 
         $shiftStartDt = $shift === 1
             ? Carbon::parse($date)->setTime(7, 30)
-            : Carbon::parse($date)->subDay()->setTime(21, 0);
+            : Carbon::parse($date)->setTime(19, 30);
         $shiftEndDt = $shift === 1
-            ? Carbon::parse($date)->setTime(21, 0)
+            ? Carbon::parse($date)->setTime(19, 30)
             : Carbon::parse($date)->addDay()->setTime(7, 30);
 
-        $workDate = $shift === 2 ? Carbon::parse($date)->subDay()->toDateString() : $date;
+        $workDate = $date;
 
         $normalizedPress = strtoupper(preg_replace('/^(PRESS|LINE)\s*/i', '', $lineName));
 
