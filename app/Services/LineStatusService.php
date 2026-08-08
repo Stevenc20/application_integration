@@ -15,9 +15,9 @@ class LineStatusService
     {
         $shiftText = $shift === 1 ? 'Shift Pagi' : 'Shift Malam';
         
-        // Use logical work_date: if before 07:00, it belongs to yesterday's night shift
+        // Use logical work_date: if before 07:30, it belongs to yesterday's night shift
         $now = now();
-        $today = ((int)$now->format('H') < 7) ? $now->copy()->subDay()->toDateString() : $now->toDateString();
+        $today = ($now->format('H:i') < '07:30') ? $now->copy()->subDay()->toDateString() : $now->toDateString();
         $activeLines = LineMaster::where('status', 'active')
             ->select('line_name')->distinct()->pluck('line_name');
 

@@ -34,8 +34,8 @@ class InputHarianController extends Controller
             return $requestDate;
         }
         $now = now();
-        // If before 07:00 AM, it belongs to yesterday's night shift
-        return ((int)$now->format('H') < 7) ? $now->copy()->subDay()->toDateString() : $now->toDateString();
+        // If before 07:30 AM, it belongs to yesterday's night shift
+        return ($now->format('H:i') < '07:30') ? $now->copy()->subDay()->toDateString() : $now->toDateString();
     }
 
 
@@ -840,11 +840,11 @@ class InputHarianController extends Controller
 
     private function getShift()
     {
-        $hour = (int) now()->format('H');
+        $time = now()->format('H:i');
 
-        // Shift Pagi: 07:00 - 19:00
-        // Shift Malam: 19:00 - 07:00
-        if ($hour >= 7 && $hour < 19) {
+        // Shift Pagi: 07:30 - 19:29
+        // Shift Malam: 19:30 - 07:29
+        if ($time >= '07:30' && $time < '19:30') {
             return 'Shift Pagi';
         }
 
