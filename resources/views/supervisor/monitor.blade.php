@@ -144,6 +144,7 @@
             padding:6px 4px!important;
             font-size:11px!important;
             overflow:hidden!important;text-overflow:ellipsis!important;max-width:0!important;
+            color: #1e293b;
         }
         .large-table thead th{font-size:10px!important;padding:8px 4px!important}
         .large-table thead th.line-header{font-size:12px!important;padding:10px 4px!important}
