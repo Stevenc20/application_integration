@@ -419,6 +419,9 @@ document.getElementById('filterBar').addEventListener('click',function(e){
 
 function fetchData(){
     const n=new Date();
+    if (n.getHours() < 7 || (n.getHours() === 7 && n.getMinutes() < 30)) {
+        n.setDate(n.getDate() - 1);
+    }
     const date=`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
     const shift=selectedShift;
 
