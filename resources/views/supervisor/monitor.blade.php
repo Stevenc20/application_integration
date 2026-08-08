@@ -384,8 +384,7 @@ let LAST_HASH = '';
 let selectedLine = null;
 const _initTime = new Date();
 const _h = _initTime.getHours();
-const _m = _initTime.getMinutes();
-const _isShift2 = (_h >= 20 || (_h === 19 && _m >= 30) || _h < 7 || (_h === 7 && _m < 30));
+const _isShift2 = (_h >= 19 || _h < 7);
 let selectedShift = _isShift2 ? 2 : 1;
 let prevCellClasses = {};
 
@@ -425,7 +424,7 @@ document.getElementById('filterBar').addEventListener('click',function(e){
 
 function fetchData(){
     const n=new Date();
-    if (n.getHours() < 7 || (n.getHours() === 7 && n.getMinutes() < 30)) {
+    if (n.getHours() < 7) {
         n.setDate(n.getDate() - 1);
     }
     const date=`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;

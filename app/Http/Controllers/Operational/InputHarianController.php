@@ -34,8 +34,8 @@ class InputHarianController extends Controller
             return $requestDate;
         }
         $now = now();
-        // If before 07:30 AM, it belongs to yesterday's night shift
-        return ($now->format('H:i') < '07:30') ? $now->copy()->subDay()->toDateString() : $now->toDateString();
+        // If before 07:00 AM, it belongs to yesterday's night shift
+        return ((int)$now->format('H') < 7) ? $now->copy()->subDay()->toDateString() : $now->toDateString();
     }
 
 
