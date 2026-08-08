@@ -91,6 +91,7 @@
             overflow:hidden;
             text-overflow:ellipsis;
             max-width:0; /* forces table-layout:fixed to clip content, not overflow */
+            color: #1e293b;
         }
         thead th{
             background:#f8fafc;font-size:8px;font-weight:800;
