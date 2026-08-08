@@ -771,7 +771,16 @@ function renderTable(){
                 const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
                 leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
                 leftBodyHtml += `<td class="val-curr">${k.current||'-'}</td>`;
-                leftBodyHtml += `<td class="val-actual ${cls}" style="border-right:none;">${k.actual||'-'}${pctVal}</td>`;
+                let actualTd = `<td class="val-actual ${cls}" style="border-right:none;">${k.actual||'-'}${pctVal}</td>`;
+                if (desc === 'GSPH') {
+                    const p = parseFloat(k.actualPct || k.actual);
+                    if (p > 0 && !isNaN(p)) {
+                        const c = p >= 100 ? '#22c55e' : p >= 80 ? '#eab308' : '#ef4444';
+                        const tc = p >= 80 && p < 100 ? '#000' : '#fff';
+                        actualTd = `<td style="background-color:${c}!important; color:${tc}!important; font-weight:900; border-right:none;">${k.actual||'-'}${pctVal}</td>`;
+                    }
+                }
+                leftBodyHtml += actualTd;
             } else {
                 leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
