@@ -122,7 +122,7 @@
         tbody tr.row-detail td{font-size:11px;padding:3px 4px}
         .val-plan{color:#64748b;font-weight:600}
         .val-curr{color:#334155;font-weight:700}
-        .val-actual{font-weight:800}
+        .val-actual{font-weight:800; color:#1e293b;}
         .bg-green{background:#22c55e!important;color:#fff!important}
         .bg-yellow{background:#eab308!important;color:#000!important}
         .bg-red{background:#ef4444!important;color:#fff!important}
