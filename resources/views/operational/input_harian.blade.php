@@ -18,6 +18,25 @@
 </style>
 <div class="space-y-6">
 
+    @php
+        $now = now();
+        $isShiftPagi = $now->format('H:i') >= '07:30' && $now->format('H:i') < '19:30';
+        $shiftLabel = $isShiftPagi ? 'Shift Pagi (Shift 1)' : 'Shift Malam (Shift 2)';
+        $shiftColor = $isShiftPagi ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-indigo-50 text-indigo-800 border-indigo-200';
+    @endphp
+
+    {{-- SHIFT NOTIFICATION BANNER --}}
+    <div class="p-4 border rounded-xl flex items-center gap-3 shadow-sm {{ $shiftColor }}">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <div>
+            <p class="font-bold text-sm tracking-wide">STATUS SHIFT SISTEM: {{ strtoupper($shiftLabel) }}</p>
+            <p class="text-xs mt-0.5">Semua data produksi yang Anda masukkan saat ini ({{ $now->format('H:i') }}) secara otomatis dicatat ke dalam buku <strong>{{ $shiftLabel }}</strong>.</p>
+        </div>
+    </div>
+
+
     {{-- PAGE HEADER --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
