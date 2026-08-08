@@ -382,7 +382,11 @@ let LINE_DETAIL = {};
 let LINE_STATUSES = {};
 let LAST_HASH = '';
 let selectedLine = null;
-let selectedShift = 1;
+const _initTime = new Date();
+const _h = _initTime.getHours();
+const _m = _initTime.getMinutes();
+const _isShift2 = (_h >= 20 || (_h === 19 && _m >= 30) || _h < 7 || (_h === 7 && _m < 30));
+let selectedShift = _isShift2 ? 2 : 1;
 let prevCellClasses = {};
 
 function setShift(s) {
@@ -402,7 +406,9 @@ function updateClock(){
     const n=new Date();
     document.getElementById('liveClock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
     document.getElementById('dateLabel').textContent=n.toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'numeric'});
-    document.getElementById('shiftLabel').textContent=selectedShift===1?'Shift Pagi':'Shift Malam';
+    document.getElementById('shiftLabel').textContent = selectedShift === 1 ? 'Shift Pagi' : 'Shift Malam';
+    document.querySelectorAll('#shiftBar button').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#shiftBar button[onclick="setShift(${selectedShift})"]`)?.classList.add('active');
 }
 setInterval(updateClock,1000);
 updateClock();
