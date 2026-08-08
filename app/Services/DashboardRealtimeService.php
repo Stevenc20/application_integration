@@ -166,7 +166,7 @@ class DashboardRealtimeService
             })->first();
         }
 
-        $hasRunning = $runningRecord !== null && $runningRecord->jobMaster && $runningRecord->jobMaster->status === 'running';
+        $hasRunning = $runningRecord !== null && $runningRecord->jobMaster && in_array($runningRecord->jobMaster->status, ['running', 'paused']);
         $currOk     = $hasRunning ? (int) $runningRecord->actual_ok : 0;
         $currRepair = $hasRunning ? (int) $runningRecord->actual_repair : 0;
         $currReject = $hasRunning ? (int) $runningRecord->actual_reject : 0;
