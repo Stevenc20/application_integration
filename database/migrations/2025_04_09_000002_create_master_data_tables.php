@@ -8,23 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Master data part / komponen
-        Schema::create('parts', function (Blueprint $table) {
-            $table->id();
-            $table->string('part_number')->unique();
-            $table->string('part_name');
-            $table->string('customer_code')->nullable();    // Kode part versi customer
-            $table->string('drawing_no')->nullable();       // Nomor gambar teknik
-            $table->string('revision')->nullable();         // Revisi drawing
-            $table->string('unit')->default('pcs');
-            $table->text('description')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->timestamps();
-            $table->softDeletes();
 
-            $table->index('part_number');
-            $table->index('is_active');
-        });
 
         // Daftar jenis defect per part (standar inspeksi)
         Schema::create('defect_masters', function (Blueprint $table) {
@@ -55,6 +39,5 @@ return new class extends Migration
     {
         Schema::dropIfExists('part_defect_standards');
         Schema::dropIfExists('defect_masters');
-        Schema::dropIfExists('parts');
     }
 };
