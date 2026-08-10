@@ -69,5 +69,21 @@ class User extends Authenticatable
             ->where('enabled', true)
             ->exists();
     }
+
+    // ── Role helpers for QA module ───────────────────────────
+
+    public function hasRole(string|array $roles): bool
+    {
+        if (is_array($roles)) {
+            return in_array($this->role, $roles);
+        }
+        return $this->role === $roles;
+    }
+
+    public function isAdmin(): bool      { return $this->role === 'Admin' || strtolower($this->role) === 'superadmin' || strtolower($this->role) === 'admin'; }
+    public function isForeman(): bool    { return $this->role === 'Foreman' || strtolower($this->role) === 'foreman'; }
+    public function isProduction(): bool { return $this->role === 'Production' || strtolower($this->role) === 'production'; }
+    public function isCustomer(): bool   { return $this->role === 'Customer' || strtolower($this->role) === 'customer'; }
+    public function isSupervisor(): bool   { return $this->role === 'Supervisor' || strtolower($this->role) === 'supervisor'; }
+    public function isGroupLeader(): bool   { return $this->role === 'Group Leader' || strtolower($this->role) === 'group leader' || strtolower($this->role) === 'leader'; }
 }
-    

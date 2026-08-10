@@ -163,4 +163,22 @@ class ProductionPlan extends Model
     {
         return $this->belongsTo(RecoveryItem::class, 'recovery_id');
     }
+
+    // ── Relasi ke Modul QA ───────────────────────────────────
+
+    public function lembarInspeksi()
+    {
+        return $this->hasMany(LembarInspeksi::class, 'job_no', 'job_no'); // Lembar Inspeksi biasanya terikat via job_no atau production_plan_id. 
+        // Namun di model QA, ia memakai kolom 'job_no'
+    }
+
+    public function itemChecks()
+    {
+        return $this->hasMany(ItemCheck::class, 'production_plan_id');
+    }
+
+    public function inspections()
+    {
+        return $this->hasMany(Inspection::class, 'production_plan_id');
+    }
 }
