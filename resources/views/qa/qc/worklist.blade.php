@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="QC Worklist">
+@extends('layouts.app')
+@section('content')
 
     <div x-data="qcWorklist({ apiUrl: '{{ url('/') }}' })" class="max-w-4xl mx-auto space-y-6">
         
@@ -76,4 +77,4 @@
             </template>
         </div>
     </div>
-</x-app-layout>
+@endsection

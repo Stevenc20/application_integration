@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="Preview QPR">
+@extends('layouts.app')
+@section('content')
     @push('scripts')
     <script>window.deferSkeletonHide = true;</script>
     @endpush
@@ -40,4 +41,4 @@
         </div>
 
     </div>
-</x-app-layout>
+@endsection

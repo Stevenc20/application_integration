@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="Approval Hub">
+@extends('layouts.app')
+@section('content')
 
     <style>
         .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border: 1px solid rgba(226, 232, 240, 0.8); }
@@ -214,4 +215,4 @@
         @include('qa.approval.partials.modals')
 
     </div>
-</x-app-layout>
+@endsection

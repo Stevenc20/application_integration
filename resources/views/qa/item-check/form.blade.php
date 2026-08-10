@@ -6,7 +6,8 @@
     $pageTitle = ($itemCheck ? 'Inspeksi Harian - ' : 'Preview Inspeksi - ') . ($template->part_name ?? 'Unknown');
 @endphp
 
-<x-app-layout :pageTitle="$pageTitle">
+@extends('layouts.app')
+@section('content')
 
 <style>
     /* CSS Khusus untuk Print / Export PDF */
@@ -3585,5 +3586,5 @@
     </div>
         
     </div>{{-- END x-data --}}
-</x-app-layout>
+@endsection
 

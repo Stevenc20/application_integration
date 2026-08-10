@@ -1,6 +1,7 @@
-<x-app-layout>
-    <x-slot name="title">QPR List</x-slot>
-    <x-slot name="pageTitle">Quality Problem Report</x-slot>
+@extends('layouts.app')
+@section('content')
+    @section('title', 'QPR List')
+    <div class='mb-6'><h1 class='text-2xl font-black text-slate-800'>Quality Problem Report</h1></div>
 
     <div x-data="qprList({ apiUrl: '{{ url('') }}', userRole: '{{ auth()->user()->role ?? 'Guest' }}', userId: {{ auth()->id() ?? 'null' }}, userName: '{{ auth()->user()->name ?? '' }}', userDepartment: '{{ auth()->user()->department ?? '' }}' })" x-init="init()" class="space-y-4 sm:space-y-6 md:space-y-8" :class="archiveMode ? 'bg-slate-50/50 -m-4 p-4 rounded-3xl' : ''">
         
@@ -325,4 +326,4 @@
         </div>
     </div>
 
-</x-app-layout>
+@endsection

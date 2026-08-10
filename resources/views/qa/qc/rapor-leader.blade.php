@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="Leaderboard Kinerja QC">
+@extends('layouts.app')
+@section('content')
     <div class="max-w-6xl mx-auto pb-12">
         
         {{-- Header Section --}}
@@ -132,4 +133,4 @@
         </div>
 
     </div>
-</x-app-layout>
+@endsection

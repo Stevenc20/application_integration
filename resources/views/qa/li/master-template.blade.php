@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="Master Template LI">
+@extends('layouts.app')
+@section('content')
 <div class="font-['Plus_Jakarta_Sans'] pb-16" x-data="liMasterTemplate()" x-init="init()">
 
 {{-- TOAST --}}
@@ -998,4 +999,4 @@ function liMasterTemplate() {
 </script>
 @endpush
 
-</x-app-layout>
+@endsection

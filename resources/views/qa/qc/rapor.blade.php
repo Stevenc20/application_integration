@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="Rapor Kinerja QC">
+@extends('layouts.app')
+@section('content')
     <div class="max-w-6xl mx-auto pb-12">
         
         {{-- Header Section: Professional & High Contrast --}}
@@ -260,4 +261,4 @@
 
         </div>
     </div>
-</x-app-layout>
+@endsection

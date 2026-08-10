@@ -1,6 +1,7 @@
-<x-app-layout>
-    <x-slot name="title">Daftar Master LI</x-slot>
-    <x-slot name="pageTitle">Daftar Master LI</x-slot>
+@extends('layouts.app')
+@section('content')
+    @section('title', 'Daftar Master LI')
+    <div class='mb-6'><h1 class='text-2xl font-black text-slate-800'>Daftar Master LI</h1></div>
 
     <div x-data="liList()" x-init="init()" class="space-y-4 sm:space-y-6 md:space-y-8" :class="archiveMode ? 'bg-slate-50/50 -m-4 p-4 rounded-3xl' : ''">
         {{-- 🔔 Notifikasi antrian produksi dipindah ke dropdown bell icon di navbar (app-layout.blade.php) --}}
@@ -928,4 +929,4 @@
         }
     </script>
     @endpush
-</x-app-layout>
+@endsection

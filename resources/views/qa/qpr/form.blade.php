@@ -1,4 +1,5 @@
-<x-app-layout pageTitle="Formulir QPR">
+@extends('layouts.app')
+@section('content')
     @push('scripts')
     <script>window.deferSkeletonHide = true;</script>
     @endpush
@@ -812,4 +813,4 @@
             </div>
         </div>
     </div>
-</x-app-layout>
+@endsection

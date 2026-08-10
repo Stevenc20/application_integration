@@ -4,7 +4,8 @@
     $pageTitle = $editId ? 'Edit Master Template' : 'Buat Master Template';
 @endphp
 
-<x-app-layout :pageTitle="$pageTitle">
+@extends('layouts.app')
+@section('content')
 {{-- liForm.js sudah di-import di app.js, jadi tidak perlu dipanggil lagi di sini --}}
 
 <div class="li-wrap font-['Plus_Jakarta_Sans'] pb-[14rem] sm:pb-36 lg:pb-40"
@@ -3127,5 +3128,5 @@
             </div>
         </div>
     </div>{{-- END x-data --}}
-</x-app-layout>
+@endsection
 

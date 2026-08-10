@@ -1,4 +1,5 @@
-<x-app-layout :pageTitle="$pageTitle">
+@extends('layouts.app')
+@section('content')
 <div class="lhi-wrap min-h-screen p-3 sm:p-5" x-data="lhiPage()" x-init="init()">
     {{-- Styles --}}
     <style>
@@ -552,4 +553,4 @@ function lhiPage() {
     }
 }
 </script>
-</x-app-layout>
+@endsection

@@ -1,4 +1,5 @@
-<x-app-layout :pageTitle="$pageTitle">
+@extends('layouts.app')
+@section('content')
 <div class="um-wrap max-w-[1100px] mx-auto p-7 pb-[70px]" x-data="userManagement({ apiUrl: '{{ url('/') }}' })">
     
     {{-- Styles --}}
@@ -222,4 +223,4 @@
     </div>
 
 </div>
-</x-app-layout>
+@endsection

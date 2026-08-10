@@ -1,4 +1,5 @@
-<x-app-layout :pageTitle="$pageTitle">
+@extends('layouts.app')
+@section('content')
 <div class="qpr-reg-wrap min-h-screen p-5" x-data="qprRegPage()" x-init="init()">
     {{-- Styles --}}
     <style>
@@ -394,4 +395,4 @@ function qprRegPage() {
     }
 }
 </script>
-</x-app-layout>
+@endsection

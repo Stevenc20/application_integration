@@ -1,4 +1,5 @@
-<x-app-layout :pageTitle="$pageTitle">
+@extends('layouts.app')
+@section('content')
 <div class="um-wrap max-w-[1100px] mx-auto p-7 pb-[70px]" x-data="machineManagement({ apiUrl: '{{ url('/api/machines') }}' })">
     
     {{-- Styles --}}
@@ -263,4 +264,4 @@ document.addEventListener('alpine:init', () => {
 });
 </script>
 @endpush
-</x-app-layout>
+@endsection

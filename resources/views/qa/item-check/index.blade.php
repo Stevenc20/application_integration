@@ -1,6 +1,7 @@
-<x-app-layout>
-    <x-slot name="title">Item Check Dashboard</x-slot>
-    <x-slot name="pageTitle">Dashboard Item Check (Inspeksi Harian)</x-slot>
+@extends('layouts.app')
+@section('content')
+    @section('title', 'Item Check Dashboard')
+    <div class='mb-6'><h1 class='text-2xl font-black text-slate-800'>Dashboard Item Check (Inspeksi Harian)</h1></div>
 
     <div x-data="itemCheckDashboard()" x-init="init()" class="space-y-6">
         
@@ -912,4 +913,4 @@
         });
     </script>
     @endpush
-</x-app-layout>
+@endsection
