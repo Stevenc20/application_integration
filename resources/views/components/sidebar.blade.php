@@ -1,3 +1,4 @@
+{{-- Sidebar Cache Buster --}}
 @php
     $user = auth()->user();
     $role = $user->role ?? 'member'; // Default ke member jika role kosong

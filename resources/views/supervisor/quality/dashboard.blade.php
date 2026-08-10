@@ -123,8 +123,8 @@
 </div>
 
 <!-- ===== MODAL ===== -->
-<div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 p-4" onclick="if(event.target===this) closeKpiDetailModal()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0" id="modalDialog">
+<div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeKpiDetailModal()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
         <div class="px-5 py-4 border-b border-red-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
             <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
             <button onclick="closeKpiDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
@@ -455,7 +455,7 @@ function openKpiDetailModal(type, line){
         showKpiModalEmpty(); return; 
     }
     const lineData = typeData[line];
-    if(!lineData || !lineData.rows || lineData.rows.length === 0) { 
+    if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
         console.warn(`No rows found for line: ${line} in type: ${type}`);
         showKpiModalEmpty(); return; 
     }
@@ -509,7 +509,6 @@ function openKpiDetailModal(type, line){
           <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
           <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
@@ -519,12 +518,30 @@ function openKpiDetailModal(type, line){
           <td class="px-4 py-3 font-semibold text-blue-700">${r.job || '-'}</td>
           <td class="px-4 py-3 text-gray-600">${r.problem}</td>
           <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
-          <td class="px-4 py-3 text-gray-600">${r.action || '-'}</td>
           <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
         </tr>`).join('')}
         <tr class="bg-gray-50 font-black">
-          <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+          <td colspan="5" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
           <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
+        </tr>
+        </tbody></table></div>`;
+
+    } else if(typeData.type === 'runtime'){
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50">
+          <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
         </tr>
         </tbody></table></div>`;
 
@@ -573,8 +590,13 @@ function closeKpiDetailModal(){
   const backdrop = document.getElementById('modalBackdrop');
   const dialog = document.getElementById('modalDialog');
   
-  backdrop.classList.add('hidden');
-  backdrop.classList.remove('flex');
+  dialog.classList.remove('scale-100', 'opacity-100');
+  dialog.classList.add('scale-95', 'opacity-0');
+  
+  setTimeout(() => {
+      backdrop.classList.add('hidden');
+      backdrop.classList.remove('flex');
+  }, 200);
 }
 function onBackdropClick(e){
   if(e.target === document.getElementById('modalBackdrop')) closeModal();

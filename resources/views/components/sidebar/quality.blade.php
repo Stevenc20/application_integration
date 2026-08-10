@@ -1,3 +1,4 @@
+{{-- QA Sidebar Cache Buster --}}
 @php
     $dashboardActive = request()->routeIs('quality.dashboard');
     $qualityActive = request()->routeIs('supervisor.quality.*') || request()->routeIs('qa.*');
