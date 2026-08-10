@@ -10,6 +10,13 @@ export default defineConfig({
                 'resources/css/app.css',
                 'resources/css/supervisor.css',
                 'resources/js/app.js',
+                'resources/js/qa/liForm.js',
+                'resources/js/qa/itemCheckForm.js',
+                'resources/js/qa/qprList.js',
+                'resources/js/qa/qprForm.js',
+                'resources/js/qa/userManagement.js',
+                'resources/js/qa/qcWorklist.js',
+                'resources/js/qa/approval.js',
                 'resources/js/operational/production-engine.js',
                 'resources/js/ppc/planning.js'
             ],

@@ -200,3 +200,74 @@ window.fillJobData = function () {
     document.getElementById('capacity').value =
         option.getAttribute('data-capacity') || '';
 };
+
+// =======================
+// QA MODULE LAZY LOADING
+// =======================
+import Alpine from 'alpinejs';
+import collapse from '@alpinejs/collapse';
+import notificationsFactory from './qa/notifications';
+
+Alpine.plugin(collapse);
+window.Alpine = Alpine;
+Alpine.data('notifications', notificationsFactory);
+
+(async () => {
+    const path = window.location.pathname;
+
+    const isLiFormPage   = /\/li\/(create|[0-9]+\/edit)/.test(path);
+    const isLiPage       = /\/li(\/|$)/.test(path);
+    const isItemCheckFormPage = /\/item-check\/[0-9]+\/form/.test(path);
+    const isItemCheckPage     = /\/item-check(\/|$)/.test(path);
+    const isQprPage      = /\/qpr(\/|$)/.test(path);
+    const isApprovalPage = /\/approval(\/|$)/.test(path);
+    const isAdminPage    = /\/admin(\/|$)/.test(path);
+    const isQcPage       = /\/qc(\/|$)/.test(path);
+
+    const loadPromises = [];
+
+    // fabric.js — ONLY on LI and Item Check form pages with signature canvas
+    if (isLiFormPage || isItemCheckFormPage) {
+        loadPromises.push(
+            import('fabric').then(({ fabric }) => {
+                window.fabric = fabric;
+            }).catch(() => {})
+        );
+    }
+
+    if (isLiFormPage || isItemCheckFormPage) {
+        await Promise.all(loadPromises);
+        loadPromises.length = 0;
+    }
+
+    if (isLiPage || isLiFormPage) {
+        loadPromises.push(import('./qa/liForm').catch(() => {}));
+    }
+
+    if (isItemCheckPage || isItemCheckFormPage) {
+        loadPromises.push(import('./qa/itemCheckForm').catch(() => {}));
+    }
+
+    if (isAdminPage) {
+        loadPromises.push(import('./qa/userManagement').catch(() => {}));
+    }
+
+    if (isQcPage) {
+        loadPromises.push(import('./qa/qcWorklist').catch(() => {}));
+    }
+
+    if (isApprovalPage) {
+        loadPromises.push(import('./qa/approval').catch(() => {}));
+    }
+
+    if (isQprPage) {
+        loadPromises.push(
+            Promise.all([import('./qa/qprForm'), import('./qa/qprList')]).catch(e => {
+                console.error('Gagal memuat modul QPR.', e);
+            })
+        );
+    }
+
+    await Promise.all(loadPromises);
+    Alpine.start();
+})();
