@@ -82,7 +82,7 @@
 <body>
     <div class="no-print w-full flex justify-center mb-6">
         <div class="flex items-center gap-3 bg-slate-100/80 border border-slate-200 px-6 py-4 rounded-2xl shadow-sm">
-            <a href="{{ route('li.index') }}" 
+            <a href="{{ route('qa.li.index') }}" 
                class="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-white border border-slate-300 text-slate-600 font-bold text-sm hover:bg-slate-50 hover:text-slate-800 transition-all group shadow-sm">
                 <svg class="w-4 h-4 group-hover:-translate-x-1 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
                 Kembali

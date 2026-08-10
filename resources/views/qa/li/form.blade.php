@@ -1749,7 +1749,7 @@
 
             {{-- 4. Export PDF --}}
             <a x-show="['finished', 'locked'].includes(status)"
-               href="{{ isset($item) ? route('li.print', $item->id) : '#' }}"
+               href="{{ isset($item) ? route('qa.li.print', $item->id) : '#' }}"
                target="_blank"
                class="flex-1 max-w-[200px] min-h-[50px] sm:min-h-[56px] flex items-center justify-center gap-2 px-4 bg-slate-800 text-white border-2 border-slate-800 text-[11px] sm:text-[13px] font-black rounded-2xl hover:bg-slate-900 transition-all shadow-md active:scale-95">
               <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>

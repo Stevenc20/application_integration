@@ -72,6 +72,16 @@
         </a>
     </li>
 
+    <!-- Laporan Harian Inspeksi -->
+    <li class="menu-item">
+        <a href="{{ route('qa.li.summary') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $itemClass($itemActive('qa.li.summary')) }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ $iconClass($itemActive('qa.li.summary')) }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+            </svg>
+            <span class="font-semibold tracking-wide">Laporan Harian Inspeksi</span>
+        </a>
+    </li>
+
     <!-- Item Check -->
     <li class="menu-item">
         <a href="{{ route('qa.item-check.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $itemClass($itemActive('qa.item-check.*')) }}">
