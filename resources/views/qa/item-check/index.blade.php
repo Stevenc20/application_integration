@@ -913,4 +913,6 @@
         });
     </script>
     @endpush
+
+</div>
 @endsection

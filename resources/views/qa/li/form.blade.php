@@ -3128,5 +3128,7 @@
             </div>
         </div>
     </div>{{-- END x-data --}}
+
+</div>
 @endsection
 
