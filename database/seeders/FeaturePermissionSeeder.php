@@ -51,7 +51,7 @@ class FeaturePermissionSeeder extends Seeder
             ['feature_code' => 'master_defect',           'feature_name' => 'Master Defect',          'group_name' => 'Master Data'],
         ];
 
-        $allRoles = ['admin', 'supervisor', 'ppc', 'foreman', 'operator', 'leader', 'quality', 'production', 'manager', 'kadiv', 'direktur', 'presdir', 'superadmin', 'hambatan', 'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi'];
+        $allRoles = ['admin', 'supervisor', 'ppc', 'foreman', 'operator', 'leader', 'quality', 'production', 'manager', 'kadiv', 'direktur', 'presdir', 'member', 'board', 'superadmin', 'hambatan', 'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi'];
 
         $adminOnlyFeatures = ['network_monitor', 'security'];
 

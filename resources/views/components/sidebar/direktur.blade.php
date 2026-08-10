@@ -1,6 +1,6 @@
 @php
     $dashboardActive = request()->routeIs('direktur.dashboard');
-    $qualityActive = request()->routeIs('supervisor.quality.*');
+    $qualityActive = request()->routeIs('quality.*');
     $grafikActive = request()->routeIs('grafik.quality') || request()->routeIs('supervisor.grafik.*');
     $reportActive = request()->routeIs('supervisor.reports.*');
     $monitoringActive = request()->routeIs('monitoring.line');

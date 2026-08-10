@@ -1,7 +1,7 @@
 @php
-    $dashboardActive = request()->routeIs('board.dashboard');
+    $dashboardActive = request()->routeIs('quality.dashboard');
     $planActive = request()->routeIs('supervisor.planning.production_line') || request()->routeIs('ppc.planning.production_plan');
-    $qualityActive = request()->routeIs('supervisor.quality.*');
+    $qualityActive = request()->routeIs('quality.*');
     $reportActive = request()->routeIs('supervisor.reports.*');
 
     $operasionalActive =
@@ -28,7 +28,7 @@
     <!-- Dashboard -->
     @if(auth()->user()->hasFeature('dashboard'))
     <li class="menu-item">
-        <a href="{{ route('board.dashboard') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $dashboardActive ? 'bg-primary-red text-white shadow-md shadow-red-200' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
+        <a href="{{ route('quality.dashboard') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $dashboardActive ? 'bg-primary-red text-white shadow-md shadow-red-200' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ $dashboardActive ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
             </svg>
@@ -260,7 +260,7 @@
         <ul class="list-none ml-9 mt-1 space-y-1 {{ $qualityActive ? '' : 'hidden' }} menu-sub">
             @if(auth()->user()->hasFeature('quality_control_defect'))
             <li>
-    <a href="{{ route('supervisor.quality.defect_monitoring') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.quality.defect_monitoring') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+    <a href="{{ route('quality.defect_monitoring') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('quality.defect_monitoring') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
         <span>Defect Monitoring</span>
     </a>
@@ -268,7 +268,7 @@
             @endif
             @if(auth()->user()->hasFeature('quality_control_reject'))
             <li>
-    <a href="{{ route('supervisor.quality.reject_analysis') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.quality.reject_analysis') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+    <a href="{{ route('quality.reject_analysis') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('quality.reject_analysis') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
         <span>Reject Analysis</span>
     </a>
