@@ -43,6 +43,7 @@
         #mainWrapper main{flex:1;overflow:auto;background-color:#f9fafb;padding:1rem}
         @media(min-width:768px){#mainWrapper main{padding:1.5rem}}
         .hidden{display:none}
+        [x-cloak]{display:none !important}
     </style>
 
     @if($useVite)
