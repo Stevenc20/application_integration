@@ -66,6 +66,96 @@
             </div>
         </div>
 
+        {{-- Worklist & Tugas QPR --}}
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-base font-black text-slate-800">Worklist</h3>
+                        <p class="text-xs font-bold text-slate-400 mt-0.5">Dokumen aktif menunggu tindakan</p>
+                    </div>
+                    <a href="{{ route('qa.qc.worklist') }}" class="text-xs font-black text-red-700 hover:text-red-600 uppercase">Lihat semua →</a>
+                </div>
+                <div class="space-y-2">
+                    @forelse($worklist as $doc)
+                        <a href="{{ $doc['url'] }}" class="flex items-center gap-3 p-3 bg-slate-50 hover:bg-red-50 rounded-xl transition-colors group">
+                            <span class="w-2 h-2 rounded-full shrink-0 {{ $doc['type'] == 'QPR' ? 'bg-rose-500' : 'bg-indigo-500' }}"></span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-md {{ $doc['type'] == 'QPR' ? 'bg-rose-100 text-rose-700' : 'bg-indigo-100 text-indigo-700' }}">{{ $doc['type'] }}</span>
+                                    <span class="text-[10px] font-black uppercase px-2 py-0.5 rounded-md bg-amber-100 text-amber-700">{{ $doc['statusLabel'] }}</span>
+                                </div>
+                                <p class="text-sm font-black text-slate-700 truncate mt-1 group-hover:text-red-700">{{ $doc['label'] }}</p>
+                                <p class="text-xs font-semibold text-slate-400 truncate">{{ $doc['detail'] }}</p>
+                            </div>
+                            <div class="shrink-0 text-right">
+                                <p class="text-[10px] font-bold text-slate-400">{{ $doc['date'] ? \Carbon\Carbon::parse($doc['date'])->format('d/m/y H:i') : '—' }}</p>
+                                <svg class="w-4 h-4 text-slate-300 group-hover:text-red-600 ml-auto mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </div>
+                        </a>
+                    @empty
+                        <div class="py-10 flex flex-col items-center justify-center border-2 border-dashed border-slate-200 rounded-2xl bg-slate-50/50">
+                            <svg class="w-10 h-10 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <p class="text-sm font-bold text-slate-400">Tidak ada dokumen aktif</p>
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+
+            <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm">
+                <div class="flex items-center justify-between mb-4">
+                    <div>
+                        <h3 class="text-base font-black text-slate-800">Tugas QPR</h3>
+                        <p class="text-xs font-bold text-slate-400 mt-0.5">{{ $qprActiveTotal }} aktif · {{ $qprTotal }} total</p>
+                    </div>
+                    <a href="{{ route('qa.qpr.index') }}" class="text-xs font-black text-red-700 hover:text-red-600 uppercase">Lihat semua →</a>
+                </div>
+
+                @if($qprOverdue > 0)
+                    <div class="flex items-center gap-2 mb-4 bg-rose-50 border border-rose-200 text-rose-600 px-3 py-2 rounded-xl">
+                        <svg class="w-4 h-4 animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        <span class="text-xs font-black">{{ $qprOverdue }} QPR Terlambat</span>
+                    </div>
+                @else
+                    <div class="flex items-center gap-2 mb-4 bg-emerald-50 border border-emerald-100 text-emerald-600 px-3 py-2 rounded-xl">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                        <span class="text-xs font-black">Tidak Ada QPR Terlambat</span>
+                    </div>
+                @endif
+
+                <div class="space-y-2.5">
+                    @php $maxStage = max(array_column($qprStages, 'count')); @endphp
+                    @foreach($qprStages as $stage)
+                        <div class="flex items-center gap-3">
+                            <span class="text-[11px] font-bold text-slate-500 w-36 shrink-0 leading-snug">{{ $stage['label'] }}</span>
+                            <div class="flex-1 h-5 rounded-full bg-slate-100 overflow-hidden relative">
+                                <div class="h-full rounded-full transition-all duration-700 {{ $stage['key'] == 'closed' ? 'bg-emerald-500' : ($stage['key'] == 'a3' ? 'bg-rose-500' : ($stage['key'] == 'verif' ? 'bg-violet-500' : ($stage['key'] == 'progress' ? 'bg-blue-500' : ($stage['key'] == 'pending' ? 'bg-amber-400' : 'bg-slate-400')))) }}"
+                                     style="width: {{ $qprTotal > 0 ? max(2, min(100, round(($stage['count'] / $qprTotal) * 100))) : 0 }}%"></div>
+                            </div>
+                            <span class="w-8 text-right text-[11px] font-black shrink-0 {{ $stage['count'] > 0 ? 'text-slate-700' : 'text-slate-300' }}">{{ $stage['count'] }}</span>
+                        </div>
+                    @endforeach
+                </div>
+
+                <div class="mt-5 pt-4 border-t border-slate-100">
+                    <p class="text-[11px] font-black text-slate-400 uppercase tracking-wider mb-3">QPR Terbaru</p>
+                    <div class="space-y-2">
+                        @forelse($recentQprs as $q)
+                            <a href="{{ route('qa.qpr.preview', $q->id) }}" class="flex items-center justify-between p-3 bg-slate-50 hover:bg-red-50 rounded-xl transition-colors">
+                                <div class="min-w-0">
+                                    <p class="text-sm font-black text-slate-700 truncate">{{ $q->no_qpr ?: $q->no_job }}</p>
+                                    <p class="text-xs font-semibold text-slate-400 truncate">{{ $q->nama_part }} — {{ $q->defect }}</p>
+                                </div>
+                                <span class="text-[10px] font-black uppercase px-2.5 py-1 rounded-lg {{ in_array(strtolower($q->status), ['close', 'closed', 'finished', 'selesai']) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700' }}">{{ $q->status }}</span>
+                            </a>
+                        @empty
+                            <p class="text-sm font-bold text-slate-400 text-center py-4">Belum ada QPR.</p>
+                        @endforelse
+                    </div>
+                </div>
+            </div>
+        </div>
+
         {{-- NG Rate Progress --}}
         <div class="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm mb-8">
             <div class="flex items-center justify-between mb-3">

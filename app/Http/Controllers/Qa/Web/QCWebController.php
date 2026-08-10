@@ -20,7 +20,7 @@ class QCWebController extends Controller
         $user = auth()->user();
         
         if (in_array($user->role, ['Admin', 'Leader', 'Supervisor', 'Foreman', 'Group Leader'])) {
-            return $this->raporLeader($request, $user);
+            return $this->raporLeader($request);
         }
         
         $selectedMonth = $request->input('month', date('m'));
@@ -111,8 +111,9 @@ class QCWebController extends Controller
         ));
     }
 
-    public function raporLeader(Request $request, $user)
+    public function raporLeader(Request $request)
     {
+        $user = auth()->user();
         $selectedMonth = $request->input('month', date('m'));
         $selectedYear = $request->input('year', date('Y'));
 

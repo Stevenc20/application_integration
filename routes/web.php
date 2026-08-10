@@ -1067,6 +1067,7 @@ Route::middleware(['auth'])->group(function() {
     Route::get('/item-check/{id}/print', [WebItemCheckController::class, 'print'])->name('qa.item-check.print');
 
     Route::get('/qc/worklist', [QCWebController::class, 'worklist'])->name('qa.qc.worklist');
+    Route::get('/qc/leaderboard', [QCWebController::class, 'raporLeader'])->name('qa.qc.rapor-leader');
     Route::get('/rapor-qc', [QCWebController::class, 'rapor'])->name('qa.qc.rapor');
 
     // QA API (can be inside web.php to access session)

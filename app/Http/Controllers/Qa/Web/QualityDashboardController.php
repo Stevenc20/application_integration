@@ -119,6 +119,83 @@ class QualityDashboardController extends Controller
 
         $recentQprs = Qpr::orderBy('created_at', 'desc')->limit(6)->get();
 
+        // ── Worklist: dokumen aktif (ItemCheck + QPR) ──
+        $itemCheckActiveStatuses = ['in_progress', 'waiting_gl', 'waiting_foreman', 'waiting_supervisor', 'waiting_qc_approval', 'ready_for_qc', 'revision'];
+        $closedQprStatuses = ['close', 'closed', 'finished', 'selesai'];
+
+        $activeItemChecks = ItemCheck::with('masterTemplate')
+            ->whereIn('status', $itemCheckActiveStatuses)
+            ->orderBy('updated_at', 'desc')
+            ->limit(12)
+            ->get();
+
+        $activeQprs = Qpr::with('actions')
+            ->whereNotIn('status', $closedQprStatuses)
+            ->orderBy('updated_at', 'desc')
+            ->limit(12)
+            ->get();
+
+        $worklist = collect();
+        foreach ($activeItemChecks as $ic) {
+            $worklist->push([
+                'type' => 'Item Check',
+                'label' => $ic->masterTemplate ? $ic->masterTemplate->part_name : 'Item Check #' . $ic->id,
+                'detail' => $ic->tanggal ? Carbon::parse($ic->tanggal)->format('d/m/Y') : '',
+                'statusLabel' => $this->itemCheckStatusLabel($ic->status),
+                'url' => route('qa.item-check.form', $ic->id),
+                'date' => $ic->updated_at ?: $ic->created_at,
+                'color' => 'indigo',
+            ]);
+        }
+        foreach ($activeQprs as $qpr) {
+            $qprDetail = trim($qpr->nama_part . ($qpr->defect ? ' — ' . $qpr->defect : ''));
+            $worklist->push([
+                'type' => 'QPR',
+                'label' => $qpr->no_qpr ?: ($qpr->no_job ?: 'QPR #' . $qpr->id),
+                'detail' => $qprDetail,
+                'statusLabel' => $this->qprStatusLabel($qpr->status),
+                'url' => route('qa.qpr.preview', $qpr->id),
+                'date' => $qpr->updated_at ?: $qpr->created_at,
+                'color' => 'rose',
+            ]);
+        }
+        $worklist = $worklist->sortByDesc('date')->values()->take(15);
+
+        // ── QPR Pipeline ──
+        $qprStages = [
+            ['key' => 'open', 'label' => 'Terbuka / Draft', 'count' => 0],
+            ['key' => 'pending', 'label' => 'Menunggu TTD GL', 'count' => 0],
+            ['key' => 'progress', 'label' => 'Dalam Perbaikan', 'count' => 0],
+            ['key' => 'verif', 'label' => 'Menunggu Verifikasi', 'count' => 0],
+            ['key' => 'a3', 'label' => 'Perlu A3 Report', 'count' => 0],
+            ['key' => 'closed', 'label' => 'Selesai / Close', 'count' => 0],
+        ];
+        foreach ($qprs as $qpr) {
+            $s = strtolower((string) $qpr->status);
+            if (in_array($s, ['close', 'closed'])) {
+                $qprStages[5]['count']++;
+            } elseif (str_contains($s, 'a3')) {
+                $qprStages[4]['count']++;
+            } elseif (str_contains($s, 'verif')) {
+                $qprStages[3]['count']++;
+            } elseif (str_contains($s, 'progress') || str_contains($s, 'waiting action') || str_contains($s, 'gl approved')) {
+                $qprStages[2]['count']++;
+            } elseif (in_array($s, ['pending approval', 'pending'])) {
+                $qprStages[1]['count']++;
+            } else {
+                $qprStages[0]['count']++;
+            }
+        }
+        $qprTotal = $qprs->count();
+        $qprActiveTotal = $qprs->filter(function ($qpr) use ($closedQprStatuses) {
+            return !in_array(strtolower((string) $qpr->status), $closedQprStatuses);
+        })->count();
+        $qprOverdue = $qprs->filter(function ($qpr) use ($closedQprStatuses) {
+            if (in_array(strtolower((string) $qpr->status), $closedQprStatuses)) return false;
+            if (!$qpr->target_selesai) return false;
+            return Carbon::parse($qpr->target_selesai)->lt(Carbon::today());
+        })->count();
+
         $bulanLabel = $this->bulanLabel($bulan);
 
         return view('qa.dashboard.index', compact(
@@ -126,8 +203,48 @@ class QualityDashboardController extends Controller
             'totalLi', 'totalProduksi', 'totalOk', 'totalNg', 'ngRate', 'totalRepair', 'totalReject',
             'statusBreakdown', 'perShift', 'topParts', 'topDefects', 'trendMingguan',
             'qprs', 'qprOpen', 'qprClosed', 'qprWaitingAction', 'qprWaitingVerif',
-            'recentItemChecks', 'recentQprs'
+            'recentItemChecks', 'recentQprs',
+            'worklist', 'qprStages', 'qprTotal', 'qprActiveTotal', 'qprOverdue'
         ));
+    }
+
+    private function itemCheckStatusLabel($status)
+    {
+        $map = [
+            'in_progress' => 'Dalam Proses',
+            'waiting_gl' => 'Menunggu GL',
+            'waiting_foreman' => 'Menunggu Foreman',
+            'waiting_supervisor' => 'Menunggu SPV',
+            'waiting_qc_approval' => 'Verifikasi QC',
+            'ready_for_qc' => 'Siap Dicek QC',
+            'revision' => 'Perlu Revisi',
+        ];
+        return $map[$status] ?? str_replace('_', ' ', ucwords($status));
+    }
+
+    private function qprStatusLabel($status)
+    {
+        $s = strtolower((string) $status);
+        $map = [
+            'draft' => 'Terbuka / Draft',
+            'open' => 'Terbuka / Draft',
+            'pending approval' => 'Menunggu TTD GL',
+            'pending' => 'Menunggu TTD GL',
+            'progress' => 'Dalam Perbaikan',
+            'waiting action' => 'Dalam Perbaikan',
+            'gl approved' => 'Dalam Perbaikan',
+            'verif' => 'Menunggu Verifikasi',
+            'waiting verif' => 'Menunggu Verifikasi',
+            'a3' => 'Perlu A3 Report',
+            'close' => 'Selesai / Close',
+            'closed' => 'Selesai / Close',
+            'finished' => 'Selesai / Close',
+            'selesai' => 'Selesai / Close',
+        ];
+        foreach ($map as $key => $label) {
+            if ($s === $key || str_contains($s, $key)) return $label;
+        }
+        return str_replace('_', ' ', ucwords($status));
     }
 
     public function defectMonitoring(Request $request)
