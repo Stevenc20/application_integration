@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Qa\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-use App\Models\ProductionPlan;
+use App\Models\ProductionSchedule;
 
 class ProductionPlanController extends Controller
 {
@@ -13,7 +13,7 @@ class ProductionPlanController extends Controller
         // Decode URI component just in case
         $job_no = urldecode($job_no);
 
-        $schedule = ProductionPlan::where('job_no', $job_no)->first();
+        $schedule = ProductionSchedule::where('job_no', $job_no)->first();
 
         if (!$schedule) {
             // Return dummy data for testing purposes if not found in db

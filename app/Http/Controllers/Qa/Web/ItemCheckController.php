@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Qa\Web;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
-use App\Models\ProductionPlan;
+use App\Models\ProductionSchedule;
 use App\Models\ItemCheck;
 use Carbon\Carbon;
 
@@ -22,7 +22,7 @@ class ItemCheckController extends Controller
             \Illuminate\Support\Facades\Artisan::call('qa:sync-schedule');
         }
 
-        $schedulesQuery = ProductionPlan::with(['itemChecks'])
+        $schedulesQuery = ProductionSchedule::with(['itemChecks'])
                         ->whereDate('tanggal_produksi', $targetDate)
                         ->orderByRaw('ISNULL(row_no), row_no ASC');
 
@@ -139,7 +139,7 @@ class ItemCheckController extends Controller
 
     public function start(Request $request, $scheduleId)
     {
-        $schedule = ProductionPlan::findOrFail($scheduleId);
+        $schedule = ProductionSchedule::findOrFail($scheduleId);
         
         // Prevent operators from cheating by doing yesterday's schedule today
         if ($schedule->tanggal_produksi && !Carbon::parse($schedule->tanggal_produksi)->isToday()) {
