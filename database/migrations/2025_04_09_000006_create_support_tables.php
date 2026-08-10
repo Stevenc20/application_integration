@@ -8,17 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Notifikasi in-app (Laravel Notification → database driver)
-        Schema::create('notifications', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->string('type');                             // Class notifikasi
-            $table->morphs('notifiable');                       // notifiable_type + notifiable_id
-            $table->text('data');                               // JSON payload
-            $table->timestamp('read_at')->nullable();
-            $table->timestamps();
 
-            $table->index(['notifiable_id', 'notifiable_type', 'read_at']);
-        });
 
         // Audit trail — semua perubahan data penting tercatat
         Schema::create('audit_logs', function (Blueprint $table) {
@@ -66,6 +56,5 @@ return new class extends Migration
     {
         Schema::dropIfExists('integration_logs');
         Schema::dropIfExists('audit_logs');
-        Schema::dropIfExists('notifications');
     }
 };
