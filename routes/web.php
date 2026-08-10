@@ -1025,3 +1025,128 @@ Route::middleware(['auth', 'role:admin,superadmin', 'feature:security'])
         Route::get('/dashboard', [\App\Http\Controllers\SecurityController::class, 'index'])->name('dashboard');
         Route::get('/logs', [\App\Http\Controllers\SecurityController::class, 'logs'])->name('logs');
     });
+// ─── ROUTE QA MODULE ──────────────────────────
+use App\Http\Controllers\Qa\Web\LembarInspeksiWebController;
+use App\Http\Controllers\Qa\Web\QprWebController;
+use App\Http\Controllers\Qa\Web\AdminWebController;
+use App\Http\Controllers\Qa\Web\QCWebController;
+use App\Http\Controllers\Qa\Web\ItemCheckController as WebItemCheckController;
+use App\Http\Controllers\Qa\Api\QprController;
+use App\Http\Controllers\Qa\Api\LembarInspeksiController;
+use App\Http\Controllers\Qa\Api\ItemCheckController as ApiItemCheckController;
+use App\Http\Controllers\Qa\Api\ApprovalController;
+use App\Http\Controllers\Qa\Api\SignatureController;
+use App\Http\Controllers\Qa\Api\DefectMasterController;
+
+Route::middleware(['auth'])->group(function() {
+    // QA Web
+    Route::get('/li', [LembarInspeksiWebController::class, 'index'])->name('qa.li.index');
+    Route::get('/li/create', [LembarInspeksiWebController::class, 'create'])->name('qa.li.create');
+    Route::get('/li/summary', [LembarInspeksiWebController::class, 'summary'])->name('qa.li.summary');
+    Route::get('/li/rekap', [LembarInspeksiWebController::class, 'rekap'])->name('qa.li.rekap');
+    Route::get('/li/{id}/edit', [LembarInspeksiWebController::class, 'edit'])->name('qa.li.edit');
+    Route::get('/li/{id}/print', [LembarInspeksiWebController::class, 'print'])->name('qa.li.print');
+
+    Route::get('/qpr', [QprWebController::class, 'index'])->name('qa.qpr.index');
+    Route::get('/qpr/create', [QprWebController::class, 'create'])->name('qa.qpr.create');
+    Route::get('/qpr/registration', [QprWebController::class, 'registration'])->name('qa.qpr.registration');
+    Route::get('/qpr/{id}/edit', [QprWebController::class, 'edit'])->name('qa.qpr.edit');
+    Route::get('/qpr/{id}/preview', [QprWebController::class, 'preview'])->name('qa.qpr.preview');
+
+    Route::get('/admin/defects', [AdminWebController::class, 'defects'])->name('qa.admin.defects');
+    
+    Route::get('/li/master-template', [LembarInspeksiWebController::class, 'masterTemplate'])->name('qa.li.master-template');
+
+    // Item Check Routes
+    Route::get('/item-check', [WebItemCheckController::class, 'index'])->name('qa.item-check.index');
+    Route::post('/item-check/{scheduleId}/start', [WebItemCheckController::class, 'start'])->name('qa.item-check.start');
+    Route::get('/item-check/{id}/form', [WebItemCheckController::class, 'form'])->name('qa.item-check.form');
+    Route::get('/item-check/preview/{templateId}', [WebItemCheckController::class, 'preview'])->name('qa.item-check.preview');
+    Route::get('/item-check/{id}/print', [WebItemCheckController::class, 'print'])->name('qa.item-check.print');
+
+    Route::get('/qc/worklist', [QCWebController::class, 'worklist'])->name('qa.qc.worklist');
+    Route::get('/rapor-qc', [QCWebController::class, 'rapor'])->name('qa.qc.rapor');
+
+    // QA API (can be inside web.php to access session)
+    Route::prefix('api/qa')->group(function() {
+        Route::post('signature/verify-pin', [SignatureController::class, 'verifyPin']);
+        Route::get('signature/get-signature', [SignatureController::class, 'getSignature']);
+        Route::post('signature/save-master', [SignatureController::class, 'saveMaster']);
+
+        Route::prefix('qprs')->group(function () {
+            Route::get('/pending-approval',          [QprController::class, 'pendingApproval']);
+            Route::post('/upload-sketch',            [QprController::class, 'uploadSketch']);
+            Route::get('/',                          [QprController::class, 'index']);
+            Route::post('/',                         [QprController::class, 'store']);
+            Route::patch('/draft',                   [QprController::class, 'saveDraft']);
+            Route::get('/{id}',                      [QprController::class, 'show']);
+            Route::put('/{id}',                      [QprController::class, 'update']);
+            Route::patch('/{id}/draft',              [QprController::class, 'saveDraft']);
+            Route::delete('/{id}',                   [QprController::class, 'destroy']);
+            Route::post('/{id}/sign',                [QprController::class, 'sign']);
+            Route::post('/{id}/revision',            [QprController::class, 'requestRevision']);
+            Route::get('/{id}/signatures',           [QprController::class, 'signatures']);
+            Route::post('/{id}/generate-tokens',     [ApprovalController::class, 'generateTokens']);
+        });
+
+        Route::prefix('inspeksi')->group(function () {
+            Route::post('/import-excel',     [LembarInspeksiController::class, 'importExcel']);
+            Route::get('/',                  [LembarInspeksiController::class, 'index']);
+            Route::post('/',                 [LembarInspeksiController::class, 'store']);
+            Route::get('/pending-ttd',       [LembarInspeksiController::class, 'pendingTtd']);
+            Route::get('/leaderboard',       [LembarInspeksiController::class, 'leaderboard']);
+            Route::get('/search',            [LembarInspeksiController::class, 'search']);  
+            Route::get('/rekap-bulanan',     [LembarInspeksiController::class, 'rekapBulanan']);
+            Route::post('/upload-sketch',    [LembarInspeksiController::class, 'uploadSketch']);  
+            Route::get('/{id}',              [LembarInspeksiController::class, 'show']);
+            Route::post('/{id}/sign',        [LembarInspeksiController::class, 'sign']);
+            Route::put('/{id}',              [LembarInspeksiController::class, 'update']);        
+            Route::delete('/{id}',           [LembarInspeksiController::class, 'destroy']);       
+            Route::post('/{id}/reject',      [LembarInspeksiController::class, 'reject']); 
+            Route::post('/{id}/restore',     [LembarInspeksiController::class, 'restore']);
+            Route::post('/{id}/sign-column', [LembarInspeksiController::class, 'signColumn']);
+            Route::post('/{id}/generate-qpr',[LembarInspeksiController::class, 'generateQpr']);
+            Route::post('/{id}/assign',      [LembarInspeksiController::class, 'assign']);
+            Route::post('/{id}/claim',       [LembarInspeksiController::class, 'claim']);
+            Route::post('/{id}/field-revisions', [LembarInspeksiController::class, 'saveFieldRevisions']);
+            Route::post('/{id}/resolve-revision', [LembarInspeksiController::class, 'resolveFieldRevision']);       
+        });
+
+        Route::prefix('item-check')->group(function () {
+            Route::get('/pending-ttd',               [ApiItemCheckController::class, 'pendingTtd']);
+            Route::get('/search',                    [ApiItemCheckController::class, 'search']);
+            Route::get('/summary',                   [ApiItemCheckController::class, 'summaryList']);
+            Route::get('/{id}',                      [ApiItemCheckController::class, 'show']);
+            Route::put('/{id}',                      [ApiItemCheckController::class, 'update']);
+            Route::post('/{id}/start',               [ApiItemCheckController::class, 'start']);
+            Route::post('/{id}/sign',                [ApiItemCheckController::class, 'sign']);
+            Route::post('/{id}/assign',              [ApiItemCheckController::class, 'assign']);
+            Route::post('/{id}/field-revisions',     [ApiItemCheckController::class, 'saveFieldRevisions']);
+            Route::post('/{id}/resolve-revision',    [ApiItemCheckController::class, 'resolveFieldRevision']);
+            Route::post('/{id}/resume',              [ApiItemCheckController::class, 'resumeTimer']);
+        });
+
+        Route::prefix('production-plans')->group(function () {
+            Route::get('/{job_no}', [\App\Http\Controllers\Qa\Api\ProductionPlanController::class, 'getByJobNo']);
+        });
+
+        Route::prefix('li-templates')->group(function () {
+            Route::get('/',                          [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'index']);
+            Route::post('/',                         [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'store']);
+            Route::post('/sync-from-li',             [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'syncFromLi']);
+            Route::get('/{part_no}',                 [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'showByPartNo']);
+            Route::delete('/{part_no}',              [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'destroyByPartNo']);
+        });
+
+        Route::prefix('intercom')->group(function () {
+            Route::post('/call',                  [\App\Http\Controllers\Qa\Api\IntercomController::class, 'initiateCall']);
+            Route::get('/status/{liId}',          [\App\Http\Controllers\Qa\Api\IntercomController::class, 'checkCallStatus']);
+            Route::post('/respond',               [\App\Http\Controllers\Qa\Api\IntercomController::class, 'respondCall']);
+            Route::post('/arrive',                [\App\Http\Controllers\Qa\Api\IntercomController::class, 'arriveAtLine']);
+            Route::post('/complete/{liId}',       [\App\Http\Controllers\Qa\Api\IntercomController::class, 'completeCall']);
+            Route::get('/active-incoming',        [\App\Http\Controllers\Qa\Api\IntercomController::class, 'checkActiveIncoming']);
+        });
+
+        Route::apiResource('defects', DefectMasterController::class);
+    });
+});
