@@ -46,6 +46,9 @@ class FeaturePermissionSeeder extends Seeder
             ['feature_code' => 'data_mining',             'feature_name' => 'Data Mining',            'group_name' => 'Analytics'],
             ['feature_code' => 'network_monitor',         'feature_name' => 'Network Monitor',        'group_name' => 'Monitoring'],
             ['feature_code' => 'security',                'feature_name' => 'Security Dashboard',     'group_name' => 'Monitoring'],
+            ['feature_code' => 'lembar_inspeksi',         'feature_name' => 'Lembar Inspeksi',        'group_name' => 'Quality Control'],
+            ['feature_code' => 'qpr',                     'feature_name' => 'Quality Problem Report', 'group_name' => 'Quality Control'],
+            ['feature_code' => 'master_defect',           'feature_name' => 'Master Defect',          'group_name' => 'Master Data'],
         ];
 
         $allRoles = ['admin', 'supervisor', 'ppc', 'foreman', 'operator', 'leader', 'quality', 'production', 'manager', 'kadiv', 'direktur', 'presdir', 'superadmin', 'hambatan', 'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi'];
