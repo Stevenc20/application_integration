@@ -162,7 +162,7 @@ class ItemCheckController extends Controller
                 'job_no' => $ic->schedule->job_no ?? '',
                 'part_name' => $master->part_name ?? '',
                 'part_no' => $master->part_no ?? '',
-                'schedule_id' => $ic->production_plan_id,
+                'schedule_id' => $ic->production_schedule_id,
                 'lokasi' => $master->lokasi ?? '',
                 'line_name' => $master->lokasi ?? '',
                 'proses_route' => $master->proses_route ?? '',
@@ -251,8 +251,8 @@ class ItemCheckController extends Controller
             $itemCheck->total_produksi = $request->input('total_produksi');
             
             // Sync total_produksi ke part tandem (jika ada) agar tidak perlu diisi dua kali
-            if ($itemCheck->production_plan_id) {
-                ItemCheck::where('production_plan_id', $itemCheck->production_plan_id)
+            if ($itemCheck->production_schedule_id) {
+                ItemCheck::where('production_schedule_id', $itemCheck->production_schedule_id)
                     ->where('id', '!=', $itemCheck->id)
                     ->update(['total_produksi' => $itemCheck->total_produksi]);
             }

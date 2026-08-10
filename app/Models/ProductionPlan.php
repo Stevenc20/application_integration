@@ -172,11 +172,6 @@ class ProductionPlan extends Model
         // Namun di model QA, ia memakai kolom 'job_no'
     }
 
-    public function itemChecks()
-    {
-        return $this->hasMany(ItemCheck::class, 'production_plan_id');
-    }
-
     public function inspections()
     {
         return $this->hasMany(Inspection::class, 'production_plan_id');

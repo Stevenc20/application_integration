@@ -9,7 +9,7 @@ class ItemCheck extends Model
     //
     protected $fillable = [
         'lembar_inspeksi_id',
-        'production_plan_id',
+        'production_schedule_id',
         'operator_id',
         'tanggal',
         'shift',
@@ -55,7 +55,7 @@ class ItemCheck extends Model
 
     public function schedule()
     {
-        return $this->belongsTo(ProductionPlan::class, 'production_plan_id');
+        return $this->belongsTo(ProductionSchedule::class, 'production_schedule_id');
     }
 
     public function operator()

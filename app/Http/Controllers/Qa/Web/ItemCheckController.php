@@ -166,7 +166,7 @@ class ItemCheckController extends Controller
 
         return \Illuminate\Support\Facades\DB::transaction(function () use ($schedule, $templates) {
             // Cek apakah jadwal ini sudah diambil
-            $existingChecks = ItemCheck::with('operator')->where('production_plan_id', $schedule->id)->lockForUpdate()->get();
+            $existingChecks = ItemCheck::with('operator')->where('production_schedule_id', $schedule->id)->lockForUpdate()->get();
 
             if ($existingChecks->count() > 0) {
                 $existingCheck = $existingChecks->first();
@@ -184,7 +184,7 @@ class ItemCheckController extends Controller
             $firstCheckId = null;
             foreach ($templates as $template) {
                 $newCheck = ItemCheck::create([
-                    'production_plan_id' => $schedule->id,
+                    'production_schedule_id' => $schedule->id,
                     'lembar_inspeksi_id' => $template->id,
                     'operator_id' => auth()->id(),
                     'tanggal' => $schedule->tanggal_produksi ? Carbon::parse($schedule->tanggal_produksi) : Carbon::today(),
@@ -208,7 +208,7 @@ class ItemCheckController extends Controller
         $tandemCheck = null;
         if ($itemCheck->schedule) {
             $tandemCheck = ItemCheck::with('masterTemplate')
-                ->where('production_plan_id', $itemCheck->schedule->id)
+                ->where('production_schedule_id', $itemCheck->schedule->id)
                 ->where('id', '!=', $itemCheck->id)
                 ->where('operator_id', $itemCheck->operator_id)
                 ->whereDate('tanggal', $itemCheck->tanggal)
