@@ -12,7 +12,7 @@ class QCWebController extends Controller
 {
     public function worklist()
     {
-        return view('qc.worklist');
+        return view('qa.qc.worklist');
     }
 
     public function rapor(Request $request)
@@ -99,7 +99,7 @@ class QCWebController extends Controller
             ->limit(5)
             ->get();
 
-        return view('qc.rapor', compact(
+        return view('qa.qc.rapor', compact(
             'user',
             'totalInspeksi',
             'totalNgFound',
@@ -160,6 +160,6 @@ class QCWebController extends Controller
             return $b['score'] <=> $a['score'];
         });
 
-        return view('qc.rapor-leader', compact('user', 'selectedMonth', 'selectedYear', 'leaderboard'));
+        return view('qa.qc.rapor-leader', compact('user', 'selectedMonth', 'selectedYear', 'leaderboard'));
     }
 }

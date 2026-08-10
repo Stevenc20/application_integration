@@ -134,7 +134,7 @@ class ItemCheckController extends Controller
             $ic->qa_ok      = $ic->qa_checked - $ic->qa_ng;
         }
 
-        return view('item-check.index', compact('schedules', 'itemChecks'));
+        return view('qa.item-check.index', compact('schedules', 'itemChecks'));
     }
 
     public function start(Request $request, $scheduleId)
@@ -215,7 +215,7 @@ class ItemCheckController extends Controller
                 ->first();
         }
         
-        return view('item-check.form', compact('itemCheck', 'tandemCheck'));
+        return view('qa.item-check.form', compact('itemCheck', 'tandemCheck'));
     }
 
     public function preview(Request $request, $templateId)
@@ -225,7 +225,7 @@ class ItemCheckController extends Controller
         $scheduleId = $request->query('schedule_id', null);
         
         // Render item-check form without an ItemCheck record (Preview Mode)
-        return view('item-check.form', [
+        return view('qa.item-check.form', [
             'itemCheck' => null,
             'template' => $template,
             'actualQty' => $actualQty,
@@ -237,7 +237,7 @@ class ItemCheckController extends Controller
     {
         $itemCheck = ItemCheck::with(['masterTemplate', 'schedule', 'operator', 'assignedGl', 'assignedForeman'])->findOrFail($id);
         
-        return view('item-check.print', compact('itemCheck'));
+        return view('qa.item-check.print', compact('itemCheck'));
     }
 
     private function findTemplatesForSchedule($schedule)

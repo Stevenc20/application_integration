@@ -10,12 +10,12 @@ class QprWebController extends Controller
 {
     public function index()
     {
-        return view('qpr.index');
+        return view('qa.qpr.index');
     }
 
     public function create()
     {
-        return view('qpr.form');
+        return view('qa.qpr.form');
     }
 
     public function edit($id)
@@ -24,16 +24,16 @@ class QprWebController extends Controller
         if (auth()->user() && auth()->user()->role === 'Operator' && $qpr->created_by !== auth()->id()) {
             abort(403, 'Akses Ditolak: Anda hanya dapat mengedit QPR yang Anda buat sendiri.');
         }
-        return view('qpr.form', ['id' => $id]);
+        return view('qa.qpr.form', ['id' => $id]);
     }
 
     public function preview($id)
     {
-        return view('qpr.preview', ['id' => $id]);
+        return view('qa.qpr.preview', ['id' => $id]);
     }
 
     public function registration()
     {
-        return view('qpr.registration', ['pageTitle' => 'Formulir Registrasi QPR']);
+        return view('qa.qpr.registration', ['pageTitle' => 'Formulir Registrasi QPR']);
     }
 }
