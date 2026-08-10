@@ -628,7 +628,9 @@ Route::middleware(['auth'])->group(function () {
 
 // quality dashboard
 Route::middleware(['auth', 'role:quality'])->prefix('quality')->name('quality.')->group(function () {
-    Route::get('/dashboard', [\App\Http\Controllers\Supervisor\DashboardController::class, 'index'])->middleware('feature:quality_dashboard')->name('dashboard');
+    Route::get('/dashboard', [\App\Http\Controllers\Qa\Web\QualityDashboardController::class, 'index'])->middleware('feature:quality_dashboard')->name('dashboard');
+    Route::get('/defect-monitoring', [\App\Http\Controllers\Qa\Web\QualityDashboardController::class, 'defectMonitoring'])->middleware('feature:quality_control_defect')->name('defect_monitoring');
+    Route::get('/reject-analysis', [\App\Http\Controllers\Qa\Web\QualityDashboardController::class, 'rejectAnalysis'])->middleware('feature:quality_control_reject')->name('reject_analysis');
 });
 
 // quality

@@ -1,7 +1,7 @@
 {{-- QA Sidebar Cache Buster --}}
 @php
     $dashboardActive = request()->routeIs('quality.dashboard');
-    $qualityActive = request()->routeIs('supervisor.quality.*') || request()->routeIs('qa.*');
+    $qualityActive = request()->routeIs('quality.defect_monitoring') || request()->routeIs('quality.reject_analysis') || request()->routeIs('qa.*');
 
     // Arrow SVG helper
     $arrow = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-300 arrow %s" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>';
@@ -36,8 +36,8 @@
             {!! sprintf($arrow, $qualityActive ? 'rotate-90' : '') !!}
         </a>
         <ul class="list-none ml-9 mt-1 space-y-1 {{ $qualityActive ? '' : 'hidden' }} menu-sub">
-            <li><a href="{{ route('supervisor.quality.defect_monitoring') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.quality.defect_monitoring') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Defect Monitoring</a></li>
-            <li><a href="{{ route('supervisor.quality.reject_analysis') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('supervisor.quality.reject_analysis') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Reject Analysis</a></li>
+            <li><a href="{{ route('quality.defect_monitoring') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('quality.defect_monitoring') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Defect Monitoring</a></li>
+            <li><a href="{{ route('quality.reject_analysis') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('quality.reject_analysis') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Reject Analysis</a></li>
             <li><a href="{{ route('qa.li.index') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('qa.li.*') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Lembar Inspeksi</a></li>
             <li><a href="{{ route('qa.qpr.index') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('qa.qpr.*') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">QPR</a></li>
             <li><a href="{{ route('qa.item-check.index') }}" class="block px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('qa.item-check.*') ? 'bg-red-600 text-white font-medium' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">Item Check</a></li>
