@@ -39,11 +39,11 @@ class SyncProductionSchedule extends Command
                 ->delete();
 
             // Ambil semua job dari PPC untuk tanggal ini (hanya row_type = job, bukan break/note)
-            $plans = \App\Models\Integration\ProductionPlan::whereDate('plan_date', $date)
+            $plans = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                         ->where('row_type', 'job')
                         ->whereNotNull('job_master')
                         ->where('job_master', '!=', '')
-                        ->whereNotIn(DB::connection('mysql_integration')->raw('UPPER(TRIM(job_master))'), [
+                        ->whereNotIn(DB::raw('UPPER(TRIM(job_master))'), [
                             'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN',
                             'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT',
                             'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
@@ -65,15 +65,13 @@ class SyncProductionSchedule extends Command
                 $repairNotes = [];
                 $rejectNotes = [];
 
-                // Cari job_master di db_integration berdasarkan job_number = job_no
-                $jobMaster = DB::connection('mysql_integration')
-                    ->table('job_masters')
+                // Cari job_master berdasarkan job_number = job_no
+                $jobMaster = DB::table('job_masters')
                     ->where('job_number', $job_no)
                     ->first();
 
                 if ($jobMaster) {
-                    $rrLogs = DB::connection('mysql_integration')
-                        ->table('repair_reject_logs')
+                    $rrLogs = DB::table('repair_reject_logs')
                         ->where('job_master_id', $jobMaster->id)
                         ->get(['type', 'defect_name', 'qty_a', 'qty_b', 'area_problem', 'root_cause', 'countermeasure', 'repair_category']);
 
