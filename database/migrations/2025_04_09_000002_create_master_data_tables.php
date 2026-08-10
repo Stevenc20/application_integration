@@ -48,23 +48,13 @@ return new class extends Migration
             $table->unique(['part_id', 'defect_master_id']);
         });
 
-        // Master data production line
-        Schema::create('production_lines', function (Blueprint $table) {
-            $table->id();
-            $table->string('code')->unique();               // Cth: LINE-01
-            $table->string('name');                         // Cth: Line Assy A
-            $table->string('department')->nullable();
-            $table->boolean('is_active')->default(true);
-            $table->boolean('is_stopped')->default(false);  // Status stop line saat ini
-            $table->timestamps();
-        });
+
     }
 
     public function down(): void
     {
         Schema::dropIfExists('part_defect_standards');
         Schema::dropIfExists('defect_masters');
-        Schema::dropIfExists('production_lines');
         Schema::dropIfExists('parts');
     }
 };
