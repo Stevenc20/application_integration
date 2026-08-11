@@ -605,9 +605,17 @@ class ProductionService
         );
 
         if ($notify) {
-            $ppcUsers = User::whereIn('role', ['ppc', 'admin'])->get();
-            foreach ($ppcUsers as $ppcUser) {
-                $ppcUser->notify(new ItemTidakTercapaiNotification($job, $recoveryItem));
+            try {
+                $ppcUsers = User::whereIn('role', ['ppc', 'admin'])->get();
+                foreach ($ppcUsers as $ppcUser) {
+                    $ppcUser->notify(new ItemTidakTercapaiNotification($job, $recoveryItem));
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Failed to notify PPC about recovery item', [
+                    'job_id'      => $job->id,
+                    'recovery_id' => $recoveryItem->id,
+                    'error'       => $e->getMessage(),
+                ]);
             }
         }
 

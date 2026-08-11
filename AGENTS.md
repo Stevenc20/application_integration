@@ -3,6 +3,7 @@
 ```bash
 sudo steven
 git pull origin main
+docker compose exec app php artisan migrate --force
 docker compose restart app nginx
 docker compose exec app php artisan optimize:clear
 ```

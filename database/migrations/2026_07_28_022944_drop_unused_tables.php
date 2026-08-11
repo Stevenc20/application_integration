@@ -14,7 +14,6 @@ return new class extends Migration
         // Disable foreign key checks just in case there are loose dependencies
         Schema::disableForeignKeyConstraints();
 
-        Schema::dropIfExists('notifications');
         Schema::dropIfExists('audit_logs');
         Schema::dropIfExists('integration_logs');
         Schema::dropIfExists('complaints');
