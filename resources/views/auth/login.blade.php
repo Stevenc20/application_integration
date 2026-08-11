@@ -67,6 +67,15 @@
             justify-content: space-between;
             align-items: center;
             height: 68px;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            transition: background 0.3s, backdrop-filter 0.3s;
+        }
+        header.scrolled {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
 
         .nav-brand {
@@ -187,6 +196,7 @@
             align-items: center;
             justify-content: center;
             padding: 3rem 1.5rem;
+            margin-top: 68px;
         }
 
         .login-card {
@@ -674,6 +684,17 @@
     document.querySelectorAll('.fade-up, .fade-left, .fade-right').forEach((el, i) => {
         setTimeout(() => el.classList.add('show'), i * 80);
     });
+
+    const header = document.querySelector('header');
+    if (header) {
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 20) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
+    }
 </script>
 
 </body>
