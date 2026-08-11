@@ -28,7 +28,7 @@
             -webkit-font-smoothing:antialiased;
             background:var(--off-white);
         }
-        .page{flex:1;display:flex;flex-direction:column}
+        .page{flex:1;display:flex;flex-direction:column;padding-top:68px;}
 
         /* ─── ANIMASI MASUK (REVEAL) ─── */
         .reveal {
@@ -44,7 +44,7 @@
         .delay-200 { transition-delay: 0.2s; }
         .delay-300 { transition-delay: 0.3s; }
 
-        /* ─── NAVBAR (Matching Login Page) ─── */
+        /* ─── NAVBAR (Fixed & Scrolled) ─── */
         header {
             background: var(--white);
             border-bottom: 1px solid var(--border);
@@ -53,7 +53,15 @@
             justify-content: space-between;
             align-items: center;
             height: 68px;
-            position:relative;z-index:10;
+            position: fixed;
+            top: 0; left: 0; right: 0;
+            z-index: 100;
+            transition: background 0.3s, backdrop-filter 0.3s;
+        }
+        header.scrolled {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
         }
         .nav-brand {
             display: flex;
@@ -244,6 +252,7 @@
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Intersection Observer for Reveal Animation
         const observer = new IntersectionObserver((entries) => {
             entries.forEach(entry => {
                 if (entry.isIntersecting) {
@@ -253,6 +262,16 @@
         }, { threshold: 0.1 });
 
         document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+
+        // Scroll listener for Navbar
+        const header = document.querySelector('header');
+        window.addEventListener('scroll', () => {
+            if (window.scrollY > 20) {
+                header.classList.add('scrolled');
+            } else {
+                header.classList.remove('scrolled');
+            }
+        });
     });
 </script>
 
