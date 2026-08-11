@@ -14,13 +14,13 @@
 
         .page{
             flex:1;display:flex;flex-direction:column;
-            background:#fff; /* Base page background */
+            background:#F7F5F0; /* Soft cream base */
         }
 
-        /* NAV - PUTIH SOLID */
+        /* NAV - CREAM SEMI PUTIH */
         nav{
             height:55px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 2rem;background:#fff;border-bottom:1px solid #E2E0DD;
+            padding:0 2rem;background:#F7F5F0;border-bottom:1px solid #EAE6DF;
             position:relative;z-index:10;
         }
         .nav-left{display:flex;align-items:center;gap:10px}
@@ -77,10 +77,10 @@
         .feat-item h3 svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
         .feat-item p{font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.5}
 
-        /* FOOTER - PUTIH SOLID */
+        /* FOOTER - CREAM SEMI PUTIH */
         .foot{
             padding:1rem 2rem;text-align:center;
-            background:#fff;border-top:1px solid #E2E0DD;
+            background:#F7F5F0;border-top:1px solid #EAE6DF;
             position:relative;z-index:10;
         }
         .foot span{font-size:.65rem;color:#9A9895}
