@@ -111,15 +111,17 @@
                 <input type="hidden" id="dtEditId" value="">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Jenis Downtime</label>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Jenis Downtime <span class="text-red-500">*</span></label>
                         <select id="dtJenis" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
+                            <option value="">— Pilih Jenis Downtime —</option>
                             <option value="mesin">Mesin</option>
                             <option value="dies">Dies (Daise)</option>
-                            <option value="logistic">Logistic</option>
                             <option value="material">Material</option>
+                            <option value="logistic">Logistic</option>
                             <option value="try out">Try Out</option>
-                            <option value="break time">Break Time</option>
                             <option value="produksi">Produksi</option>
+                            <option value="others">Others</option>
+                            <option value="break time" hidden>Break Time</option>
                         </select>
                     </div>
                     <div>

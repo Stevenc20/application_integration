@@ -2301,6 +2301,7 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
             if (dtPenyebab) dtPenyebab.value = dt.penyebab || '';
             if (dtAction) dtAction.value = dt.action || '';
             if (dtPIC) dtPIC.value = dt.pic || window.ProductionConfig.userName || '';
+            if (dtJenis) setDtFormEnabled(dtJenis.value !== '');
             if (formArea) formArea.classList.remove('hidden');
         }
 
@@ -2331,6 +2332,9 @@ function editDowntimeFromIndex(index) {
         document.getElementById('dtAction').value = dt.action || '';
         document.getElementById('dtPIC').value = dt.pic || window.ProductionConfig.userName || '';
 
+        const editDtJenis = document.getElementById('dtJenis');
+        setDtFormEnabled(!!(editDtJenis && editDtJenis.value));
+
         // Show the form area
         const formArea = document.getElementById('dtFormTitle').closest('.bg-gray-50');
         if (formArea) formArea.classList.remove('hidden');
@@ -2341,11 +2345,27 @@ function editDowntimeFromIndex(index) {
     }
 }
 
+function setDtFormEnabled(enabled) {
+    ['dtProblem', 'dtPenyebab', 'dtAction', 'dtPIC'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.disabled = !enabled;
+    });
+}
+
+const dtJenisSelect = document.getElementById('dtJenis');
+if (dtJenisSelect) {
+    dtJenisSelect.addEventListener('change', function () {
+        setDtFormEnabled(dtJenisSelect.value !== '');
+    });
+}
+
 function saveDowntime() {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
+    const jenisDowntime = document.getElementById('dtJenis').value;
+    if (!jenisDowntime) { showToast('Pilih jenis downtime terlebih dahulu.', 'danger'); return; }
     const id = document.getElementById('dtEditId').value;
     let data = {
-        jenis_downtime: document.getElementById('dtJenis').value,
+        jenis_downtime: jenisDowntime,
         problem: document.getElementById('dtProblem').value,
         penyebab: document.getElementById('dtPenyebab').value,
         action: document.getElementById('dtAction').value,
