@@ -58,7 +58,9 @@
             $prodPlan = $activeJob->production_plan;
             $schedStart = $prodPlan ? $prodPlan->start_time : ($activeJob->plan_start ? \Carbon\Carbon::parse($activeJob->plan_start)->format('H:i') : '07:40');
             $schedFinish = $prodPlan ? $prodPlan->finish_time : ($activeJob->plan_end ? \Carbon\Carbon::parse($activeJob->plan_end)->format('H:i') : '10:40');
-            $actStartVal = $prodPlan && $prodPlan->act_start ? $prodPlan->act_start : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->format('H:i') : null);
+            $actStartVal = $trueSessionStart
+                ? \Carbon\Carbon::parse($trueSessionStart)->format('H:i')
+                : ($prodPlan && $prodPlan->act_start ? $prodPlan->act_start : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->format('H:i') : null));
             $actFinishVal = $prodPlan && $prodPlan->act_finish ? $prodPlan->act_finish : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->format('H:i') : null);
 
             $actEndEstimate = null;

@@ -12,6 +12,22 @@
     
     $firstPending = isset($pendingJobs) ? $pendingJobs->first() : null;
     $isFirstPending = $firstPending && $firstPending->id === $jobId;
+
+    $actStartDerived = null;
+    $actEndDerived = null;
+    $firstDan = $job->job_data?->downtimes
+        ?->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')
+        ?->sortBy('start_time')->first();
+    if ($firstDan) {
+        $actStartDerived = \Carbon\Carbon::parse($firstDan->start_time);
+        $planWindowMinutes = (!empty($job->start_time) && !empty($job->finish_time))
+            ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time))
+            : null;
+        $tptMinutesDerived = $planWindowMinutes ?: (float)($job->tpt ?? 0);
+        if ($tptMinutesDerived > 0) {
+            $actEndDerived = $actStartDerived->copy()->addMinutes($tptMinutesDerived);
+        }
+    }
 @endphp
 
 @if($job->row_type === 'break')
@@ -263,9 +279,13 @@
                 <div class="flex justify-between items-center mb-1.5">
                     <div class="flex items-center gap-2">
                         <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">Actual Segmented Execution (Live Tracking)</span>
-                        @if(!empty($job->act_start) || !empty($job->act_finish))
+                        @if(!empty($job->act_start) || !empty($job->act_finish) || $actStartDerived)
                             <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-600 text-[8px] font-black tracking-tighter uppercase border border-blue-100">
-                                PPC Actual: {{ $job->act_start ?: '--:--' }} - {{ $job->act_finish ?: '--:--' }}
+                                @if($actStartDerived && $actEndDerived)
+                                    ACT: {{ $actStartDerived->format('H:i') }} - {{ $actEndDerived->format('H:i') }}
+                                @else
+                                    PPC Actual: {{ $job->act_start ?: '--:--' }} - {{ $job->act_finish ?: '--:--' }}
+                                @endif
                             </span>
                         @endif
                     </div>

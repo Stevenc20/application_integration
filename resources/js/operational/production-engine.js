@@ -1247,14 +1247,16 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             }
         }
 
-        // TPT Plan-based Overtime: calculate deadline using job.tpt (in minutes) if available
-        let plannedTptMs = 0;
-        if (job && job.tpt && Number(job.tpt) > 0) {
-            plannedTptMs = Number(job.tpt) * 60 * 1000;
-        } else {
-            plannedTptMs = Number(plannedDurationArg) || 0;
-        }
-        const relativeDeadline = (effectiveProductionStart && plannedTptMs > 0) ? (effectiveProductionStart + plannedTptMs) : null;
+        // TPT Plan-based Overtime: deadline = plan window duration (same source as the Act row),
+        // anchored at the earliest actual activity (first dandori) per rule "act = tpt plan".
+        const planWindowMs = Number(plannedDurationArg) || 0;
+        const tptFromColumn = job && job.tpt && Number(job.tpt) > 0 ? Number(job.tpt) * 60 * 1000 : 0;
+        const plannedTptMs = planWindowMs > 0 ? planWindowMs : tptFromColumn;
+        const earliestDandori = job.first_dandori_start || dandoriMs;
+        const deadlineBase = (earliestDandori && (!effectiveProductionStart || earliestDandori <= effectiveProductionStart))
+            ? earliestDandori
+            : effectiveProductionStart;
+        const relativeDeadline = (deadlineBase && plannedTptMs > 0) ? (deadlineBase + plannedTptMs) : null;
 
         const appendProduction = (start, end) => {
             if (end <= start) return;
