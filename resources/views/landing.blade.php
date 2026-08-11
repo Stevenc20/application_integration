@@ -10,19 +10,31 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;color:#1A1918;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;background:#fff}
-        .page{flex:1;display:flex;flex-direction:column}
+        body{font-family:'DM Sans',sans-serif;color:#fff;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+        .page{
+            flex:1;display:flex;flex-direction:column;
+            background:url("{{ asset('images/building.png') }}") center/cover no-repeat fixed;
+            position:relative;
+        }
+        .page::before{
+            content:'';position:absolute;inset:0;
+            background:linear-gradient(180deg,rgba(15,15,15,.75) 0%,rgba(15,15,15,.65) 50%,rgba(15,15,15,.85) 100%);
+            z-index:1;
+        }
+        .page>*{position:relative;z-index:2}
 
         /* NAV */
         nav{
-            height:50px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 2rem;background:#fff;border-bottom:1px solid #E2E0DD;
+            height:55px;display:flex;align-items:center;justify-content:space-between;
+            padding:0 2rem;border-bottom:1px solid rgba(255,255,255,.1);
+            background:rgba(0,0,0,.3);backdrop-filter:blur(10px);
         }
-        .nav-left{display:flex;align-items:center;gap:8px}
-        .nav-left img{height:24px;width:auto}
-        .nav-left span{font-size:.8rem;font-weight:600;color:#1A1918}
+        .nav-left{display:flex;align-items:center;gap:10px}
+        .nav-left img{height:28px;width:auto;filter:brightness(0) invert(1);opacity:.9}
+        .nav-left span{font-size:.85rem;font-weight:600;color:rgba(255,255,255,.9)}
         .nav-btn{
-            background:#C0392B;color:#fff;padding:6px 16px;border-radius:4px;
+            background:#C0392B;color:#fff;padding:8px 20px;border-radius:4px;
             font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s;
         }
         .nav-btn:hover{background:#E74C3C}
@@ -30,45 +42,57 @@
         /* CENTER */
         .center{
             flex:1;display:flex;align-items:center;justify-content:center;
-            padding:2rem;position:relative;
-            background:url("{{ asset('images/building.png') }}") center/cover no-repeat;
+            padding:2rem;
         }
-        .center::before{
-            content:'';position:absolute;inset:0;
-            background:rgba(255,255,255,.88);
-        }
-        .center-box{position:relative;z-index:2;text-align:center;max-width:500px}
-        .center-box img{width:160px;height:auto;margin-bottom:1rem}
+        .center-box{text-align:center;max-width:600px;width:100%}
+        .center-box img{width:150px;height:auto;margin-bottom:1.5rem}
         .center-box h1{
-            font-size:2.4rem;font-weight:700;line-height:1.08;
-            letter-spacing:-.03em;margin-bottom:.5rem;color:#1A1918;
+            font-size:2.8rem;font-weight:700;line-height:1.1;
+            letter-spacing:-.02em;margin-bottom:.8rem;text-shadow:0 2px 10px rgba(0,0,0,.5);
         }
-        .center-box h1 em{font-style:normal;color:#C0392B}
+        .center-box h1 em{font-style:normal;color:#E74C3C}
         .center-box p{
-            font-size:.85rem;line-height:1.6;color:#5C5A58;
-            margin-bottom:1.5rem;
+            font-size:.95rem;line-height:1.6;color:rgba(255,255,255,.75);
+            margin-bottom:2rem;text-shadow:0 1px 5px rgba(0,0,0,.5);
         }
         .center-btn{
             display:inline-flex;align-items:center;gap:8px;
             background:#C0392B;color:#fff;padding:12px 30px;border-radius:5px;
-            font-size:.85rem;font-weight:600;text-decoration:none;
+            font-size:.9rem;font-weight:600;text-decoration:none;
             transition:background .15s,transform .15s,box-shadow .15s;
         }
-        .center-btn:hover{background:#E74C3C;transform:translateY(-1px);box-shadow:0 8px 24px rgba(192,57,43,.35)}
+        .center-btn:hover{background:#E74C3C;transform:translateY(-2px);box-shadow:0 8px 24px rgba(192,57,43,.4)}
+
+        /* FEATURES (INLINE, NO CARDS) */
+        .features{
+            display:flex;justify-content:center;gap:2rem;margin-top:3rem;
+            border-top:1px solid rgba(255,255,255,.1);padding-top:2rem;
+        }
+        .feat-item{
+            flex:1;text-align:left;display:flex;flex-direction:column;gap:5px;
+        }
+        .feat-item h3{
+            font-size:.85rem;font-weight:600;color:#E74C3C;
+            display:flex;align-items:center;gap:6px;
+        }
+        .feat-item h3 svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
+        .feat-item p{font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.5}
 
         /* FOOTER */
         .foot{
-            padding:.5rem 2rem;text-align:center;
-            background:#fff;border-top:1px solid #E2E0DD;
+            padding:1rem 2rem;text-align:center;
+            background:rgba(0,0,0,.5);backdrop-filter:blur(5px);
+            border-top:1px solid rgba(255,255,255,.05);
         }
-        .foot span{font-size:.6rem;color:#9A9895}
+        .foot span{font-size:.65rem;color:rgba(255,255,255,.4)}
 
-        @media(max-width:640px){
+        @media(max-width:768px){
             nav{padding:0 1rem}
             .center{padding:1.5rem 1rem}
             .center-box img{width:120px}
-            .center-box h1{font-size:1.8rem}
-            .foot{padding:.4rem 1rem}
+            .center-box h1{font-size:2rem}
+            .features{flex-direction:column;gap:1.5rem}
+            .foot{padding:.8rem 1rem}
         }
     </style>
 </head>
@@ -92,6 +116,30 @@
                 Masuk ke Sistem
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
+            
+            <div class="features">
+                <div class="feat-item">
+                    <h3>
+                        <svg viewBox="0 0 24 24"><path d="M3 3v18h18M18 9l-5 5-4-4-5 5"/></svg>
+                        Production Monitoring
+                    </h3>
+                    <p>Output aktual vs target per shift dan lini produksi.</p>
+                </div>
+                <div class="feat-item">
+                    <h3>
+                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                        Downtime Tracking
+                    </h3>
+                    <p>Deteksi dan analisis penyebab berhentinya mesin.</p>
+                </div>
+                <div class="feat-item">
+                    <h3>
+                        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg>
+                        Quality Control
+                    </h3>
+                    <p>Inspeksi digital, defect, dan laporan QPR.</p>
+                </div>
+            </div>
         </div>
     </div>
 
