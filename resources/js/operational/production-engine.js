@@ -2474,6 +2474,23 @@ function filterDowntimeList(type) {
 
 function closeDowntimeModal() {
     try {
+        const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
+        const formVisible = !!(formArea && !formArea.classList.contains('hidden'));
+        const dtJenis = document.getElementById('dtJenis');
+        if (formVisible && dtJenis && !dtJenis.value) {
+            showToast('Pilih jenis downtime terlebih dahulu.', 'danger');
+            return;
+        }
+        if (formVisible && dtJenis && dtJenis.value) {
+            const dtEditId = document.getElementById('dtEditId');
+            if (dtEditId && dtEditId.value) {
+                fetch(`/operational/downtime/${dtEditId.value}/update`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
+                    body: JSON.stringify({ jenis_downtime: dtJenis.value })
+                });
+            }
+        }
         const modal = document.getElementById('downtimeModal');
         if (modal) {
             modal.classList.add('hidden');
