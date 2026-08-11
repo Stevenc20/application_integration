@@ -10,25 +10,18 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;color:#1A1918;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+        body{font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
 
         .page{
             flex:1;display:flex;flex-direction:column;
-            background:url("{{ asset('images/building.png') }}") center/cover no-repeat fixed;
-            position:relative;
+            background:#fff; /* Base page background */
         }
-        /* Overlay: Putih tapi tidak menyilaukan (85%), gambar gedung terlihat sebagai shadow */
-        .page::before{
-            content:'';position:absolute;inset:0;
-            background:rgba(245, 244, 242, 0.85); /* Off-white overlay */
-            z-index:1;
-        }
-        .page>*{position:relative;z-index:2}
 
         /* NAV - PUTIH SOLID */
         nav{
             height:55px;display:flex;align-items:center;justify-content:space-between;
             padding:0 2rem;background:#fff;border-bottom:1px solid #E2E0DD;
+            position:relative;z-index:10;
         }
         .nav-left{display:flex;align-items:center;gap:10px}
         .nav-left img{height:28px;width:auto}
@@ -39,21 +32,27 @@
         }
         .nav-btn:hover{background:#E74C3C}
 
-        /* CENTER */
+        /* CENTER - GELAP/BLUR (FOTO GEDUNG) */
         .center{
             flex:1;display:flex;align-items:center;justify-content:center;
-            padding:2rem;
+            padding:2rem;position:relative;
+            background:url("{{ asset('images/building.png') }}") center/cover no-repeat;
         }
-        .center-box{text-align:center;max-width:600px;width:100%}
+        .center::before{
+            content:'';position:absolute;inset:0;
+            background:linear-gradient(180deg,rgba(15,15,15,.75) 0%,rgba(15,15,15,.65) 50%,rgba(15,15,15,.85) 100%);
+        }
+        .center-box{position:relative;z-index:2;text-align:center;max-width:600px;width:100%}
         .center-box img{width:150px;height:auto;margin-bottom:1.5rem}
         .center-box h1{
             font-size:2.8rem;font-weight:700;line-height:1.1;
-            letter-spacing:-.02em;margin-bottom:.8rem;color:#1A1918;
+            letter-spacing:-.02em;margin-bottom:.8rem;color:#fff;
+            text-shadow:0 2px 10px rgba(0,0,0,.5);
         }
-        .center-box h1 em{font-style:normal;color:#C0392B}
+        .center-box h1 em{font-style:normal;color:#E74C3C}
         .center-box p{
-            font-size:.95rem;line-height:1.6;color:#5C5A58;
-            margin-bottom:2rem;
+            font-size:.95rem;line-height:1.6;color:rgba(255,255,255,.75);
+            margin-bottom:2rem;text-shadow:0 1px 5px rgba(0,0,0,.5);
         }
         .center-btn{
             display:inline-flex;align-items:center;gap:8px;
@@ -61,27 +60,28 @@
             font-size:.9rem;font-weight:600;text-decoration:none;
             transition:background .15s,transform .15s,box-shadow .15s;
         }
-        .center-btn:hover{background:#E74C3C;transform:translateY(-2px);box-shadow:0 8px 24px rgba(192,57,43,.25)}
+        .center-btn:hover{background:#E74C3C;transform:translateY(-2px);box-shadow:0 8px 24px rgba(192,57,43,.4)}
 
-        /* FEATURES (INLINE, NO CARDS, DARK TEXT) */
+        /* FEATURES (INLINE, NO CARDS, TEKS TERANG KARENA BACKGROUND GELAP) */
         .features{
             display:flex;justify-content:center;gap:2rem;margin-top:3rem;
-            border-top:1px solid rgba(0,0,0,.1);padding-top:2rem;
+            border-top:1px solid rgba(255,255,255,.1);padding-top:2rem;
         }
         .feat-item{
             flex:1;text-align:left;display:flex;flex-direction:column;gap:5px;
         }
         .feat-item h3{
-            font-size:.85rem;font-weight:600;color:#C0392B;
+            font-size:.85rem;font-weight:600;color:#E74C3C;
             display:flex;align-items:center;gap:6px;
         }
         .feat-item h3 svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
-        .feat-item p{font-size:.75rem;color:#5C5A58;line-height:1.5}
+        .feat-item p{font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.5}
 
         /* FOOTER - PUTIH SOLID */
         .foot{
             padding:1rem 2rem;text-align:center;
             background:#fff;border-top:1px solid #E2E0DD;
+            position:relative;z-index:10;
         }
         .foot span{font-size:.65rem;color:#9A9895}
 
