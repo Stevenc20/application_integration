@@ -10,29 +10,29 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;color:#fff;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+        body{font-family:'DM Sans',sans-serif;color:#1A1918;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
 
         .page{
             flex:1;display:flex;flex-direction:column;
             background:url("{{ asset('images/building.png') }}") center/cover no-repeat fixed;
             position:relative;
         }
+        /* Overlay: Putih tapi tidak menyilaukan (85%), gambar gedung terlihat sebagai shadow */
         .page::before{
             content:'';position:absolute;inset:0;
-            background:linear-gradient(180deg,rgba(15,15,15,.75) 0%,rgba(15,15,15,.65) 50%,rgba(15,15,15,.85) 100%);
+            background:rgba(245, 244, 242, 0.85); /* Off-white overlay */
             z-index:1;
         }
         .page>*{position:relative;z-index:2}
 
-        /* NAV */
+        /* NAV - PUTIH SOLID */
         nav{
             height:55px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 2rem;border-bottom:1px solid rgba(255,255,255,.1);
-            background:rgba(0,0,0,.3);backdrop-filter:blur(10px);
+            padding:0 2rem;background:#fff;border-bottom:1px solid #E2E0DD;
         }
         .nav-left{display:flex;align-items:center;gap:10px}
-        .nav-left img{height:28px;width:auto;filter:brightness(0) invert(1);opacity:.9}
-        .nav-left span{font-size:.85rem;font-weight:600;color:rgba(255,255,255,.9)}
+        .nav-left img{height:28px;width:auto}
+        .nav-left span{font-size:.85rem;font-weight:600;color:#1A1918}
         .nav-btn{
             background:#C0392B;color:#fff;padding:8px 20px;border-radius:4px;
             font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s;
@@ -48,12 +48,12 @@
         .center-box img{width:150px;height:auto;margin-bottom:1.5rem}
         .center-box h1{
             font-size:2.8rem;font-weight:700;line-height:1.1;
-            letter-spacing:-.02em;margin-bottom:.8rem;text-shadow:0 2px 10px rgba(0,0,0,.5);
+            letter-spacing:-.02em;margin-bottom:.8rem;color:#1A1918;
         }
-        .center-box h1 em{font-style:normal;color:#E74C3C}
+        .center-box h1 em{font-style:normal;color:#C0392B}
         .center-box p{
-            font-size:.95rem;line-height:1.6;color:rgba(255,255,255,.75);
-            margin-bottom:2rem;text-shadow:0 1px 5px rgba(0,0,0,.5);
+            font-size:.95rem;line-height:1.6;color:#5C5A58;
+            margin-bottom:2rem;
         }
         .center-btn{
             display:inline-flex;align-items:center;gap:8px;
@@ -61,30 +61,29 @@
             font-size:.9rem;font-weight:600;text-decoration:none;
             transition:background .15s,transform .15s,box-shadow .15s;
         }
-        .center-btn:hover{background:#E74C3C;transform:translateY(-2px);box-shadow:0 8px 24px rgba(192,57,43,.4)}
+        .center-btn:hover{background:#E74C3C;transform:translateY(-2px);box-shadow:0 8px 24px rgba(192,57,43,.25)}
 
-        /* FEATURES (INLINE, NO CARDS) */
+        /* FEATURES (INLINE, NO CARDS, DARK TEXT) */
         .features{
             display:flex;justify-content:center;gap:2rem;margin-top:3rem;
-            border-top:1px solid rgba(255,255,255,.1);padding-top:2rem;
+            border-top:1px solid rgba(0,0,0,.1);padding-top:2rem;
         }
         .feat-item{
             flex:1;text-align:left;display:flex;flex-direction:column;gap:5px;
         }
         .feat-item h3{
-            font-size:.85rem;font-weight:600;color:#E74C3C;
+            font-size:.85rem;font-weight:600;color:#C0392B;
             display:flex;align-items:center;gap:6px;
         }
         .feat-item h3 svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
-        .feat-item p{font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.5}
+        .feat-item p{font-size:.75rem;color:#5C5A58;line-height:1.5}
 
-        /* FOOTER */
+        /* FOOTER - PUTIH SOLID */
         .foot{
             padding:1rem 2rem;text-align:center;
-            background:rgba(0,0,0,.5);backdrop-filter:blur(5px);
-            border-top:1px solid rgba(255,255,255,.05);
+            background:#fff;border-top:1px solid #E2E0DD;
         }
-        .foot span{font-size:.65rem;color:rgba(255,255,255,.4)}
+        .foot span{font-size:.65rem;color:#9A9895}
 
         @media(max-width:768px){
             nav{padding:0 1rem}
