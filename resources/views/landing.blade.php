@@ -9,95 +9,129 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        :root {
-            --red: #C0392B;
-            --red-hover: #E74C3C;
-            --white: #FFFFFF;
-            --bg: #F5F4F2;
-            --border: #E2E0DD;
-            --t1: #1A1918;
-            --t2: #5C5A58;
-            --t3: #9A9895;
-        }
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--t1);min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+        body{font-family:'DM Sans',sans-serif;color:#fff;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
+
+        /* FULL PAGE BG */
+        .page{
+            flex:1;display:flex;flex-direction:column;
+            background:url("{{ asset('images/building.png') }}") center/cover no-repeat fixed;
+            position:relative;
+        }
+        .page::before{
+            content:'';position:absolute;inset:0;
+            background:linear-gradient(180deg,rgba(20,18,16,.82) 0%,rgba(20,18,16,.7) 50%,rgba(20,18,16,.88) 100%);
+            z-index:1;
+        }
+        .page>*{position:relative;z-index:2}
 
         /* NAV */
-        nav{background:var(--white);border-bottom:1px solid var(--border);height:50px;display:flex;align-items:center;justify-content:space-between;padding:0 2rem;position:sticky;top:0;z-index:100}
+        nav{
+            height:50px;display:flex;align-items:center;justify-content:space-between;
+            padding:0 2rem;border-bottom:1px solid rgba(255,255,255,.08);
+        }
         .nav-left{display:flex;align-items:center;gap:8px}
-        .nav-left img{height:24px;width:auto}
-        .nav-left span{font-size:.8rem;font-weight:600;color:var(--t1)}
-        .nav-btn{background:var(--red);color:var(--white);padding:6px 16px;border-radius:4px;font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s}
-        .nav-btn:hover{background:var(--red-hover)}
+        .nav-left img{height:24px;width:auto;filter:brightness(0) invert(1);opacity:.85}
+        .nav-left span{font-size:.8rem;font-weight:600;color:rgba(255,255,255,.8)}
+        .nav-btn{
+            background:#C0392B;color:#fff;padding:6px 16px;border-radius:4px;
+            font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s;
+        }
+        .nav-btn:hover{background:#E74C3C}
 
-        /* MAIN */
-        .main{background:var(--white);flex:1;display:flex;align-items:center;justify-content:center;padding:2rem}
-        .main-box{text-align:center;max-width:480px}
-        .main-box img{width:100px;height:auto;margin-bottom:1.2rem;opacity:.9}
-        .main-box h1{font-size:2.2rem;font-weight:700;line-height:1.1;letter-spacing:-.03em;margin-bottom:.5rem}
-        .main-box h1 em{font-style:normal;color:var(--red)}
-        .main-box p{font-size:.85rem;line-height:1.6;color:var(--t2);margin-bottom:1.5rem}
-        .main-btn{display:inline-flex;align-items:center;gap:8px;background:var(--red);color:var(--white);padding:12px 28px;border-radius:5px;font-size:.85rem;font-weight:600;text-decoration:none;transition:background .15s,transform .15s,box-shadow .15s}
-        .main-btn:hover{background:var(--red-hover);transform:translateY(-1px);box-shadow:0 6px 20px rgba(192,57,43,.25)}
+        /* CENTER */
+        .center{
+            flex:1;display:flex;align-items:center;justify-content:center;
+            padding:2rem;
+        }
+        .center-box{text-align:center;max-width:500px}
+        .center-box img{width:160px;height:auto;margin-bottom:1rem}
+        .center-box h1{
+            font-size:2.4rem;font-weight:700;line-height:1.08;
+            letter-spacing:-.03em;margin-bottom:.5rem;
+        }
+        .center-box h1 em{font-style:normal;color:#E74C3C}
+        .center-box p{
+            font-size:.85rem;line-height:1.6;color:rgba(255,255,255,.55);
+            margin-bottom:1.5rem;
+        }
+        .center-btn{
+            display:inline-flex;align-items:center;gap:8px;
+            background:#C0392B;color:#fff;padding:12px 30px;border-radius:5px;
+            font-size:.85rem;font-weight:600;text-decoration:none;
+            transition:background .15s,transform .15s,box-shadow .15s;
+        }
+        .center-btn:hover{background:#E74C3C;transform:translateY(-1px);box-shadow:0 8px 24px rgba(192,57,43,.35)}
 
-        /* STATS BAR */
-        .stats{background:var(--red);display:flex}
-        .stat{flex:1;padding:.7rem 0;text-align:center;border-right:1px solid rgba(255,255,255,.12)}
+        /* STATS */
+        .stats{
+            display:flex;border-top:1px solid rgba(255,255,255,.08);
+            background:rgba(0,0,0,.2);
+        }
+        .stat{
+            flex:1;padding:.7rem 0;text-align:center;
+            border-right:1px solid rgba(255,255,255,.06);
+        }
         .stat:last-child{border-right:none}
-        .stat-val{font-size:1.2rem;font-weight:700;color:var(--white);line-height:1}
-        .stat-val small{font-size:.75rem;font-weight:400;opacity:.5}
-        .stat-lbl{font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.45);margin-top:2px}
+        .stat-val{font-size:1.2rem;font-weight:700;color:#fff;line-height:1}
+        .stat-val small{font-size:.75rem;font-weight:400;opacity:.45}
+        .stat-lbl{font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.35);margin-top:2px}
 
         /* FOOTER */
-        footer{background:var(--t1);padding:.6rem 2rem;display:flex;align-items:center;justify-content:space-between}
-        .foot-copy{font-size:.62rem;color:rgba(255,255,255,.35)}
-        .foot-right{font-size:.62rem;color:rgba(255,255,255,.35)}
+        .foot{
+            padding:.5rem 2rem;text-align:center;
+            border-top:1px solid rgba(255,255,255,.06);
+            background:rgba(0,0,0,.15);
+        }
+        .foot span{font-size:.6rem;color:rgba(255,255,255,.25)}
 
         @media(max-width:640px){
             nav{padding:0 1rem}
-            .main{padding:1.5rem 1rem}
-            .main-box h1{font-size:1.6rem}
+            .center{padding:1.5rem 1rem}
+            .center-box img{width:120px}
+            .center-box h1{font-size:1.8rem}
             .stats{flex-wrap:wrap}
-            .stat{flex:1 1 50%;border-bottom:1px solid rgba(255,255,255,.12)}
+            .stat{flex:1 1 50%}
             .stat:nth-child(2){border-right:none}
-            .stat:nth-child(3),.stat:nth-child(4){border-bottom:none}
-            footer{flex-direction:column;gap:.3rem;padding:.5rem 1rem}
+            .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid rgba(255,255,255,.06)}
+            .foot{padding:.4rem 1rem}
         }
     </style>
 </head>
 <body>
 
-<nav>
-    <div class="nav-left">
-        <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
-        <span>Production System</span>
-    </div>
-    <a href="{{ route('login') }}" class="nav-btn">Login</a>
-</nav>
+<div class="page">
+    <nav>
+        <div class="nav-left">
+            <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
+            <span>Production System</span>
+        </div>
+        <a href="{{ route('login') }}" class="nav-btn">Login</a>
+    </nav>
 
-<div class="main">
-    <div class="main-box">
-        <img src="{{ asset('images/logoippi.png') }}" alt="PT IPPI">
-        <h1>Monitor. Track. <em>Control.</em></h1>
-        <p>Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk secara real-time dari satu platform terpadu.</p>
-        <a href="{{ route('login') }}" class="main-btn">
-            Masuk ke Sistem
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        </a>
+    <div class="center">
+        <div class="center-box">
+            <img src="{{ asset('images/logoippi.png') }}" alt="PT IPPI">
+            <h1>Monitor. Track. <em>Control.</em></h1>
+            <p>Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk secara real-time dari satu platform terpadu.</p>
+            <a href="{{ route('login') }}" class="center-btn">
+                Masuk ke Sistem
+                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+            </a>
+        </div>
+    </div>
+
+    <div class="stats">
+        <div class="stat"><div class="stat-val">99<small>%</small></div><div class="stat-lbl">Uptime</div></div>
+        <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Press Lines</div></div>
+        <div class="stat"><div class="stat-val">Real<small>-time</small></div><div class="stat-lbl">Monitoring</div></div>
+        <div class="stat"><div class="stat-val">24<small>/7</small></div><div class="stat-lbl">Operation</div></div>
+    </div>
+
+    <div class="foot">
+        <span>Created by Steven Christian</span>
     </div>
 </div>
-
-<div class="stats">
-    <div class="stat"><div class="stat-val">99<small>%</small></div><div class="stat-lbl">Uptime</div></div>
-    <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Press Lines</div></div>
-    <div class="stat"><div class="stat-val">Real<small>-time</small></div><div class="stat-lbl">Monitoring</div></div>
-    <div class="stat"><div class="stat-val">24<small>/7</small></div><div class="stat-lbl">Operation</div></div>
-</div>
-
-<footer>
-    <span class="foot-copy">© {{ date('Y') }} PT IPPI — Production System</span>
-    <span class="foot-right">manufacturing.tantechstev.com</span>
-</footer>
 
 </body>
 </html>
