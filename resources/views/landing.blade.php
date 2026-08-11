@@ -10,25 +10,24 @@
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;color:#fff;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
-
+        body{font-family:'DM Sans',sans-serif;color:#1A1918;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased;background:#fff}
         .page{flex:1;display:flex;flex-direction:column}
 
         /* NAV */
         nav{
             height:50px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 2rem;background:#1A1918;border-bottom:1px solid rgba(255,255,255,.06);
+            padding:0 2rem;background:#fff;border-bottom:1px solid #E2E0DD;
         }
         .nav-left{display:flex;align-items:center;gap:8px}
-        .nav-left img{height:24px;width:auto;filter:brightness(0) invert(1);opacity:.85}
-        .nav-left span{font-size:.8rem;font-weight:600;color:rgba(255,255,255,.8)}
+        .nav-left img{height:24px;width:auto}
+        .nav-left span{font-size:.8rem;font-weight:600;color:#1A1918}
         .nav-btn{
             background:#C0392B;color:#fff;padding:6px 16px;border-radius:4px;
             font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s;
         }
         .nav-btn:hover{background:#E74C3C}
 
-        /* CENTER - photo bg here only */
+        /* CENTER */
         .center{
             flex:1;display:flex;align-items:center;justify-content:center;
             padding:2rem;position:relative;
@@ -36,18 +35,17 @@
         }
         .center::before{
             content:'';position:absolute;inset:0;
-            background:linear-gradient(180deg,rgba(20,18,16,.82) 0%,rgba(20,18,16,.68) 50%,rgba(20,18,16,.85) 100%);
+            background:rgba(255,255,255,.88);
         }
-        .center-box{position:relative;z-index:2}
-        .center-box{text-align:center;max-width:500px}
+        .center-box{position:relative;z-index:2;text-align:center;max-width:500px}
         .center-box img{width:160px;height:auto;margin-bottom:1rem}
         .center-box h1{
             font-size:2.4rem;font-weight:700;line-height:1.08;
-            letter-spacing:-.03em;margin-bottom:.5rem;
+            letter-spacing:-.03em;margin-bottom:.5rem;color:#1A1918;
         }
-        .center-box h1 em{font-style:normal;color:#E74C3C}
+        .center-box h1 em{font-style:normal;color:#C0392B}
         .center-box p{
-            font-size:.85rem;line-height:1.6;color:rgba(255,255,255,.55);
+            font-size:.85rem;line-height:1.6;color:#5C5A58;
             margin-bottom:1.5rem;
         }
         .center-btn{
@@ -61,19 +59,15 @@
         /* FOOTER */
         .foot{
             padding:.5rem 2rem;text-align:center;
-            background:#1A1918;border-top:1px solid rgba(255,255,255,.06);
+            background:#fff;border-top:1px solid #E2E0DD;
         }
-        .foot span{font-size:.6rem;color:rgba(255,255,255,.3)}
+        .foot span{font-size:.6rem;color:#9A9895}
 
         @media(max-width:640px){
             nav{padding:0 1rem}
             .center{padding:1.5rem 1rem}
             .center-box img{width:120px}
             .center-box h1{font-size:1.8rem}
-            .stats{flex-wrap:wrap}
-            .stat{flex:1 1 50%}
-            .stat:nth-child(2){border-right:none}
-            .stat:nth-child(1),.stat:nth-child(2){border-bottom:1px solid rgba(255,255,255,.06)}
             .foot{padding:.4rem 1rem}
         }
     </style>
