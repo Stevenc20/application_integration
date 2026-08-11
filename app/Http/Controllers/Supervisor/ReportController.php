@@ -962,7 +962,17 @@ class ReportController extends Controller
 
         $userRole = strtolower(auth()->user()?->role ?? '');
         $canEdit = in_array($userRole, ['foreman', 'superadmin']);
-        $ttdLocked = count($signedRoles) > 0;
+
+        $leaderSigned = in_array('teamleader', $signedRoles);
+        $foremanSigned = in_array('foreman', $signedRoles);
+
+        if ($userRole === 'superadmin') {
+            $ttdLocked = false;
+        } elseif ($userRole === 'foreman') {
+            $ttdLocked = !($leaderSigned && !$foremanSigned);
+        } else {
+            $ttdLocked = true;
+        }
 
         return compact(
             'jobsData',
@@ -978,7 +988,8 @@ class ReportController extends Controller
             'shiftDisplayEnd',
             'signatureStatus',
             'canEdit',
-            'ttdLocked'
+            'ttdLocked',
+            'userRole'
         );
     }
 
@@ -1003,9 +1014,16 @@ class ReportController extends Controller
         }
         $date = \Carbon\Carbon::parse($date)->toDateString();
 
-        $ttdLocked = \App\Models\Signature::where('work_date', $date)->exists();
-        if ($ttdLocked) {
-            return response()->json(['error' => 'Edit terkunci karena TTD sudah diisi'], 422);
+        $leaderSigned = \App\Models\Signature::where('role', 'teamleader')->where('work_date', $date)->exists();
+        $foremanSigned = \App\Models\Signature::where('role', 'foreman')->where('work_date', $date)->exists();
+
+        if ($userRole !== 'superadmin') {
+            if (!$leaderSigned) {
+                return response()->json(['error' => 'Edit hanya terbuka setelah TTD Team Leader'], 422);
+            }
+            if ($foremanSigned) {
+                return response()->json(['error' => 'Edit terkunci karena TTD Foreman sudah diisi'], 422);
+            }
         }
 
         $qtyFields = [

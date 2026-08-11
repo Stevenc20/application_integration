@@ -84,12 +84,17 @@
                 <span class="font-bold text-gray-800 tracking-wide text-sm uppercase">Filter Laporan Kerja Harian (LKH)</span>
             </div>
             <div class="flex items-center gap-2">
-                @php $canEdit = $canEdit ?? false; $ttdLocked = $ttdLocked ?? false; @endphp
+                @php
+                    $canEdit = $canEdit ?? false;
+                    $ttdLocked = $ttdLocked ?? false;
+                    $leaderSigned = $signatureStatus['teamleader']['signed'] ?? false;
+                    $editLockMsg = $leaderSigned ? 'Edit Terkunci (TTD)' : 'Menunggu TTD Team Leader';
+                @endphp
                 @if ($canEdit)
                     @if ($ttdLocked)
                         <span class="inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed" title="Edit terkunci karena TTD sudah diisi">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
-                            <span>Edit Terkunci (TTD)</span>
+                            <span>{{ $editLockMsg }}</span>
                         </span>
                     @else
                         <button type="button" id="btn-edit-lkh" onclick="toggleLkhEdit(true)"
@@ -214,32 +219,43 @@
                         @php
                             $roleKey = strtolower(str_replace(' ', '', $role));
                             $sigState = $signatureStatus[$roleKey] ?? ['signed' => false, 'available' => false];
-                            $isLocked = !$sigState['signed'] && !$sigState['available'];
                             $isSigned = $sigState['signed'];
+
+                            $currentRole = strtolower(auth()->user()?->role ?? '');
+                            $isSuperadmin = $currentRole === 'superadmin';
+                            $isOwner = match ($roleKey) {
+                                'teamleader' => str_starts_with($currentRole, 'leader') || in_array($currentRole, ['teamleader', 'group leader']),
+                                'foreman'    => $currentRole === 'foreman',
+                                'supervisor' => $currentRole === 'supervisor',
+                                default      => false,
+                            };
+                            $canInteract = $isSuperadmin || $isOwner;
+                            $clickable = $canInteract && $sigState['available'] && !$isSigned;
+                            $showLock = !$isSigned && !$clickable;
                         @endphp
-                        <div id="card_ttd_{{ $roleKey }}" class="flex flex-col items-center justify-between p-3 rounded-2xl bg-slate-50/50 border border-slate-200/60 relative group shadow-sm transition-all hover:shadow-md hover:border-slate-300{{ $isLocked ? ' opacity-50' : '' }}">
-                            <div id="lock_ttd_{{ $roleKey }}" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-2xl flex flex-col items-center justify-center z-10 cursor-not-allowed{{ $isLocked ? '' : ' hidden' }}">
+                        <div id="card_ttd_{{ $roleKey }}" class="flex flex-col items-center justify-between p-3 rounded-2xl bg-slate-50/50 border border-slate-200/60 relative group shadow-sm transition-all hover:shadow-md hover:border-slate-300{{ $showLock ? ' opacity-50' : '' }}">
+                            <div id="lock_ttd_{{ $roleKey }}" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-2xl flex flex-col items-center justify-center z-10 cursor-not-allowed{{ $showLock ? '' : ' hidden' }}">
                                 <svg class="w-5 h-5 text-slate-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">LOCKED</span>
                             </div>
                             <span class="block text-xs tracking-wider font-black text-gray-500 mb-2">{{ $role }}</span>
-                            <div id="badge_ttd_{{ $roleKey }}" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black transition-all select-none mb-2{{ $isSigned ? ' bg-emerald-50 text-emerald-700 border-emerald-200' : ($isLocked ? ' bg-gray-100 text-gray-400 border-gray-200' : ' bg-gray-100 text-gray-400 border-gray-200') }}">
+                            <div id="badge_ttd_{{ $roleKey }}" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black transition-all select-none mb-2{{ $isSigned ? ' bg-emerald-50 text-emerald-700 border-emerald-200' : ' bg-gray-100 text-gray-400 border-gray-200' }}">
                                 @if ($isSigned)
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>
-                                @elseif ($isLocked)
+                                @elseif ($showLock)
                                 <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span><span>LOCKED</span>
                                 @else
                                 <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span><span>UNSIGNED</span>
                                 @endif
                             </div>
-                            <div id="clickarea_ttd_{{ $roleKey }}" class="h-20 w-full flex items-center justify-center border border-dashed border-gray-300 rounded-xl transition-all relative overflow-hidden group mb-2{{ $isLocked ? ' opacity-50 cursor-not-allowed' : ' cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/20' }}"
-                                 @if(!$isLocked) onclick="openSignatureModal('{{ $roleKey }}')" title="Klik untuk menggambar tanda tangan {{ $role }}" @endif>
+                            <div id="clickarea_ttd_{{ $roleKey }}" class="h-20 w-full flex items-center justify-center border border-dashed border-gray-300 rounded-xl transition-all relative overflow-hidden group mb-2{{ $clickable ? ' cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/20' : ' opacity-50 cursor-not-allowed' }}"
+                                 @if($clickable) onclick="openSignatureModal('{{ $roleKey }}')" title="Klik untuk menggambar tanda tangan {{ $role }}" @endif>
                                 <img id="img_ttd_{{ $roleKey }}" class="max-h-18 max-w-[95%] object-contain{{ $isSigned ? '' : ' hidden' }} transition-all duration-300" />
                                 <div id="placeholder_ttd_{{ $roleKey }}" class="text-[10px] font-black text-gray-400 uppercase tracking-wider flex flex-col items-center gap-1.5{{ $isSigned ? ' hidden' : '' }} group-hover:text-emerald-600 transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                    <span>@if($isLocked) LOCKED @else Klik TTD @endif</span>
+                                    <span>@if($showLock) LOCKED @else Klik TTD @endif</span>
                                 </div>
-                                <button type="button" id="btn_delete_ttd_{{ $roleKey }}" class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center{{ $isSigned ? '' : ' hidden' }} transition-all no-print hover:scale-110 shadow-sm"
+                                <button type="button" id="btn_delete_ttd_{{ $roleKey }}" class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center{{ $isSigned && $canInteract ? '' : ' hidden' }} transition-all no-print hover:scale-110 shadow-sm"
                                         onclick="event.stopPropagation();deleteSignature('{{ $roleKey }}')" title="Hapus tanda tangan">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -566,8 +582,19 @@
 <script>
 let activeSignatureRole = null;
 const sigWorkDate = '{{ $date }}';
+const SIG_USER_ROLE = @json(strtolower(auth()->user()?->role ?? ''));
+const SIG_IS_SUPERADMIN = SIG_USER_ROLE === 'superadmin';
+
+function sigRoleOwned(role) {
+    if (SIG_IS_SUPERADMIN) return true;
+    if (role === 'teamleader') return SIG_USER_ROLE.startsWith('leader') || SIG_USER_ROLE === 'teamleader' || SIG_USER_ROLE === 'group leader';
+    if (role === 'foreman') return SIG_USER_ROLE === 'foreman';
+    if (role === 'supervisor') return SIG_USER_ROLE === 'supervisor';
+    return false;
+}
 
 function openSignatureModal(role) {
+    if (!sigRoleOwned(role)) { alert('Anda tidak berhak menandatangani TTD ini'); return; }
     activeSignatureRole = role;
     document.getElementById('signature-role-label').textContent = 'Tanda Tangan: ' + role.charAt(0).toUpperCase() + role.slice(1);
     const m = document.getElementById('signature-modal');
@@ -668,7 +695,7 @@ function saveSignature() {
         badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>';
         badge.classList.remove('bg-gray-100','text-gray-400','border-gray-200');
         badge.classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
-        delBtn.classList.remove('hidden');
+        if (sigRoleOwned(activeSignatureRole)) delBtn.classList.remove('hidden');
         closeSignatureModal();
         refreshSignatureStatus();
     })
@@ -693,6 +720,7 @@ function closeConfirmModal(result) {
 }
 
 function deleteSignature(role) {
+    if (!sigRoleOwned(role)) { alert('Anda tidak berhak menghapus TTD ini'); return; }
     showConfirm('Hapus tanda tangan ' + role + '?').then(confirmed => {
         if (!confirmed) return;
         const img = document.getElementById('img_ttd_' + role);
@@ -727,30 +755,26 @@ function refreshSignatureStatus() {
                 const clickArea = document.getElementById('clickarea_ttd_' + role);
                 const card = document.getElementById('card_ttd_' + role);
                 if (!s) return;
-                if (s.signed) {
-                    if (lock) { lock.classList.add('hidden'); lock.style.display = ''; }
-                    if (clickArea) {
+                const canClick = sigRoleOwned(role) && s.available && !s.signed;
+                const showLock = !s.signed && !canClick;
+                if (lock) {
+                    if (showLock) { lock.classList.remove('hidden'); lock.style.display = ''; }
+                    else { lock.classList.add('hidden'); lock.style.display = ''; }
+                }
+                if (clickArea) {
+                    if (canClick) {
                         clickArea.onclick = function() { openSignatureModal(role); };
                         clickArea.classList.remove('opacity-50');
                         clickArea.classList.add('cursor-pointer');
-                    }
-                    if (card) card.classList.remove('opacity-50');
-                } else if (s.available) {
-                    if (lock) { lock.classList.add('hidden'); lock.style.display = ''; }
-                    if (clickArea) {
-                        clickArea.onclick = function() { openSignatureModal(role); };
-                        clickArea.classList.remove('opacity-50');
-                        clickArea.classList.add('cursor-pointer');
-                    }
-                    if (card) card.classList.remove('opacity-50');
-                } else {
-                    if (lock) lock.classList.remove('hidden');
-                    if (clickArea) {
+                    } else {
                         clickArea.onclick = null;
                         clickArea.classList.add('opacity-50');
                         clickArea.classList.remove('cursor-pointer');
                     }
-                    if (card) card.classList.add('opacity-50');
+                }
+                if (card) {
+                    if (showLock) card.classList.add('opacity-50');
+                    else card.classList.remove('opacity-50');
                 }
             });
         })
@@ -769,7 +793,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('badge_ttd_{{ $role }}').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>';
                 document.getElementById('badge_ttd_{{ $role }}').classList.remove('bg-gray-100','text-gray-400','border-gray-200');
                 document.getElementById('badge_ttd_{{ $role }}').classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
-                document.getElementById('btn_delete_ttd_{{ $role }}').classList.remove('hidden');
+                if (sigRoleOwned('{{ $role }}')) document.getElementById('btn_delete_ttd_{{ $role }}').classList.remove('hidden');
             }
         })
         .catch(() => {});

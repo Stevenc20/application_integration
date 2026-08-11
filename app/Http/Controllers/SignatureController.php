@@ -7,6 +7,25 @@ use Illuminate\Http\Request;
 
 class SignatureController extends Controller
 {
+    private function userRole(): string
+    {
+        return strtolower(auth()->user()?->role ?? '');
+    }
+
+    private function ownsRole(string $userRole, string $sigRole): bool
+    {
+        if ($userRole === 'superadmin') {
+            return true;
+        }
+
+        return match ($sigRole) {
+            'teamleader' => str_starts_with($userRole, 'leader') || in_array($userRole, ['teamleader', 'group leader']),
+            'foreman'    => $userRole === 'foreman',
+            'supervisor' => $userRole === 'supervisor',
+            default      => false,
+        };
+    }
+
     public function get(Request $request)
     {
         $role = $request->query('role');
@@ -29,6 +48,12 @@ class SignatureController extends Controller
             'work_date' => 'required|date',
             'signature' => 'required|string',
         ]);
+
+        if (!$this->ownsRole($this->userRole(), $request->role)) {
+            return response()->json([
+                'error' => 'Anda tidak berhak menandatangani TTD untuk role ini'
+            ], 403);
+        }
 
         $chain = ['teamleader', 'foreman', 'supervisor'];
         $currentIndex = array_search($request->role, $chain);
@@ -57,6 +82,12 @@ class SignatureController extends Controller
             'role' => 'required|string',
             'work_date' => 'required|date',
         ]);
+
+        if (!$this->ownsRole($this->userRole(), $request->role)) {
+            return response()->json([
+                'error' => 'Anda tidak berhak menghapus TTD ini'
+            ], 403);
+        }
 
         Signature::where('role', $request->role)->where('work_date', $request->work_date)->delete();
 
