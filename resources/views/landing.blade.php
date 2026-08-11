@@ -7,160 +7,239 @@
     <meta name="description" content="Sistem monitoring produksi real-time PT IPPI.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column;-webkit-font-smoothing:antialiased}
-
-        .page{
-            flex:1;display:flex;flex-direction:column;
-            background:#F7F5F0; /* Soft cream base */
+        :root {
+            --red: #C0392B;
+            --red-hover: #E74C3C;
+            --red-light: #FDECEA;
+            --white: #FFFFFF;
+            --off-white: #F8F7F5;
+            --border: #E9E7E4;
+            --t1: #111110;
+            --t2: #5C5A58;
+            --t3: #A09E9C;
         }
 
-        /* ANIMASI MASUK (REVEAL) */
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{
+            font-family:'Inter',sans-serif;
+            min-height:100vh;display:flex;flex-direction:column;
+            -webkit-font-smoothing:antialiased;
+            background:var(--off-white);
+        }
+        .page{flex:1;display:flex;flex-direction:column}
+
+        /* ─── ANIMASI MASUK (REVEAL) ─── */
         .reveal {
             opacity: 0;
-            transform: translateY(25px);
-            transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform: translateY(24px);
+            transition: all 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
         }
         .reveal.active {
             opacity: 1;
             transform: translateY(0);
         }
-        /* Delay utility untuk efek stagger */
         .delay-100 { transition-delay: 0.1s; }
         .delay-200 { transition-delay: 0.2s; }
         .delay-300 { transition-delay: 0.3s; }
-        .delay-400 { transition-delay: 0.4s; }
 
-        /* NAV - CREAM SEMI PUTIH */
-        nav{
-            height:55px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 2rem;background:#F7F5F0;border-bottom:1px solid #EAE6DF;
+        /* ─── NAVBAR (Matching Login Page) ─── */
+        header {
+            background: var(--white);
+            border-bottom: 1px solid var(--border);
+            padding: 0 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 68px;
             position:relative;z-index:10;
         }
-        .nav-left{display:flex;align-items:center;gap:10px}
-        .nav-left img{height:28px;width:auto}
-        .nav-left span{font-size:.85rem;font-weight:600;color:#1A1918}
-        .nav-btn{
-            background:#C0392B;color:#fff;padding:8px 20px;border-radius:4px;
-            font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s;
+        .nav-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
         }
-        .nav-btn:hover{background:#E74C3C}
+        .nav-logo {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }
+        .nav-divider {
+            width: 1px;
+            height: 20px;
+            background: var(--border);
+        }
+        .nav-title {
+            font-family: 'Playfair Display', serif;
+            font-size: 1.05rem;
+            font-weight: 500;
+            color: var(--t1);
+        }
+        .nav-badge {
+            font-size: 0.65rem;
+            font-weight: 500;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            color: var(--red);
+            background: var(--red-light);
+            border: 1px solid rgba(192,57,43,0.2);
+            padding: 3px 10px;
+            border-radius: 20px;
+        }
 
-        /* CENTER - GELAP/BLUR (FOTO GEDUNG) */
+        /* ─── CENTER HERO (Shadowy Building) ─── */
         .center{
             flex:1;display:flex;align-items:center;justify-content:center;
-            padding:2rem;position:relative;
+            padding:3rem 2rem;position:relative;
             background:url("{{ asset('images/building.png') }}") center/cover no-repeat;
         }
         .center::before{
             content:'';position:absolute;inset:0;
-            background:linear-gradient(180deg,rgba(15,15,15,.75) 0%,rgba(15,15,15,.65) 50%,rgba(15,15,15,.85) 100%);
+            background:linear-gradient(180deg,rgba(17,17,16,.75) 0%,rgba(17,17,16,.65) 50%,rgba(17,17,16,.85) 100%);
         }
-        .center-box{position:relative;z-index:2;text-align:center;max-width:600px;width:100%}
-        .center-box img{width:150px;height:auto;margin-bottom:1.5rem}
+        .center-box{position:relative;z-index:2;text-align:center;max-width:640px;width:100%}
+        
+        .hero-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.7rem;
+            font-weight: 500;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            color: var(--red-light);
+            margin-bottom: 1.5rem;
+        }
+        .hero-tag .dot {
+            width: 6px; height: 6px; border-radius: 50%;
+            background: var(--red);
+            animation: pulse 2s ease-in-out infinite;
+        }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
         .center-box h1{
-            font-size:2.8rem;font-weight:700;line-height:1.1;
-            letter-spacing:-.02em;margin-bottom:.8rem;color:#fff;
-            text-shadow:0 2px 10px rgba(0,0,0,.5);
+            font-family: 'Playfair Display', serif;
+            font-size: clamp(2.5rem, 4vw, 3.5rem);
+            font-weight: 700;line-height:1.1;
+            letter-spacing:-.02em;margin-bottom:.8rem;color:var(--white);
         }
-        .center-box h1 em{font-style:normal;color:#E74C3C}
+        .center-box h1 em{font-style:normal;color:var(--red)}
+        
         .center-box p{
-            font-size:.95rem;line-height:1.6;color:rgba(255,255,255,.75);
-            margin-bottom:2rem;text-shadow:0 1px 5px rgba(0,0,0,.5);
+            font-size:1rem;line-height:1.7;color:rgba(255,255,255,.8);
+            margin-bottom:2.5rem;
         }
+        
         .center-btn{
             display:inline-flex;align-items:center;gap:8px;
-            background:#C0392B;color:#fff;padding:12px 30px;border-radius:5px;
-            font-size:.9rem;font-weight:600;text-decoration:none;
-            transition:background .15s,transform .15s,box-shadow .15s;
+            background:var(--red);color:var(--white);
+            padding:14px 34px;border-radius:6px;
+            font-size:.9rem;font-weight:500;text-decoration:none;
+            transition:background 0.2s,transform 0.2s,box-shadow 0.2s;
         }
-        .center-btn:hover{background:#E74C3C;transform:translateY(-2px);box-shadow:0 8px 24px rgba(192,57,43,.4)}
+        .center-btn:hover{
+            background:var(--red-hover);
+            transform:translateY(-2px);
+            box-shadow:0 8px 24px rgba(192,57,43,.3);
+        }
 
-        /* FEATURES (INLINE, NO CARDS, TEKS TERANG KARENA BACKGROUND GELAP) */
+        /* ─── FEATURES (INLINE) ─── */
         .features{
-            display:flex;justify-content:center;gap:2rem;margin-top:3rem;
-            border-top:1px solid rgba(255,255,255,.1);padding-top:2rem;
+            display:flex;justify-content:center;gap:2rem;margin-top:3.5rem;
+            border-top:1px solid rgba(255,255,255,.1);padding-top:2.5rem;
         }
         .feat-item{
-            flex:1;text-align:left;display:flex;flex-direction:column;gap:5px;
+            flex:1;text-align:left;display:flex;flex-direction:column;gap:6px;
         }
         .feat-item h3{
-            font-size:.85rem;font-weight:600;color:#E74C3C;
-            display:flex;align-items:center;gap:6px;
+            font-size:.85rem;font-weight:600;color:var(--red-hover);
+            display:flex;align-items:center;gap:8px;
+            letter-spacing: 0.02em;
         }
-        .feat-item h3 svg{width:16px;height:16px;stroke:currentColor;stroke-width:2;fill:none}
-        .feat-item p{font-size:.75rem;color:rgba(255,255,255,.6);line-height:1.5}
+        .feat-item h3 svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none}
+        .feat-item p{font-size:.78rem;color:rgba(255,255,255,.65);line-height:1.55}
 
-        /* FOOTER - CREAM SEMI PUTIH */
-        .foot{
-            padding:1rem 2rem;text-align:center;
-            background:#F7F5F0;border-top:1px solid #EAE6DF;
+        /* ─── FOOTER (Matching Login Page) ─── */
+        footer{
+            background:var(--white);
+            border-top:1px solid var(--border);
+            padding:1.5rem 3rem;
+            display:flex;justify-content:space-between;align-items:center;
             position:relative;z-index:10;
         }
-        .foot span{font-size:.65rem;color:#9A9895}
+        .foot-left { display: flex; align-items: center; gap: 10px; }
+        .foot-left img { width: 22px; height: 22px; object-fit: contain; }
+        .foot-copy { font-size: 0.78rem; color: var(--t3); }
 
         @media(max-width:768px){
-            nav{padding:0 1rem}
-            .center{padding:1.5rem 1rem}
-            .center-box img{width:120px}
-            .center-box h1{font-size:2rem}
+            header{padding:0 1.5rem}
+            .nav-badge{display:none}
+            .center{padding:2rem 1.5rem}
             .features{flex-direction:column;gap:1.5rem}
-            .foot{padding:.8rem 1rem}
+            footer{flex-direction:column;gap:0.75rem;padding:1.25rem 1.5rem;text-align:center;}
         }
     </style>
 </head>
 <body>
 
 <div class="page">
-    <nav>
-        <div class="nav-left">
-            <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
-            <span>Production System</span>
+    <header class="reveal">
+        <div class="nav-brand">
+            <img src="{{ asset('images/ippi.png') }}" class="nav-logo" alt="IPPI">
+            <div class="nav-divider"></div>
+            <span class="nav-title">Production System</span>
+            <span class="nav-badge">Live</span>
         </div>
-        <a href="{{ route('login') }}" class="nav-btn">Login</a>
-    </nav>
+        <!-- Button Login dihapus dari navbar, fokus ke tengah saja -->
+    </header>
 
     <div class="center">
         <div class="center-box">
-            <img src="{{ asset('images/logoippi.png') }}" alt="PT IPPI" class="reveal">
-            <h1 class="reveal delay-100">Monitor. Track. <em>Control.</em></h1>
+            <div class="hero-tag reveal">
+                <div class="dot"></div>
+                Smart Manufacturing Platform
+            </div>
+            <h1 class="reveal delay-100">Monitor. Track.<br><em>Control.</em></h1>
             <p class="reveal delay-200">Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk secara real-time dari satu platform terpadu.</p>
+            
             <a href="{{ route('login') }}" class="center-btn reveal delay-300">
                 Masuk ke Sistem
-                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
             
             <div class="features">
-                <div class="feat-item reveal delay-200">
+                <div class="feat-item reveal delay-100">
                     <h3>
                         <svg viewBox="0 0 24 24"><path d="M3 3v18h18M18 9l-5 5-4-4-5 5"/></svg>
-                        Production Monitoring
+                        Production
                     </h3>
                     <p>Output aktual vs target per shift dan lini produksi.</p>
                 </div>
-                <div class="feat-item reveal delay-300">
+                <div class="feat-item reveal delay-200">
                     <h3>
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                        Downtime Tracking
+                        Downtime
                     </h3>
-                    <p>Deteksi dan analisis penyebab berhentinya mesin.</p>
+                    <p>Deteksi otomatis dan analisis penyebab berhentinya mesin.</p>
                 </div>
-                <div class="feat-item reveal delay-400">
+                <div class="feat-item reveal delay-300">
                     <h3>
                         <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg>
-                        Quality Control
+                        Quality
                     </h3>
-                    <p>Inspeksi digital, defect, dan laporan QPR.</p>
+                    <p>Inspeksi digital, monitoring defect, dan laporan terpadu.</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="foot">
-        <span>Created by Steven Christian</span>
-    </div>
+    <footer class="reveal delay-200">
+        <div class="foot-left">
+            <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
+            <span class="foot-copy">© {{ date('Y') }} PT IPPI. Created by Steven Christian.</span>
+        </div>
+    </footer>
 </div>
 
 <script>
