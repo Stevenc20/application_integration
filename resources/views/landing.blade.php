@@ -14,14 +14,14 @@
 
         .page{flex:1;display:flex;flex-direction:column}
 
-        /* NAV - solid white */
+        /* NAV */
         nav{
             height:50px;display:flex;align-items:center;justify-content:space-between;
-            padding:0 2rem;background:#fff;border-bottom:1px solid #E2E0DD;
+            padding:0 2rem;background:#1A1918;border-bottom:1px solid rgba(255,255,255,.06);
         }
         .nav-left{display:flex;align-items:center;gap:8px}
-        .nav-left img{height:24px;width:auto}
-        .nav-left span{font-size:.8rem;font-weight:600;color:#1A1918}
+        .nav-left img{height:24px;width:auto;filter:brightness(0) invert(1);opacity:.85}
+        .nav-left span{font-size:.8rem;font-weight:600;color:rgba(255,255,255,.8)}
         .nav-btn{
             background:#C0392B;color:#fff;padding:6px 16px;border-radius:4px;
             font-size:.75rem;font-weight:600;text-decoration:none;transition:background .15s;
@@ -58,23 +58,10 @@
         }
         .center-btn:hover{background:#E74C3C;transform:translateY(-1px);box-shadow:0 8px 24px rgba(192,57,43,.35)}
 
-        /* STATS - solid red */
-        .stats{
-            display:flex;background:#C0392B;
-        }
-        .stat{
-            flex:1;padding:.7rem 0;text-align:center;
-            border-right:1px solid rgba(255,255,255,.15);
-        }
-        .stat:last-child{border-right:none}
-        .stat-val{font-size:1.2rem;font-weight:700;color:#fff;line-height:1}
-        .stat-val small{font-size:.75rem;font-weight:400;opacity:.5}
-        .stat-lbl{font-size:.55rem;letter-spacing:.08em;text-transform:uppercase;color:rgba(255,255,255,.5);margin-top:2px}
-
-        /* FOOTER - solid dark */
+        /* FOOTER */
         .foot{
             padding:.5rem 2rem;text-align:center;
-            background:#1A1918;
+            background:#1A1918;border-top:1px solid rgba(255,255,255,.06);
         }
         .foot span{font-size:.6rem;color:rgba(255,255,255,.3)}
 
@@ -112,13 +99,6 @@
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
         </div>
-    </div>
-
-    <div class="stats">
-        <div class="stat"><div class="stat-val">99<small>%</small></div><div class="stat-lbl">Uptime</div></div>
-        <div class="stat"><div class="stat-val">4</div><div class="stat-lbl">Press Lines</div></div>
-        <div class="stat"><div class="stat-val">Real<small>-time</small></div><div class="stat-lbl">Monitoring</div></div>
-        <div class="stat"><div class="stat-val">24<small>/7</small></div><div class="stat-lbl">Operation</div></div>
     </div>
 
     <div class="foot">
