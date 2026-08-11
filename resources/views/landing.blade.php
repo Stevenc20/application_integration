@@ -17,6 +17,22 @@
             background:#F7F5F0; /* Soft cream base */
         }
 
+        /* ANIMASI MASUK (REVEAL) */
+        .reveal {
+            opacity: 0;
+            transform: translateY(25px);
+            transition: all 0.8s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+        .reveal.active {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        /* Delay utility untuk efek stagger */
+        .delay-100 { transition-delay: 0.1s; }
+        .delay-200 { transition-delay: 0.2s; }
+        .delay-300 { transition-delay: 0.3s; }
+        .delay-400 { transition-delay: 0.4s; }
+
         /* NAV - CREAM SEMI PUTIH */
         nav{
             height:55px;display:flex;align-items:center;justify-content:space-between;
@@ -108,30 +124,30 @@
 
     <div class="center">
         <div class="center-box">
-            <img src="{{ asset('images/logoippi.png') }}" alt="PT IPPI">
-            <h1>Monitor. Track. <em>Control.</em></h1>
-            <p>Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk secara real-time dari satu platform terpadu.</p>
-            <a href="{{ route('login') }}" class="center-btn">
+            <img src="{{ asset('images/logoippi.png') }}" alt="PT IPPI" class="reveal">
+            <h1 class="reveal delay-100">Monitor. Track. <em>Control.</em></h1>
+            <p class="reveal delay-200">Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk secara real-time dari satu platform terpadu.</p>
+            <a href="{{ route('login') }}" class="center-btn reveal delay-300">
                 Masuk ke Sistem
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
             </a>
             
             <div class="features">
-                <div class="feat-item">
+                <div class="feat-item reveal delay-200">
                     <h3>
                         <svg viewBox="0 0 24 24"><path d="M3 3v18h18M18 9l-5 5-4-4-5 5"/></svg>
                         Production Monitoring
                     </h3>
                     <p>Output aktual vs target per shift dan lini produksi.</p>
                 </div>
-                <div class="feat-item">
+                <div class="feat-item reveal delay-300">
                     <h3>
                         <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
                         Downtime Tracking
                     </h3>
                     <p>Deteksi dan analisis penyebab berhentinya mesin.</p>
                 </div>
-                <div class="feat-item">
+                <div class="feat-item reveal delay-400">
                     <h3>
                         <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg>
                         Quality Control
@@ -146,6 +162,20 @@
         <span>Created by Steven Christian</span>
     </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('active');
+                }
+            });
+        }, { threshold: 0.1 });
+
+        document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+    });
+</script>
 
 </body>
 </html>
