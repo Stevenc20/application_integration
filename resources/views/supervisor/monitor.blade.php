@@ -66,6 +66,35 @@
         #shiftBar button:hover{background:#f1f5f9;border-color:#94a3b8}
         #shiftBar button.active{background:#059669;color:#fff;border-color:#059669}
         #shiftBar button.active:hover{background:#047857}
+
+        /* ── NO PLAN badge / notice ── */
+        .plan-badge{
+            display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;
+            background:#fef3c7;color:#92400e;border:1px solid #fcd34d;
+            font-size:9px;font-weight:900;letter-spacing:0.06em;vertical-align:middle;
+            white-space:nowrap;
+        }
+        .plan-notice{
+            background:#fffbeb!important;color:#92400e!important;
+            font-size:10px;font-weight:800;letter-spacing:0.04em;
+        }
+        .plan-notice.alert{background:#fef3c7!important;border-top:2px solid #fcd34d}
+
+        /* ── Shift change toast ── */
+        .shift-toast{
+            position:fixed;top:76px;left:50%;transform:translateX(-50%);
+            z-index:1000;display:flex;align-items:center;gap:10px;
+            padding:10px 22px;border-radius:10px;
+            background:#1e40af;color:#fff;font-size:14px;font-weight:900;
+            letter-spacing:0.05em;box-shadow:0 10px 30px rgba(0,0,0,0.25);
+            opacity:0;pointer-events:none;
+            transition:opacity .25s ease, transform .25s ease;
+        }
+        .shift-toast.show{opacity:1;transform:translateX(-50%)}
+        .shift-toast svg{width:20px;height:20px;flex-shrink:0;animation:pulse-dot 1.2s ease-in-out infinite}
+        .shift-toast.night{background:#6d28d9}
+        @media(max-width:480px){.shift-toast{font-size:11px;padding:8px 14px;top:52px}.shift-toast svg{width:16px;height:16px}}
+        @media(min-width:3840px){.shift-toast{font-size:30px;padding:22px 48px;top:150px;border-radius:16px}.shift-toast svg{width:44px;height:44px}}
         .live-dot{
             width:7px;height:7px;border-radius:50%;
             background:#22c55e;display:inline-block;
@@ -352,8 +381,8 @@
                 <button data-line="D">D</button>
             </div>
             <div class="filter-bar" id="shiftBar">
-                <button onclick="setShift(1)" class="active">Shift Pagi</button>
-                <button onclick="setShift(2)" class="">Shift Malam</button>
+                <button onclick="setShift(1,true)" data-shift="1" class="active">Shift Pagi</button>
+                <button onclick="setShift(2,true)" data-shift="2" class="">Shift Malam</button>
             </div>
             <div>
                 <div id="shiftLabel">Shift A</div>
@@ -376,6 +405,11 @@
     </div>
 </div>
 
+<div id="shiftToast" class="shift-toast" role="alert">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <span id="shiftToastMsg"></span>
+</div>
+
 <script>
 const LINES = @json($lines);
 let LINE_KPI = {};
@@ -390,14 +424,35 @@ const _m = _initTime.getMinutes();
 const _isShift2 = (_h >= 20 || (_h === 19 && _m >= 30) || _h < 7 || (_h === 7 && _m < 30));
 let selectedShift = _isShift2 ? 2 : 1;
 let prevCellClasses = {};
+let lastManualShiftAt = 0;
+let shiftToastTimer = null;
 
-function setShift(s) {
+function currentShiftFromClock(){
+    const n = new Date(), h = n.getHours(), m = n.getMinutes();
+    return (h >= 20 || (h === 19 && m >= 30) || h < 7 || (h === 7 && m < 30)) ? 2 : 1;
+}
+
+function showShiftToast(s) {
+    const el = document.getElementById('shiftToast');
+    const msg = document.getElementById('shiftToastMsg');
+    if (!el || !msg) return;
+    msg.textContent = s === 1 ? '⏰ SHIFT BERUBAH → SHIFT PAGI' : '⏰ SHIFT BERUBAH → SHIFT MALAM';
+    el.classList.toggle('night', s === 2);
+    el.classList.add('show');
+    clearTimeout(shiftToastTimer);
+    shiftToastTimer = setTimeout(() => el.classList.remove('show'), 8000);
+}
+
+function setShift(s, fromButton) {
+    const prev = selectedShift;
     selectedShift = s;
+    if (fromButton) lastManualShiftAt = Date.now();
     document.querySelectorAll('#shiftBar button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#shiftBar button')[s === 1 ? 0 : 1].classList.add('active');
+    document.querySelector(`#shiftBar button[data-shift="${s}"]`)?.classList.add('active');
     allCells = null;
     LAST_HASH = '';
     fetchData();
+    if (s !== prev) showShiftToast(s);
 }
 
 const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
@@ -410,7 +465,12 @@ function updateClock(){
     document.getElementById('dateLabel').textContent=n.toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'numeric'});
     document.getElementById('shiftLabel').textContent = selectedShift === 1 ? 'Shift Pagi' : 'Shift Malam';
     document.querySelectorAll('#shiftBar button').forEach(b => b.classList.remove('active'));
-    document.querySelector(`#shiftBar button[onclick="setShift(${selectedShift})"]`)?.classList.add('active');
+    document.querySelector(`#shiftBar button[data-shift="${selectedShift}"]`)?.classList.add('active');
+
+    const auto = currentShiftFromClock();
+    if (auto !== selectedShift && (Date.now() - lastManualShiftAt) > 5*60*1000) {
+        setShift(auto, false);
+    }
 }
 setInterval(updateClock,1000);
 updateClock();
@@ -456,6 +516,13 @@ function kv(line,desc){
 
 function meta(line,k){ return (LINE_META[line]||{})[k]||'-' }
 
+function noPlan(line){
+    const jp = meta(line,'jobPlan');
+    if (jp === '0' || jp === '-') return true;
+    const k = kv(line,'QTY');
+    return !k || (parseFloat(k.plan) || 0) <= 0;
+}
+
 function cellClass(desc,actual,actPct){
     if(desc==='GSPH'){
         const p=parseFloat(actPct||actual);
@@ -495,9 +562,14 @@ function renderAllLines(){
         `;
         const thead=document.getElementById('monitorThead');
         let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis">DESC</th>';
-        LINES.forEach(l=>{hh+=`<th colspan="3" class="line-header">${l}</th>`});
+        LINES.forEach((l,li)=>{hh+=`<th colspan="3" class="line-header">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`});
         hh+='</tr><tr>';
         LINES.forEach(()=>{hh+='<th>PLAN</th><th>CURR</th><th>ACTUAL</th>'});
+        hh+='</tr>';
+        hh+='<tr id="planNoticeRow" style="display:none">';
+        LINES.forEach((l,li)=>{
+            hh+=`<td colspan="3" id="planNotice-${li}" class="plan-notice">⚠️ BELUM ADA PLANNING — jadwal belum diupload PPC</td>`;
+        });
         hh+='</tr>';
         thead.innerHTML=hh;
 
@@ -604,6 +676,18 @@ function updateAllCells(){
             if(cell.className!=='status-not-running') cell.className='status-not-running';
         }
     });
+    // NO PLAN badge + notice
+    let anyNoPlan=false;
+    LINES.forEach((line,li)=>{
+        const np=noPlan(line);
+        if(np) anyNoPlan=true;
+        const badge=document.getElementById(`planBadge-${li}`);
+        if(badge) badge.style.display=np?'inline-block':'none';
+        const notice=document.getElementById(`planNotice-${li}`);
+        if(notice) notice.style.display=np?'':'none';
+    });
+    const nr=document.getElementById('planNoticeRow');
+    if(nr) nr.style.display=anyNoPlan?'':'none';
 }
 
 function setText(el,v){
@@ -719,6 +803,15 @@ function renderTable(){
                 <td colspan="3" class="${statusClass}" style="text-align:left; padding-left: 20px; font-weight:900;">${statusVal}</td>
             </tr>
         `;
+
+        // NO PLAN NOTICE
+        if (noPlan(lineKey)) {
+            b += `
+                <tr>
+                    <td colspan="4" class="plan-notice alert" style="text-align:left; padding:8px 14px;">⚠️ BELUM ADA PLANNING — jadwal produksi belum diupload PPC, kolom detail job tidak ditampilkan</td>
+                </tr>
+            `;
+        }
 
         // PROGRESS PRODUKSI
         const progressPct = parseFloat(pct);
