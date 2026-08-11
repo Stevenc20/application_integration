@@ -172,6 +172,7 @@ Route::middleware(['auth', 'role:superadmin'])->prefix('super-admin')->name('sup
 Route::middleware(['auth'])->prefix('signature')->name('signature.')->group(function () {
     Route::get('/status', [\App\Http\Controllers\SignatureController::class, 'status'])->name('status');
     Route::get('/get', [\App\Http\Controllers\SignatureController::class, 'get'])->name('get');
+    Route::get('/pending', [\App\Http\Controllers\SignatureController::class, 'pending'])->name('pending');
     Route::post('/save', [\App\Http\Controllers\SignatureController::class, 'save'])->name('save');
     Route::post('/delete', [\App\Http\Controllers\SignatureController::class, 'delete'])->name('delete');
 });

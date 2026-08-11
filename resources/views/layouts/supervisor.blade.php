@@ -214,6 +214,66 @@
             setInterval(window.fetchGlobalTimer, 30000); // sync every 30s
         });
     </script>
+
+    {{-- MODAL NOTIFIKASI TTD MENUNGGU --}}
+    <div id="ttd-reminder-modal" class="hidden fixed inset-0 items-center justify-center p-4" style="z-index:1200;background:rgba(15,23,42,0.82);backdrop-filter:blur(8px);" onclick="ttdReminderClose()">
+        <div class="bg-white rounded-2xl border border-slate-100 shadow-2xl w-full max-w-md overflow-hidden" onclick="event.stopPropagation()">
+            <div class="px-6 py-4 bg-gradient-to-r from-amber-50 to-white border-b border-slate-100 flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500 flex items-center justify-center shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </div>
+                <div>
+                    <p class="text-xs font-black text-slate-800 uppercase tracking-widest">Tanda Tangan Menunggu</p>
+                    <p class="text-[10px] text-slate-400 font-semibold mt-0.5">LKH — Verifikasi Elektronik</p>
+                </div>
+            </div>
+            <div class="p-6 text-center">
+                <p class="text-sm font-bold text-gray-800 mb-1">Ada TTD <span id="ttd-reminder-role" class="text-amber-700">—</span> yang menunggu</p>
+                <p class="text-xs text-gray-500 mb-5" id="ttd-reminder-location"></p>
+                <div class="flex items-center justify-center gap-3">
+                    <a href="#" id="ttd-reminder-url" class="px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-bold text-xs uppercase tracking-wider shadow-md transition-all">TTD Sekarang</a>
+                    <button type="button" onclick="ttdReminderClose()" class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-50 font-bold text-xs uppercase tracking-wider transition-all">Nanti</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let ttdReminderDismissed = false;
+
+        function ttdReminderClose() {
+            ttdReminderDismissed = true;
+            const m = document.getElementById('ttd-reminder-modal');
+            if (m) { m.classList.add('hidden'); m.classList.remove('flex'); }
+        }
+
+        function ttdReminderCheck() {
+            if (!window.location.pathname.includes('/dashboard')) return;
+            fetch('{{ url('/signature/pending') }}')
+                .then(r => r.json())
+                .then(d => {
+                    if (!d.pending) {
+                        ttdReminderDismissed = false;
+                        ttdReminderClose();
+                        return;
+                    }
+                    if (ttdReminderDismissed) return;
+                    document.getElementById('ttd-reminder-role').textContent = d.roleLabel;
+                    document.getElementById('ttd-reminder-location').textContent = 'Lokasi: ' + d.lineName + ' — ' + d.date;
+                    document.getElementById('ttd-reminder-url').setAttribute('href', d.url);
+                    const m = document.getElementById('ttd-reminder-modal');
+                    m.classList.remove('hidden');
+                    m.classList.add('flex');
+                })
+                .catch(() => {});
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            ttdReminderCheck();
+            setInterval(ttdReminderCheck, 60000);
+        });
+    </script>
+
     @stack('modals')
     @yield('scripts')
     @stack('scripts')
