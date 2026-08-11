@@ -33,12 +33,13 @@
         /* ─── ANIMASI MASUK (REVEAL) ─── */
         .reveal {
             opacity: 0;
-            transform: translateY(24px);
-            transition: all 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+            transform: translate3d(0, 24px, 0);
+            transition: opacity 0.8s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+            will-change: opacity, transform;
         }
         .reveal.active {
             opacity: 1;
-            transform: translateY(0);
+            transform: translate3d(0, 0, 0);
         }
         .delay-100 { transition-delay: 0.1s; }
         .delay-200 { transition-delay: 0.2s; }
@@ -192,7 +193,7 @@
 <body>
 
 <div class="page">
-    <header class="reveal">
+    <header>
         <div class="nav-brand">
             <img src="{{ asset('images/ippi.png') }}" class="nav-logo" alt="IPPI">
             <div class="nav-divider"></div>
