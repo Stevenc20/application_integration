@@ -197,19 +197,19 @@
 
 {{-- SHIFT VALIDATION MODAL --}}
 <div id="shiftValidationModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
-    <div class="fixed inset-0 bg-black/60 backdrop-blur-sm" onclick="closeShiftValidationModal()"></div>
-    <div class="relative bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
-        <div class="p-5 border-b border-slate-800 flex items-center justify-between sticky top-0 bg-slate-900">
-            <h3 class="text-base font-black text-white">⚠️ Validasi Akhiri Shift</h3>
-            <button onclick="closeShiftValidationModal()" class="w-7 h-7 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white flex items-center justify-center transition-colors">
+    <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm" onclick="closeShiftValidationModal()"></div>
+    <div class="relative bg-white border border-gray-200 rounded-2xl shadow-2xl max-w-lg w-full max-h-[80vh] overflow-y-auto">
+        <div class="p-5 border-b border-gray-100 flex items-center justify-between sticky top-0 bg-white">
+            <h3 class="text-base font-black text-slate-800">Validasi Akhiri Shift</h3>
+            <button onclick="closeShiftValidationModal()" class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 hover:text-slate-800 flex items-center justify-center transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
         <div class="p-5 space-y-4" id="shiftValidationBody">
             <!-- populated by JS -->
         </div>
-        <div class="p-4 border-t border-slate-800 flex justify-end sticky bottom-0 bg-slate-900">
-            <button onclick="closeShiftValidationModal()" class="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white font-bold text-sm rounded-xl transition-all">Tutup</button>
+        <div class="p-4 border-t border-gray-100 flex justify-end sticky bottom-0 bg-white">
+            <button onclick="closeShiftValidationModal()" class="px-5 py-2 bg-gray-100 hover:bg-gray-200 text-slate-700 font-bold text-sm rounded-xl transition-all">Tutup</button>
         </div>
     </div>
 </div>

@@ -71,7 +71,7 @@
                 </button>
                 @else
                 <button id="submitShiftBtnTop" onclick="submitShift()" 
-                    class="flex items-center gap-2 {{ ($allJobsDone ?? false) ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10' : 'bg-gradient-to-r from-slate-400 to-slate-500 hover:from-slate-500 hover:to-slate-600 shadow-sm' }} text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all border border-orange-600/20">
+                    class="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10 text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all border border-orange-600/20">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
@@ -209,36 +209,31 @@
     @if(!isset($isHistorical) || !$isHistorical)
     @if(!($isLocked ?? false))
     <div id="shiftSubmissionBanner" class="mb-6">
-        <div class="bg-white rounded-2xl border {{ ($allJobsDone ?? false) ? 'border-orange-200 bg-orange-50/50' : 'border-gray-200' }} shadow-sm overflow-hidden">
+        <div class="bg-white rounded-2xl border border-orange-200 bg-orange-50/50 shadow-sm overflow-hidden">
             <div class="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl {{ ($allJobsDone ?? false) ? 'bg-orange-100' : 'bg-slate-100' }} flex items-center justify-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ ($allJobsDone ?? false) ? 'text-orange-600' : 'text-slate-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                         </svg>
                     </div>
                     <div>
-                        <h3 class="text-sm font-black {{ ($allJobsDone ?? false) ? 'text-orange-800' : 'text-slate-600' }} uppercase tracking-widest">Akhiri Shift</h3>
-                        <p class="text-[10px] font-bold {{ ($allJobsDone ?? false) ? 'text-orange-600' : 'text-slate-400' }} mt-0.5">
-                            @if($allJobsDone ?? false)
-                                Semua item sudah selesai. Klik untuk finalisasi shift.
-                            @else
-                                @php
-                                    $completedCount = $jobPlans->filter(fn($p) => optional($p->job_data)->status === 'complete')->count();
-                                    $totalJobs = $jobPlans->count();
-                                @endphp
-                                {{ $completedCount }}/{{ $totalJobs }} item selesai. Semua item harus selesai sebelum shift bisa difinalisasi.
-                            @endif
+                        <h3 class="text-sm font-black text-orange-800 uppercase tracking-widest">Akhiri Shift</h3>
+                        <p class="text-[10px] font-bold text-orange-600 mt-0.5">
+                            @php
+                                $completedCount = $jobPlans->filter(fn($p) => optional($p->job_data)->status === 'complete')->count();
+                                $totalJobs = $jobPlans->count();
+                            @endphp
+                            {{ $completedCount }}/{{ $totalJobs }} item selesai. Item yang belum mencapai target akan otomatis masuk recovery. Lengkapi downtime terlebih dahulu bila ada.
                         </p>
                     </div>
                 </div>
                 <button id="submitShiftBtn" onclick="submitShift()" 
-                    class="flex items-center gap-2 {{ ($allJobsDone ?? false) ? 'bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10' : 'bg-slate-200 text-slate-400 cursor-not-allowed' }} text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all border {{ ($allJobsDone ?? false) ? 'border-orange-600/20' : 'border-slate-300' }}"
-                    {{ ($allJobsDone ?? false) ? '' : 'disabled' }}>
+                    class="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all border border-orange-600/20">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
-                    <span>{{ ($allJobsDone ?? false) ? 'Akhiri Shift' : 'Menunggu...' }}</span>
+                    <span>Akhiri Shift</span>
                 </button>
             </div>
         </div>
@@ -626,11 +621,13 @@ function submitShift() {
         .then(r => r.json().then(data => ({ status: r.status, data })))
         .then(({ status, data }) => {
             if (status === 200 && data.success) {
-                showToast('Shift berhasil disubmit!', 'success');
+                const recovered = parseInt(data.recovered || 0, 10);
+                showToast(recovered > 0 ? 'Shift berhasil disubmit! ' + recovered + ' item tidak tercapai masuk recovery.' : 'Shift berhasil disubmit!', 'success');
                 btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Shift Disubmit';
                 btn.classList.remove('from-orange-500', 'to-red-600', 'hover:from-orange-600', 'hover:to-red-700');
                 btn.classList.add('from-emerald-500', 'to-teal-600', 'cursor-default');
                 btn.onclick = null;
+                setTimeout(function () { window.location.reload(); }, 1500);
             } else if (data.has_issues) {
                 openShiftValidationModal(data.issues);
                 btn.disabled = false;
@@ -654,30 +651,31 @@ function openShiftValidationModal(issues) {
     const body = document.getElementById('shiftValidationBody');
     if (!body) return;
     body.innerHTML = '';
-    const sections = [
-        { key: 'dt', label: 'Downtime', color: 'red', icon: '⏱' },
-        { key: 'repair', label: 'Repair', color: 'orange', icon: '🔧' },
-        { key: 'reject', label: 'Reject', color: 'rose', icon: '🗑' },
-        { key: 'remain', label: 'Remain', color: 'yellow', icon: '📦' },
-    ];
-    sections.forEach(s => {
-        const items = issues[s.key] || [];
-        let listHtml = items.length === 0
-            ? '<p class="mt-1 text-xs text-slate-500">Tidak ada masalah.</p>'
-            : '<ul class="mt-2 space-y-1">' + items.map(item =>
-                '<li class="flex items-center justify-between text-xs text-slate-300">' +
+    const sections = {
+        dt: { label: 'Downtime', color: 'red', icon: '⏱' },
+    };
+    const keys = Object.keys(sections).filter(k => (issues[k] || []).length > 0);
+    if (keys.length === 0) {
+        body.innerHTML = '<p class="text-xs text-slate-500">Tidak ada masalah yang perlu diperbaiki.</p>';
+    } else {
+        keys.forEach(k => {
+            const s = sections[k];
+            const items = issues[k] || [];
+            const listHtml = '<ul class="mt-2 space-y-1">' + items.map(item =>
+                '<li class="flex items-center justify-between text-xs text-slate-700">' +
                     '<span>&bull; ' + item.item + ': ' + item.issue + '</span>' +
-                    '<button onclick="goToIssue(\'' + s.key + '\',' + item.plan_id + ',' + item.job_master_id + ',' + (item.dt_id || 'null') + ')" class="ml-2 px-2 py-0.5 bg-' + s.color + '-500/20 hover:bg-' + s.color + '-500/30 text-' + s.color + '-300 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap">' +
+                    '<button onclick="goToIssue(\'' + k + '\',' + item.plan_id + ',' + item.job_master_id + ',' + (item.dt_id || 'null') + ')" class="ml-2 px-2 py-0.5 bg-' + s.color + '-50 hover:bg-' + s.color + '-100 text-' + s.color + '-700 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap">' +
                         '&rarr; Buka' +
                     '</button>' +
                 '</li>'
             ).join('') + '</ul>';
-        body.innerHTML +=
-            '<div class="bg-' + s.color + '-500/10 border border-' + s.color + '-500/20 rounded-xl p-4">' +
-                '<h4 class="text-sm font-black text-' + s.color + '-400 uppercase tracking-wider">' + s.icon + ' ' + s.label + ' (' + items.length + ' item)</h4>' +
-                listHtml +
-            '</div>';
-    });
+            body.innerHTML +=
+                '<div class="bg-' + s.color + '-50 border border-' + s.color + '-200 rounded-xl p-4">' +
+                    '<h4 class="text-sm font-black text-' + s.color + '-700 uppercase tracking-wider">' + s.icon + ' ' + s.label + ' (' + items.length + ' item)</h4>' +
+                    listHtml +
+                '</div>';
+        });
+    }
     const modal = document.getElementById('shiftValidationModal');
     modal.classList.remove('hidden');
     modal.classList.add('flex');
@@ -699,17 +697,9 @@ function goToIssue(type, planId, jobMasterId, dtId) {
     } else {
         showToast('Baris item tidak ditemukan.', 'info');
     }
-    if (type === 'remain') {
-        showToast('Item masih berjalan — selesaikan dulu.', 'info');
-        return;
-    }
     setTimeout(function () {
         if (type === 'dt') {
             window.openDowntimeReport ? window.openDowntimeReport(jobMasterId, null) : null;
-        } else if (type === 'repair') {
-            window.openRRInputModal ? window.openRRInputModal(jobMasterId, 'repair', 0) : null;
-        } else if (type === 'reject') {
-            window.openRRInputModal ? window.openRRInputModal(jobMasterId, 'reject', 0) : null;
         }
     }, 500);
 }

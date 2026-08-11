@@ -1280,10 +1280,7 @@ class InputHarianController extends Controller
             }
 
             $issues = [
-                'dt'     => [],
-                'repair' => [],
-                'reject' => [],
-                'remain' => [],
+                'dt' => [],
             ];
 
             // ── BATCH LOAD: All parent JobMasters + children in 3 queries instead of N*3 ──
@@ -1296,7 +1293,7 @@ class InputHarianController extends Controller
             })->filter()->values()->toArray();
 
             $parentJobMasters = \App\Models\JobMaster::whereIn('job_number', $parentIdentifiers)
-                ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                ->with(['downtimes'])
                 ->get()
                 ->keyBy('job_number');
 
@@ -1311,7 +1308,7 @@ class InputHarianController extends Controller
             })->filter()->values()->toArray();
 
             $childJobMasters = \App\Models\JobMaster::whereIn('job_number', $childIdentifiers)
-                ->with(['downtimes', 'repairRejects'])
+                ->with(['downtimes'])
                 ->get()
                 ->keyBy('job_number');
 
@@ -1352,81 +1349,10 @@ class InputHarianController extends Controller
                             ];
                         }
                     }
-
-                    foreach ($jm->repairRejects ?? [] as $rr) {
-                        if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
-                            $key = $rr->type === 'reject' ? 'reject' : 'repair';
-                            $issues[$key][] = [
-                                'item'          => $itemName,
-                                'issue'         => 'area_problem/root_cause/countermeasure belum lengkap',
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $plan->id,
-                            ];
-                        }
-                    }
-                    if ($jm->dailyProduction && $jm->dailyProduction->actual_repair > 0) {
-                        $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'repair');
-                        if (!$hasRR) {
-                            $issues['repair'][] = [
-                                'item'          => $itemName,
-                                'issue'         => (int)$jm->dailyProduction->actual_repair . ' pcs Repair tanpa catatan',
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $plan->id,
-                            ];
-                        }
-                    }
-                    if ($jm->dailyProduction && $jm->dailyProduction->actual_reject > 0) {
-                        $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'reject');
-                        if (!$hasRR) {
-                            $issues['reject'][] = [
-                                'item'          => $itemName,
-                                'issue'         => (int)$jm->dailyProduction->actual_reject . ' pcs Reject tanpa catatan',
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $plan->id,
-                            ];
-                        }
-                    }
                 }
             }
 
-        // Check Remain — use batch-loaded lookups
-        $remainIdentifiers = $parentPlans->map(function($p) {
-            $pJn = trim($p->job_no ?? '');
-            $pJmStr = trim($p->job_master ?? '');
-            if (blank($pJn) && blank($pJmStr)) return null;
-            return $pJn ? ($pJn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($pJmStr) . '-' . $p->id);
-        })->filter()->values()->toArray();
-
-        $remainJobMasters = \App\Models\JobMaster::whereIn('job_number', $remainIdentifiers)
-            ->get()
-            ->keyBy('job_number');
-
-        foreach ($plans as $p) {
-            if ($p->parent_job_id) continue;
-            if (($p->row_type ?? 'job') === 'break') continue;
-            $pJn = trim($p->job_no ?? '');
-            $pJmStr = trim($p->job_master ?? '');
-            if (blank($pJn) && blank($pJmStr)) continue;
-            $pIdent = $pJn ? ($pJn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($pJmStr) . '-' . $p->id);
-            $pJm = $remainJobMasters->get($pIdent);
-            if (!$pJm) {
-                $issues['remain'][] = [
-                    'item'          => $p->job_no ?: $p->job_master,
-                    'issue'         => 'Item belum dikerjakan (tidak ada JobMaster)',
-                    'job_master_id' => null,
-                    'plan_id'       => $p->id,
-                ];
-            } elseif (in_array(strtolower($pJm->status), ['running', 'pending', 'paused'])) {
-                $issues['remain'][] = [
-                    'item'          => $p->job_no ?: $p->job_master,
-                    'issue'         => "Status masih {$pJm->status}",
-                    'job_master_id' => $pJm->id,
-                    'plan_id'       => $p->id,
-                ];
-            }
-        }
-
-        if (!empty($issues['dt']) || !empty($issues['repair']) || !empty($issues['reject']) || !empty($issues['remain'])) {
+        if (!empty($issues['dt'])) {
                 return response()->json([
                     'success'    => false,
                     'has_issues' => true,
@@ -1449,16 +1375,29 @@ class InputHarianController extends Controller
                 'submitted_by' => auth()->id(),
             ]);
 
+            // Auto-recovery: create pending RecoveryItems for every plan item
+            // not meeting target (ok < plan), so the shift can finalize even
+            // when multiple items are not achieved.
+            $shiftName = $shift ? (str_contains(strtoupper($shift), 'MALAM') ? 'Shift Malam' : 'Shift Pagi') : 'Shift Pagi';
+            $recovered = 0;
+            try {
+                $recovered = app(\App\Services\CutOffService::class)->processCutOff($date, $shiftName)['created'] ?? 0;
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('[SHIFT SUBMIT] Auto-recovery failed', ['error' => $e->getMessage()]);
+            }
+
             \Illuminate\Support\Facades\Log::info("[SHIFT SUBMIT] Shift submitted", [
                 'line' => $lineId,
                 'date' => $date,
                 'shift' => $shift,
                 'by' => auth()->id(),
+                'recovered' => $recovered,
             ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Shift berhasil disubmit!',
+                'recovered' => $recovered,
             ]);
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('[SHIFT SUBMIT] Error: ' . $e->getMessage());
