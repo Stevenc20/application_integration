@@ -447,6 +447,9 @@ function setShift(s, fromButton) {
     const prev = selectedShift;
     selectedShift = s;
     if (fromButton) lastManualShiftAt = Date.now();
+    detailPage = 0;
+    detailPages = 1;
+    stopRotate();
     document.querySelectorAll('#shiftBar button').forEach(b => b.classList.remove('active'));
     document.querySelector(`#shiftBar button[data-shift="${s}"]`)?.classList.add('active');
     allCells = null;
@@ -482,6 +485,9 @@ document.getElementById('filterBar').addEventListener('click',function(e){
     const newSel=btn.dataset.line==='all'?null:btn.dataset.line;
     if((selectedLine===null)!==(newSel===null)) allCells=null; // flush cache when switching mode
     selectedLine=newSel;
+    detailPage = 0;
+    detailPages = 1;
+    stopRotate();
     renderTable();
 });
 
@@ -540,6 +546,97 @@ function cellClass(desc,actual,actPct){
 
 function dtCell(v,st){ return `<td style="${st||''}">${v}</td>`; }
 function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700">-</span>'; }
+
+// ── Fit-to-screen + auto-rotate helpers ──
+const MIN_FIT = 0.6;
+const ROTATE_MS = 10000;
+let detailPage = 0;
+let detailPages = 1;
+let rotateTimer = null;
+
+function buildRightBody(rows, maxRows){
+    maxRows = maxRows || rows.length;
+    let h = '';
+    let renderedRightRowspan = false;
+    for (let i = 0; i < maxRows; i++) {
+        h += '<tr>';
+        if (i < rows.length) {
+            const j = rows[i];
+            const pt = j.press_time > 0 ? j.press_time + ' m' : '-';
+            const dn = j.dandori > 0 ? j.dandori + ' m' : '-';
+            const iq = j.iq_check > 0 ? j.iq_check + ' m' : '-';
+            const dw = j.downtime > 0 ? j.downtime + ' m' : '-';
+            const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
+            h += `
+                ${dtCell(j.no, 'border-left:none;')}
+                ${dtCell(j.job_number, 'text-align:left;font-weight:600;color:#1e293b')}
+                ${dtCell(chk(j.p1))}
+                ${dtCell(chk(j.p2))}
+                ${dtCell(chk(j.p3))}
+                ${dtCell(chk(j.p4))}
+                ${dtCell(j.plan_qty, 'color:#374151')}
+                ${dtCell(j.good, 'color:#16a34a;font-weight:600')}
+                ${dtCell(j.repair, 'color:#d97706;font-weight:600')}
+                ${dtCell(j.reject, 'color:#dc2626;font-weight:600')}
+                ${dtCell(pt)}
+                ${dtCell(dn)}
+                ${dtCell(iq)}
+                ${dtCell(dw, j.downtime > 0 ? 'background-color:#ef4444; color:#fff; font-weight:700; animation:blink-red .8s ease-in-out infinite' : '')}
+                ${dtCell(tp, 'color:#2563eb;font-weight:700')}
+                ${dtCell(j.plan_finish)}
+                ${dtCell(j.actual_finish)}
+            `;
+        } else {
+            if (!renderedRightRowspan) {
+                const remainingRight = maxRows - rows.length;
+                h += `<td rowspan="${remainingRight}" colspan="17" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                renderedRightRowspan = true;
+            }
+        }
+        h += '</tr>';
+    }
+    return h;
+}
+
+function computeFit(root){
+    const scrollEl = document.querySelector('.table-scroll');
+    if(!root || !scrollEl) return 1;
+    root.style.zoom = '';
+    const availW = scrollEl.clientWidth || window.innerWidth;
+    const availH = scrollEl.clientHeight || window.innerHeight;
+    const natW = root.offsetWidth || availW;
+    const natH = root.offsetHeight || availH;
+    let s = Math.min(1, availW / natW, availH / natH);
+    return (isFinite(s) && s > 0) ? s : 1;
+}
+
+function applyFit(root){
+    const scrollEl = document.querySelector('.table-scroll');
+    if(!root || !scrollEl) return;
+    const s = computeFit(root);
+    scrollEl.style.overflow = s < 1 ? 'hidden' : '';
+    root.style.zoom = s < 1 ? s : '';
+}
+
+function stopRotate(){
+    if(rotateTimer){ clearInterval(rotateTimer); rotateTimer = null; }
+}
+
+function startRotate(){
+    stopRotate();
+    if(detailPages > 1){
+        rotateTimer = setInterval(()=>{
+            detailPage = (detailPage + 1) % detailPages;
+            renderTable();
+        }, ROTATE_MS);
+    }
+}
+
+function refitRoot(){
+    const scrollEl = document.querySelector('.table-scroll');
+    const root = scrollEl && scrollEl.firstElementChild;
+    if(root) requestAnimationFrame(()=>applyFit(root));
+}
 
 // ── Cell cache for incremental rendering (Semua view) ──
 let allCells = null;
@@ -616,6 +713,7 @@ function renderAllLines(){
 
         // Fill initial data
         updateAllCells();
+        requestAnimationFrame(()=>applyFit(document.querySelector('.table-scroll')?.firstElementChild));
         return;
     }
     updateAllCells();
@@ -831,11 +929,11 @@ function renderTable(){
         `;
 
         tbody.innerHTML = b;
+        requestAnimationFrame(()=>applyFit(tbl));
         return;
     }
 
     // CASE B: Split screen but seamlessly touching (gap: 0px) with matched rowspans
-    const maxRows = Math.max(leftRows.length, rightRows.length);
     // Build left side HTML
     let leftBodyHtml = '';
     for (let i = 0; i < leftRows.length; i++) {
@@ -883,48 +981,7 @@ function renderTable(){
 
 
 
-    // Build right side HTML
-    let rightBodyHtml = '';
-    let renderedRightRowspan = false;
-    for (let i = 0; i < maxRows; i++) {
-        rightBodyHtml += '<tr>';
-        if (i < rightRows.length) {
-            const j = rightRows[i];
-            const pt = j.press_time > 0 ? j.press_time + ' m' : '-';
-            const dn = j.dandori > 0 ? j.dandori + ' m' : '-';
-            const iq = j.iq_check > 0 ? j.iq_check + ' m' : '-';
-            const dw = j.downtime > 0 ? j.downtime + ' m' : '-';
-            const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
-
-            rightBodyHtml += `
-                ${dtCell(j.no, 'border-left:none;')}
-                ${dtCell(j.job_number, 'text-align:left;font-weight:600;color:#1e293b')}
-                ${dtCell(chk(j.p1))}
-                ${dtCell(chk(j.p2))}
-                ${dtCell(chk(j.p3))}
-                ${dtCell(chk(j.p4))}
-                ${dtCell(j.plan_qty, 'color:#374151')}
-                ${dtCell(j.good, 'color:#16a34a;font-weight:600')}
-                ${dtCell(j.repair, 'color:#d97706;font-weight:600')}
-                ${dtCell(j.reject, 'color:#dc2626;font-weight:600')}
-                ${dtCell(pt)}
-                ${dtCell(dn)}
-                ${dtCell(iq)}
-                ${dtCell(dw, j.downtime > 0 ? 'background-color:#ef4444; color:#fff; font-weight:700; animation:blink-red .8s ease-in-out infinite' : '')}
-                ${dtCell(tp, 'color:#2563eb;font-weight:700')}
-                ${dtCell(j.plan_finish)}
-                ${dtCell(j.actual_finish)}
-            `;
-        } else {
-            if (!renderedRightRowspan) {
-                const remainingRight = maxRows - rightRows.length;
-                rightBodyHtml += `<td rowspan="${remainingRight}" colspan="17" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
-                renderedRightRowspan = true;
-            }
-        }
-        rightBodyHtml += '</tr>';
-    }
-
+    // Build right side HTML (handled inside renderCaseB with fit/pagination)
     const st = LINE_STATUSES[lineKey];
     let statusVal = '—';
     let statusClass = 'status-not-running';
@@ -937,8 +994,11 @@ function renderTable(){
     const progressPct = parseFloat(pct);
     const barColor = progressPct >= 100 ? '#22c55e' : progressPct >= 80 ? '#eab308' : '#ef4444';
 
-    // Insert split container layout
-    scrollEl.innerHTML = `
+    // Insert split container layout (reusable for full or per-page render)
+    const renderCaseB = (rows, pageInfo, matchLeft) => {
+        const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length);
+        const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
+        scrollEl.innerHTML = `
         <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
@@ -965,7 +1025,7 @@ function renderTable(){
                     <table class="large-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
-                                <th colspan="17" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%</th>
+                                <th colspan="17" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
                                 <th style="width:4%; border-left:none;">NO</th>
@@ -988,7 +1048,7 @@ function renderTable(){
                             </tr>
                         </thead>
                         <tbody>
-                            ${rightBodyHtml}
+                            ${body}
                         </tbody>
                     </table>
                 </div>
@@ -1017,12 +1077,36 @@ function renderTable(){
             </div>
         </div>
     `;
+        return scrollEl.firstElementChild;
+    };
+
+    // Full render + shrink-to-fit; fall back to auto-rotate pages only when rows are too many
+    let root = renderCaseB(rightRows, null, true);
+    const s = computeFit(root);
+    if (s < MIN_FIT && rightRows.length > 1) {
+        const pageSize = Math.max(1, Math.round((rightRows.length * s) / MIN_FIT));
+        detailPages = Math.ceil(rightRows.length / pageSize);
+        detailPage = Math.min(detailPage, detailPages - 1);
+        const pageRows = rightRows.slice(detailPage * pageSize, (detailPage + 1) * pageSize);
+        root = renderCaseB(pageRows, { page: detailPage + 1, pages: detailPages }, false);
+        startRotate();
+    } else {
+        detailPages = 1;
+        detailPage = 0;
+        stopRotate();
+    }
+    applyFit(root);
 }
 
 fetchData();
 setInterval(fetchData,5000);
 document.addEventListener('visibilitychange',function(){
     if(!document.hidden){LAST_HASH='';fetchData();}
+});
+let resizeTimer = null;
+window.addEventListener('resize', function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(refitRoot, 150);
 });
 </script>
 </body>
