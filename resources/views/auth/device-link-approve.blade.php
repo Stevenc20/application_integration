@@ -47,6 +47,7 @@
 
         <button type="button" class="btn-approve" onclick="actionRequest('approve')">Setujui Masuk</button>
         <button type="button" class="btn-cancel" onclick="actionRequest('cancel')">Tolak</button>
+        <a href="{{ route('device_link.scanner') }}" class="btn-cancel" style="margin-top: 0.75rem; text-decoration: none;">Kembali ke Scanner</a>
         
         <p id="actionStatus" style="margin-top: 1rem; margin-bottom: 0; font-weight: 600; display: none;"></p>
     </div>
