@@ -808,8 +808,11 @@
             
             const data = await res.json();
             if (data.success) {
-                statusText.innerText = 'Login berhasil! Mengalihkan...';
+                const statusText = document.getElementById('qrStatus');
+                if (statusText) statusText.innerText = 'Login berhasil! Mengalihkan...';
                 window.location.href = data.redirect_url || '/';
+            } else {
+                alert(data.message || 'Gagal login.');
             }
         } catch (err) {
             console.error(err);
