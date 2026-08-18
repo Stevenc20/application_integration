@@ -755,38 +755,59 @@ function goToIssue(type, planId, jobMasterId, dtId) {
 </div>
 
 {{-- MODAL FORM REQUEST PULL AHEAD --}}
-<div id="pullAheadFormModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 hidden">
-    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform scale-95 transition-all">
-        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
-            <h3 class="text-lg font-bold text-gray-800">Request Pull Ahead</h3>
-            <button onclick="closePullAheadFormModal()" class="text-gray-400 hover:text-gray-600">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+<div id="pullAheadFormModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-gray-900/40 backdrop-blur-sm hidden transition-opacity duration-300">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden transform scale-95 transition-all duration-300">
+        <!-- Header -->
+        <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-white">
+            <div class="flex items-center gap-3">
+                <div class="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"></path></svg>
+                </div>
+                <h3 class="text-xl font-bold text-gray-800 tracking-tight">Request Pull Ahead</h3>
+            </div>
+            <button onclick="closePullAheadFormModal()" class="text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
+        
+        <!-- Body -->
         <div class="p-6">
-            <div class="mb-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                <div class="font-bold text-blue-800" id="reqItemName">-</div>
-                <div class="text-sm text-blue-600 mt-1">Available Qty: <span id="reqAvailableQty" class="font-bold">0</span> PCS</div>
+            <!-- Item Info Card -->
+            <div class="mb-6 bg-gradient-to-br from-blue-50 to-blue-50/20 p-5 rounded-2xl border border-blue-100/50 shadow-inner">
+                <p class="text-xs font-semibold tracking-wider text-blue-500 uppercase mb-1">Item yang akan ditarik</p>
+                <div class="font-black text-2xl text-blue-900 tracking-tight" id="reqItemName">-</div>
+                <div class="flex items-center gap-2 mt-2">
+                    <div class="bg-blue-100 text-blue-700 text-xs font-bold px-2.5 py-1 rounded-md">
+                        Max Qty: <span id="reqAvailableQty" class="text-sm">0</span> PCS
+                    </div>
+                </div>
             </div>
 
             <form id="pullAheadRequestForm" onsubmit="submitPullAheadRequest(event)">
                 <input type="hidden" id="reqPlanId">
                 
-                <div class="mb-4">
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Qty yang ditarik (PCS)</label>
-                    <input type="number" id="reqQty" min="1" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                <div class="mb-5 relative">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Qty yang diminta (PCS)</label>
+                    <div class="relative">
+                        <input type="number" id="reqQty" min="1" class="w-full pl-4 pr-12 py-3 rounded-xl border-gray-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all font-semibold text-gray-800 text-lg" placeholder="Misal: 50" required>
+                        <span class="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 font-medium text-sm">PCS</span>
+                    </div>
                 </div>
 
-                <div class="mb-6">
-                    <label class="block text-sm font-semibold text-gray-700 mb-2">Usulan Posisi (Sisipkan Setelah)</label>
-                    <select id="reqSequenceAfter" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
-                        <option value="">-- Paling Bawah (Default) --</option>
+                <div class="mb-8">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Sisipkan Setelah Job (Opsional)</label>
+                    <select id="reqSequenceAfter" class="w-full px-4 py-3 rounded-xl border-gray-200 shadow-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all text-gray-700 font-medium appearance-none bg-white">
+                        <option value="">-- Letakkan di Antrean Paling Bawah --</option>
                     </select>
                 </div>
 
-                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
-                    <button type="button" onclick="closePullAheadFormModal()" class="text-gray-600 bg-gray-100 hover:bg-gray-200 font-semibold px-4 py-2.5 rounded-xl transition-colors">Batal</button>
-                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/30 transition-all" id="btnSubmitReq">Kirim Request</button>
+                <!-- Footer / Actions -->
+                <div class="flex justify-end gap-3 pt-4 border-t border-gray-100">
+                    <button type="button" onclick="closePullAheadFormModal()" class="text-gray-500 hover:text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 font-semibold px-5 py-2.5 rounded-xl transition-all shadow-sm">Batal</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-lg shadow-blue-600/20 hover:shadow-blue-600/40 transition-all flex items-center gap-2" id="btnSubmitReq">
+                        <span>Kirim Request</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                    </button>
                 </div>
             </form>
         </div>
