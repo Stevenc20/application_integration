@@ -189,9 +189,9 @@
         .detail-header .desc-cell{background:#dbeafe!important}
 
         /* opaque background for sticky left table */
-        .left-kpi-table td{background:#fff!important}
-        .left-kpi-table tr:nth-child(even) td{background:#fafafa!important}
-        .left-kpi-table td.desc-cell{background:#f1f5f9!important}
+        .left-kpi-table td{background:#fff}
+        .left-kpi-table tr:nth-child(even) td{background:#fafafa}
+        .left-kpi-table td.desc-cell{background:#f1f5f9}
 
         /* detail section */
         .det-scroll{overflow-x:auto;overflow-y:auto;max-height:320px;scrollbar-width:thin;scrollbar-color:#e5e7eb #f9fafb}
