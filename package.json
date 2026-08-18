@@ -19,6 +19,9 @@
         "vite": "^7.0.7"
     },
     "dependencies": {
+        "@alpinejs/collapse": "^3.16.2",
+        "alpinejs": "^3.16.2",
+        "fabric": "^7.4.0",
         "sortablejs": "^1.15.7"
     }
 }
