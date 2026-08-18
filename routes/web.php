@@ -1155,3 +1155,24 @@ Route::middleware(['auth'])->group(function() {
         Route::apiResource('defects', DefectMasterController::class);
     });
 });
+
+// ==========================================
+// PULL AHEAD REQUEST ROUTES
+// ==========================================
+Route::middleware(['auth'])->group(function() {
+    Route::post('/pull-ahead/mark-read', [App\Http\Controllers\PullAheadController::class, 'markAsRead'])->name('pull_ahead.mark_read');
+});
+
+// Route Leader/Operational
+Route::middleware(['auth', 'role:supervisor,foreman,leader,manager,kadiv'])->group(function() {
+    Route::get('/operational/next-shift', [App\Http\Controllers\PullAheadController::class, 'nextShiftData'])->name('operational.next_shift');
+    Route::post('/operational/pull-ahead', [App\Http\Controllers\PullAheadController::class, 'submitRequest'])->name('operational.pull_ahead.request');
+});
+
+// Route PPC
+Route::middleware(['auth', 'role:supervisor,ppc,manager,kadiv,direktur'])->group(function() {
+    Route::get('/ppc/pull-ahead', [App\Http\Controllers\PullAheadController::class, 'indexPpc'])->name('ppc.pull_ahead.index');
+    Route::post('/ppc/pull-ahead/{id}/approve', [App\Http\Controllers\PullAheadController::class, 'approve'])->name('ppc.pull_ahead.approve');
+    Route::post('/ppc/pull-ahead/{id}/reject', [App\Http\Controllers\PullAheadController::class, 'reject'])->name('ppc.pull_ahead.reject');
+});
+
