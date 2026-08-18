@@ -533,12 +533,20 @@ function getClasses(desc, k){
     if(!k) return {act:'', curr:'', style:''};
     let act='', curr='', style='';
     if(desc==='GSPH'){
-        const actVal = parseFloat(k.actual);
         const planVal = parseFloat(k.plan);
+        const actVal = parseFloat(k.actual);
         if(!isNaN(actVal) && !isNaN(planVal) && planVal>0){
             const pct = (actVal/planVal)*100;
             act = pct>=100?'bg-green':pct>=80?'bg-yellow':'bg-red';
         } else if(actVal>0) act = 'bg-green';
+        
+        if(k.current && k.current!=='-'){
+            const currVal = parseFloat(k.current);
+            if(!isNaN(currVal) && !isNaN(planVal) && planVal>0){
+                const currPct = (currVal/planVal)*100;
+                curr = currPct>=100?'bg-green':currPct>=80?'bg-yellow':'bg-red';
+            } else if(currVal>0) curr = 'bg-green';
+        }
     }else if(desc==='REPAIR'||desc==='REJECT'){
         const p=parseFloat(k.actualPct||k.actual);
         if(p>5) act='bg-red';
