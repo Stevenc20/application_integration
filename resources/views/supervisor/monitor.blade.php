@@ -627,21 +627,13 @@ function computeFit(root){
 function applyFit(root){
     const scrollEl = document.querySelector('.table-scroll');
     if(!root || !scrollEl) return;
-    const s = computeFit(root);
-    scrollEl.style.overflow = s < 1 ? 'hidden' : '';
-    // Gunakan transform scale jika min-width container memaksa scale down
-    if (s < 1) {
-        root.style.transform = `scale(${s})`;
-        root.style.transformOrigin = 'top left';
-        root.style.width = `${100 / s}%`;
-        root.style.height = `${100 / s}%`;
-        root.style.zoom = '';
-    } else {
-        root.style.transform = '';
-        root.style.width = '100%';
-        root.style.height = '100%';
-        root.style.zoom = '';
-    }
+    
+    // Disable auto-zoom / scaling completely so text stays big and fixed
+    scrollEl.style.overflow = 'hidden';
+    root.style.transform = '';
+    root.style.width = '100%';
+    root.style.height = '100%';
+    root.style.zoom = '';
 }
 
 function stopRotate(){
@@ -1091,8 +1083,8 @@ function renderTable(){
     // Full render + shrink-to-fit; fall back to auto-rotate pages only when rows are too many
     let root = renderCaseB(rightRows, null, true);
     const s = computeFit(root);
-    if (s < MIN_FIT && rightRows.length > 1) {
-        const pageSize = Math.max(1, Math.round((rightRows.length * s) / MIN_FIT));
+    if (s < 0.99 && rightRows.length > 1) {
+        const pageSize = Math.max(1, Math.floor(rightRows.length * s * 0.95)); // 5% safety margin
         detailPages = Math.ceil(rightRows.length / pageSize);
         detailPage = Math.min(detailPage, detailPages - 1);
         const pageRows = rightRows.slice(detailPage * pageSize, (detailPage + 1) * pageSize);
