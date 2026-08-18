@@ -138,7 +138,7 @@
         td.desc-cell{
             background:#f8fafc;font-weight:700;text-align:left;
             padding-left:4px;
-            color:#334155;font-size:9px;
+            color:#334155;font-size:11px;
             position:sticky;left:0;z-index:1;
             overflow:hidden;text-overflow:ellipsis;
             max-width:none; /* sticky cells must NOT use max-width:0 trick */
@@ -529,19 +529,33 @@ function noPlan(line){
     return !k || (parseFloat(k.plan) || 0) <= 0;
 }
 
-function cellClass(desc,actual,actPct){
+function getClasses(desc, k){
+    if(!k) return {act:'', curr:'', style:''};
+    let act='', curr='', style='';
     if(desc==='GSPH'){
-        const p=parseFloat(actPct||actual);
-        if(p===0 || isNaN(p)) return '';
-        return p>=100?'bg-green':p>=80?'bg-yellow':'bg-red';
+        const actVal = parseFloat(k.actual);
+        const planVal = parseFloat(k.plan);
+        if(!isNaN(actVal) && !isNaN(planVal) && planVal>0){
+            const pct = (actVal/planVal)*100;
+            act = pct>=100?'bg-green':pct>=80?'bg-yellow':'bg-red';
+        } else if(actVal>0) act = 'bg-green';
+    }else if(desc==='REPAIR'||desc==='REJECT'){
+        const p=parseFloat(k.actualPct||k.actual);
+        if(p>5) act='bg-red';
+        else if(p>2) act='bg-yellow';
+        
+        if(k.current && k.current!=='-' && k.current!=='0 pcs' && parseFloat(k.current)>0) curr = act?act+'-blink':'';
+    }else if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){
+        const v=parseFloat(k.actual);
+        if(!isNaN(v) && v>0) act='bg-red';
+        
+        if(k.current && k.current!=='-' && k.current!=='0 m' && parseFloat(k.current)>0) curr='bg-red-blink';
     }
-    if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'bg-red-blink':p>2?'bg-yellow-blink':''}
-    if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){
-        const v=parseFloat(actual);
-        if(isNaN(v) || v<=0) return '';
-        return 'bg-red-blink';
-    }
-    return '';
+    
+    if(act==='bg-yellow') style='color:#000!important;';
+    else if(act!=='') style='color:#fff!important;';
+    
+    return {act, curr, style};
 }
 
 function dtCell(v,st){ return `<td style="${st||''}">${v}</td>`; }
@@ -670,10 +684,10 @@ function renderAllLines(){
             </table>
         `;
         const thead=document.getElementById('monitorThead');
-        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis">DESC</th>';
+        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:12px;text-align:left;padding-left:4px;">DESC</th>';
         LINES.forEach((l,li)=>{hh+=`<th colspan="3" class="line-header">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`});
         hh+='</tr><tr>';
-        LINES.forEach(()=>{hh+='<th>PLAN</th><th>CURR</th><th>ACTUAL</th>'});
+        LINES.forEach(()=>{hh+='<th style="font-size:11px;">PLAN</th><th style="font-size:11px;">CURR</th><th style="font-size:11px;">ACTUAL</th>'});
         hh+='</tr>';
         hh+='<tr id="planNoticeRow" style="display:none">';
         LINES.forEach((l,li)=>{
@@ -749,20 +763,14 @@ function updateAllCells(){
                 if(k){
                     setText(getCell('plan'),k.plan||'-');
                     setText(getCell('curr'),k.current||'-');
-                    const cls=cellClass(desc,k.actual,k.actualPct);
+                    const cl = getClasses(desc, k);
                     const pct=k.actualPct?` ${k.actualPct}`:'';
                     const ac=getCell('actual');
+                    const cu=getCell('curr');
                     setText(ac,(k.actual||'-')+pct);
-                    const cellKey=`${desc}-${li}`;
-                    const prevCls=prevCellClasses[cellKey]||'';
-                    if(prevCls && prevCls.includes('blink') && !cls.includes('blink')){
-                        ac.className='val-actual bg-green-blink';
-                        setTimeout(()=>{const c=document.getElementById(`cell-${desc}-${li}-actual`);if(c)c.className='val-actual';},1800);
-                    }else{
-                        ac.className='val-actual'+(cls?' '+cls:'');
-                    }
-                    if(cls) prevCellClasses[cellKey]=cls;
-                    else delete prevCellClasses[cellKey];
+                    cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
+                    ac.className = 'val-actual'+(cl.act?' '+cl.act:'');
+                    if (cl.style) ac.style.cssText = cl.style;
                 }else{
                     setText(getCell('plan'),'-');
                     setText(getCell('curr'),'-');
@@ -857,10 +865,10 @@ function renderTable(){
                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px;">PRESS ${line}</th>
             </tr>
             <tr>
-                <th style="width:25%">DESC</th>
-                <th style="width:25%">PLAN</th>
-                <th style="width:25%">CURR</th>
-                <th style="width:25%">ACTUAL</th>
+                <th style="width:25%;font-size:12px;text-align:left;padding-left:4px;">DESC</th>
+                <th style="width:25%;font-size:12px;">PLAN</th>
+                <th style="width:25%;font-size:12px;">CURR</th>
+                <th style="width:25%;font-size:12px;">ACTUAL</th>
             </tr>
         `;
 
@@ -885,11 +893,11 @@ function renderTable(){
             } else {
                 const k = kv(lineKey, desc);
                 if (k) {
-                    const cls = cellClass(desc, k.actual, k.actualPct);
+                    const cl = getClasses(desc, k);
                     const pct = k.actualPct ? ` ${k.actualPct}` : '';
                     b += `<td class="val-plan">${k.plan||'-'}</td>`;
-                    b += `<td class="val-curr">${k.current||'-'}</td>`;
-                    b += `<td class="val-actual ${cls}">${k.actual||'-'}${pct}</td>`;
+                    b += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
+                    b += `<td class="val-actual ${cl.act}" style="${cl.style}">${k.actual||'-'}${pct}</td>`;
                 } else {
                     b += `<td>-</td><td>-</td><td>-</td>`;
                 }
@@ -970,20 +978,11 @@ function renderTable(){
         } else {
             const k = kv(lineKey, desc);
             if (k) {
-                const cls = cellClass(desc, k.actual, k.actualPct);
+                const cl = getClasses(desc, k);
                 const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
                 leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
-                leftBodyHtml += `<td class="val-curr">${k.current||'-'}</td>`;
-                let actualTd = `<td class="val-actual ${cls}" style="border-right:none;">${k.actual||'-'}${pctVal}</td>`;
-                if (desc === 'GSPH') {
-                    const p = parseFloat(k.actualPct || k.actual);
-                    if (p > 0 && !isNaN(p)) {
-                        const c = p >= 100 ? '#22c55e' : p >= 80 ? '#eab308' : '#ef4444';
-                        const tc = p >= 80 && p < 100 ? '#000' : '#fff';
-                        actualTd = `<td style="background-color:${c}!important; color:${tc}!important; font-weight:900; border-right:none;">${k.actual||'-'}${pctVal}</td>`;
-                    }
-                }
-                leftBodyHtml += actualTd;
+                leftBodyHtml += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
+                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style}">${k.actual||'-'}${pctVal}</td>`;
             } else {
                 leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
@@ -1021,10 +1020,10 @@ function renderTable(){
                                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:28%">DESC</th>
-                                <th style="width:24%">PLAN</th>
-                                <th style="width:24%">CURR</th>
-                                <th style="width:24%; border-right:none;">ACTUAL</th>
+                                <th style="width:28%;font-size:12px;text-align:left;padding-left:4px;">DESC</th>
+                                <th style="width:24%;font-size:12px;">PLAN</th>
+                                <th style="width:24%;font-size:12px;">CURR</th>
+                                <th style="width:24%; border-right:none;font-size:12px;">ACTUAL</th>
                             </tr>
                         </thead>
                         <tbody>
