@@ -82,6 +82,14 @@ class DeviceLinkController extends Controller
     }
 
     /**
+     * GET: Show the scanner interface to the authenticated HP user.
+     */
+    public function scanner()
+    {
+        return view('auth.device-link-scanner');
+    }
+
+    /**
      * GET: Show the confirmation page for the authenticated HP user.
      */
     public function showScanPage(Request $request)

@@ -330,6 +330,7 @@ Route::get('/auth/device-link/{tokenHash}/status', [\App\Http\Controllers\Auth\D
 Route::post('/auth/device-link/{tokenHash}/consume', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'consume'])->name('device_link.consume');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/auth/device-link/scanner', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'scanner'])->name('device_link.scanner');
     Route::get('/auth/device-link/scan', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'showScanPage'])->name('device_link.scan_page');
     Route::post('/auth/device-link/{tokenHash}/approve', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'approve'])->name('device_link.approve');
     Route::post('/auth/device-link/{tokenHash}/cancel', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'cancel'])->name('device_link.cancel');
