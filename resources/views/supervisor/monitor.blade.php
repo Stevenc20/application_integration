@@ -458,7 +458,7 @@ function setShift(s, fromButton) {
     if (s !== prev) showShiftToast(s);
 }
 
-const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
+const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
 
 function pad(n){ return String(n).padStart(2,'0') }
 
@@ -831,7 +831,7 @@ function renderTable(){
     const actVal = qtyKpi ? parseFloat(qtyKpi.actual) : 0;
     const pct = planVal > 0 ? ((actVal / planVal) * 100).toFixed(2) : '0.00';
 
-    const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
+    const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
     const rightRows = LINE_DETAIL[lineKey] || [];
 
     // CASE A: No detail jobs scheduled -> Make KPI table take 100% full width to prevent empty columns on the right
