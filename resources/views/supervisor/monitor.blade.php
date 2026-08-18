@@ -421,7 +421,7 @@ let selectedLine = null;
 const _initTime = new Date();
 const _h = _initTime.getHours();
 const _m = _initTime.getMinutes();
-const _isShift2 = (_h >= 20 || (_h === 19 && _m >= 30) || _h < 7 || (_h === 7 && _m < 30));
+const _isShift2 = (_h >= 21 || _h < 7 || (_h === 7 && _m < 30));
 let selectedShift = _isShift2 ? 2 : 1;
 let prevCellClasses = {};
 let lastManualShiftAt = 0;
@@ -429,7 +429,7 @@ let shiftToastTimer = null;
 
 function currentShiftFromClock(){
     const n = new Date(), h = n.getHours(), m = n.getMinutes();
-    return (h >= 20 || (h === 19 && m >= 30) || h < 7 || (h === 7 && m < 30)) ? 2 : 1;
+    return (h >= 21 || h < 7 || (h === 7 && m < 30)) ? 2 : 1;
 }
 
 function showShiftToast(s) {
@@ -681,11 +681,6 @@ function renderAllLines(){
         hh+='</tr><tr>';
         LINES.forEach(()=>{hh+='<th style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th style="font-size:16px;">ACTUAL</th>'});
         hh+='</tr>';
-        hh+='<tr id="planNoticeRow" style="display:none">';
-        LINES.forEach((l,li)=>{
-            hh+=`<td colspan="3" id="planNotice-${li}" class="plan-notice">⚠️ BELUM ADA PLANNING — jadwal belum diupload PPC</td>`;
-        });
-        hh+='</tr>';
         thead.innerHTML=hh;
 
         const tbody=document.getElementById('monitorTbody');
@@ -787,17 +782,11 @@ function updateAllCells(){
         }
     });
     // NO PLAN badge + notice
-    let anyNoPlan=false;
     LINES.forEach((line,li)=>{
         const np=noPlan(line);
-        if(np) anyNoPlan=true;
         const badge=document.getElementById(`planBadge-${li}`);
         if(badge) badge.style.display=np?'inline-block':'none';
-        const notice=document.getElementById(`planNotice-${li}`);
-        if(notice) notice.style.display=np?'':'none';
     });
-    const nr=document.getElementById('planNoticeRow');
-    if(nr) nr.style.display=anyNoPlan?'':'none';
 }
 
 function setText(el,v){
@@ -913,15 +902,6 @@ function renderTable(){
                 <td colspan="3" class="${statusClass}" style="text-align:left; padding-left: 20px; font-weight:900;">${statusVal}</td>
             </tr>
         `;
-
-        // NO PLAN NOTICE
-        if (noPlan(lineKey)) {
-            b += `
-                <tr>
-                    <td colspan="4" class="plan-notice alert" style="text-align:left; padding:8px 14px;">⚠️ BELUM ADA PLANNING — jadwal produksi belum diupload PPC, kolom detail job tidak ditampilkan</td>
-                </tr>
-            `;
-        }
 
         // PROGRESS PRODUKSI
         const progressPct = parseFloat(pct);
