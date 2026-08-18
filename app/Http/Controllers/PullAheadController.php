@@ -53,11 +53,22 @@ class PullAheadController extends Controller
     {
         $line = $request->get('line', 'Line A');
         $currentShift = $request->get('shift', 'Shift Pagi');
-        // Asumsi Shift 2 selalu "Shift Malam" jika shift 1 "Shift Pagi"
-        $nextShift = ($currentShift === 'Shift Pagi') ? 'Shift Malam' : 'Shift Pagi';
         $date = $request->get('date', now()->toDateString());
 
+        // Penentuan cerdas Shift Berikutnya (mengabaikan suffix seperti 'A', 'B', dsb)
+        if (stripos($currentShift, 'Pagi') !== false || stripos($currentShift, 'Shift 1') !== false) {
+            $nextShiftPrefix = 'Shift Malam';
+        } else {
+            $nextShiftPrefix = 'Shift Pagi';
+        }
+
         $lineId = \App\Models\LineMaster::where('line_name', $line)->value('id');
+
+        // Cari nama shift sebenarnya di DB (krn kadang ada suffix e.g. "Shift Malam B")
+        $nextShift = ProductionPlan::where('line_master_id', $lineId)
+            ->where('plan_date', $date)
+            ->where('shift_name', 'like', $nextShiftPrefix . '%')
+            ->value('shift_name') ?: $nextShiftPrefix;
 
         // Ambil plan shift berikutnya
         $nextShiftPlans = ProductionPlan::where('line_master_id', $lineId)
