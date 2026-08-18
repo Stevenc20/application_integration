@@ -281,6 +281,17 @@
         body.dark .det-repair{color:#fbbf24}
         body.dark .det-reject{color:#f87171}
         body.dark .det-tpt{color:#60a5fa}
+        
+        .card-bg{background:#fff}
+        body.dark .card-bg{background:#0f172a}
+        .border-divider{border-color:#e2e8f0}
+        body.dark .border-divider{border-color:#334155}
+        .progress-pct{color:#1e293b}
+        body.dark .progress-pct{color:#f8fafc}
+
+        body.dark .left-kpi-table td{background:#0f172a}
+        body.dark .left-kpi-table tr:nth-child(even) td{background:#1e293b}
+        body.dark .left-kpi-table td.desc-cell{background:#1e293b}
 
         /* ── SMALL MOBILE (<480px) ── */
         @media(max-width:480px){
@@ -1005,13 +1016,13 @@ function renderTable(){
         const barColor = progressPct >= 100 ? '#22c55e' : progressPct >= 80 ? '#eab308' : '#ef4444';
         b += `
             <tr class="progress-row">
-                <td colspan="4" style="background:#fff; padding:8px 12px; text-align:left; border-top:2px solid #e2e8f0;">
+                <td colspan="4" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:2px; border-top-style:solid;">
                     <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
                     <div style="display:flex; align-items:center; gap:8px; width:100%;">
                         <div style="flex:1; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                             <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
                         </div>
-                        <div style="font-size:12px; font-weight:900; color:#1e293b; min-width:50px; text-align:right;">${pct}%</div>
+                        <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; text-align:right;">${pct}%</div>
                     </div>
                 </td>
             </tr>
@@ -1082,7 +1093,7 @@ function renderTable(){
         <div style="display:flex; flex-direction:column; width:100%; min-height:100%; min-width:1366px;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
-                <div style="width:24%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; background:#fff; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
+                <div class="card-bg" style="width:24%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
                     <table class="large-table left-kpi-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
                             <tr class="single-top-header">
@@ -1112,14 +1123,14 @@ function renderTable(){
                                 <th style="width:13%">JOB NO</th>
                                 <th style="width:16%">PROCESS</th>
                                 <th style="width:8%">PLAN QTY</th>
-                                <th style="width:8%;color:#16a34a">GOOD</th>
-                                <th style="width:6%;color:#d97706">REP</th>
-                                <th style="width:6%;color:#dc2626">REJ</th>
+                                <th class="det-good" style="width:8%;">GOOD</th>
+                                <th class="det-repair" style="width:6%;">REP</th>
+                                <th class="det-reject" style="width:6%;">REJ</th>
                                 <th style="width:8%">PRESS TIME</th>
                                 <th style="width:8%">DANDORI</th>
                                 <th style="width:8%">10 CHECK</th>
                                 <th style="width:8%">DOWNTIME</th>
-                                <th style="width:6%;color:#2563eb">TPT</th>
+                                <th class="det-tpt" style="width:6%;">TPT</th>
                                 <th style="width:7%">PLAN FIN</th>
                                 <th style="width:7%">ACT FIN</th>
                             </tr>
@@ -1131,7 +1142,7 @@ function renderTable(){
                 </div>
             </div>
             <!-- Shared Footer Status & Progress -->
-            <div style="width:100%; background:#fff; border-top:2px solid #e2e8f0; margin-top:8px; position:sticky; left:0; z-index:11;">
+            <div class="card-bg border-divider" style="width:100%; border-top-width:2px; border-top-style:solid; margin-top:8px; position:sticky; left:0; z-index:11;">
                 <table class="large-table" style="width:100%; border-collapse:collapse; table-layout:fixed;">
                     <tbody>
                         <tr>
@@ -1139,13 +1150,13 @@ function renderTable(){
                             <td class="${statusClass}" style="text-align:left; padding-left:20px; font-weight:900; border-bottom:none;">${statusVal}</td>
                         </tr>
                         <tr class="progress-row">
-                            <td colspan="2" style="background:#fff; padding:8px 12px; text-align:left; border-top:1px solid #e2e8f0; border-bottom:none;">
+                            <td colspan="2" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:1px; border-top-style:solid; border-bottom:none;">
                                 <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
                                 <div style="display:flex; align-items:center; gap:8px; width:100%;">
                                     <div style="flex:1; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                                         <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
                                     </div>
-                                    <div style="font-size:12px; font-weight:900; color:#1e293b; min-width:50px; text-align:right;">${pct}%</div>
+                                    <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; text-align:right;">${pct}%</div>
                                 </div>
                             </td>
                         </tr>
