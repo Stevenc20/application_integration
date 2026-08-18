@@ -565,7 +565,7 @@ function chkP(c, lbl){
 }
 
 // ── Fit-to-screen + auto-rotate helpers ──
-const MIN_FIT = 0.85;
+const MIN_FIT = 0.6;
 const ROTATE_MS = 10000;
 let detailPage = 0;
 let detailPages = 1;
@@ -684,10 +684,10 @@ function renderAllLines(){
             </table>
         `;
         const thead=document.getElementById('monitorThead');
-        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:12px;text-align:left;padding-left:4px;">DESC</th>';
+        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:16px;text-align:left;padding-left:4px;">DESC</th>';
         LINES.forEach((l,li)=>{hh+=`<th colspan="3" class="line-header">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`});
         hh+='</tr><tr>';
-        LINES.forEach(()=>{hh+='<th style="font-size:11px;">PLAN</th><th style="font-size:11px;">CURR</th><th style="font-size:11px;">ACTUAL</th>'});
+        LINES.forEach(()=>{hh+='<th style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th style="font-size:16px;">ACTUAL</th>'});
         hh+='</tr>';
         hh+='<tr id="planNoticeRow" style="display:none">';
         LINES.forEach((l,li)=>{
@@ -865,10 +865,10 @@ function renderTable(){
                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px;">PRESS ${line}</th>
             </tr>
             <tr>
-                <th style="width:25%;font-size:14px;text-align:left;padding-left:6px;">DESC</th>
-                <th style="width:25%;font-size:14px;">PLAN</th>
-                <th style="width:25%;font-size:14px;">CURR</th>
-                <th style="width:25%;font-size:14px;">ACTUAL</th>
+                <th style="width:25%;font-size:18px;text-align:left;padding-left:6px;">DESC</th>
+                <th style="width:25%;font-size:18px;">PLAN</th>
+                <th style="width:25%;font-size:18px;">CURR</th>
+                <th style="width:25%;font-size:18px;">ACTUAL</th>
             </tr>
         `;
 
@@ -1020,10 +1020,10 @@ function renderTable(){
                                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:28%;font-size:14px;text-align:left;padding-left:6px;">DESC</th>
-                                <th style="width:24%;font-size:14px;">PLAN</th>
-                                <th style="width:24%;font-size:14px;">CURR</th>
-                                <th style="width:24%; border-right:none;font-size:14px;">ACTUAL</th>
+                                <th style="width:28%;font-size:18px;text-align:left;padding-left:6px;">DESC</th>
+                                <th style="width:24%;font-size:18px;">PLAN</th>
+                                <th style="width:24%;font-size:18px;">CURR</th>
+                                <th style="width:24%; border-right:none;font-size:18px;">ACTUAL</th>
                             </tr>
                         </thead>
                         <tbody>
