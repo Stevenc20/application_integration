@@ -842,9 +842,9 @@ class InputHarianController extends Controller
     {
         $time = now()->format('H:i');
 
-        // Shift Pagi: 07:30 - 19:29
-        // Shift Malam: 19:30 - 07:29
-        if ($time >= '07:30' && $time < '19:30') {
+        // Shift Pagi: 07:30 - 20:59
+        // Shift Malam: 21:00 - 07:29
+        if ($time >= '07:30' && $time < '21:00') {
             return 'Shift Pagi';
         }
 
