@@ -808,7 +808,7 @@
             
             const data = await res.json();
             if (data.success) {
-                window.location.href = '{{ route('monitoring.dashboard') }}';
+                window.location.reload();
             }
         } catch (err) {
             console.error(err);
