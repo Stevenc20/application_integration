@@ -924,23 +924,23 @@ function goToIssue(type, planId, jobMasterId, dtId) {
         })
         .then(res => res.json())
         .then(data => {
-            btn.innerText = 'Kirim Request';
+            btn.innerHTML = '<span>Kirim Request</span><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
             btn.disabled = false;
             
             if(data.success) {
-                alert(data.message);
+                showToast(data.message, 'success');
                 closePullAheadFormModal();
                 // Refresh modal content to update available qty
                 document.getElementById('nextShiftContainer').innerHTML = '<div class="flex items-center justify-center h-40"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>';
                 openPullAheadModal(); 
             } else {
-                alert(data.message);
+                showToast(data.message, 'error');
             }
         })
         .catch(err => {
-            btn.innerText = 'Kirim Request';
+            btn.innerHTML = '<span>Kirim Request</span><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>';
             btn.disabled = false;
-            alert('Terjadi kesalahan sistem.');
+            showToast('Terjadi kesalahan sistem.', 'error');
         });
     }
 </script>
