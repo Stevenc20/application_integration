@@ -137,8 +137,8 @@
         }
         td.desc-cell{
             background:#f8fafc;font-weight:700;text-align:left;
-            padding-left:4px;
-            color:#334155;font-size:11px;
+            padding-left:6px;
+            color:#334155;font-size:12px;
             position:sticky;left:0;z-index:1;
             overflow:hidden;text-overflow:ellipsis;
             max-width:none; /* sticky cells must NOT use max-width:0 trick */
@@ -560,6 +560,9 @@ function getClasses(desc, k){
 
 function dtCell(v,st){ return `<td style="${st||''}">${v}</td>`; }
 function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700">-</span>'; }
+function chkP(c, lbl){
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span style="font-size:8px;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700;line-height:1">-</span>') + `</div>`;
+}
 
 // ── Fit-to-screen + auto-rotate helpers ──
 const MIN_FIT = 0.85;
@@ -584,10 +587,7 @@ function buildRightBody(rows, maxRows){
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
                 ${dtCell(j.job_number, 'text-align:left;font-weight:600;color:#1e293b')}
-                ${dtCell(chk(j.p1))}
-                ${dtCell(chk(j.p2))}
-                ${dtCell(chk(j.p3))}
-                ${dtCell(chk(j.p4))}
+                ${dtCell(`<div style="display:flex;gap:4px;justify-content:center;align-items:center;">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`)}
                 ${dtCell(j.plan_qty, 'color:#374151')}
                 ${dtCell(j.good, 'color:#16a34a;font-weight:600')}
                 ${dtCell(j.repair, 'color:#d97706;font-weight:600')}
@@ -865,10 +865,10 @@ function renderTable(){
                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px;">PRESS ${line}</th>
             </tr>
             <tr>
-                <th style="width:25%;font-size:12px;text-align:left;padding-left:4px;">DESC</th>
-                <th style="width:25%;font-size:12px;">PLAN</th>
-                <th style="width:25%;font-size:12px;">CURR</th>
-                <th style="width:25%;font-size:12px;">ACTUAL</th>
+                <th style="width:25%;font-size:14px;text-align:left;padding-left:6px;">DESC</th>
+                <th style="width:25%;font-size:14px;">PLAN</th>
+                <th style="width:25%;font-size:14px;">CURR</th>
+                <th style="width:25%;font-size:14px;">ACTUAL</th>
             </tr>
         `;
 
@@ -1020,10 +1020,10 @@ function renderTable(){
                                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:28%;font-size:12px;text-align:left;padding-left:4px;">DESC</th>
-                                <th style="width:24%;font-size:12px;">PLAN</th>
-                                <th style="width:24%;font-size:12px;">CURR</th>
-                                <th style="width:24%; border-right:none;font-size:12px;">ACTUAL</th>
+                                <th style="width:28%;font-size:14px;text-align:left;padding-left:6px;">DESC</th>
+                                <th style="width:24%;font-size:14px;">PLAN</th>
+                                <th style="width:24%;font-size:14px;">CURR</th>
+                                <th style="width:24%; border-right:none;font-size:14px;">ACTUAL</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1041,10 +1041,7 @@ function renderTable(){
                             <tr style="height:25px;">
                                 <th style="width:4%; border-left:none;">NO</th>
                                 <th style="width:13%">JOB NO</th>
-                                <th style="width:4%">P1</th>
-                                <th style="width:4%">P2</th>
-                                <th style="width:4%">P3</th>
-                                <th style="width:4%">P4</th>
+                                <th style="width:16%">PROCESS</th>
                                 <th style="width:8%">PLAN QTY</th>
                                 <th style="width:8%;color:#16a34a">GOOD</th>
                                 <th style="width:6%;color:#d97706">REP</th>
