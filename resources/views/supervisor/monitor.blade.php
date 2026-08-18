@@ -617,10 +617,10 @@ function applyFit(root){
     scrollEl.style.overflow = s < 1 ? 'hidden' : '';
     // Gunakan transform scale jika min-width container memaksa scale down
     if (s < 1) {
-        root.style.transform = \`scale(\${s})\`;
+        root.style.transform = `scale(${s})`;
         root.style.transformOrigin = 'top left';
-        root.style.width = \`\${100 / s}%\`;
-        root.style.height = \`\${100 / s}%\`;
+        root.style.width = `${100 / s}%`;
+        root.style.height = `${100 / s}%`;
         root.style.zoom = '';
     } else {
         root.style.transform = '';
