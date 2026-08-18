@@ -72,7 +72,7 @@
                 $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
             }
 
-            $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time';
+            $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time' && strtoupper(trim($activeDowntime->pic ?? '')) === 'AUTO BREAK';
         @endphp
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10 items-stretch">

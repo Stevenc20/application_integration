@@ -2147,17 +2147,18 @@ async function startQuickDowntime(jobId, btnType, dtType) {
             })
         }).then(r => r.json());
 
-        if (res.success) {
-            const startTime = new Date();
-            runningDowntimes[`${jobId}_${btnType}`] = { id: res.downtime.id, start: startTime, jobId: jobId, btnType: btnType, dtType: dtType };
-            window.ProductionConfig.currentDowntimeCount = Object.keys(runningDowntimes).length;
-            showToast(`${btnType.toUpperCase()} started`, 'danger');
-            updateTimeline();
-            updateLostTimeDisplay(jobId);
-            notifyLineStatusChange(jobMasterData[jobId]?.line);
+            if (res.success) {
+                const startTime = new Date();
+                runningDowntimes[`${jobId}_${btnType}`] = { id: res.downtime.id, start: startTime, jobId: jobId, btnType: btnType, dtType: dtType };
+                window.ProductionConfig.currentDowntimeCount = Object.keys(runningDowntimes).length;
+                showToast(`${btnType.toUpperCase()} started`, 'danger');
+                updateTimeline();
+                updateLostTimeDisplay(jobId);
+                notifyLineStatusChange(jobMasterData[jobId]?.line);
+                resetDowntimeButtons(jobId);
 
-            // ——— BREAK PAUSE ——— Pause the runtime timer and call server pause
-            if (btnType === 'break' && jobMasterData[jobId] && !jobMasterData[jobId]._breakPaused) {
+                // ——— BREAK PAUSE ——— Pause the runtime timer and call server pause
+                if (btnType === 'break' && jobMasterData[jobId] && !jobMasterData[jobId]._breakPaused) {
                 const job = jobMasterData[jobId];
                 let jS = job.started_at ? new Date(job.started_at) : null;
                 const firstDandori = job.dandori_start ? new Date(job.dandori_start) : null;
@@ -2185,7 +2186,6 @@ async function startQuickDowntime(jobId, btnType, dtType) {
                         auto: false
                     }));
                 } catch (e) {}
-                _updateBreakUI(jobId, 'BREAK', true);
             }
         }
     });
@@ -2256,15 +2256,21 @@ async function finishQuickDowntime(jobId, btnType, dtId) {
 
 function resetDowntimeButtons(jobId) {
     const configs = [
-        { id: 'downtime', label: 'Downtime', bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', hover: 'hover:bg-red-500' },
-        { id: 'tryout', label: 'Try Out', bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', hover: 'hover:bg-orange-500' },
-        { id: 'break', label: 'Break', bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', hover: 'hover:bg-slate-500' }
+        { id: 'downtime', label: 'Downtime', bg: 'bg-red-500/10', border: 'border-red-500/30', text: 'text-red-400', hover: 'hover:bg-red-500', activeBg: 'bg-red-500' },
+        { id: 'tryout', label: 'Try Out', bg: 'bg-orange-500/10', border: 'border-orange-500/30', text: 'text-orange-400', hover: 'hover:bg-orange-500', activeBg: 'bg-orange-500' },
+        { id: 'break', label: 'Break', bg: 'bg-slate-500/10', border: 'border-slate-500/30', text: 'text-slate-400', hover: 'hover:bg-slate-500', activeBg: 'bg-slate-500' }
     ];
     configs.forEach(c => {
         const btn = document.getElementById(`${c.id}-btn-${jobId}`);
         if (btn) {
-            btn.innerHTML = c.label;
-            btn.className = `w-full py-2.5 rounded-xl ${c.bg} border ${c.border} ${c.text} text-xs font-black uppercase flex items-center justify-center gap-1.5 ${c.hover} hover:text-white transition-all active:translate-y-0.5 cursor-pointer`;
+            const isRunning = window.runningDowntimes && window.runningDowntimes[`${jobId}_${c.id}`];
+            if (isRunning) {
+                btn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 mr-1.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg> STOP ${c.id.toUpperCase()}`;
+                btn.className = `w-full py-2.5 rounded-xl ${c.activeBg} text-white font-black text-xs uppercase flex items-center justify-center transition-all cursor-pointer shadow-lg active:scale-95`;
+            } else {
+                btn.innerHTML = c.label;
+                btn.className = `w-full py-2.5 rounded-xl ${c.bg} border ${c.border} ${c.text} text-xs font-black uppercase flex items-center justify-center gap-1.5 ${c.hover} hover:text-white transition-all active:translate-y-0.5 cursor-pointer`;
+            }
         }
     });
 }
@@ -3349,6 +3355,7 @@ function initProductionEngine() {
                     dtType: entry.type
                 };
             }
+            if (window.resetDowntimeButtons) window.resetDowntimeButtons(aid);
         })();
 
         _restoreJobStateFromStorage();
