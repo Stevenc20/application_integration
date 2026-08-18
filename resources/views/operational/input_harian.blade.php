@@ -14,13 +14,26 @@
     .dandori-hazard {
         background-color: #f59e0b; 
     }
-
+    /* ── Shift change toast ── */
+    .shift-toast{
+        position:fixed;top:76px;left:50%;transform:translateX(-50%);
+        z-index:9999;display:flex;align-items:center;gap:10px;
+        padding:10px 22px;border-radius:10px;
+        background:#1e40af;color:#fff;font-size:14px;font-weight:900;
+        letter-spacing:0.05em;box-shadow:0 10px 30px rgba(0,0,0,0.25);
+        opacity:0;pointer-events:none;
+        transition:opacity .25s ease, transform .25s ease;
+    }
+    .shift-toast.show{opacity:1;transform:translateX(-50%)}
+    .shift-toast svg{width:20px;height:20px;flex-shrink:0;animation:pulse-dot 1.2s ease-in-out infinite}
+    .shift-toast.night{background:#6d28d9}
+    @keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:0.3}}
 </style>
 <div class="space-y-6">
 
     @php
         $now = now();
-        $isShiftPagi = $now->format('H:i') >= '07:30' && $now->format('H:i') < '19:30';
+        $isShiftPagi = $now->format('H:i') >= '07:30' && $now->format('H:i') < '21:00';
         $shiftLabel = $isShiftPagi ? 'Shift Pagi (Shift 1)' : 'Shift Malam (Shift 2)';
         $shiftColor = $isShiftPagi ? 'bg-blue-50 text-blue-800 border-blue-200' : 'bg-indigo-50 text-indigo-800 border-indigo-200';
     @endphp
@@ -711,15 +724,45 @@ function goToIssue(type, planId, jobMasterId, dtId) {
 }
 
     const _pageDate = '{{ $date }}';
+    const _initShift = {{ $isShiftPagi ? 1 : 2 }};
+    let _shifting = false;
+    
+    function currentShiftFromClock(){
+        const n = new Date(), h = n.getHours(), m = n.getMinutes();
+        return (h >= 21 || h < 7 || (h === 7 && m < 30)) ? 2 : 1;
+    }
+
     setInterval(function () {
+        if (_shifting) return;
+        
         const now = new Date();
-        const today = now.getFullYear() + '-' +
-            String(now.getMonth() + 1).padStart(2, '0') + '-' +
-            String(now.getDate()).padStart(2, '0');
-        if (today !== _pageDate) {
-            window.location.reload();
+        const currentShift = currentShiftFromClock();
+        
+        // Calculate logical date (if Shift 2 and before 07:30, it belongs to previous day)
+        let logicalDate = new Date(now);
+        if (now.getHours() < 7 || (now.getHours() === 7 && now.getMinutes() < 30)) {
+            logicalDate.setDate(logicalDate.getDate() - 1);
         }
-    }, 30000);
+        const logicalToday = logicalDate.getFullYear() + '-' +
+            String(logicalDate.getMonth() + 1).padStart(2, '0') + '-' +
+            String(logicalDate.getDate()).padStart(2, '0');
+            
+        // Check if shift changed OR logical date changed
+        if (currentShift !== _initShift || logicalToday !== _pageDate) {
+            _shifting = true;
+            
+            // Show toast
+            const el = document.getElementById('shiftToast');
+            const msg = document.getElementById('shiftToastMsg');
+            if (el && msg) {
+                msg.textContent = currentShift === 1 ? '⏰ SHIFT BERUBAH → SHIFT PAGI' : '⏰ SHIFT BERUBAH → SHIFT MALAM';
+                el.classList.toggle('night', currentShift === 2);
+                el.classList.add('show');
+            }
+            
+            setTimeout(() => { window.location.reload(); }, 5000);
+        }
+    }, 10000);
 </script>
 
 @php
@@ -812,6 +855,11 @@ function goToIssue(type, planId, jobMasterId, dtId) {
             </form>
         </div>
     </div>
+</div>
+
+<div id="shiftToast" class="shift-toast" role="alert">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <span id="shiftToastMsg"></span>
 </div>
 
 <script>
