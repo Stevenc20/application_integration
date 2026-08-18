@@ -168,14 +168,29 @@ class ProductionService
                 ]);
             }
 
-            // 3. After dandori, job starts production
-            JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
-            $this->syncPlanStatus($jobId, 'running');
+            // 3. After dandori, job starts production IF no other active downtime
+            $otherActiveDowntime = Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', '!=', 'dandori')
+                ->whereNull('finish_time')
+                ->exists();
 
-            $session = ProductionSession::firstOrCreate(
-                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
-            );
-            $session->update(['start_time' => $now, 'status' => 'running']);
+            if (!$otherActiveDowntime) {
+                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
+                $this->syncPlanStatus($jobId, 'running');
+
+                $session = ProductionSession::firstOrCreate(
+                    ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
+                );
+                $session->update(['start_time' => $now, 'status' => 'running']);
+            } else {
+                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'paused']);
+                $this->syncPlanStatus($jobId, 'paused');
+
+                $session = ProductionSession::firstOrCreate(
+                    ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
+                );
+                $session->update(['start_time' => clone $now, 'status' => 'paused', 'pause_time' => clone $now]);
+            }
 
             $this->signalDashboard($jobId);
 

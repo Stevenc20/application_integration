@@ -21,6 +21,12 @@ class AutoBreakTime extends Command
     {
         $now = Carbon::now();
         $today = $now->toDateString();
+        $logicalNow = clone $now;
+        if ($now->hour < 7 || ($now->hour == 7 && $now->minute < 30)) {
+            $logicalNow->subDay();
+        }
+        $workDate = $logicalNow->toDateString();
+
         $currentHour = (int) $now->format('H');
         $currentDayIndo = MasterBreakTime::getIndonesianDayName($now);
         $currentDayEn = strtolower($now->format('l'));
@@ -41,18 +47,9 @@ class AutoBreakTime extends Command
             return 0;
         }
 
-        $runningJobs = JobMaster::where(function ($q) {
-                $q->where('status', 'running')
-                  ->orWhere(function ($q2) {
-                      $q2->where('status', 'paused')
-                         ->whereHas('downtimes', function ($q3) {
-                             $q3->whereNull('finish_time')
-                                ->where('jenis_downtime', 'break time');
-                         });
-                  });
-            })
-            ->whereHas('productionSessions', function ($q) use ($today) {
-                $q->where('work_date', $today)
+        $runningJobs = JobMaster::whereIn('status', ['running', 'paused'])
+            ->whereHas('productionSessions', function ($q) use ($workDate) {
+                $q->where('work_date', $workDate)
                   ->whereIn('status', ['running', 'paused']);
             })
             ->get();
@@ -93,14 +90,16 @@ class AutoBreakTime extends Command
                 ]);
 
                 $session = ProductionSession::where('job_master_id', $job->id)
-                    ->whereDate('work_date', $today)
+                    ->whereDate('work_date', $workDate)
                     ->where('status', 'running')
                     ->first();
                 if ($session) {
                     $session->update(['status' => 'paused', 'pause_time' => $now]);
                 }
 
-                JobMaster::where('id', $job->id)->update(['status' => 'paused']);
+                if ($job->status === 'running') {
+                    JobMaster::where('id', $job->id)->update(['status' => 'paused']);
+                }
 
                 $this->log('AUTO BREAK START', $job->job_number, $matchedBreak->label, $now->format('H:i:s'));
                 $breakCount++;
@@ -120,19 +119,25 @@ class AutoBreakTime extends Command
                     ->sum('duration_seconds');
 
                 DailyProduction::updateOrCreate(
-                    ['job_master_id' => $job->id, 'work_date' => $today],
+                    ['job_master_id' => $job->id, 'work_date' => $workDate],
                     ['downtime_seconds' => $totalDowntime]
                 );
 
-                $session = ProductionSession::where('job_master_id', $job->id)
-                    ->whereDate('work_date', $today)
-                    ->where('status', 'paused')
-                    ->first();
-                if ($session) {
-                    $session->update(['status' => 'running']);
-                }
+                $otherActiveDowntime = Downtime::where('job_master_id', $job->id)
+                    ->whereNull('finish_time')
+                    ->exists();
 
-                JobMaster::where('id', $job->id)->update(['status' => 'running']);
+                if (!$otherActiveDowntime) {
+                    $session = ProductionSession::where('job_master_id', $job->id)
+                        ->whereDate('work_date', $workDate)
+                        ->where('status', 'paused')
+                        ->first();
+                    if ($session) {
+                        $session->update(['status' => 'running']);
+                    }
+
+                    JobMaster::where('id', $job->id)->update(['status' => 'running']);
+                }
 
                 $this->log('AUTO BREAK END', $job->job_number, $activeBreak->problem, $now->format('H:i:s'));
                 $breakCount++;
