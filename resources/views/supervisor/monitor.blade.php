@@ -268,6 +268,20 @@
         body.dark .detail-header td{background:#1e3a8a!important;color:#93c5fd!important}
         body.dark .detail-header .desc-cell{background:#1e3a8a!important}
 
+        /* ── DETAIL TABLE COLORS ── */
+        .det-job{color:#1e293b}
+        .det-qty{color:#374151}
+        .det-good{color:#16a34a}
+        .det-repair{color:#d97706}
+        .det-reject{color:#dc2626}
+        .det-tpt{color:#2563eb}
+        body.dark .det-job{color:#f8fafc}
+        body.dark .det-qty{color:#cbd5e1}
+        body.dark .det-good{color:#4ade80}
+        body.dark .det-repair{color:#fbbf24}
+        body.dark .det-reject{color:#f87171}
+        body.dark .det-tpt{color:#60a5fa}
+
         /* ── SMALL MOBILE (<480px) ── */
         @media(max-width:480px){
             .header{height:44px;padding:0 8px}
@@ -641,7 +655,7 @@ function getClasses(desc, k){
     return {act, curr, style};
 }
 
-function dtCell(v,st){ return `<td style="${st||''}">${v}</td>`; }
+function dtCell(v,st,cls){ return `<td class="${cls||''}" style="${st||''}">${v}</td>`; }
 function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700">-</span>'; }
 function chkP(c, lbl){
     return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span style="font-size:8px;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700;line-height:1">-</span>') + `</div>`;
@@ -669,17 +683,17 @@ function buildRightBody(rows, maxRows){
             const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
-                ${dtCell(j.job_number, 'text-align:left;font-weight:600;color:#1e293b')}
+                ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
                 ${dtCell(`<div style="display:flex;gap:4px;justify-content:center;align-items:center;">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`)}
-                ${dtCell(j.plan_qty, 'color:#374151')}
-                ${dtCell(j.good, 'color:#16a34a;font-weight:600')}
-                ${dtCell(j.repair, 'color:#d97706;font-weight:600')}
-                ${dtCell(j.reject, 'color:#dc2626;font-weight:600')}
+                ${dtCell(j.plan_qty, '', 'det-qty')}
+                ${dtCell(j.good, 'font-weight:600;', 'det-good')}
+                ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
+                ${dtCell(j.reject, 'font-weight:600;', 'det-reject')}
                 ${dtCell(pt)}
                 ${dtCell(dn)}
                 ${dtCell(iq)}
-                ${dtCell(dw, j.downtime > 0 ? 'background-color:#ef4444; color:#fff; font-weight:700; animation:blink-red .8s ease-in-out infinite' : '')}
-                ${dtCell(tp, 'color:#2563eb;font-weight:700')}
+                ${dtCell(dw, j.downtime > 0 ? 'background-color:#ef4444!important; color:#fff!important; font-weight:700; animation:blink-red .8s ease-in-out infinite' : '')}
+                ${dtCell(tp, 'font-weight:700;', 'det-tpt')}
                 ${dtCell(j.plan_finish)}
                 ${dtCell(j.actual_finish)}
             `;
