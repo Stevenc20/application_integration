@@ -562,7 +562,7 @@ function dtCell(v,st){ return `<td style="${st||''}">${v}</td>`; }
 function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700">-</span>'; }
 
 // ── Fit-to-screen + auto-rotate helpers ──
-const MIN_FIT = 0.6;
+const MIN_FIT = 0.85;
 const ROTATE_MS = 10000;
 let detailPage = 0;
 let detailPages = 1;
