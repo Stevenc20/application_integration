@@ -68,9 +68,28 @@ class DeviceLinkController extends Controller
             $deviceLink = DeviceLinkRequest::where('token_hash', $tokenHash)->firstOrFail();
             $user = $this->service->consumePairingRequest($deviceLink, $request);
 
+            $redirectUrl = match($user->role) {
+                'admin' => route('admin.dashboard'),
+                'supervisor' => route('supervisor.dashboard'),
+                'foreman' => route('supervisor.dashboard'),
+                'operator' => route('operator.dashboard'),
+                'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => route('supervisor.dashboard'),
+                'ppc' => route('ppc.dashboard'),
+                'quality' => route('quality.dashboard'),
+                'production' => route('production.dashboard'),
+                'manager' => route('manager.dashboard'),
+                'kadiv' => route('kadiv.dashboard'),
+                'direktur' => route('direktur.dashboard'),
+                'presdir' => route('presdir.dashboard'),
+                'superadmin' => route('super-admin.dashboard'),
+                'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan' => route('hambatan-jalur.index'),
+                default => url('/')
+            };
+
             return response()->json([
                 'success' => true,
                 'message' => 'Login berhasil',
+                'redirect_url' => $redirectUrl,
                 'user' => [
                     'id' => $user->id,
                     'name' => $user->name,

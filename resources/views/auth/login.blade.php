@@ -808,7 +808,8 @@
             
             const data = await res.json();
             if (data.success) {
-                window.location.reload();
+                statusText.innerText = 'Login berhasil! Mengalihkan...';
+                window.location.href = data.redirect_url || '/';
             }
         } catch (err) {
             console.error(err);
