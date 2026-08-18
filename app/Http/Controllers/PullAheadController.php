@@ -57,10 +57,10 @@ class PullAheadController extends Controller
         $nextShift = ($currentShift === 'Shift Pagi') ? 'Shift Malam' : 'Shift Pagi';
         $date = $request->get('date', now()->toDateString());
 
+        $lineId = \App\Models\LineMaster::where('line_name', $line)->value('id');
+
         // Ambil plan shift berikutnya
-        $nextShiftPlans = ProductionPlan::where('line_master_id', function($q) use ($line) {
-                $q->select('id')->from('line_masters')->where('line_name', $line)->first();
-            })
+        $nextShiftPlans = ProductionPlan::where('line_master_id', $lineId)
             ->where('hari', $date)
             ->where('shift_name', $nextShift)
             ->where('row_type', 'job')
@@ -74,9 +74,7 @@ class PullAheadController extends Controller
         }
 
         // Ambil plan shift aktif (untuk usulan posisi sequence)
-        $currentShiftPlans = ProductionPlan::where('line_master_id', function($q) use ($line) {
-                $q->select('id')->from('line_masters')->where('line_name', $line)->first();
-            })
+        $currentShiftPlans = ProductionPlan::where('line_master_id', $lineId)
             ->where('hari', $date)
             ->where('shift_name', $currentShift)
             ->where('row_type', 'job')
