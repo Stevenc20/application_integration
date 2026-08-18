@@ -29,9 +29,9 @@ class DashboardRealtimeService
 
         $shiftStartDt = $shift === 1
             ? Carbon::parse($date)->setTime(7, 30)
-            : Carbon::parse($date)->setTime(19, 30);
+            : Carbon::parse($date)->setTime(21, 0);
         $shiftEndDt = $shift === 1
-            ? Carbon::parse($date)->setTime(19, 30)
+            ? Carbon::parse($date)->setTime(21, 0)
             : Carbon::parse($date)->addDay()->setTime(7, 30);
 
         $workDate = $date;
