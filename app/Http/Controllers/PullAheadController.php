@@ -74,14 +74,20 @@ class PullAheadController extends Controller
             ->where('plan_date', $nextDate)
             ->where('shift_name', $nextShift)
             ->where('row_type', 'job')
-            ->where('remaining_plan', '>', 0)
             ->orderBy('row_no', 'asc')
             ->get();
             
-        // Hitung Available Qty secara real-time
+        // Hitung Available Qty secara real-time dan saring yang habis
+        $validPlans = [];
         foreach ($nextShiftPlans as $plan) {
             $plan->available_qty = $this->pullAheadService->calculateAvailableQty($plan);
+            if ($plan->available_qty > 0) {
+                $validPlans[] = $plan;
+            }
         }
+        
+        // Replace koleksi dengan data yang sudah di-filter
+        $nextShiftPlans = array_values($validPlans);
 
         // Ambil plan shift aktif (untuk usulan posisi sequence)
         $currentShiftPlans = ProductionPlan::where('press_name', $line)

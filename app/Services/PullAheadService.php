@@ -18,7 +18,10 @@ class PullAheadService
             ->where('status', 'PENDING')
             ->sum('qty_requested');
 
-        $available = $plan->remaining_plan - $pendingRequestsQty;
+        // Gunakan remaining_plan, jika null maka fallback ke kolom 'plan' (kuantitas rencana)
+        $baseQty = $plan->remaining_plan !== null ? $plan->remaining_plan : $plan->plan;
+
+        $available = $baseQty - $pendingRequestsQty;
         return $available > 0 ? $available : 0;
     }
 
@@ -58,13 +61,14 @@ class PullAheadService
         DB::beginTransaction();
         try {
             $originalPlan = $request->originalPlan;
+            $baseQty = $originalPlan->remaining_plan !== null ? $originalPlan->remaining_plan : $originalPlan->plan;
 
-            if ($qtyApproved > $originalPlan->remaining_plan) {
+            if ($qtyApproved > $baseQty) {
                 throw new Exception("Qty Approved melebihi Sisa Plan asli.");
             }
 
-            // 1. Kurangi remaining plan di shift 2
-            $originalPlan->remaining_plan -= $qtyApproved;
+            // 1. Kurangi remaining plan di shift asal (atau set value baru jika tadinya null)
+            $originalPlan->remaining_plan = $baseQty - $qtyApproved;
             $originalPlan->save();
 
             // 2. Tentukan row_no untuk di shift 1 (berdasarkan final_sequence_after)
