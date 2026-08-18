@@ -757,7 +757,7 @@ function updateAllCells(){
                     setText(ac,(k.actual||'-')+pct);
                     cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
                     ac.className = 'val-actual'+(cl.act?' '+cl.act:'');
-                    if (cl.style) ac.style.cssText = cl.style;
+                    ac.style.cssText = cl.style || '';
                 }else{
                     setText(getCell('plan'),'-');
                     setText(getCell('curr'),'-');
