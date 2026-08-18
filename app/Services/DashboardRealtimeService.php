@@ -188,14 +188,17 @@ class DashboardRealtimeService
                     } elseif ($dp->jobMaster->started_at) {
                         $dpRuntime = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
                     }
-                } elseif (strtolower($dp->jobMaster->status) === 'paused') {
+                } else {
                     $session = \App\Models\ProductionSession::where('job_master_id', $dp->job_master_id)
                         ->where('work_date', $workDate)
                         ->first();
-                    $dpRuntime = (float) ($session->total_seconds ?? 0);
-                } elseif ($dp->jobMaster->started_at) {
-                    $endAt = $dp->jobMaster->finished_at ?: \Carbon\Carbon::now();
-                    $dpRuntime = abs(\Carbon\Carbon::parse($endAt)->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
+                    if ($session) {
+                        $dpRuntime = (float) ($session->total_seconds ?? 0);
+                    } elseif ($dp->jobMaster->finished_at && $dp->jobMaster->started_at) {
+                        $dpRuntime = abs(\Carbon\Carbon::parse($dp->jobMaster->finished_at)->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
+                    } else {
+                        $dpRuntime = 0;
+                    }
                 }
             }
             $runtime += $dpRuntime;
@@ -364,14 +367,17 @@ class DashboardRealtimeService
                     } elseif ($job->started_at) {
                         $jobRuntimeSeconds = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($job->started_at)));
                     }
-                } elseif (strtolower($job->status) === 'paused') {
+                } else {
                     $pSession = \App\Models\ProductionSession::where('job_master_id', $job->id)
                         ->where('work_date', $workDate)
                         ->first();
-                    $jobRuntimeSeconds = (float) ($pSession->total_seconds ?? 0);
-                } elseif ($job->started_at) {
-                    $endAt = $job->finished_at ?: \Carbon\Carbon::now();
-                    $jobRuntimeSeconds = abs(\Carbon\Carbon::parse($endAt)->diffInSeconds(\Carbon\Carbon::parse($job->started_at)));
+                    if ($pSession) {
+                        $jobRuntimeSeconds = (float) ($pSession->total_seconds ?? 0);
+                    } elseif ($job->finished_at && $job->started_at) {
+                        $jobRuntimeSeconds = abs(\Carbon\Carbon::parse($job->finished_at)->diffInSeconds(\Carbon\Carbon::parse($job->started_at)));
+                    } else {
+                        $jobRuntimeSeconds = 0;
+                    }
                 }
             }
             $jobRuntime = round($jobRuntimeSeconds / 60, 1);
