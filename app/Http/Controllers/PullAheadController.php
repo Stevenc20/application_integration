@@ -51,7 +51,14 @@ class PullAheadController extends Controller
      */
     public function nextShiftData(Request $request)
     {
-        $line = $request->get('line', 'Line A');
+        $line = $request->get('line', 'PRESS A');
+        
+        // Normalisasi Line A -> PRESS A agar sesuai dengan database press_name
+        $pressName = strtoupper(trim($line));
+        if (preg_match('/^LINE\s+([A-Z0-9]+)$/i', $pressName, $matches)) {
+            $pressName = 'PRESS ' . strtoupper($matches[1]);
+        }
+
         $currentShift = $request->get('shift', 'Shift Pagi');
         $date = $request->get('date', now()->toDateString());
 
@@ -64,13 +71,13 @@ class PullAheadController extends Controller
         }
 
         // Cari nama shift sebenarnya di DB (krn kadang ada suffix e.g. "Shift Malam B")
-        $nextShift = ProductionPlan::where('press_name', $line)
+        $nextShift = ProductionPlan::where('press_name', $pressName)
             ->where('plan_date', $nextDate)
             ->where('shift_name', 'like', $nextShiftPrefix . '%')
             ->value('shift_name') ?: $nextShiftPrefix;
 
         // Ambil plan shift berikutnya
-        $nextShiftPlans = ProductionPlan::where('press_name', $line)
+        $nextShiftPlans = ProductionPlan::where('press_name', $pressName)
             ->where('plan_date', $nextDate)
             ->where('shift_name', $nextShift)
             ->where('row_type', 'job')
@@ -90,7 +97,7 @@ class PullAheadController extends Controller
         $nextShiftPlans = array_values($validPlans);
 
         // Ambil plan shift aktif (untuk usulan posisi sequence)
-        $currentShiftPlans = ProductionPlan::where('press_name', $line)
+        $currentShiftPlans = ProductionPlan::where('press_name', $pressName)
             ->where('plan_date', $date)
             ->where('shift_name', $currentShift)
             ->where('row_type', 'job')
