@@ -76,7 +76,7 @@ class PullAheadService
                     
                     // Shift ke bawah semua plan di shift 1 (hari, line, shift yg sama) yg >= targetRowNo
                     ProductionPlan::where('line_master_id', $afterPlan->line_master_id)
-                        ->where('hari', $afterPlan->hari) // asumsi kolom hari merepresentasikan tanggal produksi
+                        ->where('plan_date', $afterPlan->plan_date) // asumsi kolom plan_date merepresentasikan tanggal produksi
                         ->where('shift_name', $request->target_shift)
                         ->where('row_no', '>=', $targetRowNo)
                         ->increment('row_no');
@@ -84,7 +84,7 @@ class PullAheadService
             } else {
                 // Jika tidak ada usulan/keputusan, taruh di paling bawah
                 $maxRow = ProductionPlan::where('line_master_id', $originalPlan->line_master_id)
-                    ->where('hari', $originalPlan->hari)
+                    ->where('plan_date', $originalPlan->plan_date)
                     ->where('shift_name', $request->target_shift)
                     ->max('row_no');
                 $targetRowNo = $maxRow ? $maxRow + 1 : 1;

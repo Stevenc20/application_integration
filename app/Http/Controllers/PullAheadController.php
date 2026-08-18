@@ -61,7 +61,7 @@ class PullAheadController extends Controller
 
         // Ambil plan shift berikutnya
         $nextShiftPlans = ProductionPlan::where('line_master_id', $lineId)
-            ->where('hari', $date)
+            ->where('plan_date', $date)
             ->where('shift_name', $nextShift)
             ->where('row_type', 'job')
             ->where('remaining_plan', '>', 0)
@@ -75,7 +75,7 @@ class PullAheadController extends Controller
 
         // Ambil plan shift aktif (untuk usulan posisi sequence)
         $currentShiftPlans = ProductionPlan::where('line_master_id', $lineId)
-            ->where('hari', $date)
+            ->where('plan_date', $date)
             ->where('shift_name', $currentShift)
             ->where('row_type', 'job')
             ->orderBy('row_no', 'asc')
