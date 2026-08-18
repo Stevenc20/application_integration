@@ -55,22 +55,25 @@ class PullAheadController extends Controller
         $currentShift = $request->get('shift', 'Shift Pagi');
         $date = $request->get('date', now()->toDateString());
 
-        // Penentuan cerdas Shift Berikutnya (mengabaikan suffix seperti 'A', 'B', dsb)
+        // Penentuan cerdas Shift Berikutnya dan Tanggalnya
+        $nextDate = $date;
         if (stripos($currentShift, 'Pagi') !== false || stripos($currentShift, 'Shift 1') !== false) {
             $nextShiftPrefix = 'Shift Malam';
         } else {
             $nextShiftPrefix = 'Shift Pagi';
+            // Jika saat ini shift malam, maka shift berikutnya adalah shift pagi keesokan harinya
+            $nextDate = \Carbon\Carbon::parse($date)->addDay()->toDateString();
         }
 
         // Cari nama shift sebenarnya di DB (krn kadang ada suffix e.g. "Shift Malam B")
         $nextShift = ProductionPlan::where('press_name', $line)
-            ->where('plan_date', $date)
+            ->where('plan_date', $nextDate)
             ->where('shift_name', 'like', $nextShiftPrefix . '%')
             ->value('shift_name') ?: $nextShiftPrefix;
 
         // Ambil plan shift berikutnya
         $nextShiftPlans = ProductionPlan::where('press_name', $line)
-            ->where('plan_date', $date)
+            ->where('plan_date', $nextDate)
             ->where('shift_name', $nextShift)
             ->where('row_type', 'job')
             ->where('remaining_plan', '>', 0)
