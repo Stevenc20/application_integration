@@ -615,7 +615,19 @@ function applyFit(root){
     if(!root || !scrollEl) return;
     const s = computeFit(root);
     scrollEl.style.overflow = s < 1 ? 'hidden' : '';
-    root.style.zoom = s < 1 ? s : '';
+    // Gunakan transform scale jika min-width container memaksa scale down
+    if (s < 1) {
+        root.style.transform = \`scale(\${s})\`;
+        root.style.transformOrigin = 'top left';
+        root.style.width = \`\${100 / s}%\`;
+        root.style.height = \`\${100 / s}%\`;
+        root.style.zoom = '';
+    } else {
+        root.style.transform = '';
+        root.style.width = '100%';
+        root.style.height = '100%';
+        root.style.zoom = '';
+    }
 }
 
 function stopRotate(){
@@ -999,10 +1011,10 @@ function renderTable(){
         const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length);
         const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
         scrollEl.innerHTML = `
-        <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
+        <div style="display:flex; flex-direction:column; width:100%; min-height:100%; min-width:1366px;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
-                <div style="width:30%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; background:#fff; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
+                <div style="width:24%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; background:#fff; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
                     <table class="large-table left-kpi-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
                             <tr class="single-top-header">
@@ -1021,7 +1033,7 @@ function renderTable(){
                     </table>
                 </div>
                 <!-- Right Detail Table -->
-                <div style="width:70%; display:flex; flex-direction:column; min-width:950px;">
+                <div style="width:76%; display:flex; flex-direction:column;">
                     <table class="large-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
