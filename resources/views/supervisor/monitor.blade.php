@@ -603,7 +603,7 @@ function buildRightBody(rows, maxRows){
         } else {
             if (!renderedRightRowspan) {
                 const remainingRight = maxRows - rows.length;
-                h += `<td rowspan="${remainingRight}" colspan="17" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                h += `<td rowspan="${remainingRight}" colspan="14" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
                 renderedRightRowspan = true;
             }
         }
@@ -1036,7 +1036,7 @@ function renderTable(){
                     <table class="large-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
-                                <th colspan="17" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
+                                <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
                                 <th style="width:4%; border-left:none;">NO</th>
