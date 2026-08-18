@@ -60,6 +60,8 @@ class PullAheadController extends Controller
             $nextShiftPrefix = 'Shift Malam';
         } else {
             $nextShiftPrefix = 'Shift Pagi';
+        }
+
         // Cari nama shift sebenarnya di DB (krn kadang ada suffix e.g. "Shift Malam B")
         $nextShift = ProductionPlan::where('press_name', $line)
             ->where('plan_date', $date)
