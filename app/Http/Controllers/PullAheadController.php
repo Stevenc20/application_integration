@@ -55,14 +55,12 @@ class PullAheadController extends Controller
         $currentShift = $request->get('shift', 'Shift Pagi');
         $date = $request->get('date', now()->toDateString());
 
-        // Penentuan cerdas Shift Berikutnya dan Tanggalnya
+        // Penentuan cerdas Shift Berikutnya pada Tanggal yang Sama
         $nextDate = $date;
         if (stripos($currentShift, 'Pagi') !== false || stripos($currentShift, 'Shift 1') !== false) {
             $nextShiftPrefix = 'Shift Malam';
         } else {
             $nextShiftPrefix = 'Shift Pagi';
-            // Jika saat ini shift malam, maka shift berikutnya adalah shift pagi keesokan harinya
-            $nextDate = \Carbon\Carbon::parse($date)->addDay()->toDateString();
         }
 
         // Cari nama shift sebenarnya di DB (krn kadang ada suffix e.g. "Shift Malam B")
