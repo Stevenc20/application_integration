@@ -324,6 +324,17 @@ Route::get('/', function(){
 Route::get('/login', [AuthController::class, 'login'])->name('login');
 Route::post('/login', [AuthController::class, 'loginProcess'])->name('login.process')->middleware('throttle:5,1');
 
+// DEVICE LINK (QR LOGIN)
+Route::post('/auth/device-link/create', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'create'])->name('device_link.create')->middleware('throttle:10,1');
+Route::get('/auth/device-link/{tokenHash}/status', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'status'])->name('device_link.status');
+Route::post('/auth/device-link/{tokenHash}/consume', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'consume'])->name('device_link.consume');
+
+Route::middleware('auth')->group(function () {
+    Route::get('/auth/device-link/scan', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'showScanPage'])->name('device_link.scan_page');
+    Route::post('/auth/device-link/{tokenHash}/approve', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'approve'])->name('device_link.approve');
+    Route::post('/auth/device-link/{tokenHash}/cancel', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'cancel'])->name('device_link.cancel');
+});
+
 // MONITORING
 Route::prefix('monitoring')
 ->name('monitoring.')

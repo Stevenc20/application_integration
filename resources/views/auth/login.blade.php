@@ -654,6 +654,22 @@
                     </svg>
                 </button>
 
+                <div style="text-align: center; margin: 1.5rem 0; color: var(--t3); font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 10px;">
+                    <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                    <span>ATAU</span>
+                    <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                </div>
+
+                <button type="button" onclick="openQrModal()" class="btn-submit" style="background: white; color: var(--t1); border: 1px solid var(--border); margin-top: 0;">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right: 8px;">
+                        <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                        <rect x="7" y="7" width="3" height="3"></rect>
+                        <rect x="14" y="7" width="3" height="3"></rect>
+                        <rect x="7" y="14" width="3" height="3"></rect>
+                        <rect x="14" y="14" width="3" height="3"></rect>
+                    </svg>
+                    Login dengan QR Code (Monitor)
+                </button>
             </form>
 
             <div class="form-divider"></div>
@@ -680,22 +696,124 @@
     </div>
 </footer>
 
+<!-- QR Modal -->
+<div id="qrModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center; backdrop-filter: blur(4px);">
+    <div style="background: white; padding: 2rem; border-radius: 12px; text-align: center; max-width: 400px; width: 90%; box-shadow: 0 10px 25px rgba(0,0,0,0.1);">
+        <h3 style="font-family: 'Playfair Display', serif; font-size: 1.25rem; margin-bottom: 0.5rem;">Login via QR Code</h3>
+        <p style="color: var(--t2); font-size: 0.85rem; margin-bottom: 1.5rem;">Buka web di HP Anda, pastikan sudah login, lalu arahkan kamera ke QR ini.</p>
+        
+        <div style="background: #f8f9fa; padding: 1rem; border-radius: 8px; display: inline-block; margin-bottom: 1rem;">
+            <img id="qrImage" src="" alt="QR Code" style="width: 250px; height: 250px; object-fit: contain;">
+        </div>
+        
+        <p id="qrStatus" style="font-weight: 500; font-size: 0.9rem; color: var(--red); margin-bottom: 1.5rem;">Membuat sesi...</p>
+        
+        <button type="button" onclick="closeQrModal()" style="padding: 10px 20px; border-radius: 6px; border: 1px solid var(--border); background: white; color: var(--t2); cursor: pointer; transition: all 0.2s;">
+            Batalkan
+        </button>
+    </div>
+</div>
+
 <script>
-    document.querySelectorAll('.fade-up, .fade-left, .fade-right').forEach((el, i) => {
-        setTimeout(() => el.classList.add('show'), i * 80);
+    document.addEventListener('DOMContentLoaded', () => {
+        const elements = document.querySelectorAll('.fade-up, .fade-left, .fade-right');
+        setTimeout(() => {
+            elements.forEach(el => el.classList.add('show'));
+        }, 100);
     });
 
-    const header = document.querySelector('header');
-    if (header) {
-        window.addEventListener('scroll', () => {
-            if (window.scrollY > 20) {
-                header.classList.add('scrolled');
+    // ─── QR LOGIN LOGIC ───
+    let qrPollingInterval = null;
+    let qrTokenHash = null;
+
+    function openQrModal() {
+        document.getElementById('qrModal').style.display = 'flex';
+        generateQr();
+    }
+
+    function closeQrModal() {
+        document.getElementById('qrModal').style.display = 'none';
+        if (qrPollingInterval) {
+            clearInterval(qrPollingInterval);
+            qrPollingInterval = null;
+        }
+    }
+
+    async function generateQr() {
+        const qrImg = document.getElementById('qrImage');
+        const statusText = document.getElementById('qrStatus');
+        qrImg.src = '';
+        statusText.innerText = 'Membuat sesi...';
+
+        try {
+            const res = await fetch('{{ route('device_link.create') }}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                },
+                body: JSON.stringify({})
+            });
+            
+            const data = await res.json();
+            
+            if (data.success) {
+                qrTokenHash = data.token; 
+                qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data.scan_url)}`;
+                statusText.innerText = 'Menunggu scan dari HP...';
+                
+                if (qrPollingInterval) clearInterval(qrPollingInterval);
+                qrPollingInterval = setInterval(() => checkQrStatus(data.token), 3000);
             } else {
-                header.classList.remove('scrolled');
+                statusText.innerText = 'Gagal membuat QR.';
             }
-        });
+        } catch (err) {
+            console.error(err);
+            statusText.innerText = 'Terjadi kesalahan sistem.';
+        }
+    }
+
+    async function checkQrStatus(token) {
+        try {
+            const res = await fetch(`{{ url('/auth/device-link') }}/${token}/status`);
+            const data = await res.json();
+            
+            if (data.success) {
+                const statusText = document.getElementById('qrStatus');
+                if (data.status === 'scanned') {
+                    statusText.innerText = 'QR di-scan! Menunggu persetujuan...';
+                } else if (data.status === 'approved') {
+                    statusText.innerText = 'Disetujui! Mengalihkan...';
+                    clearInterval(qrPollingInterval);
+                    consumeQr(token);
+                } else if (data.status === 'expired' || data.status === 'cancelled') {
+                    statusText.innerText = 'Sesi kedaluwarsa atau dibatalkan.';
+                    clearInterval(qrPollingInterval);
+                }
+            }
+        } catch (err) {
+            console.error(err);
+        }
+    }
+
+    async function consumeQr(token) {
+        try {
+            const res = await fetch(`{{ url('/auth/device-link') }}/${token}/consume`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                }
+            });
+            
+            const data = await res.json();
+            if (data.success) {
+                window.location.href = '{{ route('monitoring.dashboard') }}';
+            }
+        } catch (err) {
+            console.error(err);
+        }
     }
 </script>
-
 </body>
 </html>
