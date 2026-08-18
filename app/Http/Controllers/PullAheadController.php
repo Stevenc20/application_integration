@@ -60,18 +60,14 @@ class PullAheadController extends Controller
             $nextShiftPrefix = 'Shift Malam';
         } else {
             $nextShiftPrefix = 'Shift Pagi';
-        }
-
-        $lineId = \App\Models\LineMaster::where('line_name', $line)->value('id');
-
         // Cari nama shift sebenarnya di DB (krn kadang ada suffix e.g. "Shift Malam B")
-        $nextShift = ProductionPlan::where('line_master_id', $lineId)
+        $nextShift = ProductionPlan::where('press_name', $line)
             ->where('plan_date', $date)
             ->where('shift_name', 'like', $nextShiftPrefix . '%')
             ->value('shift_name') ?: $nextShiftPrefix;
 
         // Ambil plan shift berikutnya
-        $nextShiftPlans = ProductionPlan::where('line_master_id', $lineId)
+        $nextShiftPlans = ProductionPlan::where('press_name', $line)
             ->where('plan_date', $date)
             ->where('shift_name', $nextShift)
             ->where('row_type', 'job')
@@ -85,7 +81,7 @@ class PullAheadController extends Controller
         }
 
         // Ambil plan shift aktif (untuk usulan posisi sequence)
-        $currentShiftPlans = ProductionPlan::where('line_master_id', $lineId)
+        $currentShiftPlans = ProductionPlan::where('press_name', $line)
             ->where('plan_date', $date)
             ->where('shift_name', $currentShift)
             ->where('row_type', 'job')
