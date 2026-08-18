@@ -144,7 +144,7 @@ class InputHarianController extends Controller
         $search       = trim($request->get('search', ''));
         
         // Pilih shift: dari request atau auto-detect
-        $currentShift = $request->get('shift', $currentShift ?? 'Shift Pagi');
+        $currentShift = $request->get('shift', $currentShift ?? $this->getShift());
 
         // 1. Tentukan SHIFT TERBARU (Revisi Terakhir)
         $latestShiftName = $currentShift;
