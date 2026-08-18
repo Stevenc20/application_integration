@@ -181,5 +181,7 @@
     @stack('modals')
     @yield('scripts')
     @stack('scripts')
+@include('components.pull_ahead_alert')
+
 </body>
 </html>

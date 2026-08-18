@@ -59,6 +59,12 @@
                 <span class="text-sm font-semibold text-gray-700">{{ now()->format('d F Y') }}</span>
             </div>
 
+            {{-- PULL AHEAD BUTTON --}}
+            <button onclick="openPullAheadModal()" class="flex items-center gap-2 bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-sm px-5 py-2.5 rounded-xl shadow-sm border border-blue-200 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 5l7 7-7 7M5 5l7 7-7 7"></path></svg>
+                <span>Tarik Shift Berikutnya</span>
+            </button>
+
             {{-- Akhiri Shift Button --}}
             @if(!isset($isHistorical) || !$isHistorical)
                 @if($isLocked ?? false)
@@ -725,4 +731,197 @@ function goToIssue(type, planId, jobMasterId, dtId) {
         echo '<script src="' . asset('build/assets/' . basename($peLegacyFiles[0])) . '"></script>';
     }
 @endphp
+{{-- MODAL PULL AHEAD --}}
+<div id="pullAheadModal" class="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-sm hidden" onclick="if(event.target === this) closePullAheadModal()">
+    <div class="bg-gray-50 w-full max-w-2xl h-full shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300" id="pullAheadSidebar">
+        
+        <div class="bg-white px-6 py-5 border-b border-gray-200 flex justify-between items-center shrink-0">
+            <div>
+                <h3 class="text-xl font-bold text-gray-800">Jadwal Shift Berikutnya</h3>
+                <p class="text-sm text-blue-600 font-semibold mt-1" id="nextShiftLabel">Loading...</p>
+            </div>
+            <button onclick="closePullAheadModal()" class="text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+
+        <div class="flex-1 overflow-y-auto p-6 space-y-4" id="nextShiftContainer">
+            <div class="flex items-center justify-center h-40">
+                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{{-- MODAL FORM REQUEST PULL AHEAD --}}
+<div id="pullAheadFormModal" class="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 hidden">
+    <div class="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden transform scale-95 transition-all">
+        <div class="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+            <h3 class="text-lg font-bold text-gray-800">Request Pull Ahead</h3>
+            <button onclick="closePullAheadFormModal()" class="text-gray-400 hover:text-gray-600">
+                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+        <div class="p-6">
+            <div class="mb-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <div class="font-bold text-blue-800" id="reqItemName">-</div>
+                <div class="text-sm text-blue-600 mt-1">Available Qty: <span id="reqAvailableQty" class="font-bold">0</span> PCS</div>
+            </div>
+
+            <form id="pullAheadRequestForm" onsubmit="submitPullAheadRequest(event)">
+                <input type="hidden" id="reqPlanId">
+                
+                <div class="mb-4">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Qty yang ditarik (PCS)</label>
+                    <input type="number" id="reqQty" min="1" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500" required>
+                </div>
+
+                <div class="mb-6">
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Usulan Posisi (Sisipkan Setelah)</label>
+                    <select id="reqSequenceAfter" class="w-full rounded-xl border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                        <option value="">-- Paling Bawah (Default) --</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end gap-3 mt-6 pt-4 border-t border-gray-100">
+                    <button type="button" onclick="closePullAheadFormModal()" class="text-gray-600 bg-gray-100 hover:bg-gray-200 font-semibold px-4 py-2.5 rounded-xl transition-colors">Batal</button>
+                    <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/30 transition-all" id="btnSubmitReq">Kirim Request</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    let currentNextShift = '';
+    let currentLine = '{{ request('line', 'Line A') }}';
+    let currentShiftName = '{{ request('shift', 'Shift Pagi') }}';
+    let currentDate = '{{ request('date', now()->toDateString()) }}';
+
+    function openPullAheadModal() {
+        const modal = document.getElementById('pullAheadModal');
+        const sidebar = document.getElementById('pullAheadSidebar');
+        modal.classList.remove('hidden');
+        setTimeout(() => { sidebar.classList.remove('translate-x-full'); }, 10);
+        
+        // Fetch data
+        fetch(`/operational/next-shift?line=${currentLine}&shift=${currentShiftName}&date=${currentDate}`)
+            .then(res => res.json())
+            .then(data => {
+                document.getElementById('nextShiftLabel').innerText = data.next_shift_name;
+                currentNextShift = data.next_shift_name;
+                
+                // Populate options for sequence
+                const select = document.getElementById('reqSequenceAfter');
+                select.innerHTML = '<option value="">-- Paling Bawah (Default) --</option>';
+                data.current_shift_plans.forEach(plan => {
+                    select.innerHTML += `<option value="${plan.id}">${plan.job_master} (No: ${plan.row_no})</option>`;
+                });
+
+                // Render cards
+                const container = document.getElementById('nextShiftContainer');
+                container.innerHTML = '';
+                
+                if (data.next_shift_plans.length === 0) {
+                    container.innerHTML = '<div class="text-center text-gray-500 py-10">Jadwal shift berikutnya kosong.</div>';
+                    return;
+                }
+
+                data.next_shift_plans.forEach(plan => {
+                    const available = plan.available_qty;
+                    const card = `
+                        <div class="bg-white border ${available > 0 ? 'border-gray-200 hover:border-blue-300' : 'border-gray-200 opacity-60'} rounded-xl p-4 shadow-sm transition-colors">
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h4 class="font-bold text-gray-800">${plan.job_master}</h4>
+                                    <p class="text-xs text-gray-500 mt-1">${plan.job_no}</p>
+                                </div>
+                                <span class="bg-gray-100 text-gray-600 text-xs font-bold px-2 py-1 rounded">Seq: ${plan.row_no}</span>
+                            </div>
+                            <div class="mt-4 flex justify-between items-end">
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1">Available Qty</div>
+                                    <div class="font-bold text-lg ${available > 0 ? 'text-blue-600' : 'text-red-500'}">${available} PCS</div>
+                                </div>
+                                ${available > 0 
+                                    ? `<button onclick="openPullAheadFormModal(${plan.id}, '${plan.job_master}', ${available})" class="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg shadow-sm">Tarik Item</button>`
+                                    : `<span class="text-xs font-bold text-red-500 bg-red-50 px-3 py-1.5 rounded-lg">Habis / Pending</span>`
+                                }
+                            </div>
+                        </div>
+                    `;
+                    container.insertAdjacentHTML('beforeend', card);
+                });
+            })
+            .catch(err => {
+                document.getElementById('nextShiftContainer').innerHTML = '<div class="text-center text-red-500 py-10">Gagal mengambil data jadwal.</div>';
+            });
+    }
+
+    function closePullAheadModal() {
+        const sidebar = document.getElementById('pullAheadSidebar');
+        sidebar.classList.add('translate-x-full');
+        setTimeout(() => { document.getElementById('pullAheadModal').classList.add('hidden'); }, 300);
+    }
+
+    function openPullAheadFormModal(planId, itemName, availableQty) {
+        document.getElementById('reqPlanId').value = planId;
+        document.getElementById('reqItemName').innerText = itemName;
+        document.getElementById('reqAvailableQty').innerText = availableQty;
+        document.getElementById('reqQty').max = availableQty;
+        document.getElementById('reqQty').value = availableQty;
+        
+        document.getElementById('pullAheadFormModal').classList.remove('hidden');
+    }
+
+    function closePullAheadFormModal() {
+        document.getElementById('pullAheadFormModal').classList.add('hidden');
+    }
+
+    function submitPullAheadRequest(e) {
+        e.preventDefault();
+        const btn = document.getElementById('btnSubmitReq');
+        btn.innerText = 'Mengirim...';
+        btn.disabled = true;
+
+        const payload = {
+            original_plan_id: document.getElementById('reqPlanId').value,
+            qty_requested: document.getElementById('reqQty').value,
+            proposed_sequence_after: document.getElementById('reqSequenceAfter').value,
+            target_shift: currentShiftName,
+            source_shift: currentNextShift
+        };
+
+        fetch('/operational/pull-ahead', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': '{{ csrf_token() }}'
+            },
+            body: JSON.stringify(payload)
+        })
+        .then(res => res.json())
+        .then(data => {
+            btn.innerText = 'Kirim Request';
+            btn.disabled = false;
+            
+            if(data.success) {
+                alert(data.message);
+                closePullAheadFormModal();
+                // Refresh modal content to update available qty
+                document.getElementById('nextShiftContainer').innerHTML = '<div class="flex items-center justify-center h-40"><div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>';
+                openPullAheadModal(); 
+            } else {
+                alert(data.message);
+            }
+        })
+        .catch(err => {
+            btn.innerText = 'Kirim Request';
+            btn.disabled = false;
+            alert('Terjadi kesalahan sistem.');
+        });
+    }
+</script>
+
 @endsection

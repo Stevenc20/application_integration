@@ -1,0 +1,21 @@
+{
+  "name": "Quality Assurance System",
+  "short_name": "QA System",
+  "start_url": "/dashboard",
+  "display": "fullscreen",
+  "background_color": "#ffffff",
+  "theme_color": "#e11d48",
+  "description": "Quality Assurance Management System for PT. Inti Pantja Press Industri",
+  "icons": [
+    {
+      "src": "/IPPI.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/IPPI.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
