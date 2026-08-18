@@ -758,12 +758,12 @@
             const data = await res.json();
             
             if (data.success) {
-                qrTokenHash = data.token; 
+                qrTokenHash = data.token_hash; 
                 qrImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(data.scan_url)}`;
                 statusText.innerText = 'Menunggu scan dari HP...';
                 
                 if (qrPollingInterval) clearInterval(qrPollingInterval);
-                qrPollingInterval = setInterval(() => checkQrStatus(data.token), 3000);
+                qrPollingInterval = setInterval(() => checkQrStatus(data.token_hash), 3000);
             } else {
                 statusText.innerText = 'Gagal membuat QR.';
             }

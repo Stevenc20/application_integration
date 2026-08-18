@@ -28,6 +28,7 @@ class DeviceLinkController extends Controller
             return response()->json([
                 'success' => true,
                 'token' => $data->token,
+                'token_hash' => $data->token_hash,
                 'scan_url' => $scanUrl,
                 'expires_at' => $data->expires_at->toIso8601String(),
             ]);

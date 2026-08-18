@@ -43,43 +43,53 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
-            let html5QrcodeScanner = new Html5QrcodeScanner(
-                "reader",
-                { fps: 10, qrbox: {width: 250, height: 250}, aspectRatio: 1.0 },
-                /* verbose= */ false);
+            const html5QrCode = new Html5Qrcode("reader");
             
             function onScanSuccess(decodedText, decodedResult) {
-                // Hentikan scanner segera setelah berhasil scan pertama
-                html5QrcodeScanner.clear();
-                
-                // Pastikan yang di-scan adalah URL dari aplikasi ini
-                if(decodedText.includes('/auth/device-link/scan?token=')) {
-                    // Tampilkan indikator loading
-                    document.getElementById('reader').innerHTML = `
-                        <div style="padding: 40px 0; color: #27ae60;">
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 15px;">
-                                <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                                <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                            </svg>
-                            <p style="font-weight: 600; margin: 0;">Berhasil scan! Mengalihkan...</p>
-                        </div>
-                    `;
-                    // Arahkan ke URL konfirmasi
-                    window.location.href = decodedText;
-                } else {
-                    alert("Kode QR tidak valid untuk sistem ini.");
-                    // Restart scanner jika salah
-                    setTimeout(() => {
-                        window.location.reload();
-                    }, 1500);
-                }
+                html5QrCode.stop().then((ignore) => {
+                    if(decodedText.includes('/auth/device-link/scan?token=')) {
+                        document.getElementById('reader').innerHTML = `
+                            <div style="padding: 40px 0; color: #27ae60;">
+                                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 15px;">
+                                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                                </svg>
+                                <p style="font-weight: 600; margin: 0;">Berhasil scan! Mengalihkan...</p>
+                            </div>
+                        `;
+                        window.location.href = decodedText;
+                    } else {
+                        alert("Kode QR tidak valid untuk sistem ini.");
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    }
+                }).catch((err) => {
+                    console.error("Failed to stop scanner", err);
+                });
             }
             
             function onScanFailure(error) {
-                // handle scan failure, usually better to ignore and keep scanning.
+                // Ignore
             }
             
-            html5QrcodeScanner.render(onScanSuccess, onScanFailure);
+            html5QrCode.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 250, height: 250 },
+                    aspectRatio: 1.0
+                },
+                onScanSuccess,
+                onScanFailure
+            ).catch((err) => {
+                document.getElementById('reader').innerHTML = `
+                    <div style="padding: 20px; color: #C0392B;">
+                        <p>Gagal mengakses kamera. Pastikan Anda memberikan izin kamera.</p>
+                        <p style="font-size: 0.8rem">${err}</p>
+                    </div>
+                `;
+            });
         });
     </script>
 </body>
