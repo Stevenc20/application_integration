@@ -223,7 +223,7 @@ class DashboardRealtimeService
             ->where('start_time', '<', $shiftEndDt)
             ->get();
 
-        $runtimeMinutes = round($runtime / 60, 1);
+        $runtimeMinutes = round($runtime / 60, 0);
 
         // Fallback: estimate elapsed shift minutes if runtime not yet tracked
         if ($runtimeMinutes <= 0) {
@@ -243,7 +243,7 @@ class DashboardRealtimeService
             if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
             $dtTotalMinutes += $this->downtimeDurationSeconds($dt) / 60;
         }
-        $dtTotalMinutes = round($dtTotalMinutes, 1);
+        $dtTotalMinutes = round($dtTotalMinutes, 0);
 
         $breakdown = ProductionMetricsService::downtimeBreakdown($finishedDowntimes);
 
@@ -274,14 +274,14 @@ class DashboardRealtimeService
             elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) $currDtLog += $dur;
             else $currDtProd += $dur;
         }
-        $currDtTotal = round($currDtTotal, 1);
-        $currDtMach  = round($currDtMach, 1);
-        $currDtDies  = round($currDtDies, 1);
-        $currDtMat   = round($currDtMat, 1);
-        $currDtLog   = round($currDtLog, 1);
-        $currDtProd  = round($currDtProd, 1);
+        $currDtTotal = round($currDtTotal, 0);
+        $currDtMach  = round($currDtMach, 0);
+        $currDtDies  = round($currDtDies, 0);
+        $currDtMat   = round($currDtMat, 0);
+        $currDtLog   = round($currDtLog, 0);
+        $currDtProd  = round($currDtProd, 0);
 
-        $currOvertime = round($currDtMach + $currDtDies + $currDtMat + $currDtLog + $currDtProd, 1);
+        $currOvertime = round($currDtMach + $currDtDies + $currDtMat + $currDtLog + $currDtProd, 0);
 
         $dtRows     = [];
         $machRows   = [];
@@ -295,7 +295,7 @@ class DashboardRealtimeService
         foreach ($allDowntimes as $dt) {
             $type = strtoupper($dt->jenis_downtime ?? '');
             if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
-            $dur = round($this->downtimeDurationSeconds($dt) / 60, 1);
+            $dur = round($this->downtimeDurationSeconds($dt) / 60, 0);
             $rawJob = $dt->jobMaster?->job_name ?? '-';
             $jobName = $shortJob($rawJob);
             $row = [
@@ -382,7 +382,7 @@ class DashboardRealtimeService
                     }
                 }
             }
-            $jobRuntime = round($jobRuntimeSeconds / 60, 1);
+            $jobRuntime = round($jobRuntimeSeconds / 60, 0);
             $runtimeRows[] = [
                 'no'      => count($runtimeRows) + 1,
                 'item'    => $shortJob($job?->job_name),
@@ -390,23 +390,23 @@ class DashboardRealtimeService
             ];
         }
 
-        $runtimeMinutes = round(array_sum(array_map(fn($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 1);
+        $runtimeMinutes = round(array_sum(array_map(fn($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 0);
 
         $gsph = ProductionMetricsService::gsph($ok, max($runtimeMinutes, 1));
-        $currRuntimeMinutes = round($currRuntime / 60, 1);
+        $currRuntimeMinutes = round($currRuntime / 60, 0);
         $currGsph = $hasRunning ? ProductionMetricsService::gsph($currOk, max($currRuntimeMinutes, 1)) : 0;
 
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 1));
 
-        $dtProdLabel = round($dtProdMinutes, 2) . ' m';
-        $dtTotalLabel = round($dtTotalMinutes, 2) . ' m';
-        $dtMachLabel = round($dtMachMinutes, 2) . ' m';
-        $dtDiesLabel = round($dtDiesMinutes, 2) . ' m';
-        $dtMatLabel  = round($dtMatMinutes, 2) . ' m';
-        $dtLogLabel  = round($dtLogMinutes, 2) . ' m';
-        $overtimeMinutes = round($dtMachMinutes + $dtDiesMinutes + $dtMatMinutes + $dtLogMinutes + $dtProdMinutes, 1);
-        $overtimeLabel = round($overtimeMinutes, 2) . ' m';
+        $dtProdLabel = round($dtProdMinutes, 0) . ' m';
+        $dtTotalLabel = round($dtTotalMinutes, 0) . ' m';
+        $dtMachLabel = round($dtMachMinutes, 0) . ' m';
+        $dtDiesLabel = round($dtDiesMinutes, 0) . ' m';
+        $dtMatLabel  = round($dtMatMinutes, 0) . ' m';
+        $dtLogLabel  = round($dtLogMinutes, 0) . ' m';
+        $overtimeMinutes = round($dtMachMinutes + $dtDiesMinutes + $dtMatMinutes + $dtLogMinutes + $dtProdMinutes, 0);
+        $overtimeLabel = round($overtimeMinutes, 0) . ' m';
 
         $kpi = [
             ['desc'=>'QTY',      'plan'=>(string)$planQty,           'actual'=>(string)$ok,         'actualLink'=>true, 'current'=>$hasRunning ? (string)$currOk : '-'],
@@ -425,15 +425,15 @@ class DashboardRealtimeService
 
         $detailData = [
             'QTY'      => ['type' => 'production', $lineName => ['rows' => $qtyRows, 'total' => (string)$ok]],
-            'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($dtTotalMinutes, 2)]],
-            'MACH_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $machRows, 'total' => (string)round($dtMachMinutes, 2)]],
-            'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 2)]],
-            'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 2)]],
-            'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 2)]],
-            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 2)]],
+            'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($dtTotalMinutes, 0)]],
+            'MACH_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $machRows, 'total' => (string)round($dtMachMinutes, 0)]],
+            'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 0)]],
+            'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 0)]],
+            'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 0)]],
+            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 0)]],
             'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => $repairRows, 'total' => (string)$repair]],
             'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string)$reject]],
-            'OVERTIME' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($overtimeMinutes, 2)]],
+            'OVERTIME' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($overtimeMinutes, 0)]],
         ];
 
         $jobName = '-';

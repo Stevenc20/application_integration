@@ -106,14 +106,14 @@ class DashboardDetailService
             $actualReject = $daily ? (int) ($daily->actual_reject ?? 0) : 0;
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
-            $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 1) : 0;
+            $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 0) : 0;
 
             $jobId = $job?->id;
-            $dandori = $jobId ? (float) ($dandoriMinutes->get($jobId, 0)) : 0;
-            $iqCheck = $jobId ? round($qcheckMinutes[$jobId] ?? 0, 1) : 0;
-            $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 1) : 0;
+            $dandori = $jobId ? round($dandoriMinutes->get($jobId, 0), 0) : 0;
+            $iqCheck = $jobId ? round($qcheckMinutes[$jobId] ?? 0, 0) : 0;
+            $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 0) : 0;
 
-            $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
+            $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 0);
 
             $planFinish = $plan->finish_time;
             $actualFinish = $job?->finished_at ? Carbon::parse($job->finished_at)->format('H:i') : '-';
