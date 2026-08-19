@@ -75,12 +75,14 @@
             $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time' && strtoupper(trim($activeDowntime->pic ?? '')) === 'AUTO BREAK';
         @endphp
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10 items-start">
+        <div class="flex flex-col lg:flex-row gap-4 relative z-10 items-start">
             
             {{-- ROW 1: Progress Timeline (Left, 9 cols) & Running Session (Right, 3 cols) --}}
             
-            <!-- Progress Timeline (Left Area) -->
-            <div class="lg:col-span-9">
+                        {{-- LEFT COLUMN --}}
+            <div class="flex-1 lg:w-3/4 flex flex-col gap-4 min-w-0">
+<!-- Progress Timeline (Left Area) -->
+            <div class="w-full">
                 <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3">
 
                     <!-- Scheduling -->
@@ -186,130 +188,8 @@
                         </div>
                     </div>
                 </div>
-            </div>            <!-- Running Session Card (Right Area) -->
-            <div class="lg:col-span-3 lg:row-span-2">
-                @php
-                    $statusLabel = 'PRODUKSI';
-                    $statusBg = 'bg-emerald-500/10 border-emerald-500/20';
-                    $statusText = 'text-emerald-400';
-                    $statusPulseColor = 'bg-emerald-500';
-
-                    if ($hasActiveNonDandoriDt) {
-                        $dtType = strtolower($activeDowntime->jenis_downtime);
-                        if ($dtType === 'break time') {
-                            $statusLabel = 'BREAK';
-                            $statusBg = 'bg-slate-500/10 border-slate-500/20';
-                            $statusText = 'text-slate-400';
-                            $statusPulseColor = 'bg-slate-500';
-                        } elseif ($dtType === 'try out') {
-                            $statusLabel = 'TRY OUT';
-                            $statusBg = 'bg-orange-500/10 border-orange-500/20';
-                            $statusText = 'text-orange-400';
-                            $statusPulseColor = 'bg-orange-500';
-                        } else {
-                            $statusLabel = 'DOWNTIME';
-                            $statusBg = 'bg-rose-500/10 border-rose-500/20';
-                            $statusText = 'text-rose-400';
-                            $statusPulseColor = 'bg-rose-500';
-                        }
-                    } elseif ($openFirstCheck || $wasInFirstCheck) {
-                        $statusLabel = '1ST CHECK';
-                        $statusBg = 'bg-purple-500/10 border-purple-500/20';
-                        $statusText = 'text-purple-400';
-                        $statusPulseColor = 'bg-purple-500';
-                    } elseif ($openDandori) {
-                        $statusLabel = 'DANDORI';
-                        $statusBg = 'bg-amber-500/10 border-amber-500/20';
-                        $statusText = 'text-amber-400';
-                        $statusPulseColor = 'bg-amber-500';
-                    } elseif (!$activeJob->started_at) {
-                        $statusLabel = 'PENDING';
-                        $statusBg = 'bg-slate-100 border-slate-200';
-                        $statusText = 'text-slate-500';
-                        $statusPulseColor = 'bg-slate-400';
-                    }
-                @endphp
-                <div class="p-5 bg-white border border-slate-200 rounded-3xl h-full flex flex-col justify-between gap-3">
-                    <div>
-                        <div class="flex items-center gap-3">
-                            <div class="w-12 h-12 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center shadow-lg shadow-red-900/5 flex-shrink-0">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-                            </div>
-                            <div class="min-w-0">
-                                <span class="text-[10px] sm:text-xs font-black text-red-500 uppercase tracking-widest block leading-none">Running Session</span>
-                                <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5">
-                                    {{ strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number }}
-                                </h2>
-                            </div>
-                        </div>
-
-                        <!-- Realtime Status Alert Label -->
-                        <div id="realtime-status-container" class="px-4 py-3 mt-3.5 rounded-2xl border {{ $statusBg }} flex items-center justify-between transition-all duration-300">
-                            <div class="flex items-center gap-2">
-                                <span class="relative flex h-2 w-2">
-                                    <span id="realtime-status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full {{ $statusPulseColor }} opacity-75"></span>
-                                    <span id="realtime-status-dot" class="relative inline-flex rounded-full h-2 w-2 {{ $statusPulseColor }}"></span>
-                                </span>
-                                <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">Status:</span>
-                            </div>
-                            <span id="realtime-status-text" class="text-sm font-black {{ $statusText }} uppercase tracking-widest">
-                                {{ $statusLabel }}
-                            </span>
-                        </div>
-                    </div>
-                    @php
-                        $nextJob = null;
-                        if (isset($activeJob) && isset($pendingJobs)) {
-                            $foundActive = false;
-                            foreach ($pendingJobs as $pj) {
-                                if ($pj->id == $activeJob->id) {
-                                    $foundActive = true;
-                                    continue;
-                                }
-                                if ($foundActive && strtolower($pj->status) === 'pending') {
-                                    $nextJob = $pj;
-                                    break;
-                                }
-                            }
-                            if (!$nextJob) {
-                                foreach ($pendingJobs as $pj) {
-                                    if ($pj->id != $activeJob->id && strtolower($pj->status) === 'pending') {
-                                        $nextJob = $pj;
-                                        break;
-                                    }
-                                }
-                            }
-                        }
-                    @endphp
-
-                    <div class="space-y-1">
-                        <p class="text-[9px] sm:text-xs text-slate-400 font-black uppercase tracking-wider leading-none">Next Item</p>
-                        <p class="text-xs sm:text-sm font-black truncate leading-tight text-slate-700" title="{{ $nextJob ? $nextJob->job_name : 'No pending items' }}">
-                            @if($nextJob)
-                                {{ strpos($nextJob->job_number, '-') !== false ? substr($nextJob->job_number, 0, strrpos($nextJob->job_number, '-')) : $nextJob->job_number }}
-                            @else
-                                <span class="text-slate-500 italic">None</span>
-                            @endif
-                        </p>
-                    </div>
-                    
-                    <div class="flex items-center justify-between border-t border-slate-200 pt-3 text-[9px] sm:text-xs mt-1">
-                        <div>
-                            <span class="text-slate-400 font-black uppercase leading-none block">Line</span>
-                            <span class="text-xs sm:text-sm font-black text-red-500 leading-none block mt-1.5">{{ $activeJob->line }}</span>
-                        </div>
-                        <div class="w-[1px] h-6 bg-slate-200"></div>
-                        <div class="text-right">
-                            <span class="text-slate-400 font-black uppercase leading-none block">Work Date</span>
-                            <span class="text-xs sm:text-sm font-black text-slate-700 leading-none block mt-1.5">{{ now()->format('d/m/Y') }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-
-            {{-- BREAK OVERLAY (hidden by default, shown during auto-break) --}}
-            <div id="break-overlay" class="lg:col-span-12 {{ $isOnBreak ? '' : 'hidden' }}">
+            </div>            {{-- BREAK OVERLAY (hidden by default, shown during auto-break) --}}
+            <div id="break-overlay" class="w-full {{ $isOnBreak ? '' : 'hidden' }}">
                 <div class="flex flex-col items-center justify-center py-16 rounded-3xl bg-white border-2 border-slate-200">
                     <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6 border border-slate-200">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10 text-slate-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
@@ -342,8 +222,11 @@
             </div>
 
             {{-- ROW 2: Performance Console (Left, 9 cols) & Operator Console (Right, 3 cols) --}}
+            <div id="active-work-area" class="w-full {{ $isOnBreak ? 'hidden' : '' }}">
+
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
             <!-- Performance Console (Left Area) -->
-            <div id="active-work-area" class="lg:col-span-9 {{ $isOnBreak ? 'hidden' : '' }}">
+            <div class="lg:col-span-9">
                 <!-- Quick Entry & Performance Console (min-h-[220px]) -->
                 @if($activeJob->started_at && !$isDandori)
                 <div class="p-5 bg-red-50/50 border border-red-200 rounded-3xl min-h-[220px] flex flex-col gap-4 h-full">
@@ -480,8 +363,134 @@
                 </div>
             </div>
 
+                        </div>
+
+            {{-- RIGHT COLUMN --}}
+            <div class="w-full lg:w-1/4 xl:w-[320px] 2xl:w-[360px] flex flex-col gap-4 shrink-0">
+<!-- Running Session Card (Right Area) -->
+            <div class="w-full shrink-0">
+                @php
+                    $statusLabel = 'PRODUKSI';
+                    $statusBg = 'bg-emerald-500/10 border-emerald-500/20';
+                    $statusText = 'text-emerald-400';
+                    $statusPulseColor = 'bg-emerald-500';
+
+                    if ($hasActiveNonDandoriDt) {
+                        $dtType = strtolower($activeDowntime->jenis_downtime);
+                        if ($dtType === 'break time') {
+                            $statusLabel = 'BREAK';
+                            $statusBg = 'bg-slate-500/10 border-slate-500/20';
+                            $statusText = 'text-slate-400';
+                            $statusPulseColor = 'bg-slate-500';
+                        } elseif ($dtType === 'try out') {
+                            $statusLabel = 'TRY OUT';
+                            $statusBg = 'bg-orange-500/10 border-orange-500/20';
+                            $statusText = 'text-orange-400';
+                            $statusPulseColor = 'bg-orange-500';
+                        } else {
+                            $statusLabel = 'DOWNTIME';
+                            $statusBg = 'bg-rose-500/10 border-rose-500/20';
+                            $statusText = 'text-rose-400';
+                            $statusPulseColor = 'bg-rose-500';
+                        }
+                    } elseif ($openFirstCheck || $wasInFirstCheck) {
+                        $statusLabel = '1ST CHECK';
+                        $statusBg = 'bg-purple-500/10 border-purple-500/20';
+                        $statusText = 'text-purple-400';
+                        $statusPulseColor = 'bg-purple-500';
+                    } elseif ($openDandori) {
+                        $statusLabel = 'DANDORI';
+                        $statusBg = 'bg-amber-500/10 border-amber-500/20';
+                        $statusText = 'text-amber-400';
+                        $statusPulseColor = 'bg-amber-500';
+                    } elseif (!$activeJob->started_at) {
+                        $statusLabel = 'PENDING';
+                        $statusBg = 'bg-slate-100 border-slate-200';
+                        $statusText = 'text-slate-500';
+                        $statusPulseColor = 'bg-slate-400';
+                    }
+                @endphp
+                <div class="p-5 bg-white border border-slate-200 rounded-3xl h-full flex flex-col justify-between gap-3">
+                    <div>
+                        <div class="flex items-center gap-3">
+                            <div class="w-12 h-12 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center shadow-lg shadow-red-900/5 flex-shrink-0">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <span class="text-[10px] sm:text-xs font-black text-red-500 uppercase tracking-widest block leading-none">Running Session</span>
+                                <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5">
+                                    {{ strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number }}
+                                </h2>
+                            </div>
+                        </div>
+
+                        <!-- Realtime Status Alert Label -->
+                        <div id="realtime-status-container" class="px-4 py-3 mt-3.5 rounded-2xl border {{ $statusBg }} flex items-center justify-between transition-all duration-300">
+                            <div class="flex items-center gap-2">
+                                <span class="relative flex h-2 w-2">
+                                    <span id="realtime-status-ping" class="animate-ping absolute inline-flex h-full w-full rounded-full {{ $statusPulseColor }} opacity-75"></span>
+                                    <span id="realtime-status-dot" class="relative inline-flex rounded-full h-2 w-2 {{ $statusPulseColor }}"></span>
+                                </span>
+                                <span class="text-[9px] font-black text-slate-500 uppercase tracking-wider">Status:</span>
+                            </div>
+                            <span id="realtime-status-text" class="text-sm font-black {{ $statusText }} uppercase tracking-widest">
+                                {{ $statusLabel }}
+                            </span>
+                        </div>
+                    </div>
+                    @php
+                        $nextJob = null;
+                        if (isset($activeJob) && isset($pendingJobs)) {
+                            $foundActive = false;
+                            foreach ($pendingJobs as $pj) {
+                                if ($pj->id == $activeJob->id) {
+                                    $foundActive = true;
+                                    continue;
+                                }
+                                if ($foundActive && strtolower($pj->status) === 'pending') {
+                                    $nextJob = $pj;
+                                    break;
+                                }
+                            }
+                            if (!$nextJob) {
+                                foreach ($pendingJobs as $pj) {
+                                    if ($pj->id != $activeJob->id && strtolower($pj->status) === 'pending') {
+                                        $nextJob = $pj;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    @endphp
+
+                    <div class="space-y-1">
+                        <p class="text-[9px] sm:text-xs text-slate-400 font-black uppercase tracking-wider leading-none">Next Item</p>
+                        <p class="text-xs sm:text-sm font-black truncate leading-tight text-slate-700" title="{{ $nextJob ? $nextJob->job_name : 'No pending items' }}">
+                            @if($nextJob)
+                                {{ strpos($nextJob->job_number, '-') !== false ? substr($nextJob->job_number, 0, strrpos($nextJob->job_number, '-')) : $nextJob->job_number }}
+                            @else
+                                <span class="text-slate-500 italic">None</span>
+                            @endif
+                        </p>
+                    </div>
+                    
+                    <div class="flex items-center justify-between border-t border-slate-200 pt-3 text-[9px] sm:text-xs mt-1">
+                        <div>
+                            <span class="text-slate-400 font-black uppercase leading-none block">Line</span>
+                            <span class="text-xs sm:text-sm font-black text-red-500 leading-none block mt-1.5">{{ $activeJob->line }}</span>
+                        </div>
+                        <div class="w-[1px] h-6 bg-slate-200"></div>
+                        <div class="text-right">
+                            <span class="text-slate-400 font-black uppercase leading-none block">Work Date</span>
+                            <span class="text-xs sm:text-sm font-black text-slate-700 leading-none block mt-1.5">{{ now()->format('d/m/Y') }}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
             <!-- Operator Console (Right Area) -->
-            <div id="operator-console-area" class="lg:col-start-10 lg:col-span-3 {{ $isOnBreak ? 'hidden' : '' }}">
+            <div id="operator-console-area" class="w-full {{ $isOnBreak ? 'hidden' : '' }}">
                 @php
                     $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
                     $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
@@ -663,9 +672,10 @@
                     </div>
                 </div>
                 @endif
-            </div>
             
-            {{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
+            
+                        </div>
+{{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
             @if($activeJob->started_at)
             <div class="lg:col-span-12 mt-4 pt-4 border-t border-slate-200">
                 <div class="flex items-center justify-between mb-3">
@@ -693,6 +703,8 @@
                 </div>
             </div>
             @endif
+
+            </div> {{-- end #active-work-area --}}
 
             {{-- REKAM JEJAK --}}
             @if(isset($productionLogs) && $productionLogs->isNotEmpty() && isset($activeJob))
