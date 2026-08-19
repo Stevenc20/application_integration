@@ -666,14 +666,14 @@ function getClasses(desc, k){
         const actVal = parseFloat(k.actual);
         if(!isNaN(actVal) && !isNaN(planVal) && planVal>0){
             const pct = (actVal/planVal)*100;
-            act = pct>=100?'bg-green':pct>=80?'bg-yellow':'bg-red';
+            act = pct>=100?'bg-green':'bg-red';
         } else if(actVal>0) act = 'bg-green';
         
         if(k.current && k.current!=='-'){
             const currVal = parseFloat(k.current);
             if(!isNaN(currVal) && !isNaN(planVal) && planVal>0){
                 const currPct = (currVal/planVal)*100;
-                curr = currPct>=100?'bg-green':currPct>=80?'bg-yellow':'bg-red';
+                curr = currPct>=100?'bg-green':'bg-red';
             } else if(currVal>0) curr = 'bg-green';
         }
     }else if(desc==='REPAIR'||desc==='REJECT'){
@@ -732,8 +732,6 @@ function buildRightBody(rows, maxRows, overallPlan){
                 const pct = (j.gsph_actual / planToUse) * 100;
                 if (pct >= 100) {
                     gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
-                } else if (pct >= 80) {
-                    gsphSt = 'background-color:#eab308!important; color:#000!important; font-weight:900;';
                 } else {
                     const blinkClass = j.is_running ? 'animation:blink-red .8s ease-in-out infinite;' : '';
                     gsphSt = `background-color:#ef4444!important; color:#fff!important; font-weight:900; ${blinkClass}`;
@@ -1140,7 +1138,7 @@ function renderTable(){
     }
 
     const progressPct = parseFloat(pct);
-    const barColor = progressPct >= 100 ? '#22c55e' : progressPct >= 80 ? '#eab308' : '#ef4444';
+    const barColor = progressPct >= 100 ? '#22c55e' : '#ef4444';
 
     const kpiGsph = kv(lineKey, 'GSPH');
     const overallPlan = kpiGsph ? (parseFloat(kpiGsph.plan) || 0) : 0;
@@ -1248,7 +1246,7 @@ function renderTable(){
 }
 
 fetchData();
-setInterval(fetchData,5000);
+setInterval(fetchData, 1500);
 document.addEventListener('visibilitychange',function(){
     if(!document.hidden){LAST_HASH='';fetchData();}
 });
