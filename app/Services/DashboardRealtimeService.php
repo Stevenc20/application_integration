@@ -392,9 +392,26 @@ class DashboardRealtimeService
 
         $runtimeMinutes = round(array_sum(array_map(fn($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 0);
 
-        $gsph = ProductionMetricsService::gsph($ok, max($runtimeMinutes, 1));
-        $currRuntimeMinutes = round($currRuntime / 60, 0);
-        $currGsph = $hasRunning ? ProductionMetricsService::gsph($currOk, max($currRuntimeMinutes, 1)) : 0;
+        $totalPressTime = 0;
+        $currPressTime = 0;
+
+        foreach ($dailyRecords as $dp) {
+            if (!$dp->jobMaster) continue;
+            $plan = $plans->firstWhere('job_no', $dp->jobMaster->job_number);
+            $ctDetik = $plan ? (float) $plan->ct_detik : 0;
+            
+            $actualQty = (int)$dp->actual_ok + (int)$dp->actual_repair + (int)$dp->actual_reject;
+            $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 0) : 0;
+            
+            $totalPressTime += $pressTime;
+            
+            if ($runningRecord && $dp->job_master_id === $runningRecord->job_master_id) {
+                $currPressTime = $pressTime;
+            }
+        }
+
+        $gsph = $totalPressTime > 0 ? round($ok / ($totalPressTime / 60)) : 0;
+        $currGsph = ($hasRunning && $currPressTime > 0) ? round($currOk / ($currPressTime / 60)) : 0;
 
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 1));

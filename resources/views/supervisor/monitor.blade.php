@@ -260,8 +260,8 @@
         body.dark .filter-bar button.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
         
         /* PLAN Column Highlighting */
-        .th-plan, .val-plan { background-color: #e2e8f0 !important; }
-        body.dark .th-plan, body.dark .val-plan { background-color: #334155 !important; color: #cbd5e1 !important; border-color: #475569 !important; }
+        .left-kpi-table .th-plan, .left-kpi-table .val-plan { background-color: #e2e8f0 !important; }
+        body.dark .left-kpi-table .th-plan, body.dark .left-kpi-table .val-plan { background-color: #334155 !important; color: #cbd5e1 !important; border-color: #475569 !important; }
         body.dark #shiftBar button{background:#334155;color:#cbd5e1;border-color:#475569}
         body.dark #shiftBar button:hover{background:#475569}
         body.dark #shiftBar button.active{background:#10b981;color:#fff;border-color:#10b981}
