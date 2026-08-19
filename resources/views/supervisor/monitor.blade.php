@@ -464,15 +464,15 @@
                 <button onclick="setShift(1,true)" data-shift="1" class="active">Shift Pagi</button>
                 <button onclick="setShift(2,true)" data-shift="2" class="">Shift Malam</button>
             </div>
-            <div>
-                <div id="shiftLabel">Shift A</div>
-                <div id="dateLabel">--</div>
-            </div>
-            <button class="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode" id="themeBtn">
+            <button class="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode" id="themeBtn" style="margin-left: 4px; margin-right: 8px;">
                 <svg id="themeIcon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                 </svg>
             </button>
+            <div style="text-align: right; padding-right: 6px;">
+                <div id="shiftLabel">Shift A</div>
+                <div id="dateLabel">--</div>
+            </div>
             <div class="clock" id="liveClock">--:--:--</div>
             <a href="{{ route('supervisor.dashboard') }}" class="exit-btn">
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
