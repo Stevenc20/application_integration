@@ -84,16 +84,16 @@
                 <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3">
 
                     <!-- Scheduling -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
-                        <div class="flex flex-wrap items-center gap-2">
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                        <div class="flex items-center gap-2">
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Scheduling</span>
                             <span class="w-px h-4 bg-slate-300"></span>
                             <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
                             <span class="text-slate-300 font-bold text-sm leading-none">—</span>
                             <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
                         </div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <span class="w-px h-4 bg-slate-300 hidden sm:block"></span>
+                        <div class="flex items-center gap-2">
+                            <span class="w-px h-4 bg-slate-300 hidden md:block"></span>
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Act</span>
                             <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actStartVal ?: '--:--' }}</span>
                             <span class="text-slate-300 font-bold text-xs leading-none">—</span>
@@ -397,9 +397,9 @@
                         </div>
 
                         <!-- Right: OK / Repair / Reject (side by side) -->
-                        <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <div class="flex-1 flex flex-wrap gap-3">
                             <!-- OK Counter -->
-                            <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                            <div class="flex-1 min-w-[200px] bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
                                 <div class="flex justify-between items-center border-b border-slate-200 pb-2">
                                     <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">OK</span>
                                     <span class="text-3xl sm:text-4xl font-black text-slate-800 leading-none tabular-nums animate-pulse" id="active-actual-display">{{ $activeJob->dailyProduction->actual_ok ?? 0 }}</span>
@@ -428,7 +428,7 @@
                             </div>
 
                             <!-- REPAIR Counter -->
-                            <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                            <div class="flex-1 min-w-[150px] bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
                                 <div class="flex justify-between items-center border-b border-slate-200 pb-2">
                                     <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Repair</span>
                                     <span class="text-3xl sm:text-4xl font-black text-orange-500 leading-none tabular-nums" id="active-repair-display">{{ $activeJob->dailyProduction->actual_repair ?? 0 }}</span>
@@ -445,7 +445,7 @@
                             </div>
 
                             <!-- REJECT Counter -->
-                            <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
+                            <div class="flex-1 min-w-[150px] bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
                                 <div class="flex justify-between items-center border-b border-slate-200 pb-2">
                                     <span class="text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-wider">Reject</span>
                                     <span class="text-3xl sm:text-4xl font-black text-red-500 leading-none tabular-nums" id="active-reject-display">{{ $activeJob->dailyProduction->actual_reject ?? 0 }}</span>
