@@ -686,7 +686,7 @@ function chkP(c, lbl){
 
 // ── Fit-to-screen + auto-rotate helpers ──
 const MIN_FIT = 0.6;
-const ROTATE_MS = 10000;
+const ROTATE_MS = 15000;
 let detailPage = 0;
 let detailPages = 1;
 let rotateTimer = null;
@@ -725,7 +725,7 @@ function buildRightBody(rows, maxRows){
 
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
-                ${dtCell(j.job_number, 'text-align:left;font-weight:600;width:100%;', 'det-job')}
+                ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
                 ${dtCell(`<div style="display:flex;gap:0.3vw;justify-content:center;align-items:center;">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`)}
                 ${dtCell(j.plan_qty, '', 'det-qty')}
                 ${dtCell(j.good, 'font-weight:600;', 'det-good')}
