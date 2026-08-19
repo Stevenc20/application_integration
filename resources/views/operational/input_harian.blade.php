@@ -765,15 +765,7 @@ function goToIssue(type, planId, jobMasterId, dtId) {
     }, 10000);
 </script>
 
-@php
-    $peLegacyFiles = glob(public_path('build/assets/production-engine-legacy-*.js'));
-    if (!empty($peLegacyFiles)) {
-        usort($peLegacyFiles, function($a, $b) {
-            return filemtime($b) - filemtime($a);
-        });
-        echo '<script src="' . asset('build/assets/' . basename($peLegacyFiles[0])) . '"></script>';
-    }
-@endphp
+@vite(['resources/js/operational/production-engine.js'])
 {{-- MODAL PULL AHEAD --}}
 <div id="pullAheadModal" class="fixed inset-0 z-[100] flex justify-end bg-black/40 backdrop-blur-sm hidden" onclick="if(event.target === this) closePullAheadModal()">
     <div class="bg-gray-50 w-full max-w-2xl h-full shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300" id="pullAheadSidebar">
