@@ -738,13 +738,18 @@ class ProductionService
             }
 
             // Close any open dandori downtime
-            Downtime::where('job_master_id', $jobId)
+            $dandoriDt = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
-                ->update([
+                ->first();
+
+            if ($dandoriDt) {
+                \Illuminate\Support\Facades\Cache::put('was_in_dandori_' . $jobId, true, 86400);
+                $dandoriDt->update([
                     'finish_time' => $now,
-                    'duration_seconds' => DB::raw("TIMESTAMPDIFF(SECOND, start_time, '{$now}')")
+                    'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($dandoriDt->start_time)))
                 ]);
+            }
 
             $downtime = Downtime::create([
                 'job_master_id' => $jobId,
@@ -872,6 +877,20 @@ class ProductionService
                 \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $jobId);
                 $resumedFirstCheck = $this->startFirstCheck($jobId);
                 $firstCheckResumed = true;
+            }
+
+            // AUTO-RESUME Dandori if it was paused when downtime was triggered
+            if (\Illuminate\Support\Facades\Cache::has('was_in_dandori_' . $jobId)) {
+                \Illuminate\Support\Facades\Cache::forget('was_in_dandori_' . $jobId);
+                Downtime::create([
+                    'job_master_id' => $jobId,
+                    'jenis_downtime' => 'dandori',
+                    'problem' => 'PERSIAPAN (DANDORI)',
+                    'start_time' => now(),
+                    'penyebab' => '-',
+                    'action' => '-',
+                    'pic' => 'OPERATOR'
+                ]);
             }
 
             $this->signalDashboard($downtime->job_master_id);
