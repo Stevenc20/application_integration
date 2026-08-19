@@ -1028,7 +1028,7 @@ function renderTable(){
 
         let b = '';
         leftRows.forEach(desc => {
-            b += '<tr>';
+            b += `<tr id="row-${desc}">`;
             let descHtml = desc;
             if(desc === 'GSPH') {
                 descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
@@ -1102,8 +1102,8 @@ function renderTable(){
     // Build left side HTML
     let leftBodyHtml = '';
     for (let i = 0; i < leftRows.length; i++) {
-        leftBodyHtml += '<tr>';
         const desc = leftRows[i];
+        leftBodyHtml += `<tr id="row-${desc}">`;
         
         let descHtml = desc;
         leftBodyHtml += `<td class="desc-cell">${descHtml}</td>`;
