@@ -136,6 +136,8 @@ class DashboardDetailService
                 'tpt'              => $tpt,
                 'plan_finish'      => $planFinish ?: '-',
                 'actual_finish'    => $actualFinish,
+                'gsph_plan'        => (float) ($plan->gsph_item ?? 0),
+                'gsph_actual'      => $pressTime > 0 ? round($actualOk / ($pressTime / 60)) : 0,
             ];
         }
 

@@ -703,6 +703,13 @@ function buildRightBody(rows, maxRows){
             const iq = j.iq_check > 0 ? j.iq_check + ' m' : '-';
             const dw = j.downtime > 0 ? j.downtime + ' m' : '-';
             const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
+            
+            let gsphSt = 'font-weight:700;';
+            if (j.gsph_plan > 0 && j.good > 0 && j.gsph_actual < j.gsph_plan) {
+                gsphSt = 'background-color:#ef4444!important; color:#fff!important; font-weight:700; animation:blink-red .8s ease-in-out infinite';
+            }
+            const gsphTxt = (j.gsph_plan > 0 || j.gsph_actual > 0) ? j.gsph_actual : '-';
+
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
                 ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
@@ -718,11 +725,12 @@ function buildRightBody(rows, maxRows){
                 ${dtCell(tp, 'font-weight:700;', 'det-tpt')}
                 ${dtCell(j.plan_finish)}
                 ${dtCell(j.actual_finish)}
+                ${dtCell(gsphTxt, gsphSt)}
             `;
         } else {
             if (!renderedRightRowspan) {
                 const remainingRight = maxRows - rows.length;
-                h += `<td rowspan="${remainingRight}" colspan="14" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                h += `<td rowspan="${remainingRight}" colspan="15" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
                 renderedRightRowspan = true;
             }
         }
@@ -747,12 +755,13 @@ function applyFit(root){
     const scrollEl = document.querySelector('.table-scroll');
     if(!root || !scrollEl) return;
     
-    // Disable auto-zoom / scaling completely so text stays big and fixed
+    // Restore auto-zoom
+    const s = computeFit(root);
     scrollEl.style.overflow = 'hidden';
-    root.style.transform = '';
-    root.style.width = '100%';
-    root.style.height = '100%';
-    root.style.zoom = '';
+    root.style.transform = `scale(${s})`;
+    root.style.transformOrigin = 'top left';
+    root.style.width = `${100/s}%`;
+    root.style.height = `${100/s}%`;
 }
 
 function stopRotate(){
@@ -1101,7 +1110,7 @@ function renderTable(){
         const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length);
         const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
         scrollEl.innerHTML = `
-        <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
+        <div style="display:flex; flex-direction:column; width:100%; min-height:100%; min-width:1366px;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
                 <div class="card-bg" style="width:23%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink: 0;">
@@ -1127,7 +1136,7 @@ function renderTable(){
                     <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:auto; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
-                                <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
+                                <th colspan="15" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
                                 <th style="border-left:none; white-space:nowrap;">NO</th>
@@ -1144,6 +1153,7 @@ function renderTable(){
                                 <th class="det-tpt" style="white-space:nowrap;">TPT</th>
                                 <th style="white-space:nowrap;">PLAN FIN</th>
                                 <th style="white-space:nowrap;">ACT FIN</th>
+                                <th style="white-space:nowrap; border-right:none;">GSPH</th>
                             </tr>
                         </thead>
                         <tbody>
