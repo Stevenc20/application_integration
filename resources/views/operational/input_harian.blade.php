@@ -996,7 +996,9 @@ function goToIssue(type, planId, jobMasterId, dtId) {
     setInterval(() => {
         const now = new Date();
         if (now.getHours() === 7 && now.getMinutes() === 30 && now.getSeconds() === 2) {
-            window.location.reload();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('shift'); // Hapus parameter shift lama agar auto-detect
+            window.location.href = url.toString();
         }
     }, 1000);
 </script>
