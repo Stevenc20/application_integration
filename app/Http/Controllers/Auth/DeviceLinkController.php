@@ -73,7 +73,7 @@ class DeviceLinkController extends Controller
                 'supervisor' => route('supervisor.dashboard'),
                 'foreman' => route('supervisor.dashboard'),
                 'operator' => route('operator.dashboard'),
-                'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => route('supervisor.dashboard'),
+                'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => route('operational.input_harian'),
                 'ppc' => route('ppc.dashboard'),
                 'quality' => route('quality.dashboard'),
                 'production' => route('production.dashboard'),

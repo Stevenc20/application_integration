@@ -61,9 +61,7 @@ class AuthController extends Controller
             'foreman' => redirect()->route('supervisor.dashboard'),
 
             'operator' => redirect()->route('operator.dashboard'),
-
-            'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => redirect()->route('supervisor.dashboard'),
-
+            'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => redirect()->route('operational.input_harian'),
             'ppc' => redirect()->route('ppc.dashboard'),
 
             'quality' => redirect()->route('quality.dashboard'),
