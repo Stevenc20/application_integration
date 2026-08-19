@@ -260,8 +260,8 @@
         body.dark .filter-bar button.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
         
         /* PLAN Column Highlighting */
-        .th-plan, .val-plan { background-color: #f1f5f9 !important; }
-        body.dark .th-plan, body.dark .val-plan { background-color: #1e293b !important; color: #94a3b8 !important; border-color: #334155 !important; }
+        .th-plan, .val-plan { background-color: #e2e8f0 !important; }
+        body.dark .th-plan, body.dark .val-plan { background-color: #334155 !important; color: #cbd5e1 !important; border-color: #475569 !important; }
         body.dark #shiftBar button{background:#334155;color:#cbd5e1;border-color:#475569}
         body.dark #shiftBar button:hover{background:#475569}
         body.dark #shiftBar button.active{background:#10b981;color:#fff;border-color:#10b981}
@@ -473,11 +473,11 @@
                     <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
                 </svg>
             </button>
+            <div class="clock" id="liveClock" style="margin-right: 12px;">--:--:--</div>
             <div style="text-align: right; padding-right: 6px;">
                 <div id="shiftLabel">Shift A</div>
                 <div id="dateLabel">--</div>
             </div>
-            <div class="clock" id="liveClock">--:--:--</div>
             <a href="{{ route('supervisor.dashboard') }}" class="exit-btn">
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
                 Exit
