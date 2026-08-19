@@ -176,6 +176,17 @@
             overflow:hidden!important;text-overflow:ellipsis!important;max-width:0!important;
             color: #1e293b;
         }
+        .right-detail-table th, .right-detail-table td {
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            padding: 3px 2px !important;
+            font-size: 10px !important;
+        }
+        .right-detail-table thead th {
+            font-size: 9px !important;
+            padding: 4px 2px !important;
+        }
         .large-table thead th{font-size:10px!important;padding:8px 4px!important}
         .large-table thead th.line-header{font-size:12px!important;padding:10px 4px!important}
         .large-table td.desc-cell{font-size:11px!important;padding-left:8px!important}
@@ -667,9 +678,9 @@ function getClasses(desc, k){
 }
 
 function dtCell(v,st,cls){ return `<td class="${cls||''}" style="${st||''}">${v}</td>`; }
-function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700">-</span>'; }
+function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:9px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:9px;font-weight:700">-</span>'; }
 function chkP(c, lbl){
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span style="font-size:8px;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:2px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700;line-height:1">-</span>') + `</div>`;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span style="font-size:7px;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:2px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:9px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:2px;background:#f3f4f6;color:#9ca3af;font-size:9px;font-weight:700;line-height:1">-</span>') + `</div>`;
 }
 
 // ── Fit-to-screen + auto-rotate helpers ──
@@ -1093,7 +1104,7 @@ function renderTable(){
         <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
-                <div class="card-bg" style="width:24%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
+                <div class="card-bg" style="width:23%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink: 0;">
                     <table class="large-table left-kpi-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
                             <tr class="single-top-header">
@@ -1112,27 +1123,27 @@ function renderTable(){
                     </table>
                 </div>
                 <!-- Right Detail Table -->
-                <div style="width:76%; display:flex; flex-direction:column;">
-                    <table class="large-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
+                <div style="width:77%; display:flex; flex-direction:column; overflow:hidden;">
+                    <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:auto; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
                                 <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:3%; border-left:none;">NO</th>
-                                <th style="width:12%">JOB NO</th>
-                                <th style="width:15%">PROCESS</th>
-                                <th style="width:6%">PLAN QTY</th>
-                                <th class="det-good" style="width:7%;">GOOD</th>
-                                <th class="det-repair" style="width:5%;">REP</th>
-                                <th class="det-reject" style="width:5%;">REJ</th>
-                                <th style="width:8%">PRESS T...</th>
-                                <th style="width:7%">DANDORI</th>
-                                <th style="width:7%">10 CHECK</th>
-                                <th style="width:7%">DOWNTIME</th>
-                                <th class="det-tpt" style="width:4%;">TPT</th>
-                                <th style="width:7%">PLAN FIN</th>
-                                <th style="width:7%">ACT FIN</th>
+                                <th style="border-left:none; white-space:nowrap;">NO</th>
+                                <th style="white-space:nowrap;">JOB NO</th>
+                                <th style="white-space:nowrap;">PROCESS</th>
+                                <th style="white-space:nowrap;">PLAN QTY</th>
+                                <th class="det-good" style="white-space:nowrap;">GOOD</th>
+                                <th class="det-repair" style="white-space:nowrap;">REP</th>
+                                <th class="det-reject" style="white-space:nowrap;">REJ</th>
+                                <th style="white-space:nowrap;">PRESS TIME</th>
+                                <th style="white-space:nowrap;">DANDORI</th>
+                                <th style="white-space:nowrap;">10 CHECK</th>
+                                <th style="white-space:nowrap;">DOWNTIME</th>
+                                <th class="det-tpt" style="white-space:nowrap;">TPT</th>
+                                <th style="white-space:nowrap;">PLAN FIN</th>
+                                <th style="white-space:nowrap;">ACT FIN</th>
                             </tr>
                         </thead>
                         <tbody>
