@@ -1198,7 +1198,7 @@ function renderTable(){
         detailPages = Math.ceil(rightRows.length / pageSize);
         detailPage = Math.min(detailPage, detailPages - 1);
         const pageRows = rightRows.slice(detailPage * pageSize, (detailPage + 1) * pageSize);
-        root = renderCaseB(pageRows, { page: detailPage + 1, pages: detailPages }, false);
+        root = renderCaseB(pageRows, { page: detailPage + 1, pages: detailPages }, true);
         startRotate();
     } else {
         detailPages = 1;
