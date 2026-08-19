@@ -761,6 +761,16 @@ class ProductionService
                 'start_time' => $now
             ]);
 
+            // Pause the job and session
+            $session = ProductionSession::where('job_master_id', $jobId)
+                ->whereDate('work_date', now()->toDateString())
+                ->where('status', 'running')
+                ->first();
+            if ($session) {
+                $session->update(['status' => 'paused', 'pause_time' => $now]);
+            }
+            JobMaster::where('id', $jobId)->update(['status' => 'paused']);
+
             $this->syncHambatanJalur($downtime);
 
             // Send notification reminder to Supervisor & Leaders
@@ -868,6 +878,22 @@ class ProductionService
                 ['job_master_id' => $downtime->job_master_id, 'work_date' => now()->toDateString()],
                 ['downtime_seconds' => $totalDowntime]
             );
+
+            // Auto-resume job if no other active downtimes exist
+            $otherActive = Downtime::where('job_master_id', $downtime->job_master_id)
+                ->whereNull('finish_time')
+                ->exists();
+
+            if (!$otherActive) {
+                $session = ProductionSession::where('job_master_id', $downtime->job_master_id)
+                    ->whereDate('work_date', now()->toDateString())
+                    ->whereIn('status', ['paused', 'running'])
+                    ->first();
+                if ($session) {
+                    $session->update(['status' => 'running']);
+                }
+                JobMaster::where('id', $downtime->job_master_id)->update(['status' => 'running']);
+            }
 
             // AUTO-RESUME 1st Check if it was paused when downtime was triggered
             $firstCheckResumed = false;
