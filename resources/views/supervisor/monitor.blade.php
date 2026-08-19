@@ -258,6 +258,10 @@
         body.dark .filter-bar button{background:#334155;color:#cbd5e1;border-color:#475569}
         body.dark .filter-bar button:hover{background:#475569}
         body.dark .filter-bar button.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+        
+        /* PLAN Column Highlighting */
+        .th-plan, .val-plan { background-color: #f1f5f9 !important; }
+        body.dark .th-plan, body.dark .val-plan { background-color: #1e293b !important; color: #94a3b8 !important; border-color: #334155 !important; }
         body.dark #shiftBar button{background:#334155;color:#cbd5e1;border-color:#475569}
         body.dark #shiftBar button:hover{background:#475569}
         body.dark #shiftBar button.active{background:#10b981;color:#fff;border-color:#10b981}
@@ -819,7 +823,7 @@ function renderAllLines(){
         let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:16px;text-align:left;padding-left:4px;">DESC</th>';
         LINES.forEach((l,li)=>{hh+=`<th colspan="3" class="line-header">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`});
         hh+='</tr><tr>';
-        LINES.forEach(()=>{hh+='<th style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th style="font-size:16px;">ACTUAL</th>'});
+        LINES.forEach(()=>{hh+='<th class="th-plan" style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th style="font-size:16px;">ACTUAL</th>'});
         hh+='</tr>';
         thead.innerHTML=hh;
 
@@ -1133,7 +1137,7 @@ function renderTable(){
                             </tr>
                             <tr style="height:25px;">
                                 <th style="width:28%;font-size:1.1vw;text-align:left;padding-left:6px;">DESC</th>
-                                <th style="width:24%;font-size:1.1vw;">PLAN</th>
+                                <th class="th-plan" style="width:24%;font-size:1.1vw;">PLAN</th>
                                 <th style="width:24%;font-size:1.1vw;">CURR</th>
                                 <th style="width:24%; border-right:none;font-size:1.1vw;">ACTUAL</th>
                             </tr>
