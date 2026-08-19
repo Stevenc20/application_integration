@@ -120,6 +120,7 @@ class DashboardDetailService
 
             $rows[] = [
                 'no'               => $no,
+                'job_master_id'    => $jobId,
                 'job_number'       => $plan->job_no ?? '-',
                 'p1'               => (bool) (($plan->p1 ?? false) ?: ($plan->a1 > 0) ?: ($plan->total_mesin >= 1)),
                 'p2'               => (bool) (($plan->p2 ?? false) ?: ($plan->a2 > 0) ?: ($plan->total_mesin >= 2)),

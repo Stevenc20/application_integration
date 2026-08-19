@@ -705,7 +705,7 @@ let detailPage = 0;
 let detailPages = 1;
 let rotateTimer = null;
 
-function buildRightBody(rows, maxRows){
+function buildRightBody(rows, maxRows, overallPlan){
     maxRows = maxRows || rows.length;
     let h = '';
     let renderedRightRowspan = false;
@@ -723,8 +723,10 @@ function buildRightBody(rows, maxRows){
             let gsphSt = 'font-weight:700;';
             let gsphTxt = (j.gsph_plan > 0 || j.gsph_actual > 0) ? j.gsph_actual : '-';
             
-            if (j.gsph_plan > 0) {
-                const pct = (j.gsph_actual / j.gsph_plan) * 100;
+            const planToUse = j.gsph_plan > 0 ? j.gsph_plan : (overallPlan || 0);
+            
+            if (planToUse > 0) {
+                const pct = (j.gsph_actual / planToUse) * 100;
                 if (pct >= 100) {
                     gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
                 } else if (pct >= 80) {
@@ -1134,9 +1136,12 @@ function renderTable(){
     const progressPct = parseFloat(pct);
     const barColor = progressPct >= 100 ? '#22c55e' : progressPct >= 80 ? '#eab308' : '#ef4444';
 
+    const kpiGsph = kv(lineKey, 'GSPH');
+    const overallPlan = kpiGsph ? (parseFloat(kpiGsph.plan) || 0) : 0;
+
     // Insert split container layout (reusable for full or per-page render)
     const renderCaseB = (rows, pageInfo, matchLeft) => {
-        const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length);
+        const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length, overallPlan);
         const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
         scrollEl.innerHTML = `
         <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
