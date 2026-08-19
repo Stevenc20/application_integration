@@ -832,9 +832,6 @@ function renderAllLines(){
         const cellMap={};
         KPI_ROWS.forEach(desc=>{
             let descHtml = desc;
-            if(desc === 'GSPH') {
-                descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
-            }
             b+=`<tr id="row-${desc}"><td class="desc-cell">${descHtml}</td>`;
             LINES.forEach((line,li)=>{
                 ['plan','curr','actual'].forEach((col,ci)=>{
@@ -898,7 +895,11 @@ function updateAllCells(){
                     const pct=k.actualPct?` ${k.actualPct}`:'';
                     const ac=getCell('actual');
                     const cu=getCell('curr');
-                    setText(ac,(k.actual||'-')+pct);
+                    let actValTxt = (k.actual||'-')+pct;
+                    if (desc === 'GSPH' && cl.act === 'bg-red') {
+                        actValTxt += ` <span style="font-size:0.6vw;">⚠️</span>`;
+                    }
+                    setText(ac, actValTxt, desc === 'GSPH');
                     cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
                     ac.className = 'val-actual'+(cl.act?' '+cl.act:'');
                     ac.style.cssText = cl.style || '';
@@ -933,9 +934,10 @@ function updateAllCells(){
     });
 }
 
-function setText(el,v){
+function setText(el,v,isHtml=false){
     if(!el)return;
-    if(el.textContent!==v) el.textContent=v;
+    if(isHtml) { if(el.innerHTML!==v) el.innerHTML=v; }
+    else { if(el.textContent!==v) el.textContent=v; }
 }
 
 function renderTable(){
@@ -1077,9 +1079,6 @@ function renderTable(){
         const desc = leftRows[i];
         
         let descHtml = desc;
-        if(desc === 'GSPH') {
-            descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
-        }
         leftBodyHtml += `<td class="desc-cell">${descHtml}</td>`;
 
         if (desc === 'JOB') {
@@ -1096,9 +1095,13 @@ function renderTable(){
             if (k) {
                 const cl = getClasses(desc, k);
                 const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
+                let actValTxt = (k.actual||'-') + pctVal;
+                if (desc === 'GSPH' && cl.act === 'bg-red') {
+                    actValTxt += ` <span style="font-size:0.8vw;">⚠️</span>`;
+                }
                 leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
                 leftBodyHtml += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
-                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style}">${k.actual||'-'}${pctVal}</td>`;
+                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style}">${actValTxt}</td>`;
             } else {
                 leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
@@ -1164,7 +1167,7 @@ function renderTable(){
                                 <th class="det-reject" style="white-space:nowrap;">REJ</th>
                                 <th style="white-space:nowrap;">PRESS TIME</th>
                                 <th style="white-space:nowrap;">DANDORI</th>
-                                <th style="white-space:nowrap;">10 CHECK</th>
+                                <th style="white-space:nowrap;">1ST CHECK</th>
                                 <th style="white-space:nowrap;">DOWNTIME</th>
                                 <th class="det-tpt" style="white-space:nowrap;">TPT</th>
                                 <th style="white-space:nowrap;">PLAN FIN</th>
