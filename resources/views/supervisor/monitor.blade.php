@@ -1090,7 +1090,7 @@ function renderTable(){
         const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length);
         const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
         scrollEl.innerHTML = `
-        <div style="display:flex; flex-direction:column; width:100%; min-height:100%; min-width:1366px;">
+        <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
                 <div class="card-bg" style="width:24%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
@@ -1119,18 +1119,18 @@ function renderTable(){
                                 <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:4%; border-left:none;">NO</th>
-                                <th style="width:13%">JOB NO</th>
-                                <th style="width:16%">PROCESS</th>
-                                <th style="width:8%">PLAN QTY</th>
-                                <th class="det-good" style="width:8%;">GOOD</th>
-                                <th class="det-repair" style="width:6%;">REP</th>
-                                <th class="det-reject" style="width:6%;">REJ</th>
-                                <th style="width:8%">PRESS TIME</th>
-                                <th style="width:8%">DANDORI</th>
-                                <th style="width:8%">10 CHECK</th>
-                                <th style="width:8%">DOWNTIME</th>
-                                <th class="det-tpt" style="width:6%;">TPT</th>
+                                <th style="width:3%; border-left:none;">NO</th>
+                                <th style="width:12%">JOB NO</th>
+                                <th style="width:15%">PROCESS</th>
+                                <th style="width:6%">PLAN QTY</th>
+                                <th class="det-good" style="width:7%;">GOOD</th>
+                                <th class="det-repair" style="width:5%;">REP</th>
+                                <th class="det-reject" style="width:5%;">REJ</th>
+                                <th style="width:8%">PRESS T...</th>
+                                <th style="width:7%">DANDORI</th>
+                                <th style="width:7%">10 CHECK</th>
+                                <th style="width:7%">DOWNTIME</th>
+                                <th class="det-tpt" style="width:4%;">TPT</th>
                                 <th style="width:7%">PLAN FIN</th>
                                 <th style="width:7%">ACT FIN</th>
                             </tr>
