@@ -735,12 +735,15 @@ function buildRightBody(rows, maxRows, overallPlan){
                 } else if (pct >= 80) {
                     gsphSt = 'background-color:#eab308!important; color:#000!important; font-weight:900;';
                 } else {
-                    gsphSt = 'background-color:#ef4444!important; color:#fff!important; font-weight:900; animation:blink-red .8s ease-in-out infinite';
+                    const blinkClass = j.is_running ? 'animation:blink-red .8s ease-in-out infinite;' : '';
+                    gsphSt = `background-color:#ef4444!important; color:#fff!important; font-weight:900; ${blinkClass}`;
                     gsphTxt = `${j.gsph_actual} <span style="font-size:0.6vw;">⚠️</span>`;
                 }
             } else if (j.gsph_actual > 0) {
                 gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
             }
+
+            const dtSt = j.downtime > 0 ? 'background-color:#ef4444!important; color:#fff!important; font-weight:900;' : '';
 
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
@@ -753,7 +756,7 @@ function buildRightBody(rows, maxRows, overallPlan){
                 ${dtCell(pt)}
                 ${dtCell(dn)}
                 ${dtCell(iq)}
-                ${dtCell(dw, j.downtime > 0 ? 'background-color:#ef4444!important; color:#fff!important; font-weight:700; animation:blink-red .8s ease-in-out infinite' : '')}
+                ${dtCell(dw, dtSt)}
                 ${dtCell(tp, 'font-weight:700;', 'det-tpt')}
                 ${dtCell(j.plan_finish)}
                 ${dtCell(j.actual_finish)}
