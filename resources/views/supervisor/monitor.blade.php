@@ -684,7 +684,7 @@ function getClasses(desc, k){
         if(p>5) act='bg-red';
         else if(p>2) act='bg-yellow';
         
-        if(k.current && k.current!=='-' && k.current!=='0 pcs' && parseFloat(k.current)>0) curr = act?act+'-blink':'';
+        if(k.current && k.current!=='-' && k.current!=='0 pcs' && parseFloat(k.current)>0) curr = act;
     }else if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){
         const v=parseFloat(k.actual);
         if(!isNaN(v) && v>0) act='bg-red';
