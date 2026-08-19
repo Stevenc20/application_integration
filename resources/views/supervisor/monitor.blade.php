@@ -765,7 +765,7 @@ function buildRightBody(rows, maxRows, overallPlan){
         } else {
             if (!renderedRightRowspan) {
                 const remainingRight = maxRows - rows.length;
-                h += `<td rowspan="${remainingRight}" colspan="15" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600; height:100%;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                h += `<td rowspan="${remainingRight}" colspan="15" class="card-bg" style="border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600; height:100%;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
                 renderedRightRowspan = true;
             }
         }
