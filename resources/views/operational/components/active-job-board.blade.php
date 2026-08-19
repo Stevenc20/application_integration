@@ -664,9 +664,6 @@
                 </div>
                 @endif
             </div>
-
-            </div> {{-- end #active-work-area --}}
-            
             {{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
             @if($activeJob->started_at)
             <div class="lg:col-span-12 mt-4 pt-4 border-t border-slate-200">
@@ -695,8 +692,6 @@
                 </div>
             </div>
             @endif
-
-            </div> {{-- end #active-work-area --}}
 
             {{-- REKAM JEJAK --}}
             @if(isset($productionLogs) && $productionLogs->isNotEmpty() && isset($activeJob))
