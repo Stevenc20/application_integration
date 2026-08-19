@@ -399,9 +399,10 @@ class DashboardRealtimeService
         $gsph = $totalTpt > 0 ? (int) round($ok / ($totalTpt / 60)) : 0;
 
         $currGsph = 0;
-        if ($hasRunning && $runningRecord && $runningRecord->jobMaster) {
-            $runningJobNo = $runningRecord->jobMaster->job_number;
-            $runningRow = collect($detailRows)->firstWhere('job_number', $runningJobNo);
+        if ($hasRunning && $runningRecord) {
+            $runningRow = collect($detailRows)->first(function($r) use ($runningRecord) {
+                return (int)$r['job_master_id'] === (int)$runningRecord->job_master_id;
+            });
             if ($runningRow) {
                 $currGsph = $runningRow['gsph_actual'];
             }
