@@ -77,7 +77,10 @@
 
         <div class="flex flex-col lg:flex-row gap-4 relative z-10 items-start">
             
-            {-- LEFT COLUMN --}
+            {{-- ROW 1: Progress Timeline (Left, 9 cols) & Running Session (Right, 3 cols) --}}
+            
+            
+            {{-- LEFT COLUMN --}}
             <div class="flex-1 lg:w-3/4 flex flex-col gap-4 min-w-0">
 <!-- Progress Timeline (Left Area) -->
             <div class="w-full">
@@ -186,7 +189,8 @@
                         </div>
                     </div>
                 </div>
-            </div>            {{-- BREAK OVERLAY (hidden by default, shown during auto-break) --}}
+            </div>            
+{{-- BREAK OVERLAY (hidden by default, shown during auto-break) --}}
             <div id="break-overlay" class="w-full {{ $isOnBreak ? '' : 'hidden' }}">
                 <div class="flex flex-col items-center justify-center py-16 rounded-3xl bg-white border-2 border-slate-200">
                     <div class="w-20 h-20 rounded-full bg-slate-100 flex items-center justify-center mb-6 border border-slate-200">
@@ -220,7 +224,8 @@
             </div>
 
             {{-- ROW 2: Performance Console (Left, 9 cols) & Operator Console (Right, 3 cols) --}}
-            <!-- Performance Console (Left Area) -->
+            
+<!-- Performance Console (Left Area) -->
             <div id="active-work-area" class="w-full {{ $isOnBreak ? 'hidden' : '' }}">
                 <!-- Quick Entry & Performance Console (min-h-[220px]) -->
                 @if($activeJob->started_at && !$isDandori)
@@ -358,9 +363,10 @@
                 </div>
             </div>
 
-                        </div>
+            
+            </div>
 
-            {-- RIGHT COLUMN --}
+            {{-- RIGHT COLUMN --}}
             <div class="w-full lg:w-1/4 xl:w-[320px] 2xl:w-[360px] flex flex-col gap-4 shrink-0">
 <!-- Running Session Card (Right Area) -->
             <div class="w-full shrink-0">
@@ -484,7 +490,8 @@
             </div>
 
 
-            <!-- Operator Console (Right Area) -->
+            
+<!-- Operator Console (Right Area) -->
             <div id="operator-console-area" class="w-full {{ $isOnBreak ? 'hidden' : '' }}">
                 @php
                     $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
@@ -668,9 +675,9 @@
                 </div>
                 @endif
             </div>
-                        </div>
-
-            {{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
+            
+            </div>
+{{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
             @if($activeJob->started_at)
             <div class="lg:col-span-12 mt-4 pt-4 border-t border-slate-200">
                 <div class="flex items-center justify-between mb-3">
