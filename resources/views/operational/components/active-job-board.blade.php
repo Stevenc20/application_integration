@@ -75,13 +75,13 @@
             $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time' && strtoupper(trim($activeDowntime->pic ?? '')) === 'AUTO BREAK';
         @endphp
 
-        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 relative z-10 items-stretch">
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 relative z-10 items-start">
             
             {{-- ROW 1: Progress Timeline (Left, 9 cols) & Running Session (Right, 3 cols) --}}
             
             <!-- Progress Timeline (Left Area) -->
             <div class="xl:col-span-9">
-                <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3 h-full">
+                <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3">
 
                     <!-- Scheduling -->
                     <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
