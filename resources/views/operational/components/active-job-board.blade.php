@@ -75,12 +75,12 @@
             $isOnBreak = $activeDowntime && strtolower($activeDowntime->jenis_downtime) === 'break time' && strtoupper(trim($activeDowntime->pic ?? '')) === 'AUTO BREAK';
         @endphp
 
-        <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10 items-stretch">
+        <div class="grid grid-cols-1 xl:grid-cols-12 gap-4 relative z-10 items-stretch">
             
             {{-- ROW 1: Progress Timeline (Left, 9 cols) & Running Session (Right, 3 cols) --}}
             
             <!-- Progress Timeline (Left Area) -->
-            <div class="lg:col-span-9">
+            <div class="xl:col-span-9">
                 <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3 h-full">
 
                     <!-- Scheduling -->
@@ -187,7 +187,7 @@
                     </div>
                 </div>
             </div>            <!-- Running Session Card (Right Area) -->
-            <div class="lg:col-span-3">
+            <div class="xl:col-span-3">
                 @php
                     $statusLabel = 'PRODUKSI';
                     $statusBg = 'bg-emerald-500/10 border-emerald-500/20';
@@ -344,9 +344,9 @@
             {{-- ROW 2: Performance Console (Left, 9 cols) & Operator Console (Right, 3 cols) --}}
             <div id="active-work-area" class="lg:col-span-12 {{ $isOnBreak ? 'hidden' : '' }}">
 
-            <div class="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div class="grid grid-cols-1 xl:grid-cols-12 gap-4">
             <!-- Performance Console (Left Area) -->
-            <div class="lg:col-span-9">
+            <div class="xl:col-span-9">
                 <!-- Quick Entry & Performance Console (min-h-[220px]) -->
                 @if($activeJob->started_at && !$isDandori)
                 <div class="p-5 bg-red-50/50 border border-red-200 rounded-3xl min-h-[220px] flex flex-col gap-4 h-full">
@@ -484,7 +484,7 @@
             </div>
 
             <!-- Operator Console (Right Area) -->
-            <div class="lg:col-span-3">
+            <div class="xl:col-span-3">
                 @php
                     $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
                     $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
