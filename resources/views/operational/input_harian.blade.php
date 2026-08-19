@@ -991,6 +991,14 @@ function goToIssue(type, planId, jobMasterId, dtId) {
             showToast('Terjadi kesalahan sistem.', 'error');
         });
     }
+
+    // Auto Refresh pada pergantian shift pagi (07:30:02)
+    setInterval(() => {
+        const now = new Date();
+        if (now.getHours() === 7 && now.getMinutes() === 30 && now.getSeconds() === 2) {
+            window.location.reload();
+        }
+    }, 1000);
 </script>
 
 @endsection
