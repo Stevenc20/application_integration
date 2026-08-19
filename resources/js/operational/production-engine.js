@@ -463,6 +463,7 @@ function _updateBreakUI(jobId, label, isPaused) {
     const alertBox = document.getElementById('active-downtime-alert-box');
     const alertTitle = document.getElementById('active-downtime-title');
     const workArea = document.getElementById('active-work-area');
+    const operatorArea = document.getElementById('operator-console-area');
     const breakOverlay = document.getElementById('break-overlay');
     const breakLabel = document.getElementById('break-overlay-label');
     const breakTimer = document.getElementById('break-overlay-timer');
@@ -478,17 +479,24 @@ function _updateBreakUI(jobId, label, isPaused) {
             };
         }
 
-        if (statusContainer) statusContainer.className = window._origStatusClasses.containerClass.replace(/bg-emerald-500\/10/g, 'bg-slate-500/10').replace(/border-emerald-500\/20/g, 'border-slate-500/20');
-        if (statusText) { statusText.className = window._origStatusClasses.textClass.replace(/text-emerald-400/g, 'text-slate-400'); statusText.textContent = 'BREAK'; }
-        if (statusPing) statusPing.className = window._origStatusClasses.pingClass.replace(/bg-emerald-500/g, 'bg-slate-500');
-        if (statusDot) statusDot.className = window._origStatusClasses.dotClass.replace(/bg-emerald-500/g, 'bg-slate-500');
-        if (alertBox) { alertBox.className = alertBox.className.replace(/hidden/, '').trim() + ' bg-slate-500/10 border-slate-500/30'; }
-        if (alertTitle) { alertTitle.className = alertTitle.className.replace(/text-\w+-400/g, 'text-slate-400').replace(/text-\w+-500/g, 'text-slate-400'); alertTitle.textContent = label || 'Break Time'; }
+        if (statusContainer) statusContainer.className = 'px-4 py-3 mt-3.5 rounded-2xl border bg-slate-500/10 border-slate-500/20 flex items-center justify-between transition-all duration-300';
+        if (statusText) { statusText.className = 'text-[9px] sm:text-[10px] font-black text-slate-400 uppercase tracking-widest'; statusText.textContent = 'BREAK TIME'; }
+        if (statusPing) statusPing.className = 'animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-500 opacity-75';
+        if (statusDot) statusDot.className = 'relative inline-flex rounded-full h-2 w-2 bg-slate-500';
 
+        if (alertBox) {
+            alertBox.className = 'border-2 rounded-2xl p-4 text-center mb-6 bg-slate-100 border-slate-300 transition-all duration-300';
+            if (alertTitle) alertTitle.className = 'text-[10px] sm:text-xs font-black text-slate-500 uppercase tracking-widest mb-1';
+        }
+        
         const bar = document.getElementById('progress-bar');
-        if (bar && !window._origBarColor) { window._origBarColor = bar.className; bar.className = bar.className.replace(/bg-blue-500/g, 'bg-slate-500').replace(/from-blue-500/g, 'from-slate-500').replace(/to-blue-400/g, 'to-slate-400'); }
+        if (bar && !window._origBarColor) {
+            window._origBarColor = bar.className;
+            bar.className = 'h-full bg-slate-300 rounded-full transition-all duration-300';
+        }
 
         if (workArea) workArea.classList.add('hidden');
+        if (operatorArea) operatorArea.classList.add('hidden');
         if (breakOverlay) {
             breakOverlay.classList.remove('hidden');
             if (breakLabel) breakLabel.textContent = label || 'BREAK TIME';
@@ -506,6 +514,7 @@ function _updateBreakUI(jobId, label, isPaused) {
         if (window._origBarColor) { const bar = document.getElementById('progress-bar'); if (bar) bar.className = window._origBarColor; delete window._origBarColor; }
 
         if (workArea) workArea.classList.remove('hidden');
+        if (operatorArea) operatorArea.classList.remove('hidden');
         if (breakOverlay) breakOverlay.classList.add('hidden');
         updateTimeline();
     }
