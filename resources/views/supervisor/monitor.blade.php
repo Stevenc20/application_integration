@@ -206,6 +206,14 @@
         .large-table thead th.line-header{font-size:1.2vw!important;padding:0.6vw 0.3vw!important}
         .large-table td.desc-cell{font-size:1.2vw!important;padding-left:0.5vw!important}
         .large-table .val-plan, .large-table .val-curr, .large-table .val-actual { font-size: 1.3vw!important; }
+
+        #row-REPAIR .val-plan, #row-REPAIR .val-curr, #row-REPAIR .val-actual,
+        #row-REJECT .val-plan, #row-REJECT .val-curr, #row-REJECT .val-actual {
+            font-size: 0.8vw !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.1 !important;
+        }
         
         .large-table .status-running,.large-table .status-break,
         .large-table .status-downtime,.large-table .status-idle,
@@ -922,20 +930,6 @@ function updateAllCells(){
                     cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
                     ac.className = 'val-actual'+(cl.act?' '+cl.act:'');
                     ac.style.cssText = cl.style || '';
-                    
-                    if (desc === 'REPAIR' || desc === 'REJECT') {
-                        const len = actValTxt.length;
-                        if (len > 12) {
-                            ac.style.setProperty('font-size', '0.8vw', 'important');
-                            cu.style.setProperty('font-size', '0.8vw', 'important');
-                        } else if (len > 8) {
-                            ac.style.setProperty('font-size', '1vw', 'important');
-                            cu.style.setProperty('font-size', '1vw', 'important');
-                        } else {
-                            ac.style.setProperty('font-size', '1.3vw', 'important');
-                            cu.style.setProperty('font-size', '1.3vw', 'important');
-                        }
-                    }
                 }else{
                     setText(getCell('plan'),'-');
                     setText(getCell('curr'),'-');
