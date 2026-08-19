@@ -100,7 +100,7 @@ def main():
                         month_str = row[2].strftime('%Y-%m-%d')
                     elif row[2]:
                         month_str = str(row[2]).strip()
-
+                    
                     pallet_rows.append({
                         'no': no_val,
                         'month': month_str,
@@ -129,7 +129,7 @@ def main():
                     continue
                 try:
                     no_val = int(row[2])
-
+                    
                     def parse_date(d):
                         if d is None:
                             return None
@@ -137,10 +137,10 @@ def main():
                         if isinstance(d, datetime.datetime) or isinstance(d, datetime.date):
                             return d.strftime('%Y-%m-%d')
                         return None
-
+                        
                     t_keluar = parse_date(row[9])
                     t_masuk = parse_date(row[10])
-
+                    
                     smr_rows.append({
                         'no': no_val,
                         'month': str(row[3] or '').strip(),
@@ -171,7 +171,7 @@ def main():
                     continue
                 try:
                     no_val = int(row[2])
-
+                    
                     def parse_date(d):
                         if d is None:
                             return None
@@ -181,7 +181,7 @@ def main():
                         return None
 
                     t_date = parse_date(row[4])
-
+                    
                     def clean_val(val, val_type=int):
                         if val is None:
                             return 0
@@ -272,7 +272,7 @@ def main():
                     continue
                 try:
                     no_val = int(row[2])
-
+                    
                     def clean_val(val, val_type=int):
                         if val is None:
                             return 0
