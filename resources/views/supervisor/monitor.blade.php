@@ -707,10 +707,21 @@ function buildRightBody(rows, maxRows){
             const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
             
             let gsphSt = 'font-weight:700;';
-            if (j.gsph_plan > 0 && j.good > 0 && j.gsph_actual < j.gsph_plan) {
-                gsphSt = 'background-color:#ef4444!important; color:#fff!important; font-weight:700; animation:blink-red .8s ease-in-out infinite';
+            let gsphTxt = (j.gsph_plan > 0 || j.gsph_actual > 0) ? j.gsph_actual : '-';
+            
+            if (j.gsph_plan > 0) {
+                const pct = (j.gsph_actual / j.gsph_plan) * 100;
+                if (pct >= 100) {
+                    gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
+                } else if (pct >= 80) {
+                    gsphSt = 'background-color:#eab308!important; color:#000!important; font-weight:900;';
+                } else {
+                    gsphSt = 'background-color:#ef4444!important; color:#fff!important; font-weight:900; animation:blink-red .8s ease-in-out infinite';
+                    gsphTxt = `${j.gsph_actual} <span style="font-size:0.6vw;">⚠️</span>`;
+                }
+            } else if (j.gsph_actual > 0) {
+                gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
             }
-            const gsphTxt = (j.gsph_plan > 0 || j.gsph_actual > 0) ? j.gsph_actual : '-';
 
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
