@@ -15,29 +15,6 @@
     <link rel="dns-prefetch" href="https://unpkg.com">
     <link rel="preload" href="https://unpkg.com/boxicons@2.1.4/fonts/boxicons.woff2" as="font" type="font/woff2" crossorigin>
 
-    @php
-        $buildCssUrl = '';
-        $polyfillsLegacy = '';
-        $appLegacy = '';
-        
-        $manifestPath = public_path('build/manifest.json');
-        if (file_exists($manifestPath)) {
-            $manifest = json_decode(file_get_contents($manifestPath), true);
-            if (isset($manifest['resources/css/supervisor.css']['file'])) {
-                $buildCssUrl = asset('build/' . $manifest['resources/css/supervisor.css']['file']);
-            }
-        }
-        
-        $polyfillsFiles = glob(public_path('build/assets/polyfills-legacy-*.js'));
-        if (!empty($polyfillsFiles)) {
-            $polyfillsLegacy = asset('build/assets/' . basename($polyfillsFiles[0]));
-        }
-        $appLegacyFiles = glob(public_path('build/assets/app-legacy-*.js'));
-        if (!empty($appLegacyFiles)) {
-            $appLegacy = asset('build/assets/' . basename($appLegacyFiles[0]));
-        }
-    @endphp
-
     <style>
         @font-face { font-display: swap; }
         *,*::before,*::after{box-sizing:border-box}
@@ -50,15 +27,7 @@
         @media(min-width:768px){#mainWrapper main{padding:1.5rem}}
         .hidden{display:none}
     </style>
-    @if($buildCssUrl)
-        <link rel="stylesheet" href="{{ $buildCssUrl }}">
-    @endif
-    @if($polyfillsLegacy)
-        <script src="{{ $polyfillsLegacy }}"></script>
-    @endif
-    @if($appLegacy)
-        <script src="{{ $appLegacy }}" defer></script>
-    @endif
+    @vite(['resources/css/supervisor.css', 'resources/js/app.js'])
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">
     <noscript><link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" crossorigin="anonymous"></noscript>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" media="print" onload="this.media='all'" crossorigin="anonymous" referrerpolicy="no-referrer">

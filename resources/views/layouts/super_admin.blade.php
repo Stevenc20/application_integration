@@ -9,37 +9,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 
-    @php
-        $isLocal = in_array(request()->getHost(), ['localhost', '127.0.0.1', '::1']);
-        $hasHot = file_exists(public_path('hot'));
-        
-        $buildCssUrl = '';
-        $buildJsUrl = '';
-        
-        if (!$isLocal || !$hasHot) {
-            $manifestPath = public_path('build/manifest.json');
-            if (file_exists($manifestPath)) {
-                $manifest = json_decode(file_get_contents($manifestPath), true);
-                if (isset($manifest['resources/css/supervisor.css']['file'])) {
-                    $buildCssUrl = asset('build/' . $manifest['resources/css/supervisor.css']['file']);
-                }
-                if (isset($manifest['resources/js/app.js']['file'])) {
-                    $buildJsUrl = asset('build/' . $manifest['resources/js/app.js']['file']);
-                }
-            }
-        }
-    @endphp
-
-    @if($isLocal && $hasHot)
-        @vite(['resources/css/supervisor.css', 'resources/js/app.js'])
-    @else
-        @if($buildCssUrl)
-            <link rel="stylesheet" href="{{ $buildCssUrl }}">
-        @endif
-        @if($buildJsUrl)
-            <script type="module" src="{{ $buildJsUrl }}"></script>
-        @endif
-    @endif
+    @vite(['resources/css/supervisor.css', 'resources/js/app.js'])
 
 
     <style>

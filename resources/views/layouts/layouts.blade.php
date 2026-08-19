@@ -4,37 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>PT INTI PANTJA PRESS INDUSTRY</title>
-  @php
-      $isLocal = in_array(request()->getHost(), ['localhost', '127.0.0.1', '::1']);
-      $hasHot = file_exists(public_path('hot'));
-      
-      $buildCssUrl = '';
-      $buildJsUrl = '';
-      
-      if (!$isLocal || !$hasHot) {
-          $manifestPath = public_path('build/manifest.json');
-          if (file_exists($manifestPath)) {
-              $manifest = json_decode(file_get_contents($manifestPath), true);
-              if (isset($manifest['resources/css/app.css']['file'])) {
-                  $buildCssUrl = asset('build/' . $manifest['resources/css/app.css']['file']);
-              }
-              if (isset($manifest['resources/js/app.js']['file'])) {
-                  $buildJsUrl = asset('build/' . $manifest['resources/js/app.js']['file']);
-              }
-          }
-      }
-  @endphp
-
-  @if($isLocal && $hasHot)
-      @vite(['resources/css/app.css', 'resources/js/app.js'])
-  @else
-      @if($buildCssUrl)
-          <link rel="stylesheet" href="{{ $buildCssUrl }}">
-      @endif
-      @if($buildJsUrl)
-          <script type="module" src="{{ $buildJsUrl }}"></script>
-      @endif
-  @endif
+  @vite(['resources/css/app.css', 'resources/js/app.js'])
 
   <!-- Preconnect CDNs to boost Largest Contentful Paint (LCP) performance -->
   <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>

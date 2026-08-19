@@ -13,26 +13,6 @@
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://unpkg.com">
 
-    @php
-        $hasHot = file_exists(public_path('hot'));
-        $isLocal = in_array(request()->getHost(), ['localhost', '127.0.0.1', '::1']);
-        $useVite = $isLocal && $hasHot;
-
-        $buildCssUrl = '';
-        $buildJsUrl = '';
-
-        $manifestPath = public_path('build/manifest.json');
-        if (file_exists($manifestPath)) {
-            $manifest = json_decode(file_get_contents($manifestPath), true);
-            if (isset($manifest['resources/css/app.css']['file'])) {
-                $buildCssUrl = asset('build/' . $manifest['resources/css/app.css']['file']);
-            }
-            if (isset($manifest['resources/js/app.js']['file'])) {
-                $buildJsUrl = asset('build/' . $manifest['resources/js/app.js']['file']);
-            }
-        }
-    @endphp
-
     <style>
         *,*::before,*::after{box-sizing:border-box}
         html,body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
@@ -46,16 +26,7 @@
         [x-cloak]{display:none !important}
     </style>
 
-    @if($useVite)
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @elseif($buildCssUrl || $buildJsUrl)
-        @if($buildCssUrl)
-            <link rel="stylesheet" href="{{ $buildCssUrl }}">
-        @endif
-        @if($buildJsUrl)
-            <script type="module" src="{{ $buildJsUrl }}"></script>
-        @endif
-    @endif
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet" media="print" onload="this.media='all'">
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" media="print" onload="this.media='all'">

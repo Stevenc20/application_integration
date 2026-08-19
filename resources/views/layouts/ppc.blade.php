@@ -13,59 +13,18 @@
     <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
     <link rel="dns-prefetch" href="https://unpkg.com">
 
-    @php
-        $isLocal = in_array(request()->getHost(), ['localhost', '127.0.0.1', '::1']);
-        $hasHot = file_exists(public_path('hot'));
-
-        $buildCssUrl = '';
-        $buildJsUrl = '';
-
-        if (!$isLocal || !$hasHot) {
-            $manifestPath = public_path('build/manifest.json');
-            if (file_exists($manifestPath)) {
-                $manifest = json_decode(file_get_contents($manifestPath), true);
-                if (isset($manifest['resources/css/app.css']['file'])) {
-                    $buildCssUrl = asset('build/' . $manifest['resources/css/app.css']['file']);
-                }
-                if (isset($manifest['resources/js/app.js']['file'])) {
-                    $buildJsUrl = asset('build/' . $manifest['resources/js/app.js']['file']);
-                }
-            }
-        }
-    @endphp
-
-    @if($isLocal && $hasHot)
-        <style>
-            *,*::before,*::after{box-sizing:border-box}
-            html,body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-            body{background-color:#f9fafb;color:#374151;display:flex;height:100dvh;overflow:hidden}
-            #layout-menu{position:fixed;top:0;left:0;z-index:50}
-            #mainWrapper{display:flex;flex:1;flex-direction:column;height:100dvh;overflow:hidden}
-            @media(min-width:768px){#mainWrapper{margin-left:16rem}}
-            #mainWrapper main{flex:1;overflow:auto;background-color:#f9fafb;padding:1rem}
-            @media(min-width:768px){#mainWrapper main{padding:1.5rem}}
-            .hidden{display:none}
-        </style>
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-    @else
-        <style>
-            *,*::before,*::after{box-sizing:border-box}
-            html,body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
-            body{background-color:#f9fafb;color:#374151;display:flex;height:100dvh;overflow:hidden}
-            #layout-menu{position:fixed;top:0;left:0;z-index:50}
-            #mainWrapper{display:flex;flex:1;flex-direction:column;height:100dvh;overflow:hidden}
-            @media(min-width:768px){#mainWrapper{margin-left:16rem}}
-            #mainWrapper main{flex:1;overflow:auto;background-color:#f9fafb;padding:1rem}
-            @media(min-width:768px){#mainWrapper main{padding:1.5rem}}
-            .hidden{display:none}
-        </style>
-        @if($buildCssUrl)
-            <link rel="stylesheet" href="{{ $buildCssUrl }}">
-        @endif
-        @if($buildJsUrl)
-            <script type="module" src="{{ $buildJsUrl }}"></script>
-        @endif
-    @endif
+    <style>
+        *,*::before,*::after{box-sizing:border-box}
+        html,body{margin:0;font-family:ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale}
+        body{background-color:#f9fafb;color:#374151;display:flex;height:100dvh;overflow:hidden}
+        #layout-menu{position:fixed;top:0;left:0;z-index:50}
+        #mainWrapper{display:flex;flex:1;flex-direction:column;height:100dvh;overflow:hidden}
+        @media(min-width:768px){#mainWrapper{margin-left:16rem}}
+        #mainWrapper main{flex:1;overflow:auto;background-color:#f9fafb;padding:1rem}
+        @media(min-width:768px){#mainWrapper main{padding:1.5rem}}
+        .hidden{display:none}
+    </style>
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css" rel="stylesheet"></noscript>
