@@ -182,7 +182,9 @@
             color: #0f172a !important; 
         }
         
-        .val-curr, .val-actual, .val-plan {
+        body .large-table td.val-curr, 
+        body .large-table td.val-actual, 
+        body .large-table td.val-plan {
             max-width: none !important;
             overflow: visible !important;
             text-overflow: clip !important;
@@ -204,6 +206,13 @@
         .large-table thead th.line-header{font-size:1.2vw!important;padding:0.6vw 0.3vw!important}
         .large-table td.desc-cell{font-size:1.2vw!important;padding-left:0.5vw!important}
         .large-table .val-plan, .large-table .val-curr, .large-table .val-actual { font-size: 1.3vw!important; }
+        
+        /* Make REPAIR and REJECT slightly smaller so they don't truncate the percentages */
+        #row-REPAIR .val-plan, #row-REPAIR .val-curr, #row-REPAIR .val-actual,
+        #row-REJECT .val-plan, #row-REJECT .val-curr, #row-REJECT .val-actual {
+            font-size: 1.05vw !important;
+        }
+        
         .large-table .status-running,.large-table .status-break,
         .large-table .status-downtime,.large-table .status-idle,
         .large-table .status-not-running,.large-table .status-tryout,
