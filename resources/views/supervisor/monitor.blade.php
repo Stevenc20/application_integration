@@ -176,6 +176,16 @@
             overflow:hidden!important;text-overflow:ellipsis!important;max-width:0!important;
             color: #1e293b;
         }
+        body:not(.dark) .large-table td, body:not(.dark) .large-table th { font-weight: 800 !important; color: #0f172a !important; }
+        body:not(.dark) .right-detail-table td, body:not(.dark) .right-detail-table th { font-weight: 800 !important; color: #0f172a !important; }
+        
+        .val-curr, .val-actual, .val-plan {
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
+        }
+
         .right-detail-table th, .right-detail-table td {
             max-width: none !important;
             overflow: visible !important;
