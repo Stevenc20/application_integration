@@ -171,8 +171,8 @@
         .bg-green-blink{background:#22c55e!important;color:#fff!important;animation:blink-green .8s ease-in-out infinite!important}
 
         .large-table th,.large-table td{
-            padding:6px 4px!important;
-            font-size:11px!important;
+            padding:0.4vw 0.3vw!important;
+            font-size:1.1vw!important;
             overflow:hidden!important;text-overflow:ellipsis!important;max-width:0!important;
             color: #1e293b;
         }
@@ -180,23 +180,24 @@
             max-width: none !important;
             overflow: visible !important;
             text-overflow: clip !important;
-            padding: 3px 2px !important;
-            font-size: 10px !important;
+            padding: 0.3vw 0.2vw !important;
+            font-size: 0.75vw !important;
         }
         .right-detail-table thead th {
-            font-size: 9px !important;
-            padding: 4px 2px !important;
+            font-size: 0.7vw !important;
+            padding: 0.4vw 0.2vw !important;
         }
-        .large-table thead th{font-size:10px!important;padding:8px 4px!important}
-        .large-table thead th.line-header{font-size:12px!important;padding:10px 4px!important}
-        .large-table td.desc-cell{font-size:11px!important;padding-left:8px!important}
+        .large-table thead th{font-size:0.9vw!important;padding:0.5vw 0.3vw!important}
+        .large-table thead th.line-header{font-size:1.2vw!important;padding:0.6vw 0.3vw!important}
+        .large-table td.desc-cell{font-size:1.2vw!important;padding-left:0.5vw!important}
+        .large-table .val-plan, .large-table .val-curr, .large-table .val-actual { font-size: 1.3vw!important; }
         .large-table .status-running,.large-table .status-break,
         .large-table .status-downtime,.large-table .status-idle,
         .large-table .status-not-running,.large-table .status-tryout,
-        .large-table .status-1stcheck{font-size:12px!important;padding:10px!important}
+        .large-table .status-1stcheck{font-size:1.2vw!important;padding:0.6vw!important}
         .sep-row td{background:#e2e8f0!important;height:3px;padding:0!important;border:0!important}
         .sep-row .desc-cell{background:#e2e8f0!important}
-        .detail-header td{background:#dbeafe!important;font-size:10px;font-weight:800;color:#1e40af!important;padding:4px 6px!important}
+        .detail-header td{background:#dbeafe!important;font-size:0.8vw;font-weight:800;color:#1e40af!important;padding:0.3vw 0.4vw!important}
         .detail-header .desc-cell{background:#dbeafe!important}
 
         /* opaque background for sticky left table */
@@ -678,9 +679,9 @@ function getClasses(desc, k){
 }
 
 function dtCell(v,st,cls){ return `<td class="${cls||''}" style="${st||''}">${v}</td>`; }
-function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:9px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:9px;font-weight:700">-</span>'; }
+function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:1vw;height:1vw;border-radius:0.2vw;border:0.1vw solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:0.7vw;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 0.3vw;border-radius:0.2vw;background:#f3f4f6;color:#9ca3af;font-size:0.7vw;font-weight:700">-</span>'; }
 function chkP(c, lbl){
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:1px;"><span style="font-size:7px;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:2px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:9px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:12px;height:12px;border-radius:2px;background:#f3f4f6;color:#9ca3af;font-size:9px;font-weight:700;line-height:1">-</span>') + `</div>`;
+    return `<div style="display:flex;flex-direction:column;align-items:center;gap:0.1vw;"><span style="font-size:0.5vw;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:0.8vw;height:0.8vw;border-radius:0.1vw;border:0.1vw solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:0.6vw;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:0.8vw;height:0.8vw;border-radius:0.1vw;background:#f3f4f6;color:#9ca3af;font-size:0.6vw;font-weight:700;line-height:1">-</span>') + `</div>`;
 }
 
 // ── Fit-to-screen + auto-rotate helpers ──
@@ -695,8 +696,9 @@ function buildRightBody(rows, maxRows){
     let h = '';
     let renderedRightRowspan = false;
     for (let i = 0; i < maxRows; i++) {
-        h += '<tr>';
-        if (i < rows.length) {
+        const isDataRow = i < rows.length;
+        h += `<tr style="${isDataRow ? 'height:1px;' : ''}">`;
+        if (isDataRow) {
             const j = rows[i];
             const pt = j.press_time > 0 ? j.press_time + ' m' : '-';
             const dn = j.dandori > 0 ? j.dandori + ' m' : '-';
@@ -712,8 +714,8 @@ function buildRightBody(rows, maxRows){
 
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
-                ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
-                ${dtCell(`<div style="display:flex;gap:4px;justify-content:center;align-items:center;">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`)}
+                ${dtCell(j.job_number, 'text-align:left;font-weight:600;width:100%;', 'det-job')}
+                ${dtCell(`<div style="display:flex;gap:0.3vw;justify-content:center;align-items:center;">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`)}
                 ${dtCell(j.plan_qty, '', 'det-qty')}
                 ${dtCell(j.good, 'font-weight:600;', 'det-good')}
                 ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
@@ -730,7 +732,7 @@ function buildRightBody(rows, maxRows){
         } else {
             if (!renderedRightRowspan) {
                 const remainingRight = maxRows - rows.length;
-                h += `<td rowspan="${remainingRight}" colspan="15" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                h += `<td rowspan="${remainingRight}" colspan="15" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600; height:100%;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
                 renderedRightRowspan = true;
             }
         }
@@ -755,13 +757,12 @@ function applyFit(root){
     const scrollEl = document.querySelector('.table-scroll');
     if(!root || !scrollEl) return;
     
-    // Restore auto-zoom
-    const s = computeFit(root);
+    // Disable auto-zoom / scaling because VW units handle responsiveness natively
     scrollEl.style.overflow = 'hidden';
-    root.style.transform = `scale(${s})`;
-    root.style.transformOrigin = 'top left';
-    root.style.width = `${100/s}%`;
-    root.style.height = `${100/s}%`;
+    root.style.transform = '';
+    root.style.width = '100%';
+    root.style.height = '100%';
+    root.style.zoom = '';
 }
 
 function stopRotate(){
@@ -1110,20 +1111,20 @@ function renderTable(){
         const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length);
         const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
         scrollEl.innerHTML = `
-        <div style="display:flex; flex-direction:column; width:100%; min-height:100%; min-width:1366px;">
+        <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
-                <div class="card-bg" style="width:23%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink: 0;">
+                <div class="card-bg" style="width:28%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink: 0;">
                     <table class="large-table left-kpi-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
                             <tr class="single-top-header">
                                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:28%;font-size:18px;text-align:left;padding-left:6px;">DESC</th>
-                                <th style="width:24%;font-size:18px;">PLAN</th>
-                                <th style="width:24%;font-size:18px;">CURR</th>
-                                <th style="width:24%; border-right:none;font-size:18px;">ACTUAL</th>
+                                <th style="width:28%;font-size:1.1vw;text-align:left;padding-left:6px;">DESC</th>
+                                <th style="width:24%;font-size:1.1vw;">PLAN</th>
+                                <th style="width:24%;font-size:1.1vw;">CURR</th>
+                                <th style="width:24%; border-right:none;font-size:1.1vw;">ACTUAL</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1132,7 +1133,7 @@ function renderTable(){
                     </table>
                 </div>
                 <!-- Right Detail Table -->
-                <div style="width:77%; display:flex; flex-direction:column; overflow:hidden;">
+                <div style="width:72%; display:flex; flex-direction:column; overflow:hidden;">
                     <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:auto; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
