@@ -3,17 +3,17 @@
     {{-- LOCKED SUMMARY CARD --}}
     <div id="active-job-card" class="bg-slate-900 rounded-3xl p-6 shadow-2xl border-2 border-slate-800/50 text-white relative overflow-hidden">
         <div class="absolute top-0 left-0 w-1/2 h-0.5 bg-gradient-to-r from-red-500 via-red-500 to-transparent"></div>
-        <div class="flex items-center gap-4">
+        <div class="flex flex-col sm:flex-row items-center sm:items-start gap-4">
             <div class="w-12 h-12 rounded-2xl bg-red-500/20 flex items-center justify-center shrink-0">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/>
                 </svg>
             </div>
-            <div>
+            <div class="text-center sm:text-left">
                 <h2 class="text-sm font-black text-red-400 uppercase tracking-widest">Shift Terkunci — Read Only</h2>
                 <p class="text-xs text-slate-400 font-bold mt-1">Data produksi untuk shift ini sudah difinalisasi.</p>
             </div>
-            <div class="ml-auto flex items-center gap-6">
+            <div class="sm:ml-auto flex items-center justify-center gap-6 mt-4 sm:mt-0 w-full sm:w-auto border-t sm:border-t-0 border-slate-700/50 pt-4 sm:pt-0">
                 <div class="text-right">
                     <span class="text-[10px] text-slate-500 font-black uppercase tracking-wider">OK</span>
                     <p class="text-2xl font-black text-emerald-400 tabular-nums">{{ $activeJob->dailyProduction->actual_ok ?? 0 }}</p>
@@ -84,16 +84,16 @@
                 <div class="p-4 bg-white border border-slate-200 rounded-2xl min-h-[140px] flex flex-col gap-3 h-full">
 
                     <!-- Scheduling -->
-                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-2">
+                    <div class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-3 flex flex-wrap items-center justify-between gap-3">
+                        <div class="flex flex-wrap items-center gap-2">
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Scheduling</span>
                             <span class="w-px h-4 bg-slate-300"></span>
                             <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedStart }}</span>
                             <span class="text-slate-300 font-bold text-sm leading-none">—</span>
                             <span class="text-lg sm:text-xl font-black font-mono text-slate-800 leading-none">{{ $schedFinish }}</span>
                         </div>
-                        <div class="flex items-center gap-2">
-                            <span class="w-px h-4 bg-slate-300"></span>
+                        <div class="flex flex-wrap items-center gap-2">
+                            <span class="w-px h-4 bg-slate-300 hidden sm:block"></span>
                             <span class="text-[10px] sm:text-xs font-black text-slate-400 uppercase tracking-widest leading-none">Act</span>
                             <span class="text-sm sm:text-base font-black font-mono text-emerald-600 leading-none">{{ $actStartVal ?: '--:--' }}</span>
                             <span class="text-slate-300 font-bold text-xs leading-none">—</span>
@@ -397,7 +397,7 @@
                         </div>
 
                         <!-- Right: OK / Repair / Reject (side by side) -->
-                        <div class="flex-1 grid grid-cols-3 gap-3">
+                        <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <!-- OK Counter -->
                             <div class="bg-white p-3 rounded-2xl border border-slate-200 flex flex-col justify-between">
                                 <div class="flex justify-between items-center border-b border-slate-200 pb-2">
