@@ -195,13 +195,14 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 3rem 1.5rem;
+            padding: 2.5rem 1.5rem;
             margin-top: 68px;
+            min-height: calc(100vh - 68px - 60px); /* Fill space between header and footer */
         }
 
         .login-card {
             width: 100%;
-            max-width: 960px;
+            max-width: 900px;
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -209,6 +210,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             box-shadow: 0 8px 40px rgba(0,0,0,0.06);
+            align-items: stretch; /* ensure equal height */
         }
 
         /* ─── LEFT PANEL ─── */
@@ -217,13 +219,12 @@
             background-image: url('{{ asset('images/building.png') }}');
             background-size: cover;
             background-position: center;
-            padding: 3.5rem 3rem;
+            padding: 2.5rem 2.5rem;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             position: relative;
             overflow: hidden;
-            min-height: 500px;
         }
 
         /* Dark gradient overlay — like Forgewell */
@@ -264,7 +265,7 @@
             border: 1px solid rgba(192,57,43,0.6);
             padding: 5px 14px;
             border-radius: 4px;
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
         }
 
         .panel-dot {
@@ -283,11 +284,11 @@
 
         .panel-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2.2rem;
+            font-size: 2.1rem;
             font-weight: 700;
             color: var(--white);
             line-height: 1.15;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.5rem;
             letter-spacing: -0.01em;
             text-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
@@ -295,8 +296,9 @@
         .panel-sub {
             font-size: 0.85rem;
             color: rgba(255,255,255,0.7);
-            line-height: 1.7;
+            line-height: 1.6;
             text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+            margin-bottom: 0.5rem;
         }
 
         .panel-logo-wrap {
@@ -305,15 +307,15 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
+            padding: 1.5rem 0;
             flex: 1;
-            padding: 2.5rem 0;
         }
 
         .panel-logo-bg {
             background: rgba(255,255,255,0.07);
             border: 1px solid rgba(255,255,255,0.15);
             border-radius: 12px;
-            padding: 1.25rem 1.75rem;
+            padding: 1rem 1.5rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -323,7 +325,7 @@
 
         .panel-logo-bg img {
             width: 100%;
-            max-width: 150px;
+            max-width: 140px;
             object-fit: contain;
             filter: brightness(0) invert(1);
             opacity: 0.95;
@@ -334,6 +336,7 @@
             z-index: 1;
         }
 
+        /* ─── STATISTIC CARD ─── */
         .panel-stats {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
@@ -341,35 +344,39 @@
             background: rgba(255,255,255,0.1);
             border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .panel-stat {
             background: rgba(0,0,0,0.3);
             backdrop-filter: blur(8px);
-            padding: 0.85rem 0.75rem;
-            text-align: center;
+            padding: 0.75rem 0.5rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
         }
 
         .panel-stat-num {
-            font-size: 1.25rem;
+            font-size: 1.15rem;
             font-weight: 700;
             color: white;
-            line-height: 1;
-            margin-bottom: 0.3rem;
+            line-height: 1.2;
+            margin-bottom: 2px;
         }
 
         .panel-stat-label {
-            font-size: 0.6rem;
-            color: rgba(255,255,255,0.5);
+            font-size: 0.55rem;
+            color: rgba(255,255,255,0.6);
             text-transform: uppercase;
-            letter-spacing: 0.08em;
+            letter-spacing: 0.05em;
+            white-space: nowrap;
         }
 
         .panel-features {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 8px;
         }
 
         .panel-feature {
@@ -381,8 +388,8 @@
         }
 
         .panel-feature-icon {
-            width: 22px;
-            height: 22px;
+            width: 20px;
+            height: 20px;
             border-radius: 50%;
             background: rgba(192,57,43,0.35);
             border: 1px solid rgba(192,57,43,0.5);
@@ -393,8 +400,8 @@
         }
 
         .panel-feature-icon svg {
-            width: 11px;
-            height: 11px;
+            width: 10px;
+            height: 10px;
             stroke: rgba(255,255,255,0.9);
         }
 
@@ -403,10 +410,10 @@
             width: 100%;
             background: rgba(74,158,255,0.05);
             color: #4A9EFF;
-            border: 1.5px solid rgba(74,158,255,0.3);
+            border: 1px solid rgba(74,158,255,0.3);
             border-radius: 8px;
-            padding: 12px;
-            font-size: 0.82rem;
+            padding: 10px 12px;
+            font-size: 0.8rem;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -424,24 +431,23 @@
             border-color: rgba(74,158,255,0.65);
             color: #72C0FF;
             transform: translateY(-1px);
-            box-shadow: 0 4px 16px rgba(74,158,255,0.15);
         }
 
         .btn-qa .qa-badge {
-            font-size: 0.58rem;
+            font-size: 0.55rem;
             font-weight: 700;
-            letter-spacing: 0.12em;
+            letter-spacing: 0.1em;
             text-transform: uppercase;
             background: rgba(74,158,255,0.15);
             border: 1px solid rgba(74,158,255,0.28);
-            padding: 2px 7px;
+            padding: 2px 6px;
             border-radius: 20px;
             color: #7BC8FF;
         }
 
         /* ─── RIGHT PANEL ─── */
         .panel-right {
-            padding: 3.5rem 3rem;
+            padding: 2.5rem 3rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -455,7 +461,7 @@
             letter-spacing: 0.18em;
             text-transform: uppercase;
             color: var(--t3);
-            margin-bottom: 0.6rem;
+            margin-bottom: 0.5rem;
         }
 
         .form-eyebrow::before {
@@ -468,22 +474,22 @@
 
         .form-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2rem;
+            font-size: 1.8rem;
             font-weight: 700;
             color: var(--t1);
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.25rem;
             letter-spacing: -0.01em;
         }
 
         .form-desc {
-            font-size: 0.85rem;
+            font-size: 0.82rem;
             color: var(--t2);
-            margin-bottom: 2.25rem;
-            line-height: 1.6;
+            margin-bottom: 1.75rem;
+            line-height: 1.5;
         }
 
         .form-group {
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.1rem;
         }
 
         .form-label {
@@ -491,16 +497,16 @@
             font-size: 0.78rem;
             font-weight: 500;
             color: var(--t2);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
             letter-spacing: 0.02em;
         }
 
         .form-input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border: 1px solid var(--border);
-            border-radius: 8px;
-            font-size: 0.88rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
             font-family: 'Inter', sans-serif;
             color: var(--t1);
             background: var(--white);
@@ -524,9 +530,9 @@
             background: var(--red);
             color: var(--white);
             border: none;
-            border-radius: 8px;
-            padding: 14px;
-            font-size: 0.88rem;
+            border-radius: 6px;
+            padding: 12px;
+            font-size: 0.85rem;
             font-weight: 500;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -534,7 +540,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-top: 0.5rem;
+            margin-top: 0.25rem;
             transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
             letter-spacing: 0.02em;
         }
@@ -542,7 +548,7 @@
         .btn-submit:hover {
             background: var(--red-hover);
             transform: translateY(-2px);
-            box-shadow: 0 8px 24px rgba(192,57,43,0.28);
+            box-shadow: 0 6px 20px rgba(192,57,43,0.25);
         }
 
         .btn-submit:active {
@@ -555,7 +561,7 @@
         .form-divider {
             height: 1px;
             background: var(--border);
-            margin: 1.75rem 0;
+            margin: 1.5rem 0;
         }
 
         .form-footer {
@@ -578,8 +584,8 @@
             .panel-right::before {
                 content: '';
                 display: block;
-                width: 56px;
-                height: 56px;
+                width: 50px;
+                height: 50px;
                 background: var(--red);
                 border-radius: 10px;
                 margin: 0 auto 1.5rem;
@@ -598,6 +604,7 @@
 
         .footer-copy { font-size: 0.75rem; color: var(--t3); }
         .footer-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--red); }
+
     </style>
 </head>
 
