@@ -138,30 +138,26 @@
         }
         .hero-bg.ready { transform: scale(1); }
 
-        /* Layer 2: Tonal gradient — NOT flat black
-           - Top: deep navy (matches navbar)
-           - 30%: thin zone where building photo is most visible
-           - 65%: starts deepening again
-           - 100%: near-solid dark (merges with footer)
-        */
+        /* Layer 2: Tonal gradient — top dark navy, middle breathes, bottom fades to white */
         .hero-overlay {
             position: absolute;
             inset: 0;
             background:
-                /* Left vignette — adds depth, not a hard edge */
+                /* Left vignette */
                 linear-gradient(95deg,
-                    rgba(9,13,21,0.52) 0%,
-                    rgba(9,13,21,0.05) 55%,
+                    rgba(9,13,21,0.45) 0%,
+                    rgba(9,13,21,0.04) 55%,
                     transparent 100%
                 ),
-                /* Main vertical tonal ramp */
+                /* Main vertical — top dark, middle thin, bottom to white */
                 linear-gradient(180deg,
                     rgba(10,15,24,0.82)  0%,
-                    rgba(12,18,28,0.46)  22%,
-                    rgba(13,19,30,0.38)  42%,
-                    rgba(11,17,27,0.62)  64%,
-                    rgba(10,14,23,0.88)  82%,
-                    rgba(9, 13,21,0.97) 100%
+                    rgba(12,18,28,0.46)  20%,
+                    rgba(13,19,30,0.36)  38%,
+                    rgba(13,19,30,0.42)  55%,
+                    rgba(240,238,234,0.72) 80%,
+                    rgba(245,243,240,0.96) 92%,
+                    rgba(248,246,243,1.00) 100%
                 );
         }
 
@@ -294,7 +290,7 @@
             display: flex;
             justify-content: center;
             gap: 0;
-            border-top: 1px solid rgba(255,255,255,0.07);
+            border-top: 1px solid rgba(0,0,0,0.07);
         }
 
         .feat-item {
@@ -306,7 +302,7 @@
             text-align: left;
         }
         .feat-item + .feat-item {
-            border-left: 1px solid rgba(255,255,255,0.06);
+            border-left: 1px solid rgba(0,0,0,0.06);
         }
 
         .feat-icon {
@@ -332,7 +328,7 @@
         }
         .feat-desc {
             font-size: 0.76rem;
-            color: rgba(255,255,255,0.42);
+            color: #7A7876;
             line-height: 1.6;
         }
 
