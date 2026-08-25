@@ -305,7 +305,7 @@
             position: relative;
             z-index: 1;
             display: flex;
-            justify-content: flex-start;
+            justify-content: center; /* Center the logo */
             align-items: center;
             margin-bottom: 1.75rem; /* Compact spacing */
         }
