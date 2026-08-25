@@ -195,13 +195,12 @@
             display: flex;
             padding: 3rem 1.5rem;
             margin-top: 68px; /* ensures content clears the fixed header */
-            min-height: calc(100vh - 68px - 64px);
         }
 
         .login-card {
             margin: auto; /* Centers safely without clipping top */
             width: 100%;
-            max-width: 960px; /* Proper desktop proportion */
+            max-width: 1100px; /* BIG desktop proportion */
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -264,7 +263,7 @@
             border: 1px solid rgba(192,57,43,0.6);
             padding: 5px 14px;
             border-radius: 4px;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem;
         }
 
         .panel-dot {
@@ -283,11 +282,11 @@
 
         .panel-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2.1rem;
+            font-size: 2.2rem;
             font-weight: 700;
             color: var(--white);
             line-height: 1.15;
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.25rem;
             letter-spacing: -0.01em;
             text-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
@@ -297,7 +296,7 @@
             color: rgba(255,255,255,0.7);
             line-height: 1.6;
             text-shadow: 0 1px 6px rgba(0,0,0,0.4);
-            margin-bottom: 0.5rem;
+            margin-bottom: 1.5rem;
         }
 
         .panel-logo-wrap {
@@ -306,15 +305,14 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            flex: 1; /* Pushes top and bottom content to the edges proportionally */
-            padding: 2.5rem 0;
+            margin-bottom: 1.5rem;
         }
 
         .panel-logo-bg {
             background: rgba(255,255,255,0.07);
             border: 1px solid rgba(255,255,255,0.15);
             border-radius: 12px;
-            padding: 1rem 1.5rem;
+            padding: 1.25rem 1.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -324,7 +322,7 @@
 
         .panel-logo-bg img {
             width: 100%;
-            max-width: 140px;
+            max-width: 160px;
             object-fit: contain;
             filter: brightness(0) invert(1);
             opacity: 0.95;
@@ -343,13 +341,13 @@
             background: rgba(255,255,255,0.1);
             border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 1.25rem;
+            margin-bottom: 1rem;
         }
 
         .panel-stat {
             background: rgba(0,0,0,0.3);
             backdrop-filter: blur(8px);
-            padding: 0.75rem 0.5rem;
+            padding: 0.85rem 0.75rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -357,15 +355,15 @@
         }
 
         .panel-stat-num {
-            font-size: 1.15rem;
+            font-size: 1.25rem;
             font-weight: 700;
             color: white;
             line-height: 1.2;
-            margin-bottom: 2px;
+            margin-bottom: 4px;
         }
 
         .panel-stat-label {
-            font-size: 0.55rem;
+            font-size: 0.6rem;
             color: rgba(255,255,255,0.6);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -375,7 +373,7 @@
         .panel-features {
             display: flex;
             flex-direction: column;
-            gap: 8px;
+            gap: 10px;
         }
 
         .panel-feature {
@@ -387,8 +385,8 @@
         }
 
         .panel-feature-icon {
-            width: 20px;
-            height: 20px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
             background: rgba(192,57,43,0.35);
             border: 1px solid rgba(192,57,43,0.5);
@@ -399,8 +397,8 @@
         }
 
         .panel-feature-icon svg {
-            width: 10px;
-            height: 10px;
+            width: 11px;
+            height: 11px;
             stroke: rgba(255,255,255,0.9);
         }
 
@@ -474,7 +472,7 @@
 
         .form-title {
             font-family: 'Playfair Display', serif;
-            font-size: 1.8rem;
+            font-size: 2rem;
             font-weight: 700;
             color: var(--t1);
             margin-bottom: 0.25rem;
@@ -484,12 +482,12 @@
         .form-desc {
             font-size: 0.85rem;
             color: var(--t2);
-            margin-bottom: 2.25rem;
+            margin-bottom: 1.5rem;
             line-height: 1.6;
         }
 
         .form-group {
-            margin-bottom: 1.25rem;
+            margin-bottom: 1.15rem;
         }
 
         .form-label {
@@ -497,7 +495,7 @@
             font-size: 0.78rem;
             font-weight: 500;
             color: var(--t2);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
             letter-spacing: 0.02em;
         }
 
@@ -561,7 +559,7 @@
         .form-divider {
             height: 1px;
             background: var(--border);
-            margin: 1.75rem 0;
+            margin: 1.25rem 0;
         }
 
         .form-footer {
