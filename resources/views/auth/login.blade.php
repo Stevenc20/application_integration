@@ -201,7 +201,7 @@
         .login-card {
             margin: auto; /* Centers safely without clipping top */
             width: 100%;
-            max-width: 1200px; /* Dominant desktop proportion */
+            max-width: 960px; /* Restored to original balanced size */
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -219,9 +219,10 @@
             background-image: url('{{ asset('images/building.png') }}');
             background-size: cover;
             background-position: center;
-            padding: 4rem 3.5rem;
+            padding: 3.5rem 3rem; /* Original padding */
             display: flex;
             flex-direction: column;
+            justify-content: center; /* Centers entire content block naturally */
             position: relative;
             overflow: hidden;
         }
@@ -255,7 +256,7 @@
             display: inline-flex;
             align-items: center;
             gap: 7px;
-            font-size: 0.72rem;
+            font-size: 0.75rem; /* Larger badge */
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
@@ -264,7 +265,7 @@
             border: 1px solid rgba(192,57,43,0.6);
             padding: 6px 16px;
             border-radius: 4px;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1rem; /* Compact spacing */
         }
 
         .panel-dot {
@@ -283,20 +284,21 @@
 
         .panel-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2.5rem;
+            font-size: 2.6rem; /* Much larger title */
             font-weight: 700;
             color: var(--white);
             line-height: 1.15;
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.35rem; /* Compact spacing */
             letter-spacing: -0.01em;
             text-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
 
         .panel-sub {
-            font-size: 0.95rem;
+            font-size: 1.05rem; /* Larger description */
             color: rgba(255,255,255,0.8);
             line-height: 1.6;
             text-shadow: 0 1px 6px rgba(0,0,0,0.4);
+            margin-bottom: 1.75rem; /* Compact spacing */
         }
 
         .panel-logo-wrap {
@@ -305,9 +307,7 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            margin-top: auto;
-            margin-bottom: auto;
-            padding: 2.5rem 0;
+            margin-bottom: 1.75rem; /* Compact spacing */
         }
 
         .panel-logo-bg {
@@ -324,7 +324,7 @@
 
         .panel-logo-bg img {
             width: 100%;
-            max-width: 200px;
+            max-width: 180px; /* Larger logo */
             object-fit: contain;
             filter: brightness(0) invert(1);
             opacity: 0.95;
@@ -340,33 +340,34 @@
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 1px;
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.15);
             border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem; /* Compact spacing */
         }
 
         .panel-stat {
-            background: rgba(0,0,0,0.3);
+            background: rgba(0,0,0,0.35);
             backdrop-filter: blur(8px);
-            padding: 1.25rem 0.75rem;
+            padding: 1rem 0.5rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
+            text-align: center;
         }
 
         .panel-stat-num {
-            font-size: 1.4rem;
+            font-size: 1.45rem; /* Larger stat number */
             font-weight: 700;
             color: white;
             line-height: 1.2;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .panel-stat-label {
-            font-size: 0.65rem;
-            color: rgba(255,255,255,0.6);
+            font-size: 0.65rem; /* Larger stat label */
+            color: rgba(255,255,255,0.7);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             white-space: nowrap;
@@ -375,14 +376,14 @@
         .panel-features {
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 10px;
         }
 
         .panel-feature {
             display: flex;
             align-items: center;
             gap: 12px;
-            font-size: 0.85rem;
+            font-size: 0.9rem; /* Larger feature text */
             color: rgba(255,255,255,0.85);
         }
 
@@ -411,8 +412,8 @@
             color: #4A9EFF;
             border: 1.5px solid rgba(74,158,255,0.3);
             border-radius: 8px;
-            padding: 14px;
-            font-size: 0.9rem;
+            padding: 12px;
+            font-size: 0.82rem;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -434,20 +435,20 @@
         }
 
         .btn-qa .qa-badge {
-            font-size: 0.6rem;
+            font-size: 0.58rem;
             font-weight: 700;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             background: rgba(74,158,255,0.15);
             border: 1px solid rgba(74,158,255,0.28);
-            padding: 3px 8px;
+            padding: 2px 7px;
             border-radius: 20px;
             color: #7BC8FF;
         }
 
         /* ─── RIGHT PANEL ─── */
         .panel-right {
-            padding: 4rem 3.5rem;
+            padding: 3.5rem 3rem; /* Original right padding */
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -456,17 +457,17 @@
         .form-eyebrow {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 0.75rem;
+            gap: 8px;
+            font-size: 0.68rem;
             letter-spacing: 0.18em;
             text-transform: uppercase;
             color: var(--t3);
-            margin-bottom: 0.75rem;
+            margin-bottom: 0.6rem;
         }
 
         .form-eyebrow::before {
             content: '';
-            width: 20px;
+            width: 18px;
             height: 2px;
             background: var(--red);
             border-radius: 2px;
@@ -474,27 +475,27 @@
 
         .form-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2.2rem;
+            font-size: 2rem; /* Original size */
             font-weight: 700;
             color: var(--t1);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.4rem;
             letter-spacing: -0.01em;
         }
 
         .form-desc {
-            font-size: 0.9rem;
+            font-size: 0.85rem; /* Original size */
             color: var(--t2);
-            margin-bottom: 2rem;
+            margin-bottom: 2.25rem;
             line-height: 1.6;
         }
 
         .form-group {
-            margin-bottom: 1.5rem;
+            margin-bottom: 1.25rem;
         }
 
         .form-label {
             display: block;
-            font-size: 0.85rem;
+            font-size: 0.78rem;
             font-weight: 500;
             color: var(--t2);
             margin-bottom: 0.5rem;
@@ -503,10 +504,10 @@
 
         .form-input {
             width: 100%;
-            padding: 14px 18px;
+            padding: 12px 16px; /* Original size */
             border: 1px solid var(--border);
             border-radius: 8px;
-            font-size: 0.95rem;
+            font-size: 0.88rem; /* Original size */
             font-family: 'Inter', sans-serif;
             color: var(--t1);
             background: var(--white);
@@ -531,8 +532,8 @@
             color: var(--white);
             border: none;
             border-radius: 8px;
-            padding: 16px;
-            font-size: 0.95rem;
+            padding: 14px; /* Original size */
+            font-size: 0.88rem; /* Original size */
             font-weight: 500;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -561,11 +562,11 @@
         .form-divider {
             height: 1px;
             background: var(--border);
-            margin: 1.5rem 0;
+            margin: 1.75rem 0; /* Original size */
         }
 
         .form-footer {
-            font-size: 0.8rem;
+            font-size: 0.75rem; /* Original size */
             color: var(--t3);
             text-align: center;
             line-height: 1.6;
@@ -584,8 +585,8 @@
             .panel-right::before {
                 content: '';
                 display: block;
-                width: 50px;
-                height: 50px;
+                width: 56px;
+                height: 56px;
                 background: var(--red);
                 border-radius: 10px;
                 margin: 0 auto 1.5rem;
