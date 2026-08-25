@@ -337,13 +337,13 @@
         }
 
         /* ════════════════════════════════════════
-           FOOTER — dark base: continues from hero
+           FOOTER — white, bridges to login page
         ════════════════════════════════════════ */
         footer {
             position: relative;
             z-index: 10;
-            background: var(--dark-nav);
-            border-top: 1px solid rgba(255,255,255,0.055);
+            background: #FFFFFF;
+            border-top: 1px solid #E8E6E2;
             padding: 1.35rem 3rem;
             display: flex;
             justify-content: space-between;
@@ -351,8 +351,8 @@
         }
         .foot-left { display: flex; align-items: center; gap: 9px; }
         .foot-left img { width: 19px; height: 19px; object-fit: contain; }
-        .foot-copy { font-size: 0.73rem; color: rgba(255,255,255,0.25); }
-        .foot-right { font-size: 0.7rem; color: rgba(255,255,255,0.16); letter-spacing: 0.09em; text-transform: uppercase; }
+        .foot-copy { font-size: 0.73rem; color: #A09E9C; }
+        .foot-right { font-size: 0.7rem; color: #C8C6C2; letter-spacing: 0.09em; text-transform: uppercase; }
 
         /* ── Responsive ── */
         @media (max-width: 768px) {
