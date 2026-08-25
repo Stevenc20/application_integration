@@ -213,35 +213,40 @@
 
         /* ─── LEFT PANEL ─── */
         .panel-left {
-            background: var(--red);
+            background: #1a1a2e;
+            background-image: url('{{ asset('images/building.png') }}');
+            background-size: cover;
+            background-position: center;
             padding: 3.5rem 3rem;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             position: relative;
             overflow: hidden;
+            min-height: 500px;
         }
 
-        /* Subtle pattern overlay */
+        /* Dark gradient overlay — like Forgewell */
         .panel-left::before {
             content: '';
             position: absolute;
             inset: 0;
-            background-image:
-                linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-            background-size: 40px 40px;
+            background: linear-gradient(
+                160deg,
+                rgba(15, 15, 25, 0.80) 0%,
+                rgba(150, 35, 25, 0.55) 50%,
+                rgba(15, 15, 25, 0.88) 100%
+            );
         }
 
+        /* Subtle noise texture */
         .panel-left::after {
             content: '';
             position: absolute;
-            bottom: -60px;
-            right: -60px;
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.05);
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            background-size: 200px;
+            pointer-events: none;
         }
 
         .panel-top { position: relative; z-index: 1; }
@@ -251,73 +256,114 @@
             align-items: center;
             gap: 7px;
             font-size: 0.68rem;
-            font-weight: 500;
+            font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.7);
-            border: 1px solid rgba(255,255,255,0.25);
-            padding: 4px 12px;
-            border-radius: 20px;
+            color: rgba(255,255,255,0.9);
+            background: rgba(192,57,43,0.4);
+            border: 1px solid rgba(192,57,43,0.6);
+            padding: 5px 14px;
+            border-radius: 4px;
             margin-bottom: 2rem;
         }
 
         .panel-dot {
-            width: 5px;
-            height: 5px;
+            width: 6px;
+            height: 6px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.8);
+            background: #FF6B6B;
             animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 0 0 rgba(255,107,107,0.4);
         }
 
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        @keyframes pulse {
+            0%,100% { opacity:1; box-shadow: 0 0 0 0 rgba(255,107,107,0.4); }
+            50% { opacity:0.7; box-shadow: 0 0 0 6px rgba(255,107,107,0); }
+        }
 
         .panel-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: 700;
             color: var(--white);
             line-height: 1.15;
             margin-bottom: 0.75rem;
             letter-spacing: -0.01em;
+            text-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
 
         .panel-sub {
             font-size: 0.85rem;
-            color: rgba(255,255,255,0.65);
+            color: rgba(255,255,255,0.7);
             line-height: 1.7;
+            text-shadow: 0 1px 6px rgba(0,0,0,0.4);
         }
 
         .panel-logo-wrap {
             position: relative;
             z-index: 1;
             display: flex;
-            justify-content: center;
+            justify-content: flex-start;
             align-items: center;
             flex: 1;
-            padding: 2rem 0;
+            padding: 2.5rem 0;
         }
 
         .panel-logo-bg {
-            background: rgba(255,255,255,0.1);
+            background: rgba(255,255,255,0.07);
             border: 1px solid rgba(255,255,255,0.15);
-            border-radius: 16px;
-            padding: 2rem;
+            border-radius: 12px;
+            padding: 1.25rem 1.75rem;
             display: flex;
             align-items: center;
             justify-content: center;
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
         }
 
         .panel-logo-bg img {
             width: 100%;
-            max-width: 180px;
+            max-width: 150px;
             object-fit: contain;
             filter: brightness(0) invert(1);
-            opacity: 0.9;
+            opacity: 0.95;
         }
 
         .panel-bottom {
             position: relative;
             z-index: 1;
+        }
+
+        .panel-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 1.5rem;
+        }
+
+        .panel-stat {
+            background: rgba(0,0,0,0.3);
+            backdrop-filter: blur(8px);
+            padding: 0.85rem 0.75rem;
+            text-align: center;
+        }
+
+        .panel-stat-num {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: white;
+            line-height: 1;
+            margin-bottom: 0.3rem;
+        }
+
+        .panel-stat-label {
+            font-size: 0.6rem;
+            color: rgba(255,255,255,0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
         }
 
         .panel-features {
@@ -335,10 +381,11 @@
         }
 
         .panel-feature-icon {
-            width: 24px;
-            height: 24px;
+            width: 22px;
+            height: 22px;
             border-radius: 50%;
-            background: rgba(255,255,255,0.15);
+            background: rgba(192,57,43,0.35);
+            border: 1px solid rgba(192,57,43,0.5);
             display: flex;
             align-items: center;
             justify-content: center;
@@ -346,9 +393,50 @@
         }
 
         .panel-feature-icon svg {
-            width: 12px;
-            height: 12px;
+            width: 11px;
+            height: 11px;
             stroke: rgba(255,255,255,0.9);
+        }
+
+        /* ─── QA BUTTON ─── */
+        .btn-qa {
+            width: 100%;
+            background: rgba(74,158,255,0.05);
+            color: #4A9EFF;
+            border: 1.5px solid rgba(74,158,255,0.3);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            letter-spacing: 0.02em;
+            text-decoration: none;
+        }
+
+        .btn-qa:hover {
+            background: rgba(74,158,255,0.12);
+            border-color: rgba(74,158,255,0.65);
+            color: #72C0FF;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(74,158,255,0.15);
+        }
+
+        .btn-qa .qa-badge {
+            font-size: 0.58rem;
+            font-weight: 700;
+            letter-spacing: 0.12em;
+            text-transform: uppercase;
+            background: rgba(74,158,255,0.15);
+            border: 1px solid rgba(74,158,255,0.28);
+            padding: 2px 7px;
+            border-radius: 20px;
+            color: #7BC8FF;
         }
 
         /* ─── RIGHT PANEL ─── */
@@ -568,10 +656,10 @@
             <div class="panel-top">
                 <div class="panel-tag">
                     <div class="panel-dot"></div>
-                    Smart Manufacturing
+                    Smart Manufacturing Platform
                 </div>
-                <h1 class="panel-title">Industrial Production System</h1>
-                <p class="panel-sub">Platform monitoring produksi yang dirancang untuk performa dan efisiensi industri.</p>
+                <h1 class="panel-title">Industrial<br>Production System</h1>
+                <p class="panel-sub">Platform monitoring produksi yang dirancang untuk performa dan efisiensi industri modern.</p>
             </div>
 
             <div class="panel-logo-wrap">
@@ -581,6 +669,20 @@
             </div>
 
             <div class="panel-bottom">
+                <div class="panel-stats">
+                    <div class="panel-stat">
+                        <div class="panel-stat-num">24/7</div>
+                        <div class="panel-stat-label">Live Monitor</div>
+                    </div>
+                    <div class="panel-stat">
+                        <div class="panel-stat-num">Real</div>
+                        <div class="panel-stat-label">Time Data</div>
+                    </div>
+                    <div class="panel-stat">
+                        <div class="panel-stat-num">Auto</div>
+                        <div class="panel-stat-label">Reporting</div>
+                    </div>
+                </div>
                 <div class="panel-features">
                     <div class="panel-feature">
                         <div class="panel-feature-icon">
@@ -654,9 +756,9 @@
                     </svg>
                 </button>
 
-                <div style="text-align: center; margin: 1.5rem 0; color: var(--t3); font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 10px;">
+                <div style="text-align: center; margin: 1.25rem 0; color: var(--t3); font-size: 0.8rem; font-weight: 500; display: flex; align-items: center; gap: 10px;">
                     <div style="flex: 1; height: 1px; background: var(--border);"></div>
-                    <span>ATAU</span>
+                    <span>atau</span>
                     <div style="flex: 1; height: 1px; background: var(--border);"></div>
                 </div>
 
@@ -670,6 +772,20 @@
                     </svg>
                     Login dengan QR Code (Monitor)
                 </button>
+
+                <div style="text-align: center; margin: 1.25rem 0; color: var(--t3); font-size: 0.8rem; font-weight: 500; display: flex; align-items: center; gap: 10px;">
+                    <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                    <span>akses sistem lain</span>
+                    <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                </div>
+
+                <a href="https://qa.tantechstev.com/login" target="_blank" class="btn-qa">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Login ke QA System
+                    <span class="qa-badge">QA</span>
+                </a>
             </form>
 
             <div class="form-divider"></div>
