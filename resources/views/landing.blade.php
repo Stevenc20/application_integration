@@ -48,7 +48,7 @@
         .d5 { transition-delay: 0.68s; }
 
         /* ════════════════════════════════════════
-           NAVBAR — transparent, fades into hero
+           NAVBAR — white, matches footer & login
         ════════════════════════════════════════ */
         header {
             position: fixed;
@@ -59,42 +59,34 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            /* Top-heavy gradient: solid dark at top, fades out — navbar lives "in" the photo */
-            background: linear-gradient(180deg,
-                rgba(11,16,26,0.88) 0%,
-                rgba(11,16,26,0.40) 70%,
-                rgba(11,16,26,0.00) 100%
-            );
-            border-bottom: 1px solid rgba(255,255,255,0.04);
-            transition: background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease;
+            background: #FFFFFF;
+            border-bottom: 1px solid #E8E6E2;
+            transition: box-shadow 0.3s ease;
         }
         header.scrolled {
-            background: rgba(10,14,22,0.94);
-            backdrop-filter: blur(18px);
-            -webkit-backdrop-filter: blur(18px);
-            border-bottom: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 2px 16px rgba(0,0,0,0.07);
         }
 
         .nav-brand { display: flex; align-items: center; gap: 11px; }
         .nav-logo  { width: 32px; height: 32px; object-fit: contain; }
         .nav-divider {
             width: 1px; height: 17px;
-            background: rgba(255,255,255,0.15);
+            background: #E2E0DC;
         }
         .nav-title {
             font-family: 'Playfair Display', serif;
             font-size: 1.02rem;
             font-weight: 500;
-            color: rgba(255,255,255,0.90);
+            color: #111110;
         }
         .nav-badge {
             font-size: 0.59rem;
             font-weight: 600;
             letter-spacing: 0.15em;
             text-transform: uppercase;
-            color: var(--red);
-            background: rgba(192,57,43,0.10);
-            border: 1px solid rgba(192,57,43,0.30);
+            color: #C0392B;
+            background: rgba(192,57,43,0.07);
+            border: 1px solid rgba(192,57,43,0.22);
             padding: 3px 9px;
             border-radius: 20px;
             display: flex;
@@ -105,7 +97,7 @@
             content: '';
             width: 5px; height: 5px;
             border-radius: 50%;
-            background: var(--red);
+            background: #C0392B;
             animation: livepulse 2.4s ease-in-out infinite;
         }
         @keyframes livepulse {
@@ -179,7 +171,8 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 120px 2rem 0;
+            /* Extra top padding so headline clears the white navbar */
+            padding: 140px 2rem 0;
             text-align: center;
         }
 
@@ -328,7 +321,7 @@
         }
         .feat-desc {
             font-size: 0.76rem;
-            color: #7A7876;
+            color: #5A5856;
             line-height: 1.6;
         }
 
