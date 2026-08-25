@@ -193,16 +193,15 @@
         .main {
             flex: 1;
             display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 2.5rem 1.5rem;
-            margin-top: 68px;
-            min-height: calc(100vh - 68px - 60px); /* Fill space between header and footer */
+            padding: 3rem 1.5rem;
+            margin-top: 68px; /* ensures content clears the fixed header */
+            min-height: calc(100vh - 68px - 64px);
         }
 
         .login-card {
+            margin: auto; /* Centers safely without clipping top */
             width: 100%;
-            max-width: 900px;
+            max-width: 960px; /* Proper desktop proportion */
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -210,7 +209,8 @@
             display: grid;
             grid-template-columns: 1fr 1fr;
             box-shadow: 0 8px 40px rgba(0,0,0,0.06);
-            align-items: stretch; /* ensure equal height */
+            align-items: stretch; /* equal height for both panels */
+            gap: 0;
         }
 
         /* ─── LEFT PANEL ─── */
@@ -219,10 +219,9 @@
             background-image: url('{{ asset('images/building.png') }}');
             background-size: cover;
             background-position: center;
-            padding: 2.5rem 2.5rem;
+            padding: 3.5rem 3rem;
             display: flex;
             flex-direction: column;
-            justify-content: space-between;
             position: relative;
             overflow: hidden;
         }
@@ -307,8 +306,8 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            padding: 1.5rem 0;
-            flex: 1;
+            flex: 1; /* Pushes top and bottom content to the edges proportionally */
+            padding: 2.5rem 0;
         }
 
         .panel-logo-bg {
@@ -410,10 +409,10 @@
             width: 100%;
             background: rgba(74,158,255,0.05);
             color: #4A9EFF;
-            border: 1px solid rgba(74,158,255,0.3);
+            border: 1.5px solid rgba(74,158,255,0.3);
             border-radius: 8px;
-            padding: 10px 12px;
-            font-size: 0.8rem;
+            padding: 12px;
+            font-size: 0.82rem;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -431,23 +430,24 @@
             border-color: rgba(74,158,255,0.65);
             color: #72C0FF;
             transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(74,158,255,0.15);
         }
 
         .btn-qa .qa-badge {
-            font-size: 0.55rem;
+            font-size: 0.58rem;
             font-weight: 700;
-            letter-spacing: 0.1em;
+            letter-spacing: 0.12em;
             text-transform: uppercase;
             background: rgba(74,158,255,0.15);
             border: 1px solid rgba(74,158,255,0.28);
-            padding: 2px 6px;
+            padding: 2px 7px;
             border-radius: 20px;
             color: #7BC8FF;
         }
 
         /* ─── RIGHT PANEL ─── */
         .panel-right {
-            padding: 2.5rem 3rem;
+            padding: 3.5rem 3rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -482,14 +482,14 @@
         }
 
         .form-desc {
-            font-size: 0.82rem;
+            font-size: 0.85rem;
             color: var(--t2);
-            margin-bottom: 1.75rem;
-            line-height: 1.5;
+            margin-bottom: 2.25rem;
+            line-height: 1.6;
         }
 
         .form-group {
-            margin-bottom: 1.1rem;
+            margin-bottom: 1.25rem;
         }
 
         .form-label {
@@ -497,16 +497,16 @@
             font-size: 0.78rem;
             font-weight: 500;
             color: var(--t2);
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.5rem;
             letter-spacing: 0.02em;
         }
 
         .form-input {
             width: 100%;
-            padding: 10px 14px;
+            padding: 12px 16px;
             border: 1px solid var(--border);
-            border-radius: 6px;
-            font-size: 0.85rem;
+            border-radius: 8px;
+            font-size: 0.88rem;
             font-family: 'Inter', sans-serif;
             color: var(--t1);
             background: var(--white);
@@ -530,9 +530,9 @@
             background: var(--red);
             color: var(--white);
             border: none;
-            border-radius: 6px;
-            padding: 12px;
-            font-size: 0.85rem;
+            border-radius: 8px;
+            padding: 14px;
+            font-size: 0.88rem;
             font-weight: 500;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -540,7 +540,7 @@
             align-items: center;
             justify-content: center;
             gap: 8px;
-            margin-top: 0.25rem;
+            margin-top: 0.5rem;
             transition: background 0.2s, transform 0.2s, box-shadow 0.2s;
             letter-spacing: 0.02em;
         }
@@ -548,7 +548,7 @@
         .btn-submit:hover {
             background: var(--red-hover);
             transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(192,57,43,0.25);
+            box-shadow: 0 8px 24px rgba(192,57,43,0.28);
         }
 
         .btn-submit:active {
@@ -561,7 +561,7 @@
         .form-divider {
             height: 1px;
             background: var(--border);
-            margin: 1.5rem 0;
+            margin: 1.75rem 0;
         }
 
         .form-footer {
