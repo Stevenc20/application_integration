@@ -7,272 +7,480 @@
     <meta name="description" content="Sistem monitoring produksi real-time PT IPPI.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
-            --red: #C0392B;
+            --red:       #C0392B;
             --red-hover: #E74C3C;
-            --red-light: #FDECEA;
-            --white: #FFFFFF;
-            --off-white: #F8F7F5;
-            --border: #E9E7E4;
-            --t1: #111110;
-            --t2: #5C5A58;
-            --t3: #A09E9C;
+            --red-glow:  rgba(192,57,43,0.28);
+            --white:     #FFFFFF;
+            --dark:      #0C1018;
+            --dark-mid:  #101620;
+            --dark-nav:  #0E1420;
         }
 
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{
-            font-family:'Inter',sans-serif;
-            min-height:100vh;display:flex;flex-direction:column;
-            -webkit-font-smoothing:antialiased;
-            background:var(--off-white);
-        }
-        .page{flex:1;display:flex;flex-direction:column;padding-top:68px;}
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
 
-        /* ─── ANIMASI MASUK (REVEAL) ─── */
+        body {
+            font-family: 'Inter', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background: var(--dark);
+            color: var(--white);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ── REVEAL ── */
         .reveal {
             opacity: 0;
-            transform: translate3d(0, 24px, 0);
-            transition: opacity 0.8s cubic-bezier(0.22, 0.61, 0.36, 1), transform 0.8s cubic-bezier(0.22, 0.61, 0.36, 1);
+            transform: translate3d(0, 28px, 0);
+            transition: opacity 0.9s cubic-bezier(0.22,0.61,0.36,1),
+                        transform 0.9s cubic-bezier(0.22,0.61,0.36,1);
             will-change: opacity, transform;
         }
-        .reveal.active {
-            opacity: 1;
-            transform: translate3d(0, 0, 0);
-        }
-        .delay-100 { transition-delay: 0.1s; }
-        .delay-200 { transition-delay: 0.2s; }
-        .delay-300 { transition-delay: 0.3s; }
+        .reveal.active { opacity: 1; transform: translate3d(0,0,0); }
+        .d1 { transition-delay: 0.12s; }
+        .d2 { transition-delay: 0.26s; }
+        .d3 { transition-delay: 0.40s; }
+        .d4 { transition-delay: 0.54s; }
+        .d5 { transition-delay: 0.68s; }
 
-        /* ─── NAVBAR (Fixed & Scrolled) ─── */
+        /* ════════════════════════════════════════
+           NAVBAR — transparent, fades into hero
+        ════════════════════════════════════════ */
         header {
-            background: var(--white);
-            border-bottom: 1px solid var(--border);
-            padding: 0 3rem;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 68px;
             position: fixed;
             top: 0; left: 0; right: 0;
-            z-index: 100;
-            transition: background 0.3s, backdrop-filter 0.3s;
-        }
-        header.scrolled {
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-        }
-        .nav-brand {
+            z-index: 200;
+            height: 66px;
+            padding: 0 3rem;
             display: flex;
             align-items: center;
-            gap: 12px;
+            justify-content: space-between;
+            /* Top-heavy gradient: solid dark at top, fades out — navbar lives "in" the photo */
+            background: linear-gradient(180deg,
+                rgba(11,16,26,0.88) 0%,
+                rgba(11,16,26,0.40) 70%,
+                rgba(11,16,26,0.00) 100%
+            );
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+            transition: background 0.4s ease, backdrop-filter 0.4s ease, border-color 0.4s ease;
         }
-        .nav-logo {
-            width: 36px;
-            height: 36px;
-            object-fit: contain;
+        header.scrolled {
+            background: rgba(10,14,22,0.94);
+            backdrop-filter: blur(18px);
+            -webkit-backdrop-filter: blur(18px);
+            border-bottom: 1px solid rgba(255,255,255,0.08);
         }
+
+        .nav-brand { display: flex; align-items: center; gap: 11px; }
+        .nav-logo  { width: 32px; height: 32px; object-fit: contain; }
         .nav-divider {
-            width: 1px;
-            height: 20px;
-            background: var(--border);
+            width: 1px; height: 17px;
+            background: rgba(255,255,255,0.15);
         }
         .nav-title {
             font-family: 'Playfair Display', serif;
-            font-size: 1.05rem;
+            font-size: 1.02rem;
             font-weight: 500;
-            color: var(--t1);
+            color: rgba(255,255,255,0.90);
         }
         .nav-badge {
-            font-size: 0.65rem;
-            font-weight: 500;
-            letter-spacing: 0.1em;
+            font-size: 0.59rem;
+            font-weight: 600;
+            letter-spacing: 0.15em;
             text-transform: uppercase;
             color: var(--red);
-            background: var(--red-light);
-            border: 1px solid rgba(192,57,43,0.2);
-            padding: 3px 10px;
+            background: rgba(192,57,43,0.10);
+            border: 1px solid rgba(192,57,43,0.30);
+            padding: 3px 9px;
             border-radius: 20px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .nav-badge::before {
+            content: '';
+            width: 5px; height: 5px;
+            border-radius: 50%;
+            background: var(--red);
+            animation: livepulse 2.4s ease-in-out infinite;
+        }
+        @keyframes livepulse {
+            0%,100%{ opacity:1; } 50%{ opacity:0.3; }
         }
 
-        /* ─── CENTER HERO (Shadowy Building) ─── */
-        .center{
-            flex:1;display:flex;align-items:center;justify-content:center;
-            padding:3rem 2rem;position:relative;
-            background:url("{{ asset('images/building.png') }}") center/cover no-repeat;
+        /* ════════════════════════════════════════
+           HERO — photo + multi-stop natural overlay
+        ════════════════════════════════════════ */
+        .hero {
+            position: relative;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+            overflow: hidden;
         }
-        .center::before{
-            content:'';position:absolute;inset:0;
-            background:linear-gradient(180deg,rgba(17,17,16,.75) 0%,rgba(17,17,16,.65) 50%,rgba(17,17,16,.85) 100%);
+
+        /* Layer 1: Photo */
+        .hero-bg {
+            position: absolute;
+            inset: 0;
+            background-image: url("{{ asset('images/building.png') }}");
+            background-size: cover;
+            background-position: center 28%;
+            /* Photo feels warmer / slightly darker from the sky */
+            filter: saturate(0.85) brightness(0.96);
+            transform: scale(1.05);
+            transition: transform 14s cubic-bezier(0.25, 0.46, 0.45, 0.94);
         }
-        .center-box{position:relative;z-index:2;text-align:center;max-width:640px;width:100%}
-        
-        .hero-tag {
+        .hero-bg.ready { transform: scale(1); }
+
+        /* Layer 2: Tonal gradient — NOT flat black
+           - Top: deep navy (matches navbar)
+           - 30%: thin zone where building photo is most visible
+           - 65%: starts deepening again
+           - 100%: near-solid dark (merges with footer)
+        */
+        .hero-overlay {
+            position: absolute;
+            inset: 0;
+            background:
+                /* Left vignette — adds depth, not a hard edge */
+                linear-gradient(95deg,
+                    rgba(9,13,21,0.52) 0%,
+                    rgba(9,13,21,0.05) 55%,
+                    transparent 100%
+                ),
+                /* Main vertical tonal ramp */
+                linear-gradient(180deg,
+                    rgba(10,15,24,0.82)  0%,
+                    rgba(12,18,28,0.46)  22%,
+                    rgba(13,19,30,0.38)  42%,
+                    rgba(11,17,27,0.62)  64%,
+                    rgba(10,14,23,0.88)  82%,
+                    rgba(9, 13,21,0.97) 100%
+                );
+        }
+
+        /* Layer 3: Film grain — gives photo-overlay a unified texture */
+        .hero-grain {
+            position: absolute;
+            inset: 0;
+            opacity: 0.028;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+            background-size: 256px;
+            pointer-events: none;
+        }
+
+        /* ── Hero text area ── */
+        .hero-content {
+            position: relative;
+            z-index: 10;
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 120px 2rem 0;
+            text-align: center;
+        }
+
+        .hero-box { max-width: 680px; width: 100%; }
+
+        /* Label */
+        .hero-label {
             display: inline-flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.7rem;
-            font-weight: 500;
-            letter-spacing: 0.14em;
+            gap: 9px;
+            font-size: 0.67rem;
+            font-weight: 600;
+            letter-spacing: 0.22em;
             text-transform: uppercase;
-            color: var(--red-light);
+            color: rgba(255,255,255,0.48);
             margin-bottom: 1.5rem;
         }
-        .hero-tag .dot {
-            width: 6px; height: 6px; border-radius: 50%;
+        .hero-label .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
             background: var(--red);
-            animation: pulse 2s ease-in-out infinite;
+            box-shadow: 0 0 0 0 rgba(192,57,43,0.55);
+            animation: dotglow 2.6s cubic-bezier(0.4,0,0.6,1) infinite;
         }
-        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        @keyframes dotglow {
+            0%  { box-shadow: 0 0 0 0   rgba(192,57,43,0.55); }
+            60% { box-shadow: 0 0 0 7px rgba(192,57,43,0);    }
+            100%{ box-shadow: 0 0 0 0   rgba(192,57,43,0);    }
+        }
 
-        .center-box h1{
+        /* Headline */
+        .hero-h1 {
             font-family: 'Playfair Display', serif;
-            font-size: clamp(2.5rem, 4vw, 3.5rem);
-            font-weight: 700;line-height:1.1;
-            letter-spacing:-.02em;margin-bottom:.8rem;color:var(--white);
+            font-size: clamp(3rem, 5.8vw, 4.8rem);
+            font-weight: 700;
+            line-height: 1.07;
+            letter-spacing: -0.03em;
+            color: var(--white);
+            margin-bottom: 1.25rem;
+            text-shadow: 0 2px 28px rgba(0,0,0,0.30);
         }
-        .center-box h1 em{font-style:normal;color:var(--red)}
-        
-        .center-box p{
-            font-size:1rem;line-height:1.7;color:rgba(255,255,255,.8);
-            margin-bottom:2.5rem;
-        }
-        
-        .center-btn{
-            display:inline-flex;align-items:center;gap:8px;
-            background:var(--red);color:var(--white);
-            padding:14px 34px;border-radius:6px;
-            font-size:.9rem;font-weight:500;text-decoration:none;
-            transition:background 0.2s,transform 0.2s,box-shadow 0.2s;
-        }
-        .center-btn:hover{
-            background:var(--red-hover);
-            transform:translateY(-2px);
-            box-shadow:0 8px 24px rgba(192,57,43,.3);
+        .hero-h1 em {
+            font-style: italic;
+            color: var(--red);
+            /* warm glow so red feels embedded in the scene, not a foreign element */
+            text-shadow:
+                0 0 50px rgba(192,57,43,0.32),
+                0 2px 24px rgba(0,0,0,0.35);
         }
 
-        /* ─── FEATURES (INLINE) ─── */
-        .features{
-            display:flex;justify-content:center;gap:2rem;margin-top:3.5rem;
-            border-top:1px solid rgba(255,255,255,.1);padding-top:2.5rem;
+        /* Desc */
+        .hero-desc {
+            font-size: 0.98rem;
+            line-height: 1.78;
+            color: rgba(255,255,255,0.56);
+            max-width: 500px;
+            margin: 0 auto 2.8rem;
+            font-weight: 400;
         }
-        .feat-item{
-            flex:1;text-align:left;display:flex;flex-direction:column;gap:6px;
-        }
-        .feat-item h3{
-            font-size:.85rem;font-weight:600;color:var(--red-hover);
-            display:flex;align-items:center;gap:8px;
-            letter-spacing: 0.02em;
-        }
-        .feat-item h3 svg{width:18px;height:18px;stroke:currentColor;stroke-width:2;fill:none}
-        .feat-item p{font-size:.78rem;color:rgba(255,255,255,.65);line-height:1.55}
 
-        /* ─── FOOTER (Matching Login Page) ─── */
-        footer{
-            background:var(--white);
-            border-top:1px solid var(--border);
-            padding:1.5rem 3rem;
-            display:flex;justify-content:space-between;align-items:center;
-            position:relative;z-index:10;
+        /* CTA */
+        .hero-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: var(--red);
+            color: var(--white);
+            padding: 15px 38px;
+            border-radius: 5px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            text-decoration: none;
+            letter-spacing: 0.025em;
+            box-shadow:
+                0 4px 24px rgba(192,57,43,0.28),
+                inset 0 1px 0 rgba(255,255,255,0.10);
+            position: relative;
+            transition: background 0.2s, transform 0.25s cubic-bezier(0.22,0.61,0.36,1), box-shadow 0.25s;
         }
-        .foot-left { display: flex; align-items: center; gap: 10px; }
-        .foot-left img { width: 22px; height: 22px; object-fit: contain; }
-        .foot-copy { font-size: 0.78rem; color: var(--t3); }
+        .hero-cta::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            border-radius: inherit;
+            border: 1px solid rgba(255,255,255,0.09);
+        }
+        .hero-cta:hover {
+            background: var(--red-hover);
+            transform: translateY(-3px);
+            box-shadow: 0 14px 36px rgba(192,57,43,0.36), inset 0 1px 0 rgba(255,255,255,0.12);
+        }
+        .hero-cta:active { transform: translateY(-1px); }
+        .hero-cta svg { transition: transform 0.2s; flex-shrink: 0; }
+        .hero-cta:hover svg { transform: translateX(4px); }
 
-        @media(max-width:768px){
-            header{padding:0 1.5rem}
-            .nav-badge{display:none}
-            .center{padding:2rem 1.5rem}
-            .features{flex-direction:column;gap:1.5rem}
-            footer{flex-direction:column;gap:0.75rem;padding:1.25rem 1.5rem;text-align:center;}
+        /* ════════════════════════════════════════
+           FEATURE ROW — lives inside the hero dark zone
+        ════════════════════════════════════════ */
+        .hero-features {
+            position: relative;
+            z-index: 10;
+        }
+
+        .feat-inner {
+            max-width: 740px;
+            margin: 0 auto;
+            padding: 1.75rem 2rem 2.75rem;
+            display: flex;
+            justify-content: center;
+            gap: 0;
+            border-top: 1px solid rgba(255,255,255,0.07);
+        }
+
+        .feat-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding: 0 2rem;
+            text-align: left;
+        }
+        .feat-item + .feat-item {
+            border-left: 1px solid rgba(255,255,255,0.06);
+        }
+
+        .feat-icon {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 3px;
+        }
+        .feat-icon svg {
+            width: 15px; height: 15px;
+            stroke: var(--red);
+            stroke-width: 2;
+            fill: none;
+            flex-shrink: 0;
+            opacity: 0.9;
+        }
+        .feat-name {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--red);
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .feat-desc {
+            font-size: 0.76rem;
+            color: rgba(255,255,255,0.42);
+            line-height: 1.6;
+        }
+
+        /* ════════════════════════════════════════
+           FOOTER — dark base: continues from hero
+        ════════════════════════════════════════ */
+        footer {
+            position: relative;
+            z-index: 10;
+            background: var(--dark-nav);
+            border-top: 1px solid rgba(255,255,255,0.055);
+            padding: 1.35rem 3rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .foot-left { display: flex; align-items: center; gap: 9px; }
+        .foot-left img { width: 19px; height: 19px; object-fit: contain; }
+        .foot-copy { font-size: 0.73rem; color: rgba(255,255,255,0.25); }
+        .foot-right { font-size: 0.7rem; color: rgba(255,255,255,0.16); letter-spacing: 0.09em; text-transform: uppercase; }
+
+        /* ── Responsive ── */
+        @media (max-width: 768px) {
+            header { padding: 0 1.25rem; }
+            .hero-content { padding: 96px 1.5rem 0; }
+            .hero-desc { font-size: 0.88rem; }
+            .feat-inner { flex-direction: column; gap: 0; padding: 1.5rem 1.5rem 2.25rem; }
+            .feat-item {
+                padding: 1.25rem 0 0;
+                border-left: none !important;
+                border-top: 1px solid rgba(255,255,255,0.06);
+            }
+            .feat-item:first-child { border-top: none; padding-top: 0; }
+            footer { padding: 1.2rem 1.5rem; flex-direction: column; gap: 0.5rem; text-align: center; }
+            .foot-right { display: none; }
         }
     </style>
 </head>
 <body>
 
-<div class="page">
-    <header>
-        <div class="nav-brand">
-            <img src="{{ asset('images/ippi.png') }}" class="nav-logo" alt="IPPI">
-            <div class="nav-divider"></div>
-            <span class="nav-title">Production System</span>
-            <span class="nav-badge">Live</span>
-        </div>
-        <!-- Button Login dihapus dari navbar, fokus ke tengah saja -->
-    </header>
+<!-- ═══ NAVBAR ═══ -->
+<header id="main-header">
+    <div class="nav-brand">
+        <img src="{{ asset('images/ippi.png') }}" class="nav-logo" alt="IPPI">
+        <div class="nav-divider"></div>
+        <span class="nav-title">Production System</span>
+        <span class="nav-badge">Live</span>
+    </div>
+</header>
 
-    <div class="center">
-        <div class="center-box">
-            <div class="hero-tag reveal">
-                <div class="dot"></div>
+<!-- ═══ HERO ═══ -->
+<section class="hero">
+
+    <div class="hero-bg" id="heroBg"></div>
+    <div class="hero-overlay"></div>
+    <div class="hero-grain"></div>
+
+    <!-- Headline + CTA -->
+    <div class="hero-content">
+        <div class="hero-box">
+
+            <div class="hero-label reveal">
+                <span class="dot"></span>
                 Smart Manufacturing Platform
             </div>
-            <h1 class="reveal delay-100">Monitor. Track.<br><em>Control.</em></h1>
-            <p class="reveal delay-200">Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk secara real-time dari satu platform terpadu.</p>
-            
-            <a href="{{ route('login') }}" class="center-btn reveal delay-300">
+
+            <h1 class="hero-h1 reveal d1">
+                Monitor. Track.<br><em>Control.</em>
+            </h1>
+
+            <p class="hero-desc reveal d2">
+                Pantau lini produksi, lacak downtime mesin, dan kendalikan kualitas produk
+                secara real-time dari satu platform terpadu.
+            </p>
+
+            <a href="{{ route('login') }}" class="hero-cta reveal d3">
                 Masuk ke Sistem
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                    <path d="M5 12h14M12 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
             </a>
-            
-            <div class="features">
-                <div class="feat-item reveal delay-100">
-                    <h3>
-                        <svg viewBox="0 0 24 24"><path d="M3 3v18h18M18 9l-5 5-4-4-5 5"/></svg>
-                        Production
-                    </h3>
-                    <p>Output aktual vs target per shift dan lini produksi.</p>
-                </div>
-                <div class="feat-item reveal delay-200">
-                    <h3>
-                        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                        Downtime
-                    </h3>
-                    <p>Deteksi otomatis dan analisis penyebab berhentinya mesin.</p>
-                </div>
-                <div class="feat-item reveal delay-300">
-                    <h3>
-                        <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg>
-                        Quality
-                    </h3>
-                    <p>Inspeksi digital, monitoring defect, dan laporan terpadu.</p>
-                </div>
-            </div>
+
         </div>
     </div>
 
-    <footer class="reveal delay-200">
-        <div class="foot-left">
-            <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
-            <span class="foot-copy">© {{ date('Y') }} PT IPPI. Created by Steven Christian.</span>
+    <!-- Feature row — lives inside hero's dark gradient base -->
+    <div class="hero-features">
+        <div class="feat-inner">
+
+            <div class="feat-item reveal d3">
+                <div class="feat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M3 3v18h18M18 9l-5 5-4-4-5 5"/></svg>
+                    <span class="feat-name">Production</span>
+                </div>
+                <p class="feat-desc">Output aktual vs target per shift dan lini produksi.</p>
+            </div>
+
+            <div class="feat-item reveal d4">
+                <div class="feat-icon">
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                    <span class="feat-name">Downtime</span>
+                </div>
+                <p class="feat-desc">Deteksi otomatis dan analisis penyebab berhentinya mesin.</p>
+            </div>
+
+            <div class="feat-item reveal d5">
+                <div class="feat-icon">
+                    <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14M22 4L12 14.01l-3-3"/></svg>
+                    <span class="feat-name">Quality</span>
+                </div>
+                <p class="feat-desc">Inspeksi digital, monitoring defect, dan laporan terpadu.</p>
+            </div>
+
         </div>
-    </footer>
-</div>
+    </div>
+
+</section>
+
+<!-- ═══ FOOTER ═══ -->
+<footer>
+    <div class="foot-left">
+        <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
+        <span class="foot-copy">© {{ date('Y') }} PT IPPI. Created by Steven Christian.</span>
+    </div>
+    <span class="foot-right">Industrial Intelligence Platform</span>
+</footer>
 
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
-        // Intersection Observer for Reveal Animation
-        const observer = new IntersectionObserver((entries) => {
-            entries.forEach(entry => {
-                if (entry.isIntersecting) {
-                    entry.target.classList.add('active');
-                }
-            });
-        }, { threshold: 0.1 });
+    document.addEventListener("DOMContentLoaded", function () {
 
+        // Reveal on scroll
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('active'); });
+        }, { threshold: 0.06 });
         document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-        // Scroll listener for Navbar
-        const header = document.querySelector('header');
+        // Navbar scroll state
+        const header = document.getElementById('main-header');
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 20) {
-                header.classList.add('scrolled');
-            } else {
-                header.classList.remove('scrolled');
-            }
-        });
+            header.classList.toggle('scrolled', window.scrollY > 28);
+        }, { passive: true });
+
+        // Hero bg: load image then trigger scale-in
+        const bg = document.getElementById('heroBg');
+        const img = new Image();
+        img.onload = () => bg.classList.add('ready');
+        img.src = "{{ asset('images/building.png') }}";
+
     });
 </script>
 
