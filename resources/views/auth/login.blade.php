@@ -195,12 +195,13 @@
             display: flex;
             padding: 3rem 1.5rem;
             margin-top: 68px; /* ensures content clears the fixed header */
+            min-height: calc(100vh - 68px - 60px);
         }
 
         .login-card {
             margin: auto; /* Centers safely without clipping top */
             width: 100%;
-            max-width: 1100px; /* BIG desktop proportion */
+            max-width: 1200px; /* Dominant desktop proportion */
             background: var(--white);
             border: 1px solid var(--border);
             border-radius: 16px;
@@ -218,7 +219,7 @@
             background-image: url('{{ asset('images/building.png') }}');
             background-size: cover;
             background-position: center;
-            padding: 3.5rem 3rem;
+            padding: 4rem 3.5rem;
             display: flex;
             flex-direction: column;
             position: relative;
@@ -254,16 +255,16 @@
             display: inline-flex;
             align-items: center;
             gap: 7px;
-            font-size: 0.68rem;
+            font-size: 0.72rem;
             font-weight: 600;
             letter-spacing: 0.14em;
             text-transform: uppercase;
             color: rgba(255,255,255,0.9);
             background: rgba(192,57,43,0.4);
             border: 1px solid rgba(192,57,43,0.6);
-            padding: 5px 14px;
+            padding: 6px 16px;
             border-radius: 4px;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .panel-dot {
@@ -282,21 +283,20 @@
 
         .panel-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2.2rem;
+            font-size: 2.5rem;
             font-weight: 700;
             color: var(--white);
             line-height: 1.15;
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.75rem;
             letter-spacing: -0.01em;
             text-shadow: 0 2px 12px rgba(0,0,0,0.4);
         }
 
         .panel-sub {
-            font-size: 0.85rem;
-            color: rgba(255,255,255,0.7);
+            font-size: 0.95rem;
+            color: rgba(255,255,255,0.8);
             line-height: 1.6;
             text-shadow: 0 1px 6px rgba(0,0,0,0.4);
-            margin-bottom: 1.5rem;
         }
 
         .panel-logo-wrap {
@@ -305,14 +305,16 @@
             display: flex;
             justify-content: flex-start;
             align-items: center;
-            margin-bottom: 1.5rem;
+            margin-top: auto;
+            margin-bottom: auto;
+            padding: 2.5rem 0;
         }
 
         .panel-logo-bg {
             background: rgba(255,255,255,0.07);
             border: 1px solid rgba(255,255,255,0.15);
             border-radius: 12px;
-            padding: 1.25rem 1.75rem;
+            padding: 1.5rem 2rem;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -322,7 +324,7 @@
 
         .panel-logo-bg img {
             width: 100%;
-            max-width: 160px;
+            max-width: 200px;
             object-fit: contain;
             filter: brightness(0) invert(1);
             opacity: 0.95;
@@ -341,13 +343,13 @@
             background: rgba(255,255,255,0.1);
             border-radius: 10px;
             overflow: hidden;
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
         }
 
         .panel-stat {
             background: rgba(0,0,0,0.3);
             backdrop-filter: blur(8px);
-            padding: 0.85rem 0.75rem;
+            padding: 1.25rem 0.75rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -355,7 +357,7 @@
         }
 
         .panel-stat-num {
-            font-size: 1.25rem;
+            font-size: 1.4rem;
             font-weight: 700;
             color: white;
             line-height: 1.2;
@@ -363,7 +365,7 @@
         }
 
         .panel-stat-label {
-            font-size: 0.6rem;
+            font-size: 0.65rem;
             color: rgba(255,255,255,0.6);
             text-transform: uppercase;
             letter-spacing: 0.05em;
@@ -373,20 +375,20 @@
         .panel-features {
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
         }
 
         .panel-feature {
             display: flex;
             align-items: center;
-            gap: 10px;
-            font-size: 0.78rem;
-            color: rgba(255,255,255,0.75);
+            gap: 12px;
+            font-size: 0.85rem;
+            color: rgba(255,255,255,0.85);
         }
 
         .panel-feature-icon {
-            width: 22px;
-            height: 22px;
+            width: 24px;
+            height: 24px;
             border-radius: 50%;
             background: rgba(192,57,43,0.35);
             border: 1px solid rgba(192,57,43,0.5);
@@ -397,8 +399,8 @@
         }
 
         .panel-feature-icon svg {
-            width: 11px;
-            height: 11px;
+            width: 12px;
+            height: 12px;
             stroke: rgba(255,255,255,0.9);
         }
 
@@ -409,8 +411,8 @@
             color: #4A9EFF;
             border: 1.5px solid rgba(74,158,255,0.3);
             border-radius: 8px;
-            padding: 12px;
-            font-size: 0.82rem;
+            padding: 14px;
+            font-size: 0.9rem;
             font-weight: 600;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -432,20 +434,20 @@
         }
 
         .btn-qa .qa-badge {
-            font-size: 0.58rem;
+            font-size: 0.6rem;
             font-weight: 700;
             letter-spacing: 0.12em;
             text-transform: uppercase;
             background: rgba(74,158,255,0.15);
             border: 1px solid rgba(74,158,255,0.28);
-            padding: 2px 7px;
+            padding: 3px 8px;
             border-radius: 20px;
             color: #7BC8FF;
         }
 
         /* ─── RIGHT PANEL ─── */
         .panel-right {
-            padding: 3.5rem 3rem;
+            padding: 4rem 3.5rem;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -454,17 +456,17 @@
         .form-eyebrow {
             display: flex;
             align-items: center;
-            gap: 8px;
-            font-size: 0.68rem;
+            gap: 10px;
+            font-size: 0.75rem;
             letter-spacing: 0.18em;
             text-transform: uppercase;
             color: var(--t3);
-            margin-bottom: 0.5rem;
+            margin-bottom: 0.75rem;
         }
 
         .form-eyebrow::before {
             content: '';
-            width: 18px;
+            width: 20px;
             height: 2px;
             background: var(--red);
             border-radius: 2px;
@@ -472,39 +474,39 @@
 
         .form-title {
             font-family: 'Playfair Display', serif;
-            font-size: 2rem;
+            font-size: 2.2rem;
             font-weight: 700;
             color: var(--t1);
-            margin-bottom: 0.25rem;
+            margin-bottom: 0.5rem;
             letter-spacing: -0.01em;
         }
 
         .form-desc {
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             color: var(--t2);
-            margin-bottom: 1.5rem;
+            margin-bottom: 2rem;
             line-height: 1.6;
         }
 
         .form-group {
-            margin-bottom: 1.15rem;
+            margin-bottom: 1.5rem;
         }
 
         .form-label {
             display: block;
-            font-size: 0.78rem;
+            font-size: 0.85rem;
             font-weight: 500;
             color: var(--t2);
-            margin-bottom: 0.4rem;
+            margin-bottom: 0.5rem;
             letter-spacing: 0.02em;
         }
 
         .form-input {
             width: 100%;
-            padding: 12px 16px;
+            padding: 14px 18px;
             border: 1px solid var(--border);
             border-radius: 8px;
-            font-size: 0.88rem;
+            font-size: 0.95rem;
             font-family: 'Inter', sans-serif;
             color: var(--t1);
             background: var(--white);
@@ -529,8 +531,8 @@
             color: var(--white);
             border: none;
             border-radius: 8px;
-            padding: 14px;
-            font-size: 0.88rem;
+            padding: 16px;
+            font-size: 0.95rem;
             font-weight: 500;
             font-family: 'Inter', sans-serif;
             cursor: pointer;
@@ -559,11 +561,11 @@
         .form-divider {
             height: 1px;
             background: var(--border);
-            margin: 1.25rem 0;
+            margin: 1.5rem 0;
         }
 
         .form-footer {
-            font-size: 0.75rem;
+            font-size: 0.8rem;
             color: var(--t3);
             text-align: center;
             line-height: 1.6;
