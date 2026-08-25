@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -7,16 +7,14 @@
     <meta name="description" content="Sistem monitoring produksi real-time PT IPPI.">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,700;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --red:       #C0392B;
             --red-hover: #E74C3C;
-            --red-glow:  rgba(192,57,43,0.28);
             --white:     #FFFFFF;
-            --dark:      #0C1018;
-            --dark-mid:  #101620;
-            --dark-nav:  #0E1420;
+            --navy:      #0C1018;
+            --navy-mid:  #101824;
         }
 
         *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -25,7 +23,7 @@
         body {
             font-family: 'Inter', sans-serif;
             -webkit-font-smoothing: antialiased;
-            background: var(--dark);
+            background: var(--navy);
             color: var(--white);
             min-height: 100vh;
             display: flex;
@@ -35,9 +33,9 @@
         /* ── REVEAL ── */
         .reveal {
             opacity: 0;
-            transform: translate3d(0, 28px, 0);
-            transition: opacity 0.9s cubic-bezier(0.22,0.61,0.36,1),
-                        transform 0.9s cubic-bezier(0.22,0.61,0.36,1);
+            transform: translate3d(0, 26px, 0);
+            transition: opacity 0.85s cubic-bezier(0.22,0.61,0.36,1),
+                        transform 0.85s cubic-bezier(0.22,0.61,0.36,1);
             will-change: opacity, transform;
         }
         .reveal.active { opacity: 1; transform: translate3d(0,0,0); }
@@ -47,46 +45,47 @@
         .d4 { transition-delay: 0.54s; }
         .d5 { transition-delay: 0.68s; }
 
-        /* ════════════════════════════════════════
-           NAVBAR — white, matches footer & login
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════
+           NAVBAR — always dark, never white
+        ══════════════════════════════════════ */
         header {
             position: fixed;
             top: 0; left: 0; right: 0;
             z-index: 200;
-            height: 66px;
+            height: 64px;
             padding: 0 3rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            background: #FFFFFF;
-            border-bottom: 1px solid #E8E6E2;
-            transition: box-shadow 0.3s ease;
+            background: rgba(12, 16, 24, 0.72);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            transition: background 0.35s ease, border-color 0.35s ease;
         }
         header.scrolled {
-            box-shadow: 0 2px 16px rgba(0,0,0,0.07);
+            background: rgba(10, 14, 21, 0.96);
+            border-bottom: 1px solid rgba(255,255,255,0.09);
         }
 
         .nav-brand { display: flex; align-items: center; gap: 11px; }
-        .nav-logo  { width: 32px; height: 32px; object-fit: contain; }
-        .nav-divider {
-            width: 1px; height: 17px;
-            background: #E2E0DC;
-        }
+        .nav-logo  { width: 31px; height: 31px; object-fit: contain; }
+        .nav-divider { width: 1px; height: 16px; background: rgba(255,255,255,0.14); }
         .nav-title {
             font-family: 'Playfair Display', serif;
-            font-size: 1.02rem;
+            font-size: 1rem;
             font-weight: 500;
-            color: #111110;
+            color: rgba(255,255,255,0.88);
+            letter-spacing: 0.01em;
         }
         .nav-badge {
-            font-size: 0.59rem;
+            font-size: 0.58rem;
             font-weight: 600;
-            letter-spacing: 0.15em;
+            letter-spacing: 0.16em;
             text-transform: uppercase;
-            color: #C0392B;
-            background: rgba(192,57,43,0.07);
-            border: 1px solid rgba(192,57,43,0.22);
+            color: var(--red);
+            background: rgba(192,57,43,0.12);
+            border: 1px solid rgba(192,57,43,0.32);
             padding: 3px 9px;
             border-radius: 20px;
             display: flex;
@@ -97,16 +96,14 @@
             content: '';
             width: 5px; height: 5px;
             border-radius: 50%;
-            background: #C0392B;
-            animation: livepulse 2.4s ease-in-out infinite;
+            background: var(--red);
+            animation: livepulse 2.5s ease-in-out infinite;
         }
-        @keyframes livepulse {
-            0%,100%{ opacity:1; } 50%{ opacity:0.3; }
-        }
+        @keyframes livepulse { 0%,100%{ opacity:1; } 50%{ opacity:0.3; } }
 
-        /* ════════════════════════════════════════
-           HERO — photo + multi-stop natural overlay
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════
+           HERO — all dark, photo + navy overlay
+        ══════════════════════════════════════ */
         .hero {
             position: relative;
             flex: 1;
@@ -116,54 +113,49 @@
             overflow: hidden;
         }
 
-        /* Layer 1: Photo */
+        /* Photo layer */
         .hero-bg {
             position: absolute;
             inset: 0;
             background-image: url("{{ asset('images/building.png') }}");
             background-size: cover;
             background-position: center 28%;
-            /* Photo feels warmer / slightly darker from the sky */
-            filter: saturate(0.85) brightness(0.96);
-            transform: scale(1.05);
-            transition: transform 14s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            filter: saturate(0.82) brightness(0.94);
+            transform: scale(1.04);
+            transition: transform 12s cubic-bezier(0.25,0.46,0.45,0.94);
         }
         .hero-bg.ready { transform: scale(1); }
 
-        /* Layer 2: Tonal gradient — top dark navy, middle breathes, bottom fades to white */
+        /* Dark navy overlay — no white anywhere */
         .hero-overlay {
             position: absolute;
             inset: 0;
             background:
-                /* Left vignette */
                 linear-gradient(95deg,
-                    rgba(9,13,21,0.45) 0%,
-                    rgba(9,13,21,0.04) 55%,
-                    transparent 100%
+                    rgba(9,13,21,0.50) 0%,
+                    transparent 60%
                 ),
-                /* Main vertical — top dark, middle thin, bottom to white */
                 linear-gradient(180deg,
-                    rgba(10,15,24,0.82)  0%,
-                    rgba(12,18,28,0.46)  20%,
-                    rgba(13,19,30,0.36)  38%,
-                    rgba(13,19,30,0.42)  55%,
-                    rgba(240,238,234,0.72) 80%,
-                    rgba(245,243,240,0.96) 92%,
-                    rgba(248,246,243,1.00) 100%
+                    rgba(10,15,24,0.80)  0%,
+                    rgba(12,18,28,0.44)  20%,
+                    rgba(12,18,28,0.38)  40%,
+                    rgba(11,16,26,0.55)  58%,
+                    rgba(10,14,22,0.82)  76%,
+                    rgba(9, 13,20,0.96) 100%
                 );
         }
 
-        /* Layer 3: Film grain — gives photo-overlay a unified texture */
+        /* Film grain */
         .hero-grain {
             position: absolute;
             inset: 0;
-            opacity: 0.028;
+            opacity: 0.025;
             background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.75' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
             background-size: 256px;
             pointer-events: none;
         }
 
-        /* ── Hero text area ── */
+        /* Hero headline area */
         .hero-content {
             position: relative;
             z-index: 10;
@@ -171,8 +163,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            /* Extra top padding so headline clears the white navbar */
-            padding: 140px 2rem 0;
+            padding: 130px 2rem 0;
             text-align: center;
         }
 
@@ -183,24 +174,24 @@
             display: inline-flex;
             align-items: center;
             gap: 9px;
-            font-size: 0.67rem;
+            font-size: 0.66rem;
             font-weight: 600;
             letter-spacing: 0.22em;
             text-transform: uppercase;
-            color: rgba(255,255,255,0.48);
+            color: rgba(255,255,255,0.50);
             margin-bottom: 1.5rem;
         }
         .hero-label .dot {
             width: 6px; height: 6px;
             border-radius: 50%;
             background: var(--red);
-            box-shadow: 0 0 0 0 rgba(192,57,43,0.55);
+            box-shadow: 0 0 0 0 rgba(192,57,43,0.6);
             animation: dotglow 2.6s cubic-bezier(0.4,0,0.6,1) infinite;
         }
         @keyframes dotglow {
-            0%  { box-shadow: 0 0 0 0   rgba(192,57,43,0.55); }
-            60% { box-shadow: 0 0 0 7px rgba(192,57,43,0);    }
-            100%{ box-shadow: 0 0 0 0   rgba(192,57,43,0);    }
+            0%  { box-shadow: 0 0 0 0   rgba(192,57,43,0.6); }
+            60% { box-shadow: 0 0 0 7px rgba(192,57,43,0);   }
+            100%{ box-shadow: 0 0 0 0   rgba(192,57,43,0);   }
         }
 
         /* Headline */
@@ -210,27 +201,23 @@
             font-weight: 700;
             line-height: 1.07;
             letter-spacing: -0.03em;
-            color: var(--white);
-            margin-bottom: 1.25rem;
-            text-shadow: 0 2px 28px rgba(0,0,0,0.30);
+            color: #FFFFFF;
+            margin-bottom: 1.2rem;
+            text-shadow: 0 2px 30px rgba(0,0,0,0.35);
         }
         .hero-h1 em {
             font-style: italic;
             color: var(--red);
-            /* warm glow so red feels embedded in the scene, not a foreign element */
-            text-shadow:
-                0 0 50px rgba(192,57,43,0.32),
-                0 2px 24px rgba(0,0,0,0.35);
+            text-shadow: 0 0 48px rgba(192,57,43,0.30), 0 2px 24px rgba(0,0,0,0.40);
         }
 
-        /* Desc */
+        /* Description */
         .hero-desc {
-            font-size: 0.98rem;
+            font-size: 0.97rem;
             line-height: 1.78;
-            color: rgba(255,255,255,0.56);
+            color: rgba(255,255,255,0.62);
             max-width: 500px;
             margin: 0 auto 2.8rem;
-            font-weight: 400;
         }
 
         /* CTA */
@@ -239,23 +226,20 @@
             align-items: center;
             gap: 10px;
             background: var(--red);
-            color: var(--white);
+            color: #FFFFFF;
             padding: 15px 38px;
             border-radius: 5px;
             font-size: 0.9rem;
             font-weight: 500;
             text-decoration: none;
             letter-spacing: 0.025em;
-            box-shadow:
-                0 4px 24px rgba(192,57,43,0.28),
-                inset 0 1px 0 rgba(255,255,255,0.10);
+            box-shadow: 0 4px 24px rgba(192,57,43,0.28), inset 0 1px 0 rgba(255,255,255,0.10);
             position: relative;
             transition: background 0.2s, transform 0.25s cubic-bezier(0.22,0.61,0.36,1), box-shadow 0.25s;
         }
         .hero-cta::before {
             content: '';
-            position: absolute;
-            inset: 0;
+            position: absolute; inset: 0;
             border-radius: inherit;
             border: 1px solid rgba(255,255,255,0.09);
         }
@@ -268,22 +252,22 @@
         .hero-cta svg { transition: transform 0.2s; flex-shrink: 0; }
         .hero-cta:hover svg { transform: translateX(4px); }
 
-        /* ════════════════════════════════════════
-           FEATURE ROW — lives inside the hero dark zone
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════
+           FEATURE ROW — stays inside dark hero
+        ══════════════════════════════════════ */
         .hero-features {
             position: relative;
             z-index: 10;
+            /* This section stays on the dark overlay area */
         }
 
         .feat-inner {
             max-width: 740px;
             margin: 0 auto;
-            padding: 1.75rem 2rem 2.75rem;
+            padding: 1.75rem 2rem 3rem;
             display: flex;
-            justify-content: center;
             gap: 0;
-            border-top: 1px solid rgba(0,0,0,0.07);
+            border-top: 1px solid rgba(255,255,255,0.08);
         }
 
         .feat-item {
@@ -295,7 +279,7 @@
             text-align: left;
         }
         .feat-item + .feat-item {
-            border-left: 1px solid rgba(0,0,0,0.06);
+            border-left: 1px solid rgba(255,255,255,0.07);
         }
 
         .feat-icon {
@@ -310,7 +294,6 @@
             stroke-width: 2;
             fill: none;
             flex-shrink: 0;
-            opacity: 0.9;
         }
         .feat-name {
             font-size: 0.78rem;
@@ -321,18 +304,19 @@
         }
         .feat-desc {
             font-size: 0.76rem;
-            color: #5A5856;
+            /* White text on dark background — high contrast */
+            color: rgba(255,255,255,0.58);
             line-height: 1.6;
         }
 
-        /* ════════════════════════════════════════
-           FOOTER — white, bridges to login page
-        ════════════════════════════════════════ */
+        /* ══════════════════════════════════════
+           FOOTER — white, after all dark content
+        ══════════════════════════════════════ */
         footer {
             position: relative;
             z-index: 10;
             background: #FFFFFF;
-            border-top: 1px solid #E8E6E2;
+            border-top: 1px solid #E4E2DE;
             padding: 1.35rem 3rem;
             display: flex;
             justify-content: space-between;
@@ -341,18 +325,18 @@
         .foot-left { display: flex; align-items: center; gap: 9px; }
         .foot-left img { width: 19px; height: 19px; object-fit: contain; }
         .foot-copy { font-size: 0.73rem; color: #A09E9C; }
-        .foot-right { font-size: 0.7rem; color: #C8C6C2; letter-spacing: 0.09em; text-transform: uppercase; }
+        .foot-right { font-size: 0.7rem; color: #C2C0BC; letter-spacing: 0.09em; text-transform: uppercase; }
 
-        /* ── Responsive ── */
+        /* Responsive */
         @media (max-width: 768px) {
             header { padding: 0 1.25rem; }
-            .hero-content { padding: 96px 1.5rem 0; }
+            .hero-content { padding: 106px 1.5rem 0; }
             .hero-desc { font-size: 0.88rem; }
-            .feat-inner { flex-direction: column; gap: 0; padding: 1.5rem 1.5rem 2.25rem; }
+            .feat-inner { flex-direction: column; gap: 0; padding: 1.5rem 1.5rem 2.5rem; }
             .feat-item {
                 padding: 1.25rem 0 0;
                 border-left: none !important;
-                border-top: 1px solid rgba(255,255,255,0.06);
+                border-top: 1px solid rgba(255,255,255,0.07);
             }
             .feat-item:first-child { border-top: none; padding-top: 0; }
             footer { padding: 1.2rem 1.5rem; flex-direction: column; gap: 0.5rem; text-align: center; }
@@ -362,7 +346,7 @@
 </head>
 <body>
 
-<!-- ═══ NAVBAR ═══ -->
+<!-- NAVBAR — always dark -->
 <header id="main-header">
     <div class="nav-brand">
         <img src="{{ asset('images/ippi.png') }}" class="nav-logo" alt="IPPI">
@@ -372,7 +356,7 @@
     </div>
 </header>
 
-<!-- ═══ HERO ═══ -->
+<!-- HERO — full dark, photo + overlay -->
 <section class="hero">
 
     <div class="hero-bg" id="heroBg"></div>
@@ -407,7 +391,7 @@
         </div>
     </div>
 
-    <!-- Feature row — lives inside hero's dark gradient base -->
+    <!-- Feature row — still inside dark hero -->
     <div class="hero-features">
         <div class="feat-inner">
 
@@ -440,7 +424,7 @@
 
 </section>
 
-<!-- ═══ FOOTER ═══ -->
+<!-- FOOTER — white only here -->
 <footer>
     <div class="foot-left">
         <img src="{{ asset('images/ippi.png') }}" alt="IPPI">
@@ -458,13 +442,13 @@
         }, { threshold: 0.06 });
         document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
 
-        // Navbar scroll state
+        // Navbar stays dark — just gets slightly more opaque on scroll
         const header = document.getElementById('main-header');
         window.addEventListener('scroll', () => {
             header.classList.toggle('scrolled', window.scrollY > 28);
         }, { passive: true });
 
-        // Hero bg: load image then trigger scale-in
+        // Hero bg scale-in
         const bg = document.getElementById('heroBg');
         const img = new Image();
         img.onload = () => bg.classList.add('ready');
