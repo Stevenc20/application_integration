@@ -5,6 +5,9 @@ require __DIR__.'/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 
+// Pancing bootstrap internal Laravel dengan request kosong agar helper seperti auth() dan facade bisa aktif
+$kernel->handle(Illuminate\Http\Request::create('/', 'GET'));
+
 // KITA GUNAKAN TANGGAL HARI INI AGAR TIDAK KENA REDIRECT KADALUWARSA DI WEB
 $date = date('Y-m-d');
 $shift = 'Shift Pagi';
@@ -18,7 +21,12 @@ echo "LINE    : $line\n\n";
 $reqWeb = Illuminate\Http\Request::create('/operational/input-harian', 'GET', [
     'date' => $date, 'shift' => $shift, 'line' => $line
 ]);
-auth()->loginUsingId(1);
+
+try {
+    auth()->loginUsingId(1);
+} catch (\Exception $e) {
+    // abaikan jika tidak ada session/user 1
+}
 
 $controller = app(\App\Http\Controllers\Operational\InputHarianController::class);
 $view = $controller->index($reqWeb);
