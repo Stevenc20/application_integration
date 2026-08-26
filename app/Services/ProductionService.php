@@ -276,12 +276,9 @@ class ProductionService
             $actualReject = ($daily->actual_reject ?? 0) + ($data['reject_qty'] ?? 0);
 
             $job = JobMaster::find($jobId);
-            $targetQty = $job?->capacity ?? 0;
+            $targetQty = $job?->target_qty ?? 0;
             
-            $efficiency = 0;
-            if ($targetQty > 0) {
-                $efficiency = round(($actualQty / $targetQty) * 100, 2);
-            }
+            $efficiency = $this->calculateEfficiency($actualQty, $targetQty);
 
             $runtimeSeconds = $this->calculateRuntime($jobId);
 
@@ -482,7 +479,7 @@ class ProductionService
                     'actual_qty'      => $totalOk,
                     'actual_repair'   => $totalRepair,
                     'actual_reject'   => $totalReject,
-                    'efficiency'      => ($job && $job->capacity > 0) ? ($totalOk / $job->capacity) * 100 : 0
+                    'efficiency'      => $this->calculateEfficiency($totalOk, $job?->target_qty ?? 0)
                 ]
             );
 
@@ -977,6 +974,18 @@ class ProductionService
     }
 
     /**
+     * Calculate canonical efficiency / achievement metric.
+     * Uses Actual Output vs Target Output.
+     */
+    public function calculateEfficiency($actual, $target)
+    {
+        if (empty($target) || $target <= 0) {
+            return 0;
+        }
+        return round(((float)$actual / (float)$target) * 100, 2);
+    }
+
+    /**
      * Save daily production summary data.
      */
     public function saveDailyProduction($jobId, array $data)
@@ -990,13 +999,10 @@ class ProductionService
             $downtime = (int) ($session->downtime_seconds ?? 0);
             $job = JobMaster::find($jobId);
 
-            $targetQty = $job?->capacity ?? 0;
+            $targetQty = $job?->target_qty ?? 0; // Use canonical target
             $actualQty = (int) ($data['actual_qty'] ?? 0);
 
-            $efficiency = 0;
-            if ($targetQty > 0) {
-                $efficiency = round(($actualQty / $targetQty) * 100, 2);
-            }
+            $efficiency = $this->calculateEfficiency($actualQty, $targetQty);
 
             DailyProduction::updateOrCreate(
                 [
