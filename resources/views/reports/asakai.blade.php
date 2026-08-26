@@ -30,13 +30,26 @@
     }
     .excel-table th, .excel-table td { border: 1px solid #888; padding: 4px 6px; vertical-align: middle; }
     .excel-table th { background-color: #FFC000; font-weight: bold; text-align: center; text-transform: uppercase; }
-    .excel-table td.num { text-align: right; }
+    .excel-table td.num { text-align: center; } /* Rata tengah sesuai request */
     .excel-table td.center { text-align: center; }
     .excel-table td.indent { padding-left: 1rem; }
     .header-gray { background-color: #e2efda; font-weight: bold; }
     .diff-negative { color: red; }
     .diff-positive { color: #16a34a; }
     
+    .editable {
+        cursor: text;
+        transition: background 0.2s;
+    }
+    .editable:hover {
+        background-color: #fef9c3; /* highlight kuning tipis saat di-hover */
+    }
+    .editable:focus {
+        background-color: #fff;
+        outline: 2px solid #3b82f6;
+        outline-offset: -2px;
+    }
+
     .flex-row { display: flex; gap: 1rem; align-items: flex-start; flex-wrap: wrap; }
     .flex-1 { flex: 1; }
 </style>
@@ -81,10 +94,10 @@
                 @foreach($shift1['safety'] ?? [] as $saf)
                     <tr>
                         <td>{{ $saf['item'] }}</td>
-                        <td class="center">{{ $saf['target'] }}</td>
+                        <td class="center editable" contenteditable="true">{{ $saf['target'] }}</td>
                         <td class="center">{{ $saf['actual'] }}</td>
                         <td class="center {{ $saf['diff'] < 0 ? 'diff-negative' : '' }}">{{ $saf['diff'] }}</td>
-                        <td>{{ $saf['issue'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $saf['issue'] }}</td>
                     </tr>
                 @endforeach
             </tbody>
@@ -109,10 +122,10 @@
                     @foreach($shift1['repair'] ?? [] as $rep)
                         <tr>
                             <td>{{ $rep['line_name'] }}</td>
-                            <td class="center">{{ number_format($rep['target'], 1, ',', '.') }}%</td>
+                            <td class="center editable" contenteditable="true">{{ number_format($rep['target'], 1, ',', '.') }}%</td>
                             <td class="center">{{ number_format($rep['actual'], 2, ',', '.') }}%</td>
                             <td class="center">{{ number_format($rep['accum'], 2, ',', '.') }}%</td>
-                            <td>{{ $rep['issue'] }}</td>
+                            <td class="editable" contenteditable="true">{{ $rep['issue'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -133,7 +146,7 @@
                     @foreach($shift1['gsph'] ?? [] as $g)
                         <tr>
                             <td>{{ $g['line_name'] }}</td>
-                            <td class="num">{{ $g['target'] }}</td>
+                            <td class="num editable" contenteditable="true">{{ $g['target'] }}</td>
                             <td class="num">{{ number_format($g['plan'], 0, '', '') }}</td>
                             <td class="num">{{ number_format($g['actual'], 0, '', '') }}</td>
                             <td class="num {{ $g['diff'] < 0 ? 'diff-negative' : '' }}">{{ number_format($g['diff'], 0, '', '') }}</td>
@@ -159,12 +172,12 @@
                     @foreach($shift1['reject'] ?? [] as $rej)
                         <tr>
                             <td>{{ $rej['line_name'] }}</td>
-                            <td class="center">{{ number_format($rej['target'], 2, ',', '.') }}%</td>
+                            <td class="center editable" contenteditable="true">{{ number_format($rej['target'], 2, ',', '.') }}%</td>
                             <td class="center">{{ number_format($rej['actual'], 2, ',', '.') }}%</td>
                             <td class="num">Rp {{ number_format($rej['cost'], 2, ',', '.') }}</td>
                             <td class="center">{{ number_format($rej['accum'], 2, ',', '.') }}%</td>
                             <td class="num">Rp {{ number_format($rej['accum_cost'], 2, ',', '.') }}</td>
-                            <td>{{ $rej['issue'] }}</td>
+                            <td class="editable" contenteditable="true">{{ $rej['issue'] }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -247,27 +260,6 @@
         </table>
 
     </div>
-
-    <!-- DIAGNOSTIC DEBUG INFO (TEMPORARY) -->
-    @if(isset($diagnostic))
-    <div style="margin-top: 2rem; padding: 1rem; background: #ffebee; border: 1px solid #f44336;">
-        <h3 style="color: #c62828; margin-top: 0;">DEBUG DATA (Tolong infokan isi blok ini ke saya)</h3>
-        <pre style="font-size: 0.85rem; color: #000; overflow-x: auto;">
-        Report Date Requested: {{ $reportDate }}
-        Target Shift 1 Date: {{ $diagnostic['shift1_date'] }}
-        
-        # 1. Total baris di ProductionPlan untuk tanggal {{ $diagnostic['shift1_date'] }} tanpa filter apapun:
-        Count = {{ $diagnostic['total_plans_shift1_date'] }}
-        
-        # 2. Tanggal Plan (plan_date) paling baru yang ada di database (Top 10):
-        {{ json_encode($diagnostic['latest_available_dates_in_db'], JSON_PRETTY_PRINT) }}
-        
-        # 3. Semua jenis penamaan shift (shift_name) yang pernah dipakai di database:
-        {{ json_encode($diagnostic['all_shift_names_in_db'], JSON_PRETTY_PRINT) }}
-        </pre>
-        <p style="margin-bottom:0; font-size:0.85rem;"><strong>Kenapa kosong?</strong> Jika (1) bernilai 0, dan tanggal 2026-08-25 TIDAK ADA di (2), berarti format/nama tanggal saat Import Excel PPC berbeda dengan input kalender ini (misal diimport dengan format/tahun berbeda). Jika (1) ada nilainya tapi data tidak muncul, masalahnya ada pada `shift_name` yang di-upload PPC tidak menggunakan kata "Shift 1" atau "Pagi" (Bisa dicek di nomor 3).</p>
-    </div>
-    @endif
 
 </div>
 @endsection

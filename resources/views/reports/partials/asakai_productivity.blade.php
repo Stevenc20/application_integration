@@ -48,23 +48,27 @@
                     <td class="num {{ $iDiffClass }}" rowspan="{{ $rowspan }}">{{ $item['diff'] }}</td>
                     
                     @if(count($item['downtimes']) > 0)
-                        <td>{{ $item['downtimes'][0]['factor'] }}</td>
-                        <td>{{ $item['downtimes'][0]['problem'] }}</td>
-                        <td>{{ $item['downtimes'][0]['penyebab'] }}</td>
-                        <td>{{ $item['downtimes'][0]['action'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][0]['factor'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][0]['problem'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][0]['penyebab'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][0]['action'] }}</td>
                         <td class="num">{{ $item['downtimes'][0]['minutes'] }}</td>
                     @else
-                        <td></td><td></td><td></td><td></td><td class="num"></td>
+                        <td class="editable" contenteditable="true"></td>
+                        <td class="editable" contenteditable="true"></td>
+                        <td class="editable" contenteditable="true"></td>
+                        <td class="editable" contenteditable="true"></td>
+                        <td class="num"></td>
                     @endif
                 </tr>
                 
                 @if(count($item['downtimes']) > 1)
                     @for($i = 1; $i < count($item['downtimes']); $i++)
                     <tr>
-                        <td>{{ $item['downtimes'][$i]['factor'] }}</td>
-                        <td>{{ $item['downtimes'][$i]['problem'] }}</td>
-                        <td>{{ $item['downtimes'][$i]['penyebab'] }}</td>
-                        <td>{{ $item['downtimes'][$i]['action'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][$i]['factor'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][$i]['problem'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][$i]['penyebab'] }}</td>
+                        <td class="editable" contenteditable="true">{{ $item['downtimes'][$i]['action'] }}</td>
                         <td class="num">{{ $item['downtimes'][$i]['minutes'] }}</td>
                     </tr>
                     @endfor

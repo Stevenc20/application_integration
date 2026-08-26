@@ -1724,20 +1724,7 @@ class ReportController extends Controller
             ['item' => 'LAS CO', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
         ];
 
-        // --- DIAGNOSTIC BLOCK ---
-        // Find latest available dates in the DB to see if 2026-08-25 actually exists
-        $latestDates = \App\Models\ProductionPlan::select('plan_date')->distinct()->orderByDesc('plan_date')->limit(10)->pluck('plan_date')->toArray();
-        $allShifts = \App\Models\ProductionPlan::select('shift_name')->distinct()->pluck('shift_name')->toArray();
-        $diag1 = \App\Models\ProductionPlan::whereDate('plan_date', $shift1Date)->count();
-        
-        $diag = [
-            'shift1_date' => $shift1Date,
-            'total_plans_shift1_date' => $diag1,
-            'latest_available_dates_in_db' => $latestDates,
-            'all_shift_names_in_db' => $allShifts
-        ];
-
-        return view('reports.asakai', [
+                return view('reports.asakai', [
             'reportDate' => $inputDate,
             'shift1Date' => $shift1Date,
             'shift2Date' => $shift2Date,
@@ -1745,7 +1732,6 @@ class ReportController extends Controller
             'shift2' => $shift2Data,
             'subAssy' => $subAssyData,
             'spot' => $spotData,
-            'diagnostic' => $diag,
         ]);
     }
 
