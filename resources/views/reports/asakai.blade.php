@@ -233,7 +233,7 @@
         <div class="asakai-subtitle">Reporting System - Produksi Aktual vs Plan</div>
         
         <div class="asakai-meta">
-            <form action="{{ route('reports.asakai') }}" method="GET" class="date-filter-form">
+            <form action="{{ route('supervisor.reports.asakai') }}" method="GET" class="date-filter-form">
                 <div>
                     <label for="date" style="font-size: 0.85rem; font-weight: 600; color: #475569; margin-right: 0.5rem;">Tanggal Report (Cut-off):</label>
                     <input type="date" name="date" id="date" value="{{ $reportDate }}" class="date-input">
