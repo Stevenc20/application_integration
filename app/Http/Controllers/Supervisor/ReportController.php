@@ -1702,19 +1702,39 @@ class ReportController extends Controller
         $shift1Data = $this->buildAsakaiShiftData($shift1Date, 'Shift 1');
         $shift2Data = $this->buildAsakaiShiftData($shift2Date, 'Shift 2');
 
-                // --- DIAGNOSTIC BLOCK ---
+                        // Build Sub-Assy and Spot data (Placeholders for structure)
+        $subAssyLines = ['LINE 1', 'LINE 2', 'LINE 3', 'LINE 4', 'LINE 5', 'LINE 6', 'LINE 7', 'LINE 8', 'LINE 9', 'LINE 10', 'LINE 12', 'LINE 13', 'LINE 14', 'LAS CO'];
+        $subAssyData = [];
+        foreach ($subAssyLines as $saLine) {
+            $subAssyData[] = [
+                'line_name' => $saLine,
+                'plan_shift_1' => 0,
+                'plan_shift_2' => 0,
+                'plan_total' => 0,
+                'actual' => 0,
+                'diff' => 0,
+                'issue' => '',
+                'dt' => 0
+            ];
+        }
+
+        $spotData = [
+            ['item' => 'ROBOT SPOT', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
+            ['item' => 'MANUAL', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
+            ['item' => 'LAS CO', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
+        ];
+
+        // --- DIAGNOSTIC BLOCK ---
+        // Find latest available dates in the DB to see if 2026-08-25 actually exists
+        $latestDates = \App\Models\ProductionPlan::select('plan_date')->distinct()->orderByDesc('plan_date')->limit(10)->pluck('plan_date')->toArray();
+        $allShifts = \App\Models\ProductionPlan::select('shift_name')->distinct()->pluck('shift_name')->toArray();
         $diag1 = \App\Models\ProductionPlan::whereDate('plan_date', $shift1Date)->count();
-        $diag2 = \App\Models\ProductionPlan::whereDate('plan_date', $shift2Date)->count();
-        $diag1_shifts = \App\Models\ProductionPlan::whereDate('plan_date', $shift1Date)->pluck('shift_name')->unique()->values();
-        $diag2_shifts = \App\Models\ProductionPlan::whereDate('plan_date', $shift2Date)->pluck('shift_name')->unique()->values();
         
         $diag = [
             'shift1_date' => $shift1Date,
-            'shift1_total_plans' => $diag1,
-            'shift1_distinct_shifts' => $diag1_shifts,
-            'shift2_date' => $shift2Date,
-            'shift2_total_plans' => $diag2,
-            'shift2_distinct_shifts' => $diag2_shifts,
+            'total_plans_shift1_date' => $diag1,
+            'latest_available_dates_in_db' => $latestDates,
+            'all_shift_names_in_db' => $allShifts
         ];
 
         return view('reports.asakai', [
@@ -1723,6 +1743,8 @@ class ReportController extends Controller
             'shift2Date' => $shift2Date,
             'shift1' => $shift1Data,
             'shift2' => $shift2Data,
+            'subAssy' => $subAssyData,
+            'spot' => $spotData,
             'diagnostic' => $diag,
         ]);
     }
