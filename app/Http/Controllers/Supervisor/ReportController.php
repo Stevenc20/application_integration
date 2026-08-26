@@ -1716,17 +1716,22 @@ class ReportController extends Controller
         $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
             ->where(function($q) use ($shiftPrefix) {
                 if (str_contains($shiftPrefix, '1')) {
-                    $q->where('shift_name', 'LIKE', '%Shift 1%')
+                    $q->where('shift_name', 'LIKE', '%1%')
                       ->orWhere('shift_name', 'LIKE', '%Pagi%');
                 } else {
-                    $q->where('shift_name', 'LIKE', '%Shift 2%')
+                    $q->where('shift_name', 'LIKE', '%2%')
                       ->orWhere('shift_name', 'LIKE', '%Malam%');
                 }
             })
-            ->visibleOnTimeline();
+            // Simple filter for junk rows instead of strict visibleOnTimeline
+            ->whereNotIn(\DB::raw('UPPER(TRIM(job_master))'), [
+                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'
+            ])
+            ->where(function ($q) {
+                $q->whereNull('row_type')->orWhere('row_type', '!=', 'break');
+            });
 
         $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
-        $plans = app(\App\Services\BreakTimelineValidator::class)->filterValidPlans($plans);
 
         // Extract and load jobs
         $jobNumbers = $plans->map(function($p) {
@@ -1735,14 +1740,14 @@ class ReportController extends Controller
             return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
         })->toArray();
 
-        $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
+        $jobMasters = \App\Models\JobMaster::whereIn('job_number', $jobNumbers)
             ->with(['dailyProduction', 'downtimes'])
             ->get()
             ->keyBy('job_number');
 
         $lines = [];
         foreach ($plans as $plan) {
-            if ($plan->row_type === 'break' || !$plan->press_name) continue;
+            if (!$plan->press_name) continue;
             
             $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $plan->press_name)));
             if (!isset($lines[$lineName])) {
@@ -1773,15 +1778,17 @@ class ReportController extends Controller
                     $mins = (int) round($dt->duration_seconds / 60);
                     $downtimeMinutes += $mins;
                     $downtimeRecords[] = [
-                        'factor' => $dt->jenis_downtime,
-                        'problem' => $dt->problem,
-                        'penyebab' => $dt->penyebab,
-                        'action' => $dt->action,
+                        'factor' => $dt->jenis_downtime ?? '',
+                        'problem' => $dt->problem ?? '',
+                        'penyebab' => $dt->penyebab ?? '',
+                        'action' => $dt->action ?? '',
                         'minutes' => $mins
                     ];
                 }
             }
             
+            // Allow 0 actual because it is valid
+            // Allow items to be added as long as it's a real plan item
             $lines[$lineName]['total_plan'] += $planQty;
             $lines[$lineName]['total_actual'] += $actualQty;
             $lines[$lineName]['total_diff'] = $lines[$lineName]['total_actual'] - $lines[$lineName]['total_plan'];
@@ -1795,12 +1802,10 @@ class ReportController extends Controller
                 'downtimes' => $downtimeRecords
             ];
             
-            // Only push to items if plan or actual > 0
-            if ($planQty > 0 || $actualQty > 0) {
-                $lines[$lineName]['items'][] = $itemData;
-                if ($diff < 0) {
-                    $lines[$lineName]['unachieved_items'][] = $itemData;
-                }
+            $lines[$lineName]['items'][] = $itemData;
+            
+            if ($diff < 0) {
+                $lines[$lineName]['unachieved_items'][] = $itemData;
             }
         }
         
