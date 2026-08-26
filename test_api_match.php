@@ -19,7 +19,12 @@ $reqApi = Illuminate\Http\Request::create('/api/v1/ppc/item-check', 'GET', [
 ]);
 $reqApi->headers->set('Authorization', 'Bearer qa-super-secret-token');
 $resApi = $kernel->handle($reqApi);
-$apiData = json_decode($resApi->getContent(), true)['data'] ?? [];
+$rawApiContent = $resApi->getContent();
+echo "--- RAW API RESPONSE ---\n";
+echo $rawApiContent . "\n";
+echo "------------------------\n\n";
+
+$apiData = json_decode($rawApiContent, true)['data'] ?? [];
 
 // 2. Eksekusi Input Harian Controller
 $reqWeb = Illuminate\Http\Request::create('/operational/input-harian', 'GET', [
@@ -30,7 +35,6 @@ auth()->loginUsingId(1);
 $controller = app(\App\Http\Controllers\Operational\InputHarianController::class);
 $view = $controller->index($reqWeb);
 
-// Tangani FORCE REDIRECT jika shift memiliki revisi terbaru (misal: "Shift Pagi - Revisi 1")
 if ($view instanceof \Illuminate\Http\RedirectResponse) {
     $parsedUrl = parse_url($view->getTargetUrl());
     parse_str($parsedUrl['query'] ?? '', $queryParams);
@@ -47,6 +51,9 @@ $webJobs = $view->getData()['jobs'] ?? [];
 echo "INPUT HARIAN\n";
 $webMapped = [];
 foreach ($webJobs as $job) {
+    // Filter break persis seperti web yang baru saya amati
+    if ($job->row_type === 'break') continue;
+    
     $jn = trim($job->job_no ?? '');
     $jm = trim($job->job_master ?? '');
     $target = (int) ($job->plan ?? $job->target_qty ?? 0);
