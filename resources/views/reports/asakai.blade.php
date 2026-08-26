@@ -98,6 +98,24 @@
         @include('reports.partials.asakai_content', ['shiftData' => $shift2, 'shiftTitle' => '4. PRODUCTIVITY STAMPING SHIFT 2'])
     </div>
 
+    <!-- DIAGNOSTIC DEBUG INFO (TEMPORARY) -->
+    @if(isset($diagnostic))
+    <div style="margin-top: 2rem; padding: 1rem; background: #ffebee; border: 1px solid #f44336;">
+        <h3 style="color: #c62828; margin-top: 0;">DEBUG DATA (Tolong cek ini)</h3>
+        <pre style="font-size: 0.85rem; color: #000; overflow-x: auto;">
+        Report Date: {{ $reportDate }}
+        ---
+        Shift 1 Date: {{ $diagnostic['shift1_date'] }}
+        Total baris ProductionPlan pada tanggal ini: {{ $diagnostic['shift1_total_plans'] }}
+        Shift Name yang ada di DB: {{ json_encode($diagnostic['shift1_distinct_shifts']) }}
+        ---
+        Shift 2 Date: {{ $diagnostic['shift2_date'] }}
+        Total baris ProductionPlan pada tanggal ini: {{ $diagnostic['shift2_total_plans'] }}
+        Shift Name yang ada di DB: {{ json_encode($diagnostic['shift2_distinct_shifts']) }}
+        </pre>
+    </div>
+    @endif
+
 </div>
 
 <script>

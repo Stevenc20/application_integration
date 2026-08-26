@@ -1702,12 +1702,28 @@ class ReportController extends Controller
         $shift1Data = $this->buildAsakaiShiftData($shift1Date, 'Shift 1');
         $shift2Data = $this->buildAsakaiShiftData($shift2Date, 'Shift 2');
 
+                // --- DIAGNOSTIC BLOCK ---
+        $diag1 = \App\Models\ProductionPlan::whereDate('plan_date', $shift1Date)->count();
+        $diag2 = \App\Models\ProductionPlan::whereDate('plan_date', $shift2Date)->count();
+        $diag1_shifts = \App\Models\ProductionPlan::whereDate('plan_date', $shift1Date)->pluck('shift_name')->unique()->values();
+        $diag2_shifts = \App\Models\ProductionPlan::whereDate('plan_date', $shift2Date)->pluck('shift_name')->unique()->values();
+        
+        $diag = [
+            'shift1_date' => $shift1Date,
+            'shift1_total_plans' => $diag1,
+            'shift1_distinct_shifts' => $diag1_shifts,
+            'shift2_date' => $shift2Date,
+            'shift2_total_plans' => $diag2,
+            'shift2_distinct_shifts' => $diag2_shifts,
+        ];
+
         return view('reports.asakai', [
             'reportDate' => $inputDate,
             'shift1Date' => $shift1Date,
             'shift2Date' => $shift2Date,
             'shift1' => $shift1Data,
             'shift2' => $shift2Data,
+            'diagnostic' => $diag,
         ]);
     }
 
@@ -1717,17 +1733,13 @@ class ReportController extends Controller
             ->where(function($q) use ($shiftPrefix) {
                 if (str_contains($shiftPrefix, '1')) {
                     $q->where('shift_name', 'LIKE', '%1%')
-                      ->orWhere('shift_name', 'LIKE', '%Pagi%');
+                      ->orWhere('shift_name', 'LIKE', '%Pagi%')
+                      ->orWhereNull('shift_name')
+                      ->orWhere('shift_name', '');
                 } else {
                     $q->where('shift_name', 'LIKE', '%2%')
                       ->orWhere('shift_name', 'LIKE', '%Malam%');
                 }
-            })
-            ->where(function ($q) {
-                $q->whereNull('job_master')
-                  ->orWhereNotIn(\DB::raw('UPPER(TRIM(job_master))'), [
-                      'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'
-                  ]);
             })
             ->where(function ($q) {
                 $q->whereNull('row_type')->orWhere('row_type', '!=', 'break');
@@ -1748,9 +1760,16 @@ class ReportController extends Controller
 
         $lines = [];
         foreach ($plans as $plan) {
-            if (!$plan->press_name) continue;
+            // Filter junk rows in PHP to avoid SQL NULL gotchas
+            $jmUpper = strtoupper(trim($plan->job_master ?? ''));
+            $junkWords = ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'];
+            if (in_array($jmUpper, $junkWords)) {
+                continue;
+            }
             
-            $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $plan->press_name)));
+            // Assign to UNASSIGNED if press_name is null
+            $rawLine = trim($plan->press_name ?? $plan->line_master_id ?? 'UNASSIGNED');
+            $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
             if (!isset($lines[$lineName])) {
                 $lines[$lineName] = [
                     'line_name' => $lineName,
@@ -1817,11 +1836,10 @@ class ReportController extends Controller
             $lines[$lineName]['total_reject'] += $actualReject;
             $lines[$lineName]['plan_gsph'] += (float)($plan->gsph ?? $plan->target_gsph ?? 0);
             
-            // Try to extract actual GSPH. It's often computed, we'll try to pull it from job_master or calculate dummy for now
             if ($jobMaster && isset($jobMaster->actual_gsph)) {
                 $lines[$lineName]['actual_gsph'] += (float)$jobMaster->actual_gsph;
             } else {
-                $lines[$lineName]['actual_gsph'] += ($actualQty > 0 ? $lines[$lineName]['plan_gsph'] * 0.9 : 0); // Simple fallback
+                $lines[$lineName]['actual_gsph'] += ($actualQty > 0 ? $lines[$lineName]['plan_gsph'] * 0.9 : 0);
             }
 
             $itemData = [
