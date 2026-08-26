@@ -331,6 +331,7 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
             },
             body: JSON.stringify({
                 jenis_downtime: 'break time',
+                source: 'AUTO',
                 problem: breakInfo.label || 'AUTO BREAK',
                 penyebab: '-',
                 action: '-',
@@ -558,7 +559,11 @@ function _updateBreakUI(jobId, label, isPaused) {
                     problem: h.problem || ''
                 };
                 window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-                _updateBreakUI(activeId, isAutoBreak ? 'BREAK TIME' : 'BREAK', true);
+                if (isAutoBreak) {
+                    _updateBreakUI(activeId, 'BREAK TIME', true);
+                } else {
+                    _updateBreakUI(activeId, null, false);
+                }
             }
             break;
         }
@@ -589,7 +594,11 @@ function _updateBreakUI(jobId, label, isPaused) {
                         problem: saved.label || (isAutoBreak ? 'AUTO BREAK' : '')
                     };
                     window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-                    _updateBreakUI(saved.jobId, saved.label, true);
+                    if (isAutoBreak) {
+                        _updateBreakUI(saved.jobId, saved.label, true);
+                    } else {
+                        _updateBreakUI(saved.jobId, null, false);
+                    }
                 }
             }
         } catch (e) {}
@@ -2828,8 +2837,12 @@ function checkSyncStatus() {
                 job._breakPaused = true;
             }
             updateTimeline();
-            _updateBreakUI(id, serverBreakIsAuto ? 'BREAK TIME' : 'BREAK', true);
-        } else if (!serverDown && clientBreak && window._autoBreakActive) {
+            if (serverBreakIsAuto) {
+                _updateBreakUI(id, 'BREAK TIME', true);
+            } else {
+                _updateBreakUI(id, null, false);
+            }
+        } else if (!serverDown && clientBreak && clientBreak.dtType === 'break time') {
             // Keep the finished break visible on the timeline before removing it
             if (!window.jobDowntimeHistory[id]) window.jobDowntimeHistory[id] = [];
             if (!window.jobDowntimeHistory[id].some(h => h.id != null && String(h.id) === String(clientBreak.id))) {
@@ -2854,13 +2867,16 @@ function checkSyncStatus() {
                 window.ProductionConfig.currentStatus = 'running';
                 try { sessionStorage.removeItem('prod_break_state'); } catch (e) {}
             }
+            const wasAutoBreak = window._autoBreakActive || (clientBreak.source === 'AUTO');
             window._autoBreakActive = false;
             window._autoBreakDowntimeId = null;
             window._autoBreakSkipped = false;
             window._autoBreakEndMin = null;
             updateTimeline();
             _updateBreakUI(id, null, false);
-            showToast('Break time selesai, produksi dilanjutkan.', 'success');
+            if (wasAutoBreak) {
+                showToast('Break time selesai, produksi dilanjutkan.', 'success');
+            }
         } else if (!serverDown && !clientBreak && window._autoBreakActive) {
             window._autoBreakActive = false;
             window._autoBreakDowntimeId = null;
