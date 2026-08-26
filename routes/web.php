@@ -1194,3 +1194,7 @@ Route::middleware(['auth', 'role:supervisor,ppc,manager,kadiv,direktur'])->group
 Route::prefix('api/v1/ppc')->group(function () {
     Route::get('/item-check', [\App\Http\Controllers\Api\PpcItemCheckController::class, 'index']);
 });
+Route::get('/run-migration-now', function () {
+    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
+    return \Illuminate\Support\Facades\Artisan::output();
+});

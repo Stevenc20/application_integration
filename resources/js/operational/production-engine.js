@@ -2144,18 +2144,16 @@ window.handleQuickDowntime = function handleQuickDowntime(jobId, btnType, dtType
 
 async function startQuickDowntime(jobId, btnType, dtType) {
     await window.ActionRunner.run('Start ' + btnType, async () => {
-        let payloadType = dtType;
-        if (dtType === 'break time') payloadType = 'manual break';
-
         const res = await fetch(`/operational/job/${jobId}/downtime/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
             body: JSON.stringify({
-                jenis_downtime: payloadType,
+                jenis_downtime: dtType,
                 problem: '-',
                 penyebab: '',
                 action: '',
-                pic: window.ProductionConfig.userName || ''
+                pic: window.ProductionConfig.userName || '',
+                source: dtType === 'break time' ? 'MANUAL' : null
             })
         }).then(r => r.json());
 
@@ -2804,7 +2802,7 @@ function checkSyncStatus() {
 
         const serverDown = data.downtime;
         const clientBreak = window.runningDowntimes?.[`${id}_break`];
-        const serverBreakIsAuto = !!(serverDown && serverDown.jenis_downtime === 'break time' && (serverDown.pic || '') === 'AUTO BREAK');
+        const serverBreakIsAuto = !!(serverDown && serverDown.jenis_downtime === 'break time' && serverDown.source === 'AUTO');
 
         if (serverDown && serverDown.jenis_downtime === 'break time' && !clientBreak && !window._autoBreakActive) {
             if (serverBreakIsAuto) {

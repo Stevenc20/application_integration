@@ -653,7 +653,7 @@ class InputHarianController extends Controller
             if (strtolower($job->status) === 'paused') {
                 $hasActiveBreak = Downtime::where('job_master_id', $id)
                     ->whereNull('finish_time')
-                    ->whereIn('jenis_downtime', ['break time', 'manual break'])
+                    ->whereIn('jenis_downtime', ['break time'])
                     ->exists();
                 if ($hasActiveBreak) {
                     return response()->json(['success' => false, 'message' => 'Sedang break time, item tidak bisa dipindahkan ke dandori.'], 400);
@@ -675,7 +675,7 @@ class InputHarianController extends Controller
             if ($job && strtolower($job->status) === 'paused') {
                 $hasActiveBreak = Downtime::where('job_master_id', $id)
                     ->whereNull('finish_time')
-                    ->whereIn('jenis_downtime', ['break time', 'manual break'])
+                    ->whereIn('jenis_downtime', ['break time'])
                     ->exists();
                 if ($hasActiveBreak) {
                     return response()->json(['success' => false, 'message' => 'Sedang break time, tidak bisa start dandori.'], 400);
@@ -1137,7 +1137,7 @@ class InputHarianController extends Controller
             ->where('work_date', $date)
             ->first();
 
-        $downtime = Downtime::select('id', 'jenis_downtime', 'start_time', 'problem', 'pic')
+        $downtime = Downtime::select('id', 'jenis_downtime', 'source', 'start_time', 'problem', 'pic')
             ->where('job_master_id', $id)
             ->whereNull('finish_time')
             ->orderByDesc('start_time')
@@ -1336,7 +1336,7 @@ class InputHarianController extends Controller
 
                 foreach ($allJms as $jm) {
                     foreach ($jm->downtimes ?? [] as $dt) {
-                        if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time', 'manual break'])) {
+                        if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
                             continue;
                         }
                         if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {

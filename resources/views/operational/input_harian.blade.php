@@ -397,6 +397,7 @@ window.runningDowntimes = {
                     jobId: {{ $jd->id }}, 
                     btnType: "{{ $btnType }}",
                     dtType: "{{ $rdt->jenis_downtime }}",
+                    source: "{{ $rdt->source }}",
                     problem: {!! json_encode($rdt->problem ?? '') !!},
                     pic: {!! json_encode($rdt->pic ?? '') !!}
                 },
@@ -431,6 +432,7 @@ window.runningDowntimes = {
                 jobId: {{ $activeJob->id }}, 
                 btnType: "{{ $btnType }}",
                 dtType: "{{ $rdt->jenis_downtime }}",
+                    source: "{{ $rdt->source }}",
                 problem: {!! json_encode($rdt->problem ?? '') !!}
             },
             @endforeach
@@ -529,6 +531,7 @@ window.jobDowntimeHistory = {
                 'start' => \Carbon\Carbon::parse($dt->start_time)->timestamp * 1000,
                 'end' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->timestamp * 1000 : null,
                 'type' => $dt->jenis_downtime,
+                'source' => $dt->source,
                 'problem' => $dt->problem,
                 'pic' => $dt->pic
             ];
@@ -554,6 +557,7 @@ window.jobDowntimeHistory = {
                 'start' => \Carbon\Carbon::parse($dt->start_time)->timestamp * 1000,
                 'end' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->timestamp * 1000 : null,
                 'type' => $dt->jenis_downtime,
+                'source' => $dt->source,
                 'problem' => $dt->problem,
                 'pic' => $dt->pic
             ];

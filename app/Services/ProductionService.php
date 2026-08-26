@@ -751,6 +751,7 @@ class ProductionService
             $downtime = Downtime::create([
                 'job_master_id' => $jobId,
                 'jenis_downtime' => $data['jenis_downtime'],
+                'source' => $data['source'] ?? null,
                 'problem' => $data['problem'],
                 'penyebab' => $data['penyebab'],
                 'action' => $data['action'],

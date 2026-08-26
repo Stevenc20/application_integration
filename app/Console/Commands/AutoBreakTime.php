@@ -63,6 +63,7 @@ class AutoBreakTime extends Command
             $activeBreak = Downtime::where('job_master_id', $job->id)
                 ->whereNull('finish_time')
                 ->where('jenis_downtime', 'break time')
+                ->where('source', 'AUTO')
                 ->first();
 
             $inBreakWindow = false;
@@ -82,6 +83,7 @@ class AutoBreakTime extends Command
                 $downtime = Downtime::create([
                     'job_master_id' => $job->id,
                     'jenis_downtime' => 'break time',
+                    'source' => 'AUTO',
                     'problem' => $matchedBreak->label ?? 'BREAK TIME',
                     'penyebab' => '-',
                     'action' => '-',
@@ -95,7 +97,7 @@ class AutoBreakTime extends Command
                 $this->log('AUTO BREAK START', $job->job_number, $matchedBreak->label, $now->format('H:i:s'));
                 $breakCount++;
 
-            } elseif (!$inBreakWindow && $activeBreak && ($activeBreak->pic ?? '') === 'AUTO BREAK') {
+            } elseif (!$inBreakWindow && $activeBreak && $activeBreak->source === 'AUTO') {
                 $startTime = Carbon::parse($activeBreak->start_time);
                 $duration = abs($now->diffInSeconds($startTime));
 
