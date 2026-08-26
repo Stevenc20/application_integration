@@ -55,6 +55,39 @@
 </style>
 @endsection
 
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Dynamic diff coloring for elements with dynamic-diff class
+        const diffCells = document.querySelectorAll('.dynamic-diff');
+        
+        function updateColor(cell) {
+            const val = parseFloat(cell.innerText.replace(/[^0-9.-]/g, ''));
+            if (!isNaN(val)) {
+                if (val < 0) {
+                    cell.classList.add('diff-negative');
+                    cell.classList.remove('diff-positive');
+                } else if (val > 0) {
+                    cell.classList.add('diff-positive');
+                    cell.classList.remove('diff-negative');
+                } else {
+                    cell.classList.remove('diff-negative', 'diff-positive');
+                }
+            }
+        }
+        
+        diffCells.forEach(cell => {
+            // Apply initial color
+            updateColor(cell);
+            
+            // Listen for changes
+            cell.addEventListener('input', function() {
+                updateColor(cell);
+            });
+        });
+    });
+</script>
+@endsection
 @section('content')
 <div class="page-wrapper" style="padding: 1.5rem;">
 
@@ -92,11 +125,16 @@
             </thead>
             <tbody>
                 @foreach($shift1['safety'] ?? [] as $saf)
+                    @php
+                        $diffClass = '';
+                        if ($saf['diff'] < 0) $diffClass = 'diff-negative';
+                        elseif ($saf['diff'] > 0) $diffClass = 'diff-positive';
+                    @endphp
                     <tr>
                         <td>{{ $saf['item'] }}</td>
                         <td class="center editable" contenteditable="true">{{ $saf['target'] }}</td>
-                        <td class="center">{{ $saf['actual'] }}</td>
-                        <td class="center {{ $saf['diff'] < 0 ? 'diff-negative' : '' }}">{{ $saf['diff'] }}</td>
+                        <td class="center editable" contenteditable="true">{{ $saf['actual'] }}</td>
+                        <td class="center editable {{ $diffClass }} dynamic-diff" contenteditable="true">{{ $saf['diff'] }}</td>
                         <td class="editable" contenteditable="true">{{ $saf['issue'] }}</td>
                     </tr>
                 @endforeach
@@ -123,8 +161,8 @@
                         <tr>
                             <td>{{ $rep['line_name'] }}</td>
                             <td class="center editable" contenteditable="true">{{ number_format($rep['target'], 1, ',', '.') }}%</td>
-                            <td class="center">{{ number_format($rep['actual'], 2, ',', '.') }}%</td>
-                            <td class="center">{{ number_format($rep['accum'], 2, ',', '.') }}%</td>
+                            <td class="center editable" contenteditable="true">{{ number_format($rep['actual'], 2, ',', '.') }}%</td>
+                            <td class="center editable" contenteditable="true">{{ number_format($rep['accum'], 2, ',', '.') }}%</td>
                             <td class="editable" contenteditable="true">{{ $rep['issue'] }}</td>
                         </tr>
                     @endforeach
@@ -144,12 +182,17 @@
                 </thead>
                 <tbody>
                     @foreach($shift1['gsph'] ?? [] as $g)
+                        @php
+                            $diffClass = '';
+                            if ($g['diff'] < 0) $diffClass = 'diff-negative';
+                            elseif ($g['diff'] > 0) $diffClass = 'diff-positive';
+                        @endphp
                         <tr>
                             <td>{{ $g['line_name'] }}</td>
                             <td class="num editable" contenteditable="true">{{ $g['target'] }}</td>
-                            <td class="num">{{ number_format($g['plan'], 0, '', '') }}</td>
-                            <td class="num">{{ number_format($g['actual'], 0, '', '') }}</td>
-                            <td class="num {{ $g['diff'] < 0 ? 'diff-negative' : '' }}">{{ number_format($g['diff'], 0, '', '') }}</td>
+                            <td class="num editable" contenteditable="true">{{ number_format($g['plan'], 0, '', '') }}</td>
+                            <td class="num editable" contenteditable="true">{{ number_format($g['actual'], 0, '', '') }}</td>
+                            <td class="num editable {{ $diffClass }} dynamic-diff" contenteditable="true">{{ number_format($g['diff'], 0, '', '') }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -173,10 +216,10 @@
                         <tr>
                             <td>{{ $rej['line_name'] }}</td>
                             <td class="center editable" contenteditable="true">{{ number_format($rej['target'], 2, ',', '.') }}%</td>
-                            <td class="center">{{ number_format($rej['actual'], 2, ',', '.') }}%</td>
-                            <td class="num">Rp {{ number_format($rej['cost'], 2, ',', '.') }}</td>
-                            <td class="center">{{ number_format($rej['accum'], 2, ',', '.') }}%</td>
-                            <td class="num">Rp {{ number_format($rej['accum_cost'], 2, ',', '.') }}</td>
+                            <td class="center editable" contenteditable="true">{{ number_format($rej['actual'], 2, ',', '.') }}%</td>
+                            <td class="num editable" contenteditable="true">Rp {{ number_format($rej['cost'], 2, ',', '.') }}</td>
+                            <td class="center editable" contenteditable="true">{{ number_format($rej['accum'], 2, ',', '.') }}%</td>
+                            <td class="num editable" contenteditable="true">Rp {{ number_format($rej['accum_cost'], 2, ',', '.') }}</td>
                             <td class="editable" contenteditable="true">{{ $rej['issue'] }}</td>
                         </tr>
                     @endforeach
@@ -262,4 +305,38 @@
     </div>
 
 </div>
+@endsection
+
+@section('scripts')
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Dynamic diff coloring for elements with dynamic-diff class
+        const diffCells = document.querySelectorAll('.dynamic-diff');
+        
+        function updateColor(cell) {
+            const val = parseFloat(cell.innerText.replace(/[^0-9.-]/g, ''));
+            if (!isNaN(val)) {
+                if (val < 0) {
+                    cell.classList.add('diff-negative');
+                    cell.classList.remove('diff-positive');
+                } else if (val > 0) {
+                    cell.classList.add('diff-positive');
+                    cell.classList.remove('diff-negative');
+                } else {
+                    cell.classList.remove('diff-negative', 'diff-positive');
+                }
+            }
+        }
+        
+        diffCells.forEach(cell => {
+            // Apply initial color
+            updateColor(cell);
+            
+            // Listen for changes
+            cell.addEventListener('input', function() {
+                updateColor(cell);
+            });
+        });
+    });
+</script>
 @endsection
