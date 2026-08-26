@@ -148,14 +148,6 @@
         font-weight: bold;
         background-color: #f2f2f2;
     }
-
-    .empty-state {
-        padding: 2rem;
-        text-align: center;
-        color: #666;
-        border: 1px solid #ccc;
-        background: #fff;
-    }
 </style>
 @endsection
 
@@ -189,10 +181,7 @@
 
     <!-- SHIFT 1 CONTENT -->
     <div id="shift1" class="tab-content active">
-        @if(count($shift1Data) == 0)
-            <div class="empty-state">Tidak ada data plan/aktual untuk Shift 1 pada tanggal ini.</div>
-        @else
-            <div class="table-container">
+                    <div class="table-container">
                 <div class="section-title">3. PRODUCTIVITY STAMPING SHIFT 1</div>
                 <table class="excel-table">
                     <thead>
@@ -208,7 +197,18 @@
                             <th style="width: 6%;">DT</th>
                         </tr>
                     </thead>
-                    @foreach($shift1Data as $line)
+                    
+                    @if(count($shift1Data) == 0)
+                        <tbody>
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                                    Belum ada data plan/aktual yang masuk untuk Shift 1 pada tanggal ini.
+                                </td>
+                            </tr>
+                        </tbody>
+                    @else
+                        @foreach($shift1Data as $line)
+
                         <tbody>
                             <!-- LINE SUMMARY -->
                             <tr class="line-header-row">
@@ -289,18 +289,16 @@
                                 <td class="num">{{ $line['total_downtime'] }}</td>
                             </tr>
                         </tbody>
-                    @endforeach
+                    
+                        @endforeach
+                    @endif
                 </table>
             </div>
-        @endif
     </div>
 
     <!-- SHIFT 2 CONTENT -->
     <div id="shift2" class="tab-content">
-        @if(count($shift2Data) == 0)
-            <div class="empty-state">Tidak ada data plan/aktual untuk Shift 2 pada tanggal ini.</div>
-        @else
-            <div class="table-container">
+                    <div class="table-container">
                 <div class="section-title">4. PRODUCTIVITY STAMPING SHIFT 2</div>
                 <table class="excel-table">
                     <thead>
@@ -316,7 +314,18 @@
                             <th style="width: 6%;">DT</th>
                         </tr>
                     </thead>
-                    @foreach($shift2Data as $line)
+                    
+                    @if(count($shift2Data) == 0)
+                        <tbody>
+                            <tr>
+                                <td colspan="9" style="text-align: center; padding: 2rem; color: #666; font-style: italic;">
+                                    Belum ada data plan/aktual yang masuk untuk Shift 2 pada tanggal ini.
+                                </td>
+                            </tr>
+                        </tbody>
+                    @else
+                        @foreach($shift2Data as $line)
+
                         <tbody>
                             <!-- LINE SUMMARY -->
                             <tr class="line-header-row">
@@ -397,10 +406,11 @@
                                 <td class="num">{{ $line['total_downtime'] }}</td>
                             </tr>
                         </tbody>
-                    @endforeach
+                    
+                        @endforeach
+                    @endif
                 </table>
             </div>
-        @endif
     </div>
 
 </div>
