@@ -2144,11 +2144,14 @@ window.handleQuickDowntime = function handleQuickDowntime(jobId, btnType, dtType
 
 async function startQuickDowntime(jobId, btnType, dtType) {
     await window.ActionRunner.run('Start ' + btnType, async () => {
+        let payloadType = dtType;
+        if (dtType === 'break time') payloadType = 'manual break';
+
         const res = await fetch(`/operational/job/${jobId}/downtime/start`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
             body: JSON.stringify({
-                jenis_downtime: dtType,
+                jenis_downtime: payloadType,
                 problem: '-',
                 penyebab: '',
                 action: '',
@@ -3350,7 +3353,7 @@ function initProductionEngine() {
         (function syncRunningFromHistory() {
             const aid = window.ProductionConfig?.currentActiveId;
             if (!aid || !window.jobDowntimeHistory?.[aid]) return;
-            const typeMap = { 'break time': 'break', 'try out': 'tryout', 'dandori': 'dandori' };
+            const typeMap = { 'break time': 'break', 'manual break': 'break', 'try out': 'tryout', 'dandori': 'dandori' };
             for (const entry of window.jobDowntimeHistory[aid]) {
                 if (entry.end || !entry.id) continue;
                 const bt = typeMap[String(entry.type).toLowerCase()] || 'downtime';

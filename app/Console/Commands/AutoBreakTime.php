@@ -89,17 +89,8 @@ class AutoBreakTime extends Command
                     'start_time' => $now,
                 ]);
 
-                $session = ProductionSession::where('job_master_id', $job->id)
-                    ->whereDate('work_date', $workDate)
-                    ->where('status', 'running')
-                    ->first();
-                if ($session) {
-                    $session->update(['status' => 'paused', 'pause_time' => $now]);
-                }
-
-                if ($job->status === 'running') {
-                    JobMaster::where('id', $job->id)->update(['status' => 'paused']);
-                }
+                // FIXED: Use production service to properly calculate total_seconds
+                app(\App\Services\ProductionService::class)->pauseJob($job->id);
 
                 $this->log('AUTO BREAK START', $job->job_number, $matchedBreak->label, $now->format('H:i:s'));
                 $breakCount++;
@@ -128,15 +119,8 @@ class AutoBreakTime extends Command
                     ->exists();
 
                 if (!$otherActiveDowntime) {
-                    $session = ProductionSession::where('job_master_id', $job->id)
-                        ->whereDate('work_date', $workDate)
-                        ->where('status', 'paused')
-                        ->first();
-                    if ($session) {
-                        $session->update(['status' => 'running']);
-                    }
-
-                    JobMaster::where('id', $job->id)->update(['status' => 'running']);
+                    // FIXED: Use production service to properly reset start_time for timeline segmenting
+                    app(\App\Services\ProductionService::class)->resumeJob($job->id);
                 }
 
                 $this->log('AUTO BREAK END', $job->job_number, $activeBreak->problem, $now->format('H:i:s'));

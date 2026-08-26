@@ -388,7 +388,7 @@ window.runningDowntimes = {
                     $btnType = 'downtime';
                     if($dtTypeLower == 'try out') $btnType = 'tryout';
                     elseif($dtTypeLower == 'downtime') $btnType = 'downtime';
-                    elseif($dtTypeLower == 'break time') $btnType = 'break';
+                    elseif(in_array($dtTypeLower, ['break time', 'manual break'])) $btnType = 'break';
                     elseif($dtTypeLower == 'dandori') $btnType = 'dandori';
                 @endphp
                 "{{ $jd->id }}_{{ $btnType }}": { 
@@ -422,7 +422,7 @@ window.runningDowntimes = {
                 $btnType = 'downtime';
                 if($dtTypeLower == 'try out') $btnType = 'tryout';
                 elseif($dtTypeLower == 'downtime') $btnType = 'downtime';
-                elseif($dtTypeLower == 'break time') $btnType = 'break';
+                elseif(in_array($dtTypeLower, ['break time', 'manual break'])) $btnType = 'break';
                 elseif($dtTypeLower == 'dandori') $btnType = 'dandori';
             @endphp
             "{{ $activeJob->id }}_{{ $btnType }}": { 
