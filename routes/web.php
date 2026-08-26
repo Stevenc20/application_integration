@@ -1189,3 +1189,8 @@ Route::middleware(['auth', 'role:supervisor,ppc,manager,kadiv,direktur'])->group
     Route::post('/ppc/pull-ahead/{id}/reject', [App\Http\Controllers\PullAheadController::class, 'reject'])->name('ppc.pull_ahead.reject');
 });
 
+
+// 16. ROUTE API QA ITEM CHECK
+Route::prefix('api/v1/ppc')->group(function () {
+    Route::get('/item-check', [\App\Http\Controllers\Api\PpcItemCheckController::class, 'index']);
+});
