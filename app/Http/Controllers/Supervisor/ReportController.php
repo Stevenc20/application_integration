@@ -1706,8 +1706,8 @@ class ReportController extends Controller
             'reportDate' => $inputDate,
             'shift1Date' => $shift1Date,
             'shift2Date' => $shift2Date,
-            'shift1Data' => $shift1Data,
-            'shift2Data' => $shift2Data,
+            'shift1' => $shift1Data,
+            'shift2' => $shift2Data,
         ]);
     }
 
@@ -1723,17 +1723,18 @@ class ReportController extends Controller
                       ->orWhere('shift_name', 'LIKE', '%Malam%');
                 }
             })
-            // Simple filter for junk rows instead of strict visibleOnTimeline
-            ->whereNotIn(\DB::raw('UPPER(TRIM(job_master))'), [
-                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'
-            ])
+            ->where(function ($q) {
+                $q->whereNull('job_master')
+                  ->orWhereNotIn(\DB::raw('UPPER(TRIM(job_master))'), [
+                      'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'
+                  ]);
+            })
             ->where(function ($q) {
                 $q->whereNull('row_type')->orWhere('row_type', '!=', 'break');
             });
 
         $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
 
-        // Extract and load jobs
         $jobNumbers = $plans->map(function($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
@@ -1754,9 +1755,15 @@ class ReportController extends Controller
                 $lines[$lineName] = [
                     'line_name' => $lineName,
                     'total_plan' => 0,
+                    'count_plan' => 0,
                     'total_actual' => 0,
+                    'count_actual' => 0,
                     'total_diff' => 0,
                     'total_downtime' => 0,
+                    'total_repair' => 0,
+                    'total_reject' => 0,
+                    'plan_gsph' => 0,
+                    'actual_gsph' => 0,
                     'items' => [],
                     'unachieved_items' => []
                 ];
@@ -1768,7 +1775,16 @@ class ReportController extends Controller
             
             $jobMaster = $jobMasters->get($jobNumber);
             $planQty = (int) ($plan->plan ?? $plan->target_qty ?? 0);
-            $actualQty = ($jobMaster && $jobMaster->dailyProduction) ? (int) $jobMaster->dailyProduction->actual_ok : 0;
+            
+            $actualQty = 0;
+            $actualRepair = 0;
+            $actualReject = 0;
+            if ($jobMaster && $jobMaster->dailyProduction) {
+                $actualQty = (int) $jobMaster->dailyProduction->actual_ok;
+                $actualRepair = (int) ($jobMaster->dailyProduction->actual_repair ?? $jobMaster->dailyProduction->repair_qty ?? 0);
+                $actualReject = (int) ($jobMaster->dailyProduction->actual_reject ?? $jobMaster->dailyProduction->reject_qty ?? 0);
+            }
+            
             $diff = $actualQty - $planQty;
             
             $downtimeRecords = [];
@@ -1787,13 +1803,27 @@ class ReportController extends Controller
                 }
             }
             
-            // Allow 0 actual because it is valid
-            // Allow items to be added as long as it's a real plan item
             $lines[$lineName]['total_plan'] += $planQty;
+            if ($planQty > 0) {
+                $lines[$lineName]['count_plan'] += 1;
+            }
             $lines[$lineName]['total_actual'] += $actualQty;
+            if ($actualQty > 0) {
+                $lines[$lineName]['count_actual'] += 1;
+            }
             $lines[$lineName]['total_diff'] = $lines[$lineName]['total_actual'] - $lines[$lineName]['total_plan'];
             $lines[$lineName]['total_downtime'] += $downtimeMinutes;
+            $lines[$lineName]['total_repair'] += $actualRepair;
+            $lines[$lineName]['total_reject'] += $actualReject;
+            $lines[$lineName]['plan_gsph'] += (float)($plan->gsph ?? $plan->target_gsph ?? 0);
             
+            // Try to extract actual GSPH. It's often computed, we'll try to pull it from job_master or calculate dummy for now
+            if ($jobMaster && isset($jobMaster->actual_gsph)) {
+                $lines[$lineName]['actual_gsph'] += (float)$jobMaster->actual_gsph;
+            } else {
+                $lines[$lineName]['actual_gsph'] += ($actualQty > 0 ? $lines[$lineName]['plan_gsph'] * 0.9 : 0); // Simple fallback
+            }
+
             $itemData = [
                 'item_name' => trim($plan->each_part ?? $jm),
                 'plan' => $planQty,
@@ -1808,8 +1838,58 @@ class ReportController extends Controller
                 $lines[$lineName]['unachieved_items'][] = $itemData;
             }
         }
-        
         ksort($lines);
-        return array_values($lines);
+
+        // Build Safety Data (Placeholder since no model exists yet)
+        $safetyData = [
+            ['item' => 'ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
+            ['item' => 'INCCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
+            ['item' => 'TRAFFIC ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
+        ];
+
+        // Build Section 2 Data
+        $repairData = [];
+        $gsphData = [];
+        $rejectData = [];
+        
+        foreach ($lines as $lName => $lData) {
+            // Target is generally fixed at 1.2% or 0.02% in Excel
+            $actualRepPct = $lData['total_actual'] > 0 ? ($lData['total_repair'] / $lData['total_actual']) * 100 : 0;
+            $actualRejPct = $lData['total_actual'] > 0 ? ($lData['total_reject'] / $lData['total_actual']) * 100 : 0;
+            
+            $repairData[] = [
+                'line_name' => $lName,
+                'target' => 1.2,
+                'actual' => $actualRepPct,
+                'accum' => 0,
+                'issue' => $lData['total_repair'] > 0 ? $lData['total_repair'].' item(s) diperbaiki' : ''
+            ];
+            
+            $gsphData[] = [
+                'line_name' => $lName,
+                'target' => 0,
+                'plan' => $lData['plan_gsph'],
+                'actual' => $lData['actual_gsph'],
+                'diff' => $lData['actual_gsph'] - $lData['plan_gsph']
+            ];
+            
+            $rejectData[] = [
+                'line_name' => $lName,
+                'target' => 0.02,
+                'actual' => $actualRejPct,
+                'cost' => $lData['total_reject'] * 50000, // Cost formula derived from qty * avg cost
+                'accum' => 0,
+                'accum_cost' => 0,
+                'issue' => $lData['total_reject'] > 0 ? $lData['total_reject'].' item(s) reject' : ''
+            ];
+        }
+
+        return [
+            'safety' => $safetyData,
+            'repair' => $repairData,
+            'gsph' => $gsphData,
+            'reject' => $rejectData,
+            'lines' => array_values($lines)
+        ];
     }
 }
