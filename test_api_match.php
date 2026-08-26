@@ -5,7 +5,8 @@ require __DIR__.'/vendor/autoload.php';
 $app = require_once __DIR__.'/bootstrap/app.php';
 $kernel = $app->make(Illuminate\Contracts\Http\Kernel::class);
 
-$date = '2026-08-25';
+// KITA GUNAKAN TANGGAL HARI INI AGAR TIDAK KENA REDIRECT KADALUWARSA DI WEB
+$date = date('Y-m-d');
 $shift = 'Shift Pagi';
 $line = 'LINE A';
 
@@ -13,20 +14,7 @@ echo "TANGGAL : $date\n";
 echo "SHIFT   : $shift\n";
 echo "LINE    : $line\n\n";
 
-// 1. Eksekusi API secara internal
-$reqApi = Illuminate\Http\Request::create('/api/v1/ppc/item-check', 'GET', [
-    'date' => $date, 'shift' => $shift, 'line' => $line
-]);
-$reqApi->headers->set('Authorization', 'Bearer qa-super-secret-token');
-$resApi = $kernel->handle($reqApi);
-$rawApiContent = $resApi->getContent();
-echo "--- RAW API RESPONSE ---\n";
-echo $rawApiContent . "\n";
-echo "------------------------\n\n";
-
-$apiData = json_decode($rawApiContent, true)['data'] ?? [];
-
-// 2. Eksekusi Input Harian Controller
+// 2. Eksekusi Input Harian Controller DULU, biar kita tau dia redirect ke shift/date apa
 $reqWeb = Illuminate\Http\Request::create('/operational/input-harian', 'GET', [
     'date' => $date, 'shift' => $shift, 'line' => $line
 ]);
@@ -35,23 +23,38 @@ auth()->loginUsingId(1);
 $controller = app(\App\Http\Controllers\Operational\InputHarianController::class);
 $view = $controller->index($reqWeb);
 
+$finalDate = $date;
+$finalShift = $shift;
+
 if ($view instanceof \Illuminate\Http\RedirectResponse) {
     $parsedUrl = parse_url($view->getTargetUrl());
     parse_str($parsedUrl['query'] ?? '', $queryParams);
+    
+    $finalDate = $queryParams['date'] ?? $date;
+    $finalShift = $queryParams['shift'] ?? $shift;
+    
     $reqWeb = Illuminate\Http\Request::create('/operational/input-harian', 'GET', array_merge([
         'date' => $date, 'line' => $line
     ], $queryParams));
     
-    echo "(Mengikuti internal redirect Controller ke: " . $reqWeb->query('shift') . ")\n\n";
+    echo "(Mengikuti internal redirect Controller ke Date: $finalDate, Shift: $finalShift)\n\n";
     $view = $controller->index($reqWeb);
 }
 
+// 1. Eksekusi API secara internal menggunakan Final Date & Shift hasil evaluasi Web
+$reqApi = Illuminate\Http\Request::create('/api/v1/ppc/item-check', 'GET', [
+    'date' => $finalDate, 'shift' => $finalShift, 'line' => $line
+]);
+$reqApi->headers->set('Authorization', 'Bearer qa-super-secret-token');
+$resApi = $kernel->handle($reqApi);
+$rawApiContent = $resApi->getContent();
+$apiData = json_decode($rawApiContent, true)['data'] ?? [];
+
 $webJobs = $view->getData()['jobs'] ?? [];
 
-echo "INPUT HARIAN\n";
+echo "INPUT HARIAN (Web)\n";
 $webMapped = [];
 foreach ($webJobs as $job) {
-    // Filter break persis seperti web yang baru saya amati
     if ($job->row_type === 'break') continue;
     
     $jn = trim($job->job_no ?? '');
@@ -60,7 +63,7 @@ foreach ($webJobs as $job) {
     
     $jobNumber = $jn ? ($jn . '-' . $job->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $job->id);
     $jmRecord = \App\Models\JobMaster::where('job_number', $jobNumber)
-                ->with(['dailyProduction' => function ($q) use ($date) { $q->where('work_date', $date); }])
+                ->with(['dailyProduction' => function ($q) use ($finalDate) { $q->where('work_date', $finalDate); }])
                 ->first();
                 
     $actualOk = $jmRecord ? (int)($jmRecord->dailyProduction->actual_ok ?? 0) : 0;
