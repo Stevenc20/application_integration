@@ -1685,4 +1685,126 @@ class ReportController extends Controller
 
         return $totalBlueSeconds / 60.0;
     }
+
+    public function asakaiReport(Request $request)
+    {
+        $inputDate = $request->query('date');
+        if (!$inputDate) {
+            $hour = (int) now()->format('H');
+            $inputDate = ($hour < 8) ? now()->subDay()->toDateString() : now()->toDateString();
+        } else {
+            $inputDate = Carbon::parse($inputDate)->toDateString();
+        }
+
+        $shift1Date = $inputDate;
+        $shift2Date = Carbon::parse($inputDate)->subDay()->toDateString();
+
+        $shift1Data = $this->buildAsakaiShiftData($shift1Date, 'Shift 1');
+        $shift2Data = $this->buildAsakaiShiftData($shift2Date, 'Shift 2');
+
+        return view('reports.asakai', [
+            'reportDate' => $inputDate,
+            'shift1Date' => $shift1Date,
+            'shift2Date' => $shift2Date,
+            'shift1Data' => $shift1Data,
+            'shift2Data' => $shift2Data,
+        ]);
+    }
+
+    private function buildAsakaiShiftData(string $date, string $shiftPrefix)
+    {
+        $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->where(function($q) use ($shiftPrefix) {
+                if (str_contains($shiftPrefix, '1')) {
+                    $q->where('shift_name', 'LIKE', '%Shift 1%')
+                      ->orWhere('shift_name', 'LIKE', '%Pagi%');
+                } else {
+                    $q->where('shift_name', 'LIKE', '%Shift 2%')
+                      ->orWhere('shift_name', 'LIKE', '%Malam%');
+                }
+            })
+            ->visibleOnTimeline();
+
+        $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
+        $plans = app(\App\Services\BreakTimelineValidator::class)->filterValidPlans($plans);
+
+        // Extract and load jobs
+        $jobNumbers = $plans->map(function($p) {
+            $jn = trim($p->job_no ?? '');
+            $jm = trim($p->job_master ?? '');
+            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+        })->toArray();
+
+        $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
+            ->with(['dailyProduction', 'downtimes'])
+            ->get()
+            ->keyBy('job_number');
+
+        $lines = [];
+        foreach ($plans as $plan) {
+            if ($plan->row_type === 'break' || !$plan->press_name) continue;
+            
+            $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $plan->press_name)));
+            if (!isset($lines[$lineName])) {
+                $lines[$lineName] = [
+                    'line_name' => $lineName,
+                    'total_plan' => 0,
+                    'total_actual' => 0,
+                    'total_diff' => 0,
+                    'total_downtime' => 0,
+                    'items' => [],
+                    'unachieved_items' => []
+                ];
+            }
+            
+            $jn = trim($plan->job_no ?? '');
+            $jm = trim($plan->job_master ?? '');
+            $jobNumber = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+            
+            $jobMaster = $jobMasters->get($jobNumber);
+            $planQty = (int) ($plan->plan ?? $plan->target_qty ?? 0);
+            $actualQty = ($jobMaster && $jobMaster->dailyProduction) ? (int) $jobMaster->dailyProduction->actual_ok : 0;
+            $diff = $actualQty - $planQty;
+            
+            $downtimeRecords = [];
+            $downtimeMinutes = 0;
+            if ($jobMaster && $jobMaster->downtimes) {
+                foreach ($jobMaster->downtimes as $dt) {
+                    $mins = (int) round($dt->duration_seconds / 60);
+                    $downtimeMinutes += $mins;
+                    $downtimeRecords[] = [
+                        'factor' => $dt->jenis_downtime,
+                        'problem' => $dt->problem,
+                        'penyebab' => $dt->penyebab,
+                        'action' => $dt->action,
+                        'minutes' => $mins
+                    ];
+                }
+            }
+            
+            $lines[$lineName]['total_plan'] += $planQty;
+            $lines[$lineName]['total_actual'] += $actualQty;
+            $lines[$lineName]['total_diff'] = $lines[$lineName]['total_actual'] - $lines[$lineName]['total_plan'];
+            $lines[$lineName]['total_downtime'] += $downtimeMinutes;
+            
+            $itemData = [
+                'item_name' => trim($plan->each_part ?? $jm),
+                'plan' => $planQty,
+                'actual' => $actualQty,
+                'diff' => $diff,
+                'downtimes' => $downtimeRecords
+            ];
+            
+            // Only push to items if plan or actual > 0
+            if ($planQty > 0 || $actualQty > 0) {
+                $lines[$lineName]['items'][] = $itemData;
+                if ($diff < 0) {
+                    $lines[$lineName]['unachieved_items'][] = $itemData;
+                }
+            }
+        }
+        
+        ksort($lines);
+        return array_values($lines);
+    }
 }
