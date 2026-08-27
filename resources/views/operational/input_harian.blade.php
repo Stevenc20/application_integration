@@ -217,7 +217,7 @@
                     <p class="text-xs font-bold text-amber-700 mt-0.5">Terdapat {{ $unfilledDowntimes->count() }} kejadian Downtime yang belum diisi detailnya (Problem/Penyebab/Action). Mohon periksa &amp; lengkapi laporan.</p>
                 </div>
             </div>
-            <button onclick="openDowntimeReport({{ $activeJob->id }}, @json($unfilledDowntimes->first()))" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow transition whitespace-nowrap">Isi Detail Downtime Sekarang</button>
+            <button onclick="openDowntimeReport({{ $activeJob->id }}, {{ e(json_encode($unfilledDowntimes->first())) }})" class="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white font-black text-xs rounded-xl shadow transition whitespace-nowrap">Isi Detail Downtime Sekarang</button>
         </div>
         @endif
 
