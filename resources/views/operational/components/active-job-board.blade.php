@@ -408,15 +408,15 @@
                                 <div class="flex flex-col gap-2 mt-2">
                                     <div class="flex gap-1.5">
                                         @if(($activeJob->capacity ?? 0) > 0)
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-sm transition-all active:scale-95 shadow-sm shadow-emerald-200 flex items-center justify-center gap-1.5">
-                                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
-                                            PLT ({{ $activeJob->capacity ?? 0 }})
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', {{ $activeJob->capacity ?? 0 }}, {{ $activeJob->id }})" class="flex-1 py-2 px-1 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs sm:text-sm transition-all active:scale-95 shadow-sm shadow-emerald-200 flex flex-col items-center justify-center gap-0.5">
+                                            <span class="flex items-center gap-1"><svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>PLT</span>
+                                            <span class="text-[9px] opacity-90 leading-none">({{ $activeJob->capacity ?? 0 }})</span>
                                         </button>
                                         @endif
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="flex-1 py-2 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-emerald-400 font-black text-xs sm:text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                         </button>
-                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', -1, {{ $activeJob->id }})" class="flex-1 py-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-black text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
+                                        <button onclick="stepInput('active-actual-{{ $activeJob->id }}', -1, {{ $activeJob->id }})" class="flex-1 py-2 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 font-black text-xs sm:text-sm transition-all active:scale-95 flex items-center justify-center gap-1">
                                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M5 11h14v2H5z"/></svg>-1
                                         </button>
                                     </div>
@@ -434,7 +434,7 @@
                                     <span class="text-3xl sm:text-4xl font-black text-orange-500 leading-none tabular-nums" id="active-repair-display">{{ $activeJob->dailyProduction->actual_repair ?? 0 }}</span>
                                 </div>
                                 <div class="flex flex-col gap-2 mt-2">
-                                    <button onclick="stepInput('active-repair-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-sm hover:bg-orange-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
+                                    <button onclick="stepInput('active-repair-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-2 rounded-xl bg-orange-500/10 border border-orange-500/20 text-orange-400 font-black text-xs sm:text-sm hover:bg-orange-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                     </button>
                                     <div class="flex items-center gap-1.5">
@@ -451,7 +451,7 @@
                                     <span class="text-3xl sm:text-4xl font-black text-red-500 leading-none tabular-nums" id="active-reject-display">{{ $activeJob->dailyProduction->actual_reject ?? 0 }}</span>
                                 </div>
                                 <div class="flex flex-col gap-2 mt-2">
-                                    <button onclick="stepInput('active-reject-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-3 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-sm hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
+                                    <button onclick="stepInput('active-reject-{{ $activeJob->id }}', 1, {{ $activeJob->id }})" class="w-full py-2 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 font-black text-xs sm:text-sm hover:bg-red-500 hover:text-white transition-all active:scale-95 flex items-center justify-center gap-1">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>+1
                                     </button>
                                     <div class="flex items-center gap-1.5">

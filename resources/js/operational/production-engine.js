@@ -1336,9 +1336,13 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         if (runningDowntimesForJob.length > 0) {
             runningDowntimesForJob.forEach((rdItem, rdIdx) => {
                 const rdStart = Math.max(rdItem.start.getTime(), lastPos);
-                if (rdStart > lastPos && effectiveActualStart && rdStart > effectiveActualStart) {
-                    const segStart = Math.max(lastPos, effectiveActualStart);
-                    appendProduction(segStart, rdStart);
+                if (rdStart > lastPos) {
+                    if (effectiveActualStart && rdStart > effectiveActualStart) {
+                        const segStart = Math.max(lastPos, effectiveActualStart);
+                        appendProduction(segStart, rdStart);
+                    } else if (!effectiveActualStart && hasDandori) {
+                        addSegment(lastPos, rdStart, 'bg-amber-400', 'Dandori');
+                    }
                 }
 
                 let color = 'bg-red-600';
@@ -1363,8 +1367,12 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             });
         } else {
             if (finalTime > lastPos) {
-                const segStart = (lastPos < effectiveActualStart) ? effectiveActualStart : lastPos;
-                appendProduction(segStart, finalTime);
+                if (effectiveActualStart) {
+                    const segStart = (lastPos < effectiveActualStart) ? effectiveActualStart : lastPos;
+                    appendProduction(segStart, finalTime);
+                } else if (hasDandori) {
+                    addSegment(lastPos, finalTime, 'bg-amber-400', 'Dandori');
+                }
             }
         }
 

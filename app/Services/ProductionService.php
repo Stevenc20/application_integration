@@ -80,7 +80,11 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
             $job = JobMaster::findOrFail($jobId);
-            $job->update(['status' => 'running']);
+            $updateData = ['status' => 'running'];
+            if (!$job->started_at) {
+                $updateData['started_at'] = now();
+            }
+            $job->update($updateData);
             $this->syncPlanStatus($jobId, 'running');
 
             ProductionSession::firstOrCreate(
@@ -175,7 +179,7 @@ class ProductionService
                 ->exists();
 
             if (!$otherActiveDowntime) {
-                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
+                JobMaster::where('id', $jobId)->update(['status' => 'running']);
                 $this->syncPlanStatus($jobId, 'running');
 
                 $session = ProductionSession::firstOrCreate(
@@ -183,7 +187,7 @@ class ProductionService
                 );
                 $session->update(['start_time' => $now, 'status' => 'running']);
             } else {
-                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'paused']);
+                JobMaster::where('id', $jobId)->update(['status' => 'paused']);
                 $this->syncPlanStatus($jobId, 'paused');
 
                 $session = ProductionSession::firstOrCreate(
