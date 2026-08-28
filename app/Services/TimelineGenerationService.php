@@ -676,6 +676,7 @@ foreach ($breakWindows as $idx => $b) {
         $overflow = [];
         if (!empty($cutoffPlans)) {
             foreach ($cutoffPlans as $cp) {
+                $cp->row_no = null;
                 $cp->start_time = null;
                 $cp->finish_time = null;
                 $cp->save();
@@ -849,8 +850,11 @@ foreach ($breakWindows as $idx => $b) {
                     $q->whereNull('source_type')->orWhere('source_type', '!=', 'recovery');
                 })
                 ->whereIn('job_no', $recoveryJobNos)
-                ->whereNull('start_time')
-                ->update(['row_no' => null]);
+                ->update([
+                    'row_no' => null,
+                    'start_time' => null,
+                    'finish_time' => null,
+                ]);
         }
 
         \Log::info('[REGEN END]');

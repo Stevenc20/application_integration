@@ -45,7 +45,7 @@ class ProductionAnalyticsController extends Controller
         $shift = $request->get('shift', $saved['shift'] ?? $this->detectShift());
         $status = $request->get('status', $saved['status'] ?? null);
 
-        $lines = JobMaster::distinct()->pluck('line')->filter()->values();
+        $lines = collect(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D']);
 
         $data = match ($tab) {
             'overview' => $this->overviewData($dateFrom, $dateTo, $line, $shift, $status),

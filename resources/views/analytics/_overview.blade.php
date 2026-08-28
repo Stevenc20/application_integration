@@ -299,9 +299,12 @@
                 if ($job) {
                     foreach ($job->downtimes as $dt) {
                         $s = $dt->start_time ? \Carbon\Carbon::parse($dt->start_time) : null;
-                        $dur = (int)($dt->duration_seconds ?? 0);
-                        $e = $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : ($s && $dur > 0 ? $s->copy()->addSeconds($dur) : null);
-                        if ($s && $dur > 0) {
+                        if (!$s) continue;
+                        
+                        $e = $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : ($job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : now());
+                        $dur = $dt->finish_time ? (int)($dt->duration_seconds ?? $s->diffInSeconds($e)) : $s->diffInSeconds($e);
+                        
+                        if ($s && $e && $s->timestamp < $e->timestamp) {
                             $dtType = strtolower($dt->jenis_downtime ?? '');
                             $isDandori = $dtType === 'dandori';
                             $isTryOut = in_array($dtType, ['try out','tryout']);
@@ -314,11 +317,11 @@
                                 'label' => $isDandori ? 'Dandori' : ($isTryOut ? 'Try Out' : ($isBreak ? 'Break Time' : ($dt->jenis_downtime ?? 'Downtime'))),
                                 'color' => $segmentColor,
                                 'start' => $s,
-                                'end' => $e ?? $s,
+                                'end' => $e,
                                 'detail' => $dt->problem ?? ''
                             ];
                             if (!$earliest || $s < $earliest) $earliest = $s;
-                            if ($e && (!$latest || $e > $latest)) $latest = $e;
+                            if (!$latest || $e > $latest) $latest = $e;
                         }
                     }
                 }
@@ -337,36 +340,50 @@
                 });
 
                 // Fill gaps between non-production segments with Production bars
-                if (count($segments) > 0) {
-                    $nonProd = array_values(array_filter($segments, fn($s) => $s['type'] !== 'production' && $s['type'] !== 'overtime'));
-                    if (count($nonProd) > 0) {
-                        usort($nonProd, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp);
-                        $gapStart = $nonProd[0]['start']->copy();
-                        $prodSegs = [];
-                        $prodDeadline = null;
-                        if ($plan->start_time && $plan->finish_time) {
-                            $pS = str_contains($plan->start_time, '-') ? \Carbon\Carbon::parse($plan->start_time) : \Carbon\Carbon::parse($gapStart->format('Y-m-d').' '.$plan->start_time);
-                            $pF = str_contains($plan->finish_time, '-') ? \Carbon\Carbon::parse($plan->finish_time) : \Carbon\Carbon::parse($gapStart->format('Y-m-d').' '.$plan->finish_time);
-                            $prodDeadline = $gapStart->copy()->addSeconds((int) max(abs($pF->diffInSeconds($pS)), 1));
-                        } elseif ($job && $job->plan_start && $job->plan_end) {
-                            try { $prodDeadline = $gapStart->copy()->addSeconds((int) max(abs(\Carbon\Carbon::parse($job->plan_end)->diffInSeconds(\Carbon\Carbon::parse($job->plan_start))), 1)); } catch (\Exception $e) {}
-                        }
-                        foreach ($nonProd as $seg) {
-                            $segStart = $seg['start'];
-                            if ($segStart->timestamp > $gapStart->timestamp) {
-                                if ($prodDeadline && $segStart->timestamp > $prodDeadline->timestamp && $gapStart->timestamp < $prodDeadline->timestamp) {
-                                    $prodSegs[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$gapStart->copy(),'end'=>$prodDeadline->copy()];
-                                    $prodSegs[] = ['type'=>'overtime','label'=>'Overtime','color'=>'bg-red-600','start'=>$prodDeadline->copy(),'end'=>$segStart->copy()];
-                                } else {
-                                    $prodSegs[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$gapStart->copy(),'end'=>$segStart->copy()];
-                                }
-                            }
-                            $segEnd = $seg['end'] ?? $seg['start'];
-                            if ($segEnd->timestamp > $gapStart->timestamp) $gapStart = $segEnd->copy();
-                        }
-                        $segments = array_merge($segments, $prodSegs);
-                        usort($segments, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp);
+                $nonProd = array_values(array_filter($segments, fn($s) => $s['type'] !== 'production' && $s['type'] !== 'overtime'));
+                if (count($nonProd) > 0) {
+                    usort($nonProd, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp);
+                    $gapStart = $earliest->copy();
+                    $prodSegs = [];
+                    $prodDeadline = null;
+                    if ($plan->start_time && $plan->finish_time) {
+                        $pS = str_contains($plan->start_time, '-') ? \Carbon\Carbon::parse($plan->start_time) : \Carbon\Carbon::parse($gapStart->format('Y-m-d').' '.$plan->start_time);
+                        $pF = str_contains($plan->finish_time, '-') ? \Carbon\Carbon::parse($plan->finish_time) : \Carbon\Carbon::parse($gapStart->format('Y-m-d').' '.$plan->finish_time);
+                        $prodDeadline = $gapStart->copy()->addSeconds((int) max(abs($pF->diffInSeconds($pS)), 1));
+                    } elseif ($job && $job->plan_start && $job->plan_end) {
+                        try { $prodDeadline = $gapStart->copy()->addSeconds((int) max(abs(\Carbon\Carbon::parse($job->plan_end)->diffInSeconds(\Carbon\Carbon::parse($job->plan_start))), 1)); } catch (\Exception $e) {}
                     }
+                    
+                    foreach ($nonProd as $seg) {
+                        $segStart = $seg['start'];
+                        if ($segStart->timestamp > $gapStart->timestamp) {
+                            if ($prodDeadline && $segStart->timestamp > $prodDeadline->timestamp && $gapStart->timestamp < $prodDeadline->timestamp) {
+                                $prodSegs[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$gapStart->copy(),'end'=>$prodDeadline->copy()];
+                                $prodSegs[] = ['type'=>'overtime','label'=>'Overtime','color'=>'bg-red-600','start'=>$prodDeadline->copy(),'end'=>$segStart->copy()];
+                            } else {
+                                $prodSegs[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$gapStart->copy(),'end'=>$segStart->copy()];
+                            }
+                        }
+                        $segEnd = $seg['end'] ?? $seg['start'];
+                        if ($segEnd->timestamp > $gapStart->timestamp) $gapStart = $segEnd->copy();
+                    }
+                    
+                    // Fill final gap up to $latest
+                    if ($gapStart->timestamp < $latest->timestamp) {
+                        $segStart = $latest;
+                        if ($prodDeadline && $segStart->timestamp > $prodDeadline->timestamp && $gapStart->timestamp < $prodDeadline->timestamp) {
+                            $prodSegs[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$gapStart->copy(),'end'=>$prodDeadline->copy()];
+                            $prodSegs[] = ['type'=>'overtime','label'=>'Overtime','color'=>'bg-red-600','start'=>$prodDeadline->copy(),'end'=>$segStart->copy()];
+                        } else {
+                            $prodSegs[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$gapStart->copy(),'end'=>$segStart->copy()];
+                        }
+                    }
+                    
+                    $segments = array_merge($segments, $prodSegs);
+                    usort($segments, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp);
+                } elseif ($earliest && $latest && $latest->timestamp > $earliest->timestamp) {
+                    $prodSegs = [['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$earliest->copy(),'end'=>$latest->copy()]];
+                    $segments = array_merge($segments, $prodSegs);
                 }
 
                 $totalDur = $latest && $earliest ? max(1, $latest->timestamp - $earliest->timestamp) : 1;
