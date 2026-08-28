@@ -8,6 +8,9 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>@yield('title', 'Supervisor Dashboard')</title>
     
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{{ asset('images/ippi.png') }}">
+    
     <!-- DNS Prefetch & Font Preloading for fast LCP & FCP -->
     <link rel="dns-prefetch" href="https://code.jquery.com">
     <link rel="dns-prefetch" href="https://cdn.jsdelivr.net">
