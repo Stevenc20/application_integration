@@ -59,21 +59,23 @@ class DashboardDetailService
             ->get()
             ->keyBy('job_master_id');
 
-        $dandoriMinutes = Dandori::whereIn('next_job_id', $jobIds)
-            ->whereNotNull('finish_time')
-            ->selectRaw('next_job_id, COALESCE(SUM(duration_minutes), 0) as total')
-            ->groupBy('next_job_id')
-            ->pluck('total', 'next_job_id');
-
-        $qcheckModels = QCheck::whereIn('job_master_id', $jobIds)
-            ->whereNotNull('start_time')
+        $dandoriRecords = Dandori::whereIn('next_job_id', $jobIds)
             ->whereNotNull('finish_time')
             ->get();
 
+        $dandoriMinutes = [];
         $qcheckMinutes = [];
-        foreach ($qcheckModels as $qc) {
-            $qcheckMinutes[$qc->job_master_id] = ($qcheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
+
+        foreach ($dandoriRecords as $d) {
+            $jenis = strtolower($d->jenis_dandori ?? '');
+            if ($jenis === '1st_check' || $jenis === '1st check') {
+                $qcheckMinutes[$d->next_job_id] = ($qcheckMinutes[$d->next_job_id] ?? 0) + ($d->duration_minutes ?? 0);
+            } else {
+                $dandoriMinutes[$d->next_job_id] = ($dandoriMinutes[$d->next_job_id] ?? 0) + ($d->duration_minutes ?? 0);
+            }
         }
+        
+        $dandoriMinutes = collect($dandoriMinutes);
 
         $downtimeData = Downtime::whereIn('job_master_id', $jobIds)
             ->whereNotNull('duration_seconds')
