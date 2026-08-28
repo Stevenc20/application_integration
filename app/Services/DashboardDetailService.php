@@ -59,27 +59,29 @@ class DashboardDetailService
             ->get()
             ->keyBy('job_master_id');
 
-        $dandoriRecords = Dandori::whereIn('next_job_id', $jobIds)
-            ->whereNotNull('finish_time')
-            ->get();
+        $dandoriRecords = Dandori::whereIn('next_job_id', $jobIds)->get();
 
         $dandoriMinutes = [];
         $qcheckMinutes = [];
 
         foreach ($dandoriRecords as $d) {
+            $s = $d->start_time ? Carbon::parse($d->start_time) : null;
+            if (!$s) continue;
+            
+            $e = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+            $durMinutes = max(0, $s->diffInSeconds($e) / 60);
+            
             $jenis = strtolower($d->jenis_dandori ?? '');
             if ($jenis === '1st_check' || $jenis === '1st check') {
-                $qcheckMinutes[$d->next_job_id] = ($qcheckMinutes[$d->next_job_id] ?? 0) + ($d->duration_minutes ?? 0);
+                $qcheckMinutes[$d->next_job_id] = ($qcheckMinutes[$d->next_job_id] ?? 0) + $durMinutes;
             } else {
-                $dandoriMinutes[$d->next_job_id] = ($dandoriMinutes[$d->next_job_id] ?? 0) + ($d->duration_minutes ?? 0);
+                $dandoriMinutes[$d->next_job_id] = ($dandoriMinutes[$d->next_job_id] ?? 0) + $durMinutes;
             }
         }
         
         $dandoriMinutes = collect($dandoriMinutes);
 
-        $downtimeData = Downtime::whereIn('job_master_id', $jobIds)
-            ->whereNotNull('duration_seconds')
-            ->get();
+        $downtimeData = Downtime::whereIn('job_master_id', $jobIds)->get();
 
         $downtimeMinutes = [];
         foreach ($downtimeData as $dt) {
@@ -87,7 +89,14 @@ class DashboardDetailService
             if (in_array($jenis, ['dandori', 'idle time', 'idle', 'break time'])) {
                 continue;
             }
-            $downtimeMinutes[$dt->job_master_id] = ($downtimeMinutes[$dt->job_master_id] ?? 0) + ($dt->duration_seconds / 60);
+            
+            $s = $dt->start_time ? Carbon::parse($dt->start_time) : null;
+            if (!$s) continue;
+            
+            $e = $dt->finish_time ? Carbon::parse($dt->finish_time) : now();
+            $durSecs = $dt->finish_time ? (int)($dt->duration_seconds ?? $s->diffInSeconds($e)) : $s->diffInSeconds($e);
+            
+            $downtimeMinutes[$dt->job_master_id] = ($downtimeMinutes[$dt->job_master_id] ?? 0) + ($durSecs / 60);
         }
 
         $rows = [];
@@ -111,11 +120,11 @@ class DashboardDetailService
             $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 0) : 0;
 
             $jobId = $job?->id;
-            $dandori = $jobId ? round($dandoriMinutes->get($jobId, 0), 0) : 0;
-            $iqCheck = $jobId ? round($qcheckMinutes[$jobId] ?? 0, 0) : 0;
-            $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 0) : 0;
+            $dandori = $jobId ? (int) ceil($dandoriMinutes->get($jobId, 0)) : 0;
+            $iqCheck = $jobId ? (int) ceil($qcheckMinutes[$jobId] ?? 0) : 0;
+            $downtime = $jobId ? (int) ceil($downtimeMinutes[$jobId] ?? 0) : 0;
 
-            $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 0);
+            $tpt = (int) ceil($pressTime + $dandori + $iqCheck + $downtime);
 
             $planFinish = $plan->finish_time;
             $actualFinish = $job?->finished_at ? Carbon::parse($job->finished_at)->format('H:i') : '-';
