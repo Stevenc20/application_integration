@@ -28,3 +28,8 @@ referensi/
 referensiQA/
 test_api_debug_response.php
 test_api_match.php
+
+# Local folders excluded from repository
+IPPI-PPLC/
+digitalisasi/
+tests/
