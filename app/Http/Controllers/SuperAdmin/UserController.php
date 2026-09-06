@@ -87,7 +87,7 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if ($user->system_role === 'superadmin' || $user->role === 'superadmin') {
+        if ($user->system_role === 'superadmin' || $user->isRole('superadmin')) {
             $superadminCount = User::where('system_role', 'superadmin')->orWhere('role', 'superadmin')->count();
             if ($superadminCount <= 1) {
                 return back()->with('error', 'Cannot delete the last super admin.');

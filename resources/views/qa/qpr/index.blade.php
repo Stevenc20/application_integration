@@ -61,7 +61,7 @@
                     <svg class="w-5 h-5 group-hover:rotate-180 transition-transform duration-500" :class="loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                 </button>
                 
-                @if(auth()->user()->role === 'Admin' || auth()->user()->role === 'Supervisor')
+                @if(auth()->user()->isRole('Admin') || auth()->user()->isRole('Supervisor'))
                 <button @click="toggleArchiveMode()" 
                         class="px-5 flex items-center justify-center gap-2 font-black rounded-2xl transition-all active:scale-95 border-2"
                         :class="archiveMode ? 'bg-slate-800 border-slate-800 text-white shadow-lg shadow-slate-800/20' : 'bg-white border-slate-100 text-slate-600 hover:border-slate-200 hover:bg-slate-50'">
@@ -70,7 +70,7 @@
                 </button>
                 @endif
                 
-                @if(auth()->user()->role !== 'Operator')
+                @if(!auth()->user()->isRole('Operator'))
                     @if(auth()->user()->department === 'QA' || auth()->user()->department === 'Quality Assurance')
                     <a href="{{ url('/qpr/create') }}" x-show="!archiveMode" class="px-6 flex items-center justify-center gap-2 bg-gradient-to-r from-rose-500 to-red-600 text-white font-black rounded-2xl hover:from-rose-400 hover:to-red-500 transition-all shadow-lg shadow-rose-500/30 active:scale-95 border border-rose-400/50">
                         <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M12 4v16m8-8H4" /></svg>

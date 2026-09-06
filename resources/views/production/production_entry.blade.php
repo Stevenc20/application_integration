@@ -27,7 +27,7 @@ if($role == 'operator'){
 <p class="text-gray-500 text-sm">{{ now()->format('d F Y') }}</p>
 </div>
 
-@if(auth()->user()->role == 'operator')
+@if(auth()->user()->isRole('operator'))
 <button onclick="openProductionModal()"
 class="bg-red-600 text-white px-4 py-2 rounded">
 + Add Production
@@ -47,7 +47,7 @@ class="bg-red-600 text-white px-4 py-2 rounded">
 @endif
 
 
-@if(auth()->user()->role == 'operator')
+@if(auth()->user()->isRole('operator'))
 
 <div id="productionModal"
 class="fixed inset-0 hidden items-center justify-center bg-black/40 z-[9999]"

@@ -68,23 +68,44 @@ class DeviceLinkController extends Controller
             $deviceLink = DeviceLinkRequest::where('token_hash', $tokenHash)->firstOrFail();
             $user = $this->service->consumePairingRequest($deviceLink, $request);
 
-            $redirectUrl = match($user->role) {
-                'admin' => route('admin.dashboard'),
-                'supervisor' => route('supervisor.dashboard'),
-                'foreman' => route('supervisor.dashboard'),
-                'operator' => route('operator.dashboard'),
-                'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => route('operational.input_harian'),
-                'ppc' => route('ppc.dashboard'),
-                'quality' => route('quality.dashboard'),
-                'production' => route('production.dashboard'),
-                'manager' => route('manager.dashboard'),
-                'kadiv' => route('kadiv.dashboard'),
-                'direktur' => route('direktur.dashboard'),
-                'presdir' => route('presdir.dashboard'),
-                'superadmin' => route('super-admin.dashboard'),
-                'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan' => route('hambatan-jalur.index'),
-                default => url('/')
-            };
+            if ($user->isSuperadmin()) $redirectUrl = route('super-admin.dashboard');
+            elseif ($user->isAdmin()) $redirectUrl = route('admin.dashboard');
+            else {
+                $pos = strtolower($user->position ? $user->position->position_name : '');
+                $sec = strtolower($user->section ? $user->section->section_name : '');
+                $legacyRole = strtolower($user->role ?? '');
+
+                if ($pos === 'tim member' || $legacyRole === 'operator') {
+                    $redirectUrl = route('operator.dashboard');
+                } elseif ($pos === 'leader' || str_starts_with($legacyRole, 'leader') || in_array($legacyRole, ['shearing', 'handwork'])) {
+                    $redirectUrl = route('operational.input_harian');
+                } elseif ($pos === 'foreman' || $legacyRole === 'foreman') {
+                    $redirectUrl = route('supervisor.dashboard');
+                } elseif ($pos === 'spv' || $legacyRole === 'supervisor') {
+                    $redirectUrl = route('supervisor.dashboard');
+                } elseif ($pos === 'manager' || $legacyRole === 'manager') {
+                    $redirectUrl = route('manager.dashboard');
+                } elseif ($pos === 'kadiv' || $legacyRole === 'kadiv') {
+                    $redirectUrl = route('kadiv.dashboard');
+                } elseif ($pos === 'direktur' || $legacyRole === 'direktur') {
+                    $redirectUrl = route('direktur.dashboard');
+                } elseif ($pos === 'presdir' || $legacyRole === 'presdir') {
+                    $redirectUrl = route('presdir.dashboard');
+                } elseif ($sec === 'ppc' || $legacyRole === 'ppc') {
+                    $redirectUrl = route('ppc.dashboard');
+                } elseif ($sec === 'quality' || $legacyRole === 'quality') {
+                    $redirectUrl = route('quality.dashboard');
+                } elseif ($sec === 'produksi' || $legacyRole === 'production') {
+                    $redirectUrl = route('production.dashboard');
+                } else {
+                    $hambatanRoles = ['dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan', 'mesin'];
+                    if (in_array($legacyRole, $hambatanRoles) || in_array($sec, $hambatanRoles)) {
+                        $redirectUrl = route('hambatan-jalur.index');
+                    } else {
+                        $redirectUrl = url('/');
+                    }
+                }
+            }
 
             return response()->json([
                 'success' => true,

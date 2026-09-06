@@ -166,6 +166,38 @@ class User extends Authenticatable
             ->exists();
     }
 
+    public function isRole($roles): bool
+    {
+        $roles = is_array($roles) ? $roles : func_get_args();
+        $roles = array_map('strtolower', $roles);
+        
+        // 1. Check System Role
+        if (in_array(strtolower($this->system_role ?? ''), $roles)) return true;
+
+        // 2. Check Canonical Position
+        if ($this->position) {
+            $posName = strtolower($this->position->position_name);
+            if (in_array($posName, $roles)) return true;
+            // Handle specific aliases
+            if ($posName === 'tim member' && in_array('operator', $roles)) return true;
+            if ($posName === 'spv' && in_array('supervisor', $roles)) return true;
+            if (in_array('group leader', $roles) && $posName === 'leader') return true;
+            if (in_array('groupleader', $roles) && $posName === 'leader') return true;
+        }
+
+        // 3. Legacy Fallback
+        $legacyRole = strtolower($this->role ?? '');
+        if (in_array($legacyRole, $roles)) return true;
+        if (str_starts_with($legacyRole, 'leader') && in_array('leader', $roles)) return true;
+        
+        // Special legacy handling for group leader checks
+        if (in_array('group leader', $roles) || in_array('groupleader', $roles)) {
+            if (str_starts_with($legacyRole, 'leader')) return true;
+        }
+
+        return false;
+    }
+
     // Role helpers for legacy modules
     public function hasRole(string|array $roles): bool
     {

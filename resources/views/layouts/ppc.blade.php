@@ -66,7 +66,7 @@
         </main>
     </div>
 
-    @if(auth()->check() && in_array(strtolower(auth()->user()->role), ['supervisor', 'leader', 'foreman']))
+    @if(auth()->check() && auth()->user()->isRole(['supervisor', 'leader', 'foreman']))
     <div id="global-timer-popout" class="fixed bottom-6 right-6 z-[100] hidden bg-gray-900 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:scale-105 transition-all border border-gray-700">
         <div class="relative flex h-3 w-3">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>

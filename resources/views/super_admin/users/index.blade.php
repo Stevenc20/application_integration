@@ -126,7 +126,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-        <form action="{{ route('super-admin.users.store') }}" method="POST" class="space-y-4">
+        <form action="{{ route('access-management.users.store') }}" method="POST" class="space-y-4">
             @csrf
             <div>
                 <label class="text-sm font-medium text-gray-700">Name</label>
@@ -423,7 +423,7 @@ window.openSuperAdminEditModal = function (btn) {
     document.getElementById('edit_section').value = user.section_id || '';
 
     var form = document.getElementById('editForm');
-    form.action = '/super-admin/users/' + user.id;
+    form.action = '/access-management/users/' + user.id;
 
     toggleEditOrgFields();
 
@@ -440,7 +440,7 @@ window.openSuperAdminDeleteModal = function (btn) {
     var id = btn.getAttribute('data-user-id');
     document.getElementById('deleteUserName').textContent = 'Hapus user "' + name + '"?';
     var form = document.getElementById('deleteForm');
-    form.action = '/super-admin/users/' + id;
+    form.action = '/access-management/users/' + id;
     document.getElementById('deleteModal').classList.remove('hidden');
     document.getElementById('deleteModal').classList.add('flex');
 };

@@ -14,14 +14,22 @@ class HambatanJalurController extends Controller
 {
     private function roleToJenis(): ?string
     {
+        $user = Auth::user();
+        $legacy = strtolower($user->role ?? '');
+        $sec = strtolower($user->section ? $user->section->section_name : '');
+
         $map = [
             'dies_shop' => 'DT',
+            'dies' => 'DT',
             'plant_service' => 'MT',
+            'mesin' => 'MT',
             'irm' => 'MST',
             'logistik' => 'LOGT',
             'produksi' => 'Prot',
+            'production' => 'Prot',
         ];
-        return $map[strtolower(Auth::user()->role ?? '')] ?? null;
+        
+        return $map[$legacy] ?? $map[$sec] ?? null;
     }
 
     public function index()
@@ -152,13 +160,13 @@ class HambatanJalurController extends Controller
         $letter = trim(str_ireplace('press', '', $hambatan->line_name ?? ''));
         $roleName = 'leader ' . strtolower($letter);
 
-        $userRole = strtolower(Auth::user()->role ?? '');
-        if ($userRole === $roleName) {
+        $user = Auth::user();
+        if ($user && $user->isRole($roleName)) {
             return true;
         }
 
         // Foreman can also sign
-        if ($userRole === 'foreman') {
+        if ($user && $user->isRole('foreman')) {
             return true;
         }
 

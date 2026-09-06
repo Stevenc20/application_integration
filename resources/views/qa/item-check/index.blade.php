@@ -408,7 +408,7 @@
                         // Cek status apakah sudah selesai
                         $isFinished = $schedule->itemChecks->whereIn('status', ['finished', 'approved'])->count() > 0;
                         $progress = $isFinished ? 100 : ($requiredCount > 0 ? min(100, round(($checkedTotal / $requiredCount) * 100)) : 0);
-                        $isOperator = auth()->user()->role === 'Operator';
+                        $isOperator = auth()->user()->isRole('Operator');
                         
                         $j = $schedule->job_no;
                         $prefix = strpos($j, '-') !== false ? substr($j, 0, strpos($j, '-')) : $j;
@@ -561,7 +561,7 @@
 
                         {{-- Action Button --}}
                         <div class="flex gap-2">
-                            @if($isOperator || auth()->user()->role === 'QC')
+                            @if($isOperator || auth()->user()->isRole('QC'))
                                 @if($schedule->master_template_id)
                                     @php
                                         $existingCheck = $schedule->itemChecks->first();
@@ -613,7 +613,7 @@
                                             Belum Dimulai
                                         </button>
                                         @if($schedule->master_template_id)
-                                            @if(auth()->user()->role === 'Admin' || auth()->user()->role === 'QC')
+                                            @if(auth()->user()->isRole('Admin') || auth()->user()->isRole('QC'))
                                                 <a href="{{ route('item-check.preview', $schedule->master_template_id) }}?actual_qty={{ $schedule->actual_qty > 0 ? $schedule->actual_qty : $schedule->target_qty }}&schedule_id={{ $schedule->id }}" 
                                                    class="w-[48px] bg-amber-50 border border-amber-200 hover:bg-amber-100 hover:border-amber-300 text-amber-600 rounded-xl flex items-center justify-center transition-all shadow-sm"
                                                    title="Preview Form Template">

@@ -13,19 +13,19 @@ class ItemCheckController extends Controller
         $user = $request->user();
         $query = ItemCheck::with(['masterTemplate']);
 
-        if ($user->role === 'Admin') {
+        if ($user->isRole('Admin')) {
             $query->where('status', 'waiting_qc_approval');
-        } elseif ($user->role === 'Operator') {
+        } elseif ($user->isRole('Operator')) {
             $query->where('status', 'revision')
                   ->where('operator_id', $user->id);
         } else {
             $query->where(function($q) use ($user) {
-                if (in_array($user->role, ['Group Leader', 'Leader'])) {
+                if ($user->isRole(['Group Leader', 'Leader'])) {
                     $q->where('status', 'waiting_qc_approval')
                       ->whereNull('paraf_foreman')
                       ->where('assigned_gl_id', $user->id);
                 }
-                if ($user->role === 'Foreman') {
+                if ($user->isRole('Foreman')) {
                     $q->orWhere(function($q2) use ($user) {
                         $q2->where('status', 'waiting_qc_approval')
                            ->whereNotNull('paraf_foreman')

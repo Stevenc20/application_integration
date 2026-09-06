@@ -37,7 +37,7 @@ class ItemCheckController extends Controller
         $user = auth()->user();
         
         // Filter by assigned line for Operators
-        if ($user && $user->role === 'Operator') {
+        if ($user && $user->isRole('Operator')) {
             if (!empty($user->assigned_line) && $user->assigned_line !== 'Semua Line') {
                 $schedulesQuery->where('line', 'like', '%' . $user->assigned_line . '%');
                 

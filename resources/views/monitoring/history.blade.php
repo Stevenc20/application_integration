@@ -1,4 +1,4 @@
-@extends(auth()->user()->role === 'ppc' ? 'layouts.ppc' : 'layouts.supervisor')
+@extends(auth()->user()->isRole('ppc') ? 'layouts.ppc' : 'layouts.supervisor')
 
 @php
     $title = match ($type) {

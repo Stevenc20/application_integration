@@ -137,7 +137,7 @@ class QprController extends Controller
 
     private function canEditSeksiSection($user, $qpr) {
         if (!$user) return true;
-        if ($user->role === 'Admin') return true;
+        if ($user->isRole('Admin')) return true;
         if ($qpr->pic_seksi && $user->department === $qpr->pic_seksi) return true;
         return false;
     }
@@ -551,7 +551,7 @@ class QprController extends Controller
     public function update(Request $request, $id)
     {
         $qpr = Qpr::findOrFail($id);
-        if ($request->user() && $request->user()->role === 'Operator' && $qpr->created_by !== $request->user()->id && $qpr->pic !== $request->user()->name) {
+        if ($request->user() && $request->user()->isRole('Operator') && $qpr->created_by !== $request->user()->id && $qpr->pic !== $request->user()->name) {
             return response()->json(['message' => 'Anda hanya dapat mengedit QPR yang Anda buat atau ditugaskan kepada Anda.'], 403);
         }
 
@@ -617,7 +617,7 @@ class QprController extends Controller
 
             if ($id) {
                 $qpr = Qpr::findOrFail($id);
-                if ($request->user() && $request->user()->role === 'Operator' && $qpr->created_by !== $request->user()->id && $qpr->pic !== $request->user()->name) {
+                if ($request->user() && $request->user()->isRole('Operator') && $qpr->created_by !== $request->user()->id && $qpr->pic !== $request->user()->name) {
                     return response()->json(['message' => 'Anda hanya dapat mengedit QPR yang Anda buat atau ditugaskan kepada Anda.'], 403);
                 }
                 
@@ -651,7 +651,7 @@ class QprController extends Controller
         // DELETE /api/qprs/{id}
         public function destroy($id)
         {
-            if (auth()->user()?->role === 'Operator') {
+            if (auth()->user()?->isRole('Operator')) {
                 return response()->json(['message' => 'Operator dilarang menghapus QPR'], 403);
             }
 
@@ -710,7 +710,7 @@ class QprController extends Controller
             $pending = [];
 
             // ── GL / Foreman dari QC → lihat QPR yang di-assign ke mereka ─────────
-            $isQcForeman = in_array($user->role, ['Group Leader', 'GroupLeader', 'Foreman', 'foreman'])
+            $isQcForeman = $user->isRole(['Group Leader', 'GroupLeader', 'Foreman', 'foreman'])
                         && $user->department === 'Quality Control';
 
             if ($isQcForeman) {
@@ -736,7 +736,7 @@ class QprController extends Controller
             }
 
             // ── QA (Foreman/GL/Kasie) → lihat QPR yang butuh Verifikasi ─────────
-            $isQaRole = in_array($user->role, ['Group Leader', 'GroupLeader', 'Foreman', 'foreman', 'Kasie QA', 'Kasie'])
+            $isQaRole = $user->isRole(['Group Leader', 'GroupLeader', 'Foreman', 'foreman', 'Kasie QA', 'Kasie'])
                      && in_array($user->department, ['QA', 'Quality Assurance', 'Quality Control']);
 
             if ($isQaRole) {

@@ -28,7 +28,7 @@ class ProductionController extends Controller
                     ->whereDate('work_date', $date);
 
         // filter khusus operator
-        if($user->role == 'operator'){
+        if($user->isRole('operator')){
             $query->where('saved_by', $user->id);
         }
 

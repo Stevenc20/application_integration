@@ -23,13 +23,13 @@ class LembarInspeksiController extends Controller
         $isGlobalReport = $request->query('report') == '1';
 
         if (!$isGlobalReport) {
-            if ($user->role === 'Operator') {
+            if ($user->isRole('Operator')) {
                 // Operator can only see completed/approved Master Templates
                 $query->whereNotIn('status', ['draft', 'revision', 'waiting_foreman', 'waiting_supervisor']);
-            } elseif ($user->role === 'Foreman') {
+            } elseif ($user->isRole('Foreman')) {
                 // Foreman can see everything except other people's drafts maybe? Or just all non-drafts
                 $query->whereNotIn('status', ['draft', 'revision'])->orWhere('created_by', $user->id);
-            } elseif ($user->role === 'Supervisor' || $user->role === 'Leader') {
+            } elseif ($user->isRole('Supervisor') || $user->isRole('Leader')) {
                 // Supervisors/Leaders can see everything
             }
         }
@@ -75,7 +75,7 @@ class LembarInspeksiController extends Controller
     public function restore($id)
     {
         $user = auth()->user();
-        if (!in_array($user->role, ['Admin', 'Supervisor'])) {
+        if (!$user->isRole(['Admin', 'Supervisor'])) {
             return response()->json(['message' => 'Hanya Admin atau Supervisor yang dapat melakukan restore'], 403);
         }
 
@@ -580,7 +580,7 @@ class LembarInspeksiController extends Controller
             }
 
             // Auto-claim jika Operator mengisi form dan belum assigned
-            if (auth()->user()?->role === 'Operator' && empty($item->assigned_operator_id) && empty($data['assigned_operator_id'])) {
+            if (auth()->user()?->isRole('Operator') && empty($item->assigned_operator_id) && empty($data['assigned_operator_id'])) {
                 $data['assigned_operator_id'] = auth()->id();
                 $data['operator_claimed_at'] = now();
             }
@@ -620,11 +620,11 @@ class LembarInspeksiController extends Controller
         $user = $request->user();
         $item = LembarInspeksi::findOrFail($id);
 
-        if (! in_array($user->role, ['Admin', 'Leader'], true)) {
+        if (! $user->isRole(['Admin', 'Leader'])) {
             return response()->json(['message' => 'Hanya Admin atau Leader yang dapat menghapus Lembar Inspeksi.'], 403);
         }
 
-        if ($user->role === 'Leader') {
+        if ($user->isRole('Leader')) {
             $allowed = ['draft', 'revision', 'submitted', 'waiting_foreman'];
             if (! in_array($item->status, $allowed, true)) {
                 return response()->json([
@@ -695,13 +695,13 @@ class LembarInspeksiController extends Controller
 ])
             ->whereNull('deleted_at');
 
-        if ($user->role === 'Admin') {
+        if ($user->isRole('Admin')) {
             // Admin bisa lihat semua yang statusnya belum final
             $query->whereIn('status', ['draft', 'waiting_foreman', 'waiting_qc_approval']);
         } else {
             $query->where(function($q) use ($user) {
                 // 1. Kondisi sebagai Foreman (Checked / Approver)
-                if ($user->role === 'Foreman') {
+                if ($user->isRole('Foreman')) {
                     $q->orWhere(function($q2) use ($user) {
                         // Dokumen yang secara eksplisit ditujukan ke Foreman ini
                         $q2->whereIn('status', ['waiting_foreman', 'waiting_verification'])
@@ -727,7 +727,7 @@ class LembarInspeksiController extends Controller
                 }
 
                 // 2. Kondisi sebagai Checker (Group Leader / Leader)
-                if (in_array($user->role, ['Foreman', 'Group Leader', 'GroupLeader', 'Leader'])) {
+                if ($user->isRole(['Foreman', 'Group Leader', 'GroupLeader', 'Leader'])) {
                     $q->orWhere(function($q2) use ($user) {
                         $q2->whereIn('status', ['draft', 'waiting_foreman', 'waiting_verification', 'waiting_qc_approval'])
                            ->where(function($q3) use ($user) {
@@ -739,7 +739,7 @@ class LembarInspeksiController extends Controller
 
                 // 3. Kondisi sebagai QC (Operator) 
                 // (Dinonaktifkan agar notifikasi lonceng tidak membaca Master Template)
-                /* if ($user->role === 'Operator') {
+                /* if ($user->isRole('Operator')) {
                     $q->orWhere(function($q2) use ($user) {
                         $q2->where('assigned_operator_id', $user->id)
                            ->whereIn('status', ['ready_for_qc', 'locked']);
@@ -754,12 +754,12 @@ class LembarInspeksiController extends Controller
                 } */
 
                 // 4. Kondisi sebagai Supervisor
-                if ($user->role === 'Supervisor') {
+                if ($user->isRole('Supervisor')) {
                     $q->orWhere('status', 'waiting_supervisor');
                 }
 
                 // 5. Jika bukan role di atas, jangan kembalikan data apa-apa (hindari fetch all)
-                if (!in_array($user->role, ['Foreman', 'Group Leader', 'GroupLeader', 'Leader', 'Supervisor'])) {
+                if (!$user->isRole(['Foreman', 'Group Leader', 'GroupLeader', 'Leader', 'Supervisor'])) {
                     $q->whereRaw('1 = 0');
                 }
             });
@@ -784,9 +784,9 @@ class LembarInspeksiController extends Controller
 
         DB::beginTransaction();
         try {
-            if ($request->role === 'gl') {
+            if ($request->isRole('gl')) {
                 // Pak Azriel (Foreman) harus bisa TTD Checked
-                if ($user->role !== 'Foreman' && $user->role !== 'Admin' && $user->role !== 'Supervisor') {
+                if (!$user->isRole('Foreman') && !$user->isRole('Admin') && !$user->isRole('Supervisor')) {
                     return response()->json(['message' => 'Hanya Foreman/Admin yang bisa TTD Checked'], 403);
                 }
                 $item->paraf_gl     = $request->signature;
@@ -795,9 +795,9 @@ class LembarInspeksiController extends Controller
                 // Alur baru: GL TTD -> Menunggu Supervisor
                 $item->status = 'waiting_supervisor';
 
-            } elseif ($request->role === 'foreman') {
+            } elseif ($request->isRole('foreman')) {
                 // Approved (Top) biasanya Novina (Supervisor), tapi kita izinkan Admin/Supervisor
-                if ($user->role !== 'Supervisor' && $user->role !== 'Admin' && $user->role !== 'Foreman') {
+                if (!$user->isRole('Supervisor') && !$user->isRole('Admin') && !$user->isRole('Foreman')) {
                     return response()->json(['message' => 'Hanya Supervisor/Foreman/Admin yang bisa Approve'], 403);
                 }
                 $item->paraf_foreman     = $request->signature;
@@ -806,23 +806,23 @@ class LembarInspeksiController extends Controller
                 // Alur baru: Supervisor TTD -> Locked (Siap diisi QC)
                 $item->status = 'locked';
 
-            } elseif ($request->role === 'prepared') {
+            } elseif ($request->isRole('prepared')) {
                 $item->prepared_paraf = $request->signature;
                 $item->prepared_at    = now();
                 $item->qg_name        = $user->name;
 
-            } elseif ($request->role === 'qc') {
+            } elseif ($request->isRole('qc')) {
                 $item->paraf_qc     = $request->signature;
                 $item->qc_name      = $user->name;
                 $item->qc_signed_at = now();
                 $item->status       = 'waiting_qc_approval'; 
                 $item->qg_judgement = $item->hasNg() ? 'NG' : 'OK';
 
-            } elseif ($request->role === 'gl_bottom') {
+            } elseif ($request->isRole('gl_bottom')) {
                 $item->paraf_gl_bottom      = $request->signature;
                 $item->paraf_gl_bottom_name = $user->name;
 
-            } elseif ($request->role === 'fm_bottom') {
+            } elseif ($request->isRole('fm_bottom')) {
                 $item->paraf_foreman_bottom = $request->signature;
                 $item->paraf_fm_bottom_name = $user->name;
                 if ($request->signature) {
@@ -872,7 +872,7 @@ class LembarInspeksiController extends Controller
         $user = $request->user();
 
         // Hanya Foreman, Admin, atau Supervisor yang bisa assign
-        if (!in_array($user->role, ['Foreman', 'Admin', 'Supervisor'])) {
+        if (!$user->isRole(['Foreman', 'Admin', 'Supervisor'])) {
             return response()->json(['message' => 'Hanya Supervisor, Foreman, atau Admin yang bisa assign Operator'], 403);
         }
 
@@ -940,7 +940,7 @@ class LembarInspeksiController extends Controller
         $item = LembarInspeksi::findOrFail($id);
         $user = $request->user();
 
-        if (!in_array($user->role, ['Foreman', 'Admin'])) {
+        if (!$user->isRole(['Foreman', 'Admin'])) {
             return response()->json(['message' => 'Hanya Foreman/Admin yang bisa menambahkan field revision'], 403);
         }
 
@@ -996,7 +996,7 @@ class LembarInspeksiController extends Controller
         $user = $request->user();
 
         // Leader (atau Admin/Foreman) berhak menandai bahwa revisi telah selesai
-        if (!in_array($user->role, ['Leader', 'Foreman', 'Admin'])) {
+        if (!$user->isRole(['Leader', 'Foreman', 'Admin'])) {
             return response()->json(['message' => 'Hanya Leader/Foreman yang bisa konfirmasi revisi'], 403);
         }
 
@@ -1047,7 +1047,7 @@ class LembarInspeksiController extends Controller
         $user = $request->user();
 
         // Hanya Operator yang bisa claim
-        if ($user->role !== 'Operator' && $user->role !== 'Admin') {
+        if (!$user->isRole('Operator') && !$user->isRole('Admin')) {
             return response()->json(['message' => 'Hanya Operator yang bisa claim tugas'], 403);
         }
 

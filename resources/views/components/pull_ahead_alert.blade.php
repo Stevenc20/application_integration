@@ -3,7 +3,7 @@
     $hasPullAheadAlert = false;
     $pullAheadMessage = '';
     
-    if ($user && in_array(strtolower($user->role), ['ppc', 'manager'])) {
+    if ($user && $user->isRole(['ppc', 'manager'])) {
         $count = \App\Models\PullAheadRequest::where('status', 'PENDING')
                     ->where('is_read_by_ppc', false)
                     ->count();
@@ -32,7 +32,7 @@
         <h3 class="text-xl font-bold text-gray-800 mb-2">Pemberitahuan Sistem</h3>
         <p class="text-gray-600 mb-6 leading-relaxed">{{ $pullAheadMessage }}</p>
         <div class="flex flex-col gap-3">
-            @if(in_array(strtolower($user->role), ['ppc', 'manager']))
+            @if($user->isRole(['ppc', 'manager']))
             <a href="{{ route('ppc.pull_ahead.index') }}" class="w-full inline-flex justify-center items-center bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold py-2.5 px-4 rounded-xl shadow-md transition-all">
                 Tinjau Request
             </a>

@@ -52,36 +52,47 @@ class AuthController extends Controller
         // ======================
         // REDIRECT ROLE CLEAN
         // ======================
-        return match($user->role) {
+        if ($user->isSuperadmin()) {
+            return redirect()->route('super-admin.dashboard');
+        }
+        if ($user->isAdmin()) {
+            return redirect()->route('admin.dashboard');
+        }
 
-            'admin' => redirect()->route('admin.dashboard'),
+        $pos = strtolower($user->position ? $user->position->position_name : '');
+        $sec = strtolower($user->section ? $user->section->section_name : '');
+        $legacyRole = strtolower($user->role ?? '');
 
-            'supervisor' => redirect()->route('supervisor.dashboard'),
+        if ($pos === 'tim member' || $legacyRole === 'operator') {
+            return redirect()->route('operator.dashboard');
+        } elseif ($pos === 'leader' || str_starts_with($legacyRole, 'leader') || in_array($legacyRole, ['shearing', 'handwork'])) {
+            return redirect()->route('operational.input_harian');
+        } elseif ($pos === 'foreman' || $legacyRole === 'foreman') {
+            return redirect()->route('supervisor.dashboard');
+        } elseif ($pos === 'spv' || $legacyRole === 'supervisor') {
+            return redirect()->route('supervisor.dashboard');
+        } elseif ($pos === 'manager' || $legacyRole === 'manager') {
+            return redirect()->route('manager.dashboard');
+        } elseif ($pos === 'kadiv' || $legacyRole === 'kadiv') {
+            return redirect()->route('kadiv.dashboard');
+        } elseif ($pos === 'direktur' || $legacyRole === 'direktur') {
+            return redirect()->route('direktur.dashboard');
+        } elseif ($pos === 'presdir' || $legacyRole === 'presdir') {
+            return redirect()->route('presdir.dashboard');
+        }
 
-            'foreman' => redirect()->route('supervisor.dashboard'),
+        // Section based redirects
+        if ($sec === 'ppc' || $legacyRole === 'ppc') return redirect()->route('ppc.dashboard');
+        if ($sec === 'quality' || $legacyRole === 'quality') return redirect()->route('quality.dashboard');
+        if ($sec === 'produksi' || $legacyRole === 'production') return redirect()->route('production.dashboard');
+        
+        // Hambatan Jalur fallback
+        $hambatanRoles = ['dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan', 'mesin'];
+        if (in_array($legacyRole, $hambatanRoles) || in_array($sec, $hambatanRoles)) {
+            return redirect()->route('hambatan-jalur.index');
+        }
 
-            'operator' => redirect()->route('operator.dashboard'),
-            'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => redirect()->route('operational.input_harian'),
-            'ppc' => redirect()->route('ppc.dashboard'),
-
-            'quality' => redirect()->route('quality.dashboard'),
-
-            'production' => redirect()->route('production.dashboard'),
-
-            'manager' => redirect()->route('manager.dashboard'),
-
-            'kadiv' => redirect()->route('kadiv.dashboard'),
-
-            'direktur' => redirect()->route('direktur.dashboard'),
-
-            'presdir' => redirect()->route('presdir.dashboard'),
-
-            'superadmin' => redirect()->route('super-admin.dashboard'),
-
-            'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan' => redirect()->route('hambatan-jalur.index'),
-
-            default => redirect('/login')
-        };
+        return redirect('/');
     }
 
     // ======================

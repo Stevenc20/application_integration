@@ -37,7 +37,7 @@
                     <button @click="loadData()" class="flex-1 md:flex-none p-3.5 bg-white border border-slate-200 rounded-[18px] text-slate-500 hover:text-blue-600 hover:border-blue-200 hover:bg-blue-50 transition-all shadow-sm active:scale-95 flex items-center justify-center" title="Refresh Data">
                         <svg class="w-5 h-5" :class="loading ? 'animate-spin' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     </button>
-                    @if(auth()->user()->role === 'Admin' || auth()->user()->role === 'Supervisor')
+                    @if(auth()->user()->isRole('Admin') || auth()->user()->isRole('Supervisor'))
                     <button @click="toggleArchiveMode()" 
                             class="flex-1 md:flex-none flex items-center justify-center gap-2 px-5 py-3.5 font-black rounded-[18px] transition-all shadow-sm active:scale-95 whitespace-nowrap"
                             :class="archiveMode ? 'bg-slate-800 text-white hover:bg-slate-700' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'">
@@ -45,7 +45,7 @@
                         <span x-text="archiveMode ? 'Tutup Arsip' : 'Arsip'"></span>
                     </button>
                     @endif
-                    @if(auth()->user()->role === 'Leader' || auth()->user()->role === 'Admin')
+                    @if(auth()->user()->isRole('Leader') || auth()->user()->isRole('Admin'))
                     <div class="relative flex-1 md:flex-none">
                         <input type="file" x-ref="excelInput" @change="uploadExcel" accept=".xlsx,.xls" class="hidden">
                         <button type="button" @click="$refs.excelInput.click()" 

@@ -19,7 +19,7 @@ class QCWebController extends Controller
     {
         $user = auth()->user();
         
-        if (in_array($user->role, ['Admin', 'Leader', 'Supervisor', 'Foreman', 'Group Leader'])) {
+        if ($user->isRole(['Admin', 'Leader', 'Supervisor', 'Foreman', 'Group Leader'])) {
             return $this->raporLeader($request);
         }
         
