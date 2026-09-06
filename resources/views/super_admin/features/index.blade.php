@@ -1,180 +1,216 @@
-@extends('layouts.super_admin')
-
-@section('title', 'Feature Permissions')
+﻿@extends('layouts.app')
 
 @section('content')
-<div class="p-3 sm:p-4 md:p-6">
-
-    @if(session('success'))
-    <div class="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl flex items-center gap-3 shadow-sm">
-        <span class="text-sm font-medium">{{ session('success') }}</span>
-    </div>
-    @endif
-
-    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+<div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto" x-data="permissionsDashboard()">
+    
+    <div class="sm:flex sm:justify-between sm:items-center mb-8">
         <div>
-            <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">Permission Matrix</h1>
-            <p class="text-gray-500 text-xs sm:text-sm">Manage fine-grained access to features by Jabatan and Section.</p>
+            <h1 class="text-2xl md:text-3xl text-slate-800 font-bold">Feature Permissions</h1>
+            <p class="mt-1 text-sm text-slate-500">Manage feature access by organizational role and section.</p>
         </div>
-        <button type="button" onclick="openAddModal()" class="inline-flex items-center gap-2 bg-yellow-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-yellow-600 transition shadow-sm w-full sm:w-auto justify-center">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
-            Add Permission
-        </button>
     </div>
 
-    <form method="POST" action="{{ route('access-management.features.update') }}">
-        @csrf
-        
-        <div class="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden mb-6">
-            <div class="overflow-x-auto">
-                <table class="min-w-full text-xs md:text-sm">
-                    <thead class="bg-gray-50 sticky top-0 z-10">
-                        <tr class="text-left border-b border-gray-200">
-                            <th class="px-5 py-3 font-semibold text-gray-600">Feature</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600">Jabatan</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600">Section</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">View</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Create</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Edit</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Delete</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Approve</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Export</th>
-                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-gray-100">
-                        @forelse($matrices as $featureId => $group)
-                            @foreach($group as $matrix)
-                            <tr class="hover:bg-gray-50 transition">
-                                <td class="px-5 py-3 font-medium text-gray-800">{{ $matrix->feature->feature_name }}</td>
-                                <td class="px-5 py-3 text-gray-600">{{ $matrix->position ? $matrix->position->position_name : 'All' }}</td>
-                                <td class="px-5 py-3 text-gray-600">{{ $matrix->section ? $matrix->section->section_name : 'All' }}</td>
-                                
-                                <td class="px-5 py-3 text-center">
-                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_view]" value="1" {{ $matrix->can_view ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
-                                </td>
-                                <td class="px-5 py-3 text-center">
-                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_create]" value="1" {{ $matrix->can_create ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
-                                </td>
-                                <td class="px-5 py-3 text-center">
-                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_edit]" value="1" {{ $matrix->can_edit ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
-                                </td>
-                                <td class="px-5 py-3 text-center">
-                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_delete]" value="1" {{ $matrix->can_delete ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
-                                </td>
-                                <td class="px-5 py-3 text-center">
-                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_approve]" value="1" {{ $matrix->can_approve ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
-                                </td>
-                                <td class="px-5 py-3 text-center">
-                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_export]" value="1" {{ $matrix->can_export ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
-                                </td>
-                                
-                                <td class="px-5 py-3 text-center">
-                                    <button type="button" onclick="deleteMatrix({{ $matrix->id }})" class="text-red-500 hover:text-red-700 transition">
-                                        <svg class="w-5 h-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                                    </button>
-                                </td>
-                            </tr>
-                            @endforeach
-                        @empty
-                            <tr>
-                                <td colspan="10" class="px-5 py-12 text-center text-gray-400">No permission matrix records found. Add one above.</td>
-                            </tr>
-                        @endforelse
-                    </tbody>
-                </table>
-            </div>
-            
-            <div class="p-4 border-t border-gray-100 flex justify-end">
-                <button type="submit" class="inline-flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 transition shadow-sm">
-                    Save Changes
-                </button>
-            </div>
+    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-8 flex flex-wrap gap-4 items-end">
+        <div class="w-full sm:w-auto min-w-[200px]">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan</label>
+            <select x-model="position_id" @change="loadPermissions()" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">-- All / Global --</option>
+                @foreach(\ as \)
+                    <option value="{{ \->id }}">{{ \->position_name }}</option>
+                @endforeach
+            </select>
         </div>
-    </form>
-</div>
-
-{{-- Add Modal --}}
-<div id="addModal" class="fixed inset-0 z-[9999] hidden items-center justify-center">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeAddModal()"></div>
-    <div class="relative bg-white w-full max-w-lg mx-4 rounded-2xl shadow-2xl p-6">
-        <h2 class="text-lg font-bold text-gray-800 mb-4">Add Permission</h2>
-        <form method="POST" action="{{ route('access-management.features.update') }}" class="space-y-4">
-            @csrf
-            <div>
-                <label class="text-sm font-medium text-gray-700">Feature</label>
-                <select name="new_feature_id" required class="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-200">
-                    <option value="">- Select Feature -</option>
-                    @foreach($features as $f)
-                        <option value="{{ $f->id }}">{{ $f->feature_name }} ({{ $f->group_name }})</option>
-                    @endforeach
-                </select>
-            </div>
-            
-            <div class="flex gap-4">
-                <div class="flex-1">
-                    <label class="text-sm font-medium text-gray-700">Jabatan (Optional)</label>
-                    <select name="new_position_id" class="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-200">
-                        <option value="">- All -</option>
-                        @foreach($positions as $p)
-                            <option value="{{ $p->id }}">{{ $p->position_name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div class="flex-1">
-                    <label class="text-sm font-medium text-gray-700">Section (Optional)</label>
-                    <select name="new_section_id" class="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-200">
-                        <option value="">- All -</option>
-                        @foreach($sections as $s)
-                            <option value="{{ $s->id }}">{{ $s->section_name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            <div>
-                <label class="text-sm font-medium text-gray-700 block mb-2">Permissions</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_view" value="1" class="rounded text-red-600" checked> View</label>
-                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_create" value="1" class="rounded text-red-600"> Create</label>
-                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_edit" value="1" class="rounded text-red-600"> Edit</label>
-                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_delete" value="1" class="rounded text-red-600"> Delete</label>
-                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_approve" value="1" class="rounded text-red-600"> Approve</label>
-                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_export" value="1" class="rounded text-red-600"> Export</label>
-                </div>
-            </div>
-
-            <div class="flex justify-end gap-2 pt-4">
-                <button type="button" onclick="closeAddModal()" class="px-5 py-2.5 text-sm font-medium bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">Cancel</button>
-                <button type="submit" class="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-xl hover:bg-red-700">Add Assignment</button>
-            </div>
-        </form>
+        <div class="w-full sm:w-auto min-w-[200px]">
+            <label class="block text-sm font-medium text-slate-700 mb-1">Section</label>
+            <select x-model="section_id" @change="loadPermissions()" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
+                <option value="">-- All / Global --</option>
+                @foreach(\ as \)
+                    <option value="{{ \->id }}">{{ \->section_name }}</option>
+                @endforeach
+            </select>
+        </div>
+        <div class="w-full sm:w-auto">
+            <button @click="resetFilters()" class="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-600 text-sm font-medium rounded-lg transition-colors border border-slate-200">
+                Reset to Default
+            </button>
+        </div>
     </div>
+
+    <div x-show="notification.show" 
+         x-transition.opacity.duration.300ms
+         class="fixed top-4 right-4 z-50 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3"
+         style="display: none;">
+        <svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+        <span x-text="notification.message" class="text-sm font-medium"></span>
+    </div>
+
+    <div x-show="loading" class="flex justify-center py-12" style="display: none;">
+        <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+        </svg>
+    </div>
+
+    <div x-show="!loading && !hasSelection()" class="text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200" style="display: none;">
+        <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+            <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+        </svg>
+        <h3 class="mt-2 text-sm font-medium text-slate-900">No organizational role selected</h3>
+        <p class="mt-1 text-sm text-slate-500">Select a Jabatan and Section above to configure feature permissions.</p>
+    </div>
+
+    <div x-show="!loading && hasSelection()" style="display: none;" class="space-y-6">
+        <template x-for="(features, groupName) in groups" :key="groupName">
+            <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 px-5 py-3 border-b border-slate-200">
+                    <h2 class="font-semibold text-slate-800" x-text="groupName"></h2>
+                </div>
+                <div class="divide-y divide-slate-100">
+                    <template x-for="feature in features" :key="feature.feature_id">
+                        <div class="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50 transition-colors">
+                            <div>
+                                <h3 class="text-base font-medium text-slate-800" x-text="feature.feature_name"></h3>
+                                <p class="text-sm text-slate-500 mt-1" x-text="feature.feature_code"></p>
+                                
+                                <div class="mt-3 flex flex-wrap gap-4" x-show="feature.is_active" x-collapse>
+                                    <template x-for="(val, actionKey) in feature.actions" :key="actionKey">
+                                        <label class="inline-flex items-center gap-2 cursor-pointer group">
+                                            <input type="checkbox" 
+                                                   class="form-checkbox h-4 w-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                                   :checked="val"
+                                                   @change="toggleAction(feature.feature_id, actionKey, \.target.checked)">
+                                            <span class="text-xs font-medium text-slate-600 capitalize group-hover:text-slate-900" x-text="actionKey.replace('can_', '')"></span>
+                                        </label>
+                                    </template>
+                                </div>
+                            </div>
+                            <div class="flex items-center sm:justify-end shrink-0">
+                                <button type="button" 
+                                    class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
+                                    :class="feature.is_active ? 'bg-blue-600' : 'bg-slate-200'"
+                                    role="switch" 
+                                    :aria-checked="feature.is_active.toString()"
+                                    @click="toggleFeature(feature.feature_id, !feature.is_active)">
+                                    <span class="sr-only">Toggle feature</span>
+                                    <span class="pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out"
+                                          :class="feature.is_active ? 'translate-x-5' : 'translate-x-0'"></span>
+                                </button>
+                                <span class="ml-3 text-sm font-medium w-8" :class="feature.is_active ? 'text-blue-600' : 'text-slate-400'" x-text="feature.is_active ? 'ON' : 'OFF'"></span>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
+    </div>
+
 </div>
 
-{{-- Hidden Delete Form --}}
-<form id="deleteForm" method="POST" style="display: none;">
-    @csrf
-    @method('DELETE')
-</form>
-@endsection
-
-@push('scripts')
 <script>
-    function openAddModal() {
-        document.getElementById('addModal').classList.remove('hidden');
-        document.getElementById('addModal').classList.add('flex');
-    }
-    function closeAddModal() {
-        document.getElementById('addModal').classList.add('hidden');
-        document.getElementById('addModal').classList.remove('flex');
-    }
-    function deleteMatrix(id) {
-        if (confirm('Delete this permission assignment?')) {
-            const form = document.getElementById('deleteForm');
-            form.action = '/access-management/features/matrix/' + id;
-            form.submit();
+document.addEventListener('alpine:init', () => {
+    Alpine.data('permissionsDashboard', () => ({
+        position_id: '',
+        section_id: '',
+        groups: {},
+        loading: false,
+        notification: { show: false, message: '' },
+
+        init() {
+            this.\('position_id', () => { if(!this.hasSelection()) this.groups = {}; });
+            this.\('section_id', () => { if(!this.hasSelection()) this.groups = {}; });
+        },
+
+        hasSelection() { return this.position_id !== '' || this.section_id !== ''; },
+
+        resetFilters() {
+            this.position_id = '';
+            this.section_id = '';
+            this.groups = {};
+        },
+
+        async loadPermissions() {
+            if (!this.hasSelection()) {
+                this.groups = {};
+                return;
+            }
+            this.loading = true;
+            try {
+                const res = await fetch({{ route('access-management.features.ajax') }}?position_id=\&section_id=\);
+                const data = await res.json();
+                if (data.success) {
+                    this.groups = data.groups;
+                }
+            } catch (err) { console.error(err); } finally { this.loading = false; }
+        },
+
+        async toggleFeature(featureId, newState) {
+            let success = await this.updateBackend(featureId, 'is_active', newState);
+            if(success) {
+                for (let g in this.groups) {
+                    let f = this.groups[g].find(x => x.feature_id === featureId);
+                    if (f) {
+                        f.is_active = newState;
+                        if(newState) f.actions.can_view = true;
+                        if(!newState) {
+                            for(let k in f.actions) f.actions[k] = false;
+                        }
+                        this.showNotification(\ access \);
+                        break;
+                    }
+                }
+            }
+        },
+
+        async toggleAction(featureId, action, newState) {
+            let success = await this.updateBackend(featureId, action, newState);
+            if(success) {
+                for (let g in this.groups) {
+                    let f = this.groups[g].find(x => x.feature_id === featureId);
+                    if (f) {
+                        f.actions[action] = newState;
+                        if(newState && action !== 'can_view') {
+                            f.actions.can_view = true;
+                            f.is_active = true;
+                        }
+                        this.showNotification(\ permission updated);
+                        break;
+                    }
+                }
+            }
+        },
+
+        async updateBackend(featureId, action, state) {
+            try {
+                const res = await fetch({{ route('access-management.features.toggle') }}, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                    },
+                    body: JSON.stringify({
+                        position_id: this.position_id,
+                        section_id: this.section_id,
+                        feature_id: featureId,
+                        action: action,
+                        state: state
+                    })
+                });
+                const data = await res.json();
+                if (!data.success) {
+                    alert('Error updating permission.'); return false;
+                }
+                return true;
+            } catch (err) {
+                console.error(err); alert('Connection error.'); return false;
+            }
+        },
+
+        showNotification(msg) {
+            this.notification.message = msg;
+            this.notification.show = true;
+            setTimeout(() => { this.notification.show = false; }, 3000);
         }
-    }
+    }));
+});
 </script>
-@endpush
+@endsection

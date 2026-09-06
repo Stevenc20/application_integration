@@ -157,8 +157,8 @@ Route::middleware(['auth', 'role:superadmin,admin'])->prefix('access-management'
     Route::delete('/users/{user}', [\App\Http\Controllers\SuperAdmin\UserController::class, 'destroy'])->name('users.destroy');
     
     Route::get('/features', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'index'])->name('features.index');
-    Route::post('/features', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'update'])->name('features.update');
-    Route::delete('/features/matrix/{id}', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'destroyMatrix'])->name('features.destroyMatrix');
+    Route::get('/features/ajax', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'getPermissions'])->name('features.ajax');
+    Route::post('/features/toggle', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'togglePermission'])->name('features.toggle');
 });
 
 // SUPER ADMIN ONLY

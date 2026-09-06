@@ -13,62 +13,102 @@ class FeatureController extends Controller
 {
     public function index()
     {
-        $features = Feature::orderBy('group_name')->orderBy('feature_name')->get();
         $positions = Position::orderBy('level')->get();
         $sections = Section::orderBy('section_name')->get();
-        
-        $matrices = PermissionMatrix::with(['position', 'section', 'feature'])
-            ->orderBy('feature_id')
-            ->get()
-            ->groupBy('feature_id');
-
-        return view('super_admin.features.index', compact('features', 'positions', 'sections', 'matrices'));
+        return view('super_admin.features.index', compact('positions', 'sections'));
     }
 
-    public function update(Request $request)
+    public function getPermissions(Request $request)
     {
-        // For backwards compatibility with the previous form structure or new structure
-        if ($request->has('matrices')) {
-            foreach ($request->matrices as $id => $perms) {
-                PermissionMatrix::where('id', $id)->update([
-                    'can_view' => isset($perms['can_view']),
-                    'can_create' => isset($perms['can_create']),
-                    'can_edit' => isset($perms['can_edit']),
-                    'can_delete' => isset($perms['can_delete']),
-                    'can_approve' => isset($perms['can_approve']),
-                    'can_export' => isset($perms['can_export']),
-                ]);
+        $positionId = $request->query('position_id') ?: null;
+        $sectionId = $request->query('section_id') ?: null;
+
+        $features = Feature::orderBy('group_name')->orderBy('feature_name')->get();
+        
+        $matrices = PermissionMatrix::where('position_id', $positionId)
+            ->where('section_id', $sectionId)
+            ->get()
+            ->keyBy('feature_id');
+
+        $result = [];
+        $groups = [];
+
+        foreach ($features as $f) {
+            $matrix = $matrices->get($f->id);
+            $hasAccess = $matrix ? $matrix->can_view : false;
+
+            $groupName = $f->group_name ?: 'Other';
+            if (!isset($groups[$groupName])) {
+                $groups[$groupName] = [];
+            }
+
+            $groups[$groupName][] = [
+                'feature_id' => $f->id,
+                'feature_name' => $f->feature_name,
+                'feature_code' => $f->feature_code,
+                'is_active' => $hasAccess,
+                'actions' => [
+                    'can_view' => $matrix ? $matrix->can_view : false,
+                    'can_create' => $matrix ? $matrix->can_create : false,
+                    'can_edit' => $matrix ? $matrix->can_edit : false,
+                    'can_delete' => $matrix ? $matrix->can_delete : false,
+                    'can_approve' => $matrix ? $matrix->can_approve : false,
+                    'can_export' => $matrix ? $matrix->can_export : false,
+                ]
+            ];
+        }
+
+        return response()->json([
+            'success' => true,
+            'groups' => $groups
+        ]);
+    }
+
+    public function togglePermission(Request $request)
+    {
+        $request->validate([
+            'position_id' => 'nullable|exists:positions,id',
+            'section_id' => 'nullable|exists:sections,id',
+            'feature_id' => 'required|exists:features,id',
+            'action' => 'required|string|in:is_active,can_view,can_create,can_edit,can_delete,can_approve,can_export',
+            'state' => 'required|boolean'
+        ]);
+
+        $posId = $request->position_id ?: null;
+        $secId = $request->section_id ?: null;
+        $featureId = $request->feature_id;
+        $action = $request->action;
+        $state = $request->state;
+
+        $matrix = PermissionMatrix::firstOrNew([
+            'position_id' => $posId,
+            'section_id' => $secId,
+            'feature_id' => $featureId,
+        ]);
+
+        if ($action === 'is_active') {
+            // Turning off main switch turns everything off
+            if (!$state) {
+                $matrix->can_view = false;
+                $matrix->can_create = false;
+                $matrix->can_edit = false;
+                $matrix->can_delete = false;
+                $matrix->can_approve = false;
+                $matrix->can_export = false;
+            } else {
+                // Turning on turns on can_view by default
+                $matrix->can_view = true;
+            }
+        } else {
+            $matrix->{$action} = $state;
+            // If they enable an action, ensure can_view is true
+            if ($state && $action !== 'can_view') {
+                $matrix->can_view = true;
             }
         }
-        
-        // Handle creating a new matrix row
-        if ($request->has('new_feature_id') && $request->new_feature_id) {
-            $request->validate([
-                'new_feature_id' => 'required|exists:features,id',
-                'new_position_id' => 'nullable|exists:positions,id',
-                'new_section_id' => 'nullable|exists:sections,id',
-            ]);
 
-            PermissionMatrix::updateOrCreate([
-                'feature_id' => $request->new_feature_id,
-                'position_id' => $request->new_position_id ?: null,
-                'section_id' => $request->new_section_id ?: null,
-            ], [
-                'can_view' => $request->has('new_can_view'),
-                'can_create' => $request->has('new_can_create'),
-                'can_edit' => $request->has('new_can_edit'),
-                'can_delete' => $request->has('new_can_delete'),
-                'can_approve' => $request->has('new_can_approve'),
-                'can_export' => $request->has('new_can_export'),
-            ]);
-        }
+        $matrix->save();
 
-        return redirect()->back()->with('success', 'Permissions updated successfully.');
-    }
-
-    public function destroyMatrix($id)
-    {
-        PermissionMatrix::findOrFail($id)->delete();
-        return redirect()->back()->with('success', 'Permission matrix row deleted.');
+        return response()->json(['success' => true]);
     }
 }
