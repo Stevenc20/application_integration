@@ -1,8 +1,9 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto" x-data="permissionsDashboard()">
     
+    <!-- Page Header -->
     <div class="sm:flex sm:justify-between sm:items-center mb-8">
         <div>
             <h1 class="text-2xl md:text-3xl text-slate-800 font-bold">Feature Permissions</h1>
@@ -10,13 +11,14 @@
         </div>
     </div>
 
+    <!-- Top Filter -->
     <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 mb-8 flex flex-wrap gap-4 items-end">
         <div class="w-full sm:w-auto min-w-[200px]">
             <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan</label>
             <select x-model="position_id" @change="loadPermissions()" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                 <option value="">-- All / Global --</option>
-                @foreach(\ as \)
-                    <option value="{{ \->id }}">{{ \->position_name }}</option>
+                @foreach($positions as $pos)
+                    <option value="{{ $pos->id }}">{{ $pos->position_name }}</option>
                 @endforeach
             </select>
         </div>
@@ -24,8 +26,8 @@
             <label class="block text-sm font-medium text-slate-700 mb-1">Section</label>
             <select x-model="section_id" @change="loadPermissions()" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                 <option value="">-- All / Global --</option>
-                @foreach(\ as \)
-                    <option value="{{ \->id }}">{{ \->section_name }}</option>
+                @foreach($sections as $sec)
+                    <option value="{{ $sec->id }}">{{ $sec->section_name }}</option>
                 @endforeach
             </select>
         </div>
@@ -36,6 +38,7 @@
         </div>
     </div>
 
+    <!-- Notification Toast -->
     <div x-show="notification.show" 
          x-transition.opacity.duration.300ms
          class="fixed top-4 right-4 z-50 bg-slate-800 text-white px-4 py-3 rounded-lg shadow-lg flex items-center gap-3"
@@ -44,6 +47,7 @@
         <span x-text="notification.message" class="text-sm font-medium"></span>
     </div>
 
+    <!-- Loading State -->
     <div x-show="loading" class="flex justify-center py-12" style="display: none;">
         <svg class="animate-spin h-8 w-8 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
@@ -51,6 +55,7 @@
         </svg>
     </div>
 
+    <!-- empty state -->
     <div x-show="!loading && !hasSelection()" class="text-center py-12 bg-white rounded-xl shadow-sm border border-slate-200" style="display: none;">
         <svg class="mx-auto h-12 w-12 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
             <path vector-effect="non-scaling-stroke" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
@@ -59,6 +64,7 @@
         <p class="mt-1 text-sm text-slate-500">Select a Jabatan and Section above to configure feature permissions.</p>
     </div>
 
+    <!-- Permissions List -->
     <div x-show="!loading && hasSelection()" style="display: none;" class="space-y-6">
         <template x-for="(features, groupName) in groups" :key="groupName">
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -72,19 +78,21 @@
                                 <h3 class="text-base font-medium text-slate-800" x-text="feature.feature_name"></h3>
                                 <p class="text-sm text-slate-500 mt-1" x-text="feature.feature_code"></p>
                                 
+                                <!-- Advanced actions (expandable) -->
                                 <div class="mt-3 flex flex-wrap gap-4" x-show="feature.is_active" x-collapse>
                                     <template x-for="(val, actionKey) in feature.actions" :key="actionKey">
                                         <label class="inline-flex items-center gap-2 cursor-pointer group">
                                             <input type="checkbox" 
                                                    class="form-checkbox h-4 w-4 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                                                    :checked="val"
-                                                   @change="toggleAction(feature.feature_id, actionKey, \.target.checked)">
+                                                   @change="toggleAction(feature.feature_id, actionKey, $event.target.checked)">
                                             <span class="text-xs font-medium text-slate-600 capitalize group-hover:text-slate-900" x-text="actionKey.replace('can_', '')"></span>
                                         </label>
                                     </template>
                                 </div>
                             </div>
                             <div class="flex items-center sm:justify-end shrink-0">
+                                <!-- Modern Toggle Switch -->
                                 <button type="button" 
                                     class="relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2"
                                     :class="feature.is_active ? 'bg-blue-600' : 'bg-slate-200'"
@@ -116,8 +124,8 @@ document.addEventListener('alpine:init', () => {
         notification: { show: false, message: '' },
 
         init() {
-            this.\('position_id', () => { if(!this.hasSelection()) this.groups = {}; });
-            this.\('section_id', () => { if(!this.hasSelection()) this.groups = {}; });
+            this.$watch('position_id', () => { if(!this.hasSelection()) this.groups = {}; });
+            this.$watch('section_id', () => { if(!this.hasSelection()) this.groups = {}; });
         },
 
         hasSelection() { return this.position_id !== '' || this.section_id !== ''; },
@@ -135,7 +143,7 @@ document.addEventListener('alpine:init', () => {
             }
             this.loading = true;
             try {
-                const res = await fetch({{ route('access-management.features.ajax') }}?position_id=\&section_id=\);
+                const res = await fetch(`{{ route('access-management.features.ajax') }}?position_id=${this.position_id}&section_id=${this.section_id}`);
                 const data = await res.json();
                 if (data.success) {
                     this.groups = data.groups;
@@ -154,7 +162,7 @@ document.addEventListener('alpine:init', () => {
                         if(!newState) {
                             for(let k in f.actions) f.actions[k] = false;
                         }
-                        this.showNotification(\ access \);
+                        this.showNotification(`${f.feature_name} access ${newState ? 'enabled' : 'disabled'}`);
                         break;
                     }
                 }
@@ -172,7 +180,7 @@ document.addEventListener('alpine:init', () => {
                             f.actions.can_view = true;
                             f.is_active = true;
                         }
-                        this.showNotification(\ permission updated);
+                        this.showNotification(`${action.replace('can_', '')} permission updated`);
                         break;
                     }
                 }
@@ -181,7 +189,7 @@ document.addEventListener('alpine:init', () => {
 
         async updateBackend(featureId, action, state) {
             try {
-                const res = await fetch({{ route('access-management.features.toggle') }}, {
+                const res = await fetch(`{{ route('access-management.features.toggle') }}`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',

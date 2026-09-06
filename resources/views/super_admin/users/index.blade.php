@@ -1,4 +1,4 @@
-﻿@extends('layouts.app')
+@extends('layouts.app')
 
 @section('content')
 <div class="px-4 sm:px-6 lg:px-8 py-8 w-full max-w-9xl mx-auto">
@@ -23,11 +23,11 @@
             {{ session('success') }}
         </div>
     @endif
-    @if (->any())
+    @if ($errors->any())
         <div class="mb-6 px-4 py-3 bg-rose-50 border-l-4 border-rose-500 text-rose-700 rounded-r-lg">
             <ul class="list-disc pl-5">
-                @foreach (->all() as )
-                    <li>{{ \ }}</li>
+                @foreach ($errors->all() as $error)
+                    <li>{{ $error }}</li>
                 @endforeach
             </ul>
         </div>
@@ -45,25 +45,25 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100 text-sm">
-                    @foreach( as \)
+                    @foreach($users as $user)
                     <tr class="hover:bg-slate-50 transition-colors group">
                         <td class="px-6 py-4">
-                            <div class="font-medium text-slate-800">{{ \->name }}</div>
-                            <div class="text-slate-500 text-xs mt-1">{{ \->nrp ?? 'No NRP' }}</div>
+                            <div class="font-medium text-slate-800">{{ $user->name }}</div>
+                            <div class="text-slate-500 text-xs mt-1">{{ $user->nrp ?? 'No NRP' }}</div>
                         </td>
                         <td class="px-6 py-4">
-                            @if(\->system_role === 'superadmin')
+                            @if($user->system_role === 'superadmin')
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-100 text-purple-700">Superadmin</span>
-                            @elseif(\->system_role === 'admin')
+                            @elseif($user->system_role === 'admin')
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">Admin</span>
                             @else
                                 <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">User</span>
                             @endif
                         </td>
                         <td class="px-6 py-4">
-                            @if(\->position || \->section)
-                                <div class="font-medium text-slate-700">{{ \->position ? \->position->position_name : '-' }}</div>
-                                <div class="text-slate-500 text-xs mt-0.5">{{ \->section ? \->section->section_name : '-' }}</div>
+                            @if($user->position || $user->section)
+                                <div class="font-medium text-slate-700">{{ $user->position ? $user->position->position_name : '-' }}</div>
+                                <div class="text-slate-500 text-xs mt-0.5">{{ $user->section ? $user->section->section_name : '-' }}</div>
                             @else
                                 <span class="text-slate-400 italic">Global Access</span>
                             @endif
@@ -71,14 +71,14 @@
                         <td class="px-6 py-4 text-center">
                             <div class="flex items-center justify-center gap-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                                 <button type="button" 
-                                    data-user="{{ json_encode(\) }}"
+                                    data-user="{{ json_encode($user) }}"
                                     onclick="openSuperAdminEditModal(this)"
                                     class="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-2 rounded-lg transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <button type="button" 
-                                    data-user-id="{{ \->id }}" 
-                                    data-user-name="{{ \->name }}"
+                                    data-user-id="{{ $user->id }}" 
+                                    data-user-name="{{ $user->name }}"
                                     onclick="openSuperAdminDeleteModal(this)"
                                     class="text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 p-2 rounded-lg transition-colors">
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
@@ -91,7 +91,7 @@
             </table>
         </div>
         <div class="px-6 py-4 border-t border-slate-200">
-            {{ \->links() }}
+            {{ $users->links() }}
         </div>
     </div>
 
@@ -163,8 +163,8 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan <span class="text-rose-500">*</span></label>
                         <select name="position_id" id="add_position" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="">[ Select Position ]</option>
-                            @foreach(\ as \)
-                                <option value="{{ \->id }}">{{ \->position_name }}</option>
+                            @foreach($positions as $pos)
+                                <option value="{{ $pos->id }}">{{ $pos->position_name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -172,8 +172,8 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Section <span class="text-rose-500">*</span></label>
                         <select name="section_id" id="add_section" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="">[ Select Section ]</option>
-                            @foreach(\ as \)
-                                <option value="{{ \->id }}">{{ \->section_name }}</option>
+                            @foreach($sections as $sec)
+                                <option value="{{ $sec->id }}">{{ $sec->section_name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -256,8 +256,8 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Jabatan <span class="text-rose-500">*</span></label>
                         <select name="position_id" id="edit_position" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="">[ Select Position ]</option>
-                            @foreach(\ as \)
-                                <option value="{{ \->id }}">{{ \->position_name }}</option>
+                            @foreach($positions as $pos)
+                                <option value="{{ $pos->id }}">{{ $pos->position_name }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -265,8 +265,8 @@
                         <label class="block text-sm font-medium text-slate-700 mb-1">Section <span class="text-rose-500">*</span></label>
                         <select name="section_id" id="edit_section" class="w-full form-select px-3 py-2 border border-slate-200 rounded-lg text-sm focus:ring-blue-500 focus:border-blue-500">
                             <option value="">[ Select Section ]</option>
-                            @foreach(\ as \)
-                                <option value="{{ \->id }}">{{ \->section_name }}</option>
+                            @foreach($sections as $sec)
+                                <option value="{{ $sec->id }}">{{ $sec->section_name }}</option>
                             @endforeach
                         </select>
                     </div>
