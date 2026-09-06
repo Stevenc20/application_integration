@@ -101,14 +101,54 @@ class User extends Authenticatable
         return ucfirst($this->role ?? 'Unassigned');
     }
 
-    public function hasFeature(string $featureCode): bool
+    public function hasPermission(string $featureCode, string $action = 'can_view'): bool
     {
         // 1. Superadmin override
         if ($this->isSuperadmin()) {
             return true;
         }
 
-        // 2. Legacy fallback
+        // 2. Check new PermissionMatrix if position or section exists
+        if ($this->position_id || $this->section_id) {
+            $hasMatrixAccess = PermissionMatrix::whereHas('feature', function ($q) use ($featureCode) {
+                    $q->where('feature_code', $featureCode);
+                })
+                ->where(function($q) {
+                    // Match either the specific pos+sec, or pos+null, or null+sec
+                    $q->where(function($q1) {
+                        $q1->where('position_id', $this->position_id)
+                           ->where('section_id', $this->section_id);
+                    })->orWhere(function($q2) {
+                        $q2->where('position_id', $this->position_id)
+                           ->whereNull('section_id');
+                    })->orWhere(function($q3) {
+                        $q3->whereNull('position_id')
+                           ->where('section_id', $this->section_id);
+                    });
+                })
+                ->where($action, true)
+                ->exists();
+
+            if ($hasMatrixAccess) {
+                return true;
+            }
+        }
+
+        // 3. Legacy Fallback (defaults to view equivalent in legacy)
+        if ($action === 'can_view' || $action === 'can_create') {
+            return $this->hasLegacyFeature($featureCode);
+        }
+
+        return false;
+    }
+
+    public function hasFeature(string $featureCode): bool
+    {
+        return $this->hasPermission($featureCode, 'can_view');
+    }
+
+    public function hasLegacyFeature(string $featureCode): bool
+    {
         $role = strtolower($this->role);
         if (str_starts_with($role, 'leader') || $role === 'shearing' || $role === 'handwork') {
             $role = 'leader';
