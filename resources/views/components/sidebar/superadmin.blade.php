@@ -18,12 +18,12 @@
     </li>
 
     <li class="px-4 mt-6 mb-2">
-        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">System Management</span>
+        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">Access Management</span>
     </li>
 
     <li class="menu-item">
-        <a href="{{ route('super-admin.users.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $userActive ? 'bg-red-600 text-white font-medium' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ $userActive ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <a href="{{ route('access-management.users.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ request()->routeIs('access-management.users.*') ? 'bg-red-600 text-white font-medium' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ request()->routeIs('access-management.users.*') ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/>
             </svg>
             <span class="font-semibold">Users</span>
@@ -31,12 +31,16 @@
     </li>
 
     <li class="menu-item">
-        <a href="{{ route('super-admin.features.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $featureActive ? 'bg-red-600 text-white font-medium' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ $featureActive ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <a href="{{ route('access-management.features.index') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ request()->routeIs('access-management.features.*') ? 'bg-red-600 text-white font-medium' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ request()->routeIs('access-management.features.*') ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
             </svg>
             <span class="font-semibold">Features</span>
         </a>
+    </li>
+
+    <li class="px-4 mt-6 mb-2">
+        <span class="text-xs font-bold text-gray-400 uppercase tracking-wider">System Management</span>
     </li>
 
     <li class="menu-item">

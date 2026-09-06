@@ -149,15 +149,21 @@ Route::middleware(['auth','role:admin,supervisor,ppc'])->prefix('admin')->name('
         ->middleware('feature:user_management');
 
 });
-// SUPER ADMIN
-Route::middleware(['auth', 'role:superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
-    Route::get('/dashboard', [\App\Http\Controllers\SuperAdmin\DashboardController::class, 'index'])->name('dashboard');
+// ADMIN & SUPER ADMIN (Access Management)
+Route::middleware(['auth', 'role:superadmin,admin'])->prefix('access-management')->name('access-management.')->group(function () {
     Route::get('/users', [\App\Http\Controllers\SuperAdmin\UserController::class, 'index'])->name('users.index');
     Route::post('/users', [\App\Http\Controllers\SuperAdmin\UserController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [\App\Http\Controllers\SuperAdmin\UserController::class, 'update'])->name('users.update');
     Route::delete('/users/{user}', [\App\Http\Controllers\SuperAdmin\UserController::class, 'destroy'])->name('users.destroy');
+    
     Route::get('/features', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'index'])->name('features.index');
     Route::post('/features', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'update'])->name('features.update');
+    Route::delete('/features/matrix/{id}', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'destroyMatrix'])->name('features.destroyMatrix');
+});
+
+// SUPER ADMIN ONLY
+Route::middleware(['auth', 'role:superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\SuperAdmin\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/assignments', [\App\Http\Controllers\SuperAdmin\LineAssignmentController::class, 'index'])->name('assignments.index');
     Route::post('/assignments', [\App\Http\Controllers\SuperAdmin\LineAssignmentController::class, 'store'])->name('assignments.store');
     Route::delete('/assignments/{assignment}', [\App\Http\Controllers\SuperAdmin\LineAssignmentController::class, 'destroy'])->name('assignments.destroy');

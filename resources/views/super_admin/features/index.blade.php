@@ -1,415 +1,180 @@
 @extends('layouts.super_admin')
 
-@section('title', 'Feature Management')
-
-@section('head')
-<style>
-    /* ── Design Tokens ── */
-    :root {
-        --fm-primary: #dc2626;
-        --fm-primary-light: #ef4444;
-        --fm-primary-dark: #b91c1c;
-        --fm-accent: #f87171;
-        --fm-success: #10b981;
-        --fm-surface: rgba(255,255,255,0.72);
-        --fm-surface-solid: #ffffff;
-        --fm-border: rgba(0,0,0,0.06);
-        --fm-text: #1e293b;
-        --fm-text-secondary: #64748b;
-        --fm-radius: 16px;
-    }
-
-    /* ── Hero Banner ── */
-    .fm-hero {
-        background: linear-gradient(135deg, #991b1b 0%, #dc2626 50%, #e11d48 100%);
-        border-radius: var(--fm-radius);
-        padding: 2rem 2.5rem;
-        color: #fff;
-        position: relative;
-        overflow: hidden;
-        margin-bottom: 1.5rem;
-    }
-    .fm-hero::before {
-        content: '';
-        position: absolute;
-        top: -40%;
-        right: -10%;
-        width: 320px;
-        height: 320px;
-        background: radial-gradient(circle, rgba(255,255,255,0.12) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-    .fm-hero::after {
-        content: '';
-        position: absolute;
-        bottom: -30%;
-        left: 20%;
-        width: 200px;
-        height: 200px;
-        background: radial-gradient(circle, rgba(139,92,246,0.25) 0%, transparent 70%);
-        border-radius: 50%;
-    }
-    .fm-hero h1 { font-size: 1.5rem; font-weight: 800; margin: 0 0 0.25rem; position: relative; z-index: 1; }
-    .fm-hero p { margin: 0; opacity: 0.85; font-size: 0.875rem; position: relative; z-index: 1; }
-
-    /* ── Stat Pills ── */
-    .fm-stats {
-        display: flex;
-        gap: 0.75rem;
-        margin-top: 1.25rem;
-        position: relative;
-        z-index: 1;
-        flex-wrap: wrap;
-    }
-    .fm-stat {
-        background: rgba(255,255,255,0.15);
-        backdrop-filter: blur(8px);
-        border: 1px solid rgba(255,255,255,0.2);
-        border-radius: 12px;
-        padding: 0.625rem 1.25rem;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.8125rem;
-        font-weight: 600;
-    }
-    .fm-stat .num { font-size: 1.25rem; font-weight: 800; }
-
-    /* ── Success Alert ── */
-    .fm-alert {
-        background: linear-gradient(135deg, #ecfdf5, #d1fae5);
-        border: 1px solid #a7f3d0;
-        border-radius: 12px;
-        padding: 0.875rem 1.25rem;
-        display: flex;
-        align-items: center;
-        gap: 0.625rem;
-        margin-bottom: 1.25rem;
-        color: #065f46;
-        font-size: 0.875rem;
-        font-weight: 500;
-        animation: fm-slideDown 0.4s ease;
-    }
-    @keyframes fm-slideDown {
-        from { opacity: 0; transform: translateY(-12px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* ── Group Card ── */
-    .fm-group {
-        background: var(--fm-surface-solid);
-        border: 1px solid var(--fm-border);
-        border-radius: var(--fm-radius);
-        margin-bottom: 1.25rem;
-        overflow: hidden;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
-        transition: box-shadow 0.3s ease;
-    }
-    .fm-group:hover { box-shadow: 0 4px 20px rgba(0,0,0,0.08); }
-
-    .fm-group-header {
-        padding: 1rem 1.5rem;
-        background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-        border-bottom: 1px solid var(--fm-border);
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        cursor: pointer;
-        user-select: none;
-        transition: background 0.2s;
-    }
-    .fm-group-header:hover { background: linear-gradient(135deg, #f1f5f9, #e2e8f0); }
-
-    .fm-group-icon {
-        width: 36px;
-        height: 36px;
-        border-radius: 10px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 1rem;
-        flex-shrink: 0;
-    }
-    .fm-group-title {
-        font-weight: 700;
-        font-size: 0.9375rem;
-        color: var(--fm-text);
-        flex: 1;
-    }
-    .fm-group-badge {
-        font-size: 0.6875rem;
-        font-weight: 600;
-        padding: 0.2rem 0.6rem;
-        border-radius: 999px;
-        background: rgba(220,38,38,0.08);
-        color: var(--fm-primary);
-    }
-    .fm-group-chevron {
-        width: 20px;
-        height: 20px;
-        color: #94a3b8;
-        transition: transform 0.3s ease;
-    }
-    .fm-group.collapsed .fm-group-chevron { transform: rotate(-90deg); }
-    .fm-group.collapsed .fm-group-body { display: none; }
-
-    /* ── Table ── */
-    .fm-table { width: 100%; border-collapse: collapse; font-size: 0.8125rem; }
-    .fm-table thead th {
-        padding: 0.625rem 1rem;
-        font-weight: 600;
-        font-size: 0.6875rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        color: var(--fm-text-secondary);
-        text-align: center;
-        white-space: nowrap;
-        border-bottom: 1px solid var(--fm-border);
-        background: #fafbfc;
-        position: sticky;
-        top: 0;
-        z-index: 2;
-    }
-    .fm-table thead th:first-child { text-align: left; padding-left: 1.5rem; }
-    .fm-table tbody tr { transition: background 0.15s; }
-    .fm-table tbody tr:hover { background: #f8fafc; }
-    .fm-table tbody td {
-        padding: 0.75rem 1rem;
-        text-align: center;
-        border-bottom: 1px solid rgba(0,0,0,0.03);
-    }
-    .fm-table tbody td:first-child {
-        text-align: left;
-        padding-left: 1.5rem;
-        font-weight: 600;
-        color: var(--fm-text);
-    }
-
-    /* ── Toggle Switch ── */
-    .fm-toggle {
-        position: relative;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-    }
-    .fm-toggle input { position: absolute; opacity: 0; width: 0; height: 0; }
-    .fm-toggle-track {
-        width: 36px;
-        height: 20px;
-        background: #d1d5db;
-        border-radius: 999px;
-        position: relative;
-        cursor: pointer;
-        transition: background 0.25s ease;
-    }
-    .fm-toggle-track::after {
-        content: '';
-        position: absolute;
-        top: 2px;
-        left: 2px;
-        width: 16px;
-        height: 16px;
-        background: #fff;
-        border-radius: 50%;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
-        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    }
-    .fm-toggle input:checked + .fm-toggle-track {
-        background: linear-gradient(135deg, var(--fm-primary), var(--fm-accent));
-    }
-    .fm-toggle input:checked + .fm-toggle-track::after {
-        transform: translateX(16px);
-    }
-    .fm-toggle input:focus-visible + .fm-toggle-track {
-        outline: 2px solid var(--fm-primary-light);
-        outline-offset: 2px;
-    }
-
-    /* ── Save Button ── */
-    .fm-save-bar {
-        position: sticky;
-        bottom: 0;
-        background: linear-gradient(to top, rgba(249,250,251,1) 60%, rgba(249,250,251,0));
-        padding: 1.5rem 0 0.5rem;
-        display: flex;
-        justify-content: flex-end;
-        gap: 0.75rem;
-        z-index: 10;
-    }
-    .fm-btn-save {
-        background: linear-gradient(135deg, var(--fm-primary), var(--fm-primary-dark));
-        color: #fff;
-        border: none;
-        padding: 0.75rem 2rem;
-        border-radius: 12px;
-        font-weight: 700;
-        font-size: 0.875rem;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        gap: 0.5rem;
-        box-shadow: 0 4px 14px rgba(220,38,38,0.3);
-        transition: all 0.25s ease;
-    }
-    .fm-btn-save:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 6px 20px rgba(220,38,38,0.4);
-    }
-    .fm-btn-save:active { transform: translateY(0); }
-
-    /* ── Role Header Colors ── */
-    .role-admin { color: #dc2626; }
-    .role-supervisor { color: #ef4444; }
-    .role-ppc { color: #7c3aed; }
-    .role-foreman { color: #0891b2; }
-    .role-operator { color: #059669; }
-    .role-leader { color: #d97706; }
-    .role-quality { color: #e11d48; }
-    .role-production { color: #4f46e5; }
-    .role-manager { color: #0d9488; }
-    .role-kadiv { color: #9333ea; }
-    .role-direktur { color: #1d4ed8; }
-    .role-presdir { color: #b45309; }
-
-    /* ── Group Icon Colors ── */
-    .gicon-dashboard { background: linear-gradient(135deg, #dbeafe, #ede9fe); color: #3b82f6; }
-    .gicon-master { background: linear-gradient(135deg, #fef3c7, #fde68a); color: #d97706; }
-    .gicon-production { background: linear-gradient(135deg, #d1fae5, #a7f3d0); color: #059669; }
-    .gicon-quality { background: linear-gradient(135deg, #fce7f3, #fbcfe8); color: #ec4899; }
-    .gicon-report { background: linear-gradient(135deg, #e0e7ff, #c7d2fe); color: #6366f1; }
-    .gicon-default { background: linear-gradient(135deg, #f1f5f9, #e2e8f0); color: #64748b; }
-
-    /* ── Responsive ── */
-    .fm-scroll-wrapper { overflow-x: auto; }
-    @media (max-width: 768px) {
-        .fm-hero { padding: 1.5rem; }
-        .fm-hero h1 { font-size: 1.25rem; }
-        .fm-stats { gap: 0.5rem; }
-        .fm-stat { padding: 0.5rem 0.75rem; font-size: 0.75rem; }
-        .fm-stat .num { font-size: 1rem; }
-    }
-
-    /* ── Animation ── */
-    .fm-group { animation: fm-fadeUp 0.4s ease both; }
-    @keyframes fm-fadeUp {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-    .fm-group:nth-child(2) { animation-delay: 0.05s; }
-    .fm-group:nth-child(3) { animation-delay: 0.1s; }
-    .fm-group:nth-child(4) { animation-delay: 0.15s; }
-    .fm-group:nth-child(5) { animation-delay: 0.2s; }
-    .fm-group:nth-child(6) { animation-delay: 0.25s; }
-</style>
-@endsection
+@section('title', 'Feature Permissions')
 
 @section('content')
 <div class="p-3 sm:p-4 md:p-6">
 
-    {{-- Success Alert --}}
     @if(session('success'))
-    <div class="fm-alert">
-        <svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        {{ session('success') }}
+    <div class="mb-4 p-4 bg-green-50 border border-green-200 text-green-700 rounded-xl flex items-center gap-3 shadow-sm">
+        <span class="text-sm font-medium">{{ session('success') }}</span>
     </div>
     @endif
 
-    {{-- Hero Banner --}}
-    <div class="fm-hero">
-        <h1>⚙️ Feature Management</h1>
-        <p>Control which roles can access each module across the platform</p>
-        <div class="fm-stats">
-            <div class="fm-stat">
-                <span class="num">{{ $features->count() }}</span> Features
-            </div>
-            <div class="fm-stat">
-                <span class="num">{{ count($roles) }}</span> Roles
-            </div>
-            <div class="fm-stat">
-                <span class="num">{{ $groups->count() }}</span> Groups
-            </div>
+    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-6">
+        <div>
+            <h1 class="text-lg sm:text-xl md:text-2xl font-bold text-gray-800">Permission Matrix</h1>
+            <p class="text-gray-500 text-xs sm:text-sm">Manage fine-grained access to features by Jabatan and Section.</p>
         </div>
+        <button type="button" onclick="openAddModal()" class="inline-flex items-center gap-2 bg-yellow-500 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-yellow-600 transition shadow-sm w-full sm:w-auto justify-center">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+            Add Permission
+        </button>
     </div>
 
-    {{-- Permission Form --}}
-    <form method="POST" action="{{ route('super-admin.features.update') }}">
+    <form method="POST" action="{{ route('access-management.features.update') }}">
         @csrf
-
-        @php
-            $groupIcons = [
-                'dashboard' => ['class' => 'gicon-dashboard', 'icon' => '📊'],
-                'master' => ['class' => 'gicon-master', 'icon' => '🗂️'],
-                'production' => ['class' => 'gicon-production', 'icon' => '🏭'],
-                'quality' => ['class' => 'gicon-quality', 'icon' => '🔬'],
-                'report' => ['class' => 'gicon-report', 'icon' => '📈'],
-            ];
-        @endphp
-
-        @foreach($groups as $groupName => $groupFeatures)
-            @php
-                $gKey = strtolower($groupName ?? 'default');
-                $gMeta = $groupIcons[$gKey] ?? ['class' => 'gicon-default', 'icon' => '📦'];
-                $enabledCount = 0;
-                $totalPerms = count($groupFeatures) * count($roles);
-                foreach ($groupFeatures as $f) {
-                    foreach ($roles as $r) {
-                        $k = $r . '_' . $f->id;
-                        if (!isset($permissions[$k]) || $permissions[$k]->enabled) $enabledCount++;
-                    }
-                }
-                $pct = $totalPerms > 0 ? round(($enabledCount / $totalPerms) * 100) : 0;
-            @endphp
-            <div class="fm-group" id="group-{{ Str::slug($groupName) }}">
-                <div class="fm-group-header" onclick="this.parentElement.classList.toggle('collapsed')">
-                    <div class="fm-group-icon {{ $gMeta['class'] }}">{{ $gMeta['icon'] }}</div>
-                    <span class="fm-group-title">{{ $groupName ?: 'Uncategorized' }}</span>
-                    <span class="fm-group-badge">{{ $groupFeatures->count() }} features · {{ $pct }}% active</span>
-                    <svg class="fm-group-chevron" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
-                </div>
-                <div class="fm-group-body">
-                    <div class="fm-scroll-wrapper">
-                        <table class="fm-table">
-                            <thead>
-                                <tr>
-                                    <th style="min-width:180px;">Feature Name</th>
-                                    @foreach($roles as $role)
-                                        <th><span class="role-{{ $role }}">{{ ucfirst($role) }}</span></th>
-                                    @endforeach
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($groupFeatures as $feature)
-                                <tr>
-                                    <td>{{ $feature->feature_name }}</td>
-                                    @foreach($roles as $role)
-                                        @php
-                                            $key = $role . '_' . $feature->id;
-                                            $enabled = isset($permissions[$key]) ? $permissions[$key]->enabled : true;
-                                        @endphp
-                                        <td>
-                                            <label class="fm-toggle">
-                                                <input type="hidden" name="permissions[{{ $role }}][{{ $feature->id }}]" value="0">
-                                                <input type="checkbox" name="permissions[{{ $role }}][{{ $feature->id }}]" value="1" {{ $enabled ? 'checked' : '' }}>
-                                                <span class="fm-toggle-track"></span>
-                                            </label>
-                                        </td>
-                                    @endforeach
-                                </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
+        
+        <div class="bg-white border border-gray-200 shadow-sm rounded-xl overflow-hidden mb-6">
+            <div class="overflow-x-auto">
+                <table class="min-w-full text-xs md:text-sm">
+                    <thead class="bg-gray-50 sticky top-0 z-10">
+                        <tr class="text-left border-b border-gray-200">
+                            <th class="px-5 py-3 font-semibold text-gray-600">Feature</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600">Jabatan</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600">Section</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">View</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Create</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Edit</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Delete</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Approve</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Export</th>
+                            <th class="px-5 py-3 font-semibold text-gray-600 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        @forelse($matrices as $featureId => $group)
+                            @foreach($group as $matrix)
+                            <tr class="hover:bg-gray-50 transition">
+                                <td class="px-5 py-3 font-medium text-gray-800">{{ $matrix->feature->feature_name }}</td>
+                                <td class="px-5 py-3 text-gray-600">{{ $matrix->position ? $matrix->position->position_name : 'All' }}</td>
+                                <td class="px-5 py-3 text-gray-600">{{ $matrix->section ? $matrix->section->section_name : 'All' }}</td>
+                                
+                                <td class="px-5 py-3 text-center">
+                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_view]" value="1" {{ $matrix->can_view ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
+                                </td>
+                                <td class="px-5 py-3 text-center">
+                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_create]" value="1" {{ $matrix->can_create ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
+                                </td>
+                                <td class="px-5 py-3 text-center">
+                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_edit]" value="1" {{ $matrix->can_edit ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
+                                </td>
+                                <td class="px-5 py-3 text-center">
+                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_delete]" value="1" {{ $matrix->can_delete ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
+                                </td>
+                                <td class="px-5 py-3 text-center">
+                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_approve]" value="1" {{ $matrix->can_approve ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
+                                </td>
+                                <td class="px-5 py-3 text-center">
+                                    <input type="checkbox" name="matrices[{{ $matrix->id }}][can_export]" value="1" {{ $matrix->can_export ? 'checked' : '' }} class="w-4 h-4 text-red-600 rounded border-gray-300 focus:ring-red-500">
+                                </td>
+                                
+                                <td class="px-5 py-3 text-center">
+                                    <button type="button" onclick="deleteMatrix({{ $matrix->id }})" class="text-red-500 hover:text-red-700 transition">
+                                        <svg class="w-5 h-5 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    </button>
+                                </td>
+                            </tr>
+                            @endforeach
+                        @empty
+                            <tr>
+                                <td colspan="10" class="px-5 py-12 text-center text-gray-400">No permission matrix records found. Add one above.</td>
+                            </tr>
+                        @endforelse
+                    </tbody>
+                </table>
             </div>
-        @endforeach
-
-        {{-- Sticky Save Bar --}}
-        <div class="fm-save-bar">
-            <button type="submit" class="fm-btn-save">
-                <svg width="18" height="18" fill="none" viewBox="0 0 24 24"><path d="M5 13l4 4L19 7" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>
-                Save Permissions
-            </button>
+            
+            <div class="p-4 border-t border-gray-100 flex justify-end">
+                <button type="submit" class="inline-flex items-center gap-2 bg-red-600 text-white px-6 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 transition shadow-sm">
+                    Save Changes
+                </button>
+            </div>
         </div>
     </form>
 </div>
+
+{{-- Add Modal --}}
+<div id="addModal" class="fixed inset-0 z-[9999] hidden items-center justify-center">
+    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeAddModal()"></div>
+    <div class="relative bg-white w-full max-w-lg mx-4 rounded-2xl shadow-2xl p-6">
+        <h2 class="text-lg font-bold text-gray-800 mb-4">Add Permission</h2>
+        <form method="POST" action="{{ route('access-management.features.update') }}" class="space-y-4">
+            @csrf
+            <div>
+                <label class="text-sm font-medium text-gray-700">Feature</label>
+                <select name="new_feature_id" required class="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-200">
+                    <option value="">- Select Feature -</option>
+                    @foreach($features as $f)
+                        <option value="{{ $f->id }}">{{ $f->feature_name }} ({{ $f->group_name }})</option>
+                    @endforeach
+                </select>
+            </div>
+            
+            <div class="flex gap-4">
+                <div class="flex-1">
+                    <label class="text-sm font-medium text-gray-700">Jabatan (Optional)</label>
+                    <select name="new_position_id" class="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-200">
+                        <option value="">- All -</option>
+                        @foreach($positions as $p)
+                            <option value="{{ $p->id }}">{{ $p->position_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="flex-1">
+                    <label class="text-sm font-medium text-gray-700">Section (Optional)</label>
+                    <select name="new_section_id" class="w-full mt-1.5 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-red-200">
+                        <option value="">- All -</option>
+                        @foreach($sections as $s)
+                            <option value="{{ $s->id }}">{{ $s->section_name }}</option>
+                        @endforeach
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="text-sm font-medium text-gray-700 block mb-2">Permissions</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_view" value="1" class="rounded text-red-600" checked> View</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_create" value="1" class="rounded text-red-600"> Create</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_edit" value="1" class="rounded text-red-600"> Edit</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_delete" value="1" class="rounded text-red-600"> Delete</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_approve" value="1" class="rounded text-red-600"> Approve</label>
+                    <label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="new_can_export" value="1" class="rounded text-red-600"> Export</label>
+                </div>
+            </div>
+
+            <div class="flex justify-end gap-2 pt-4">
+                <button type="button" onclick="closeAddModal()" class="px-5 py-2.5 text-sm font-medium bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200">Cancel</button>
+                <button type="submit" class="px-5 py-2.5 text-sm font-medium bg-red-600 text-white rounded-xl hover:bg-red-700">Add Assignment</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{{-- Hidden Delete Form --}}
+<form id="deleteForm" method="POST" style="display: none;">
+    @csrf
+    @method('DELETE')
+</form>
 @endsection
+
+@push('scripts')
+<script>
+    function openAddModal() {
+        document.getElementById('addModal').classList.remove('hidden');
+        document.getElementById('addModal').classList.add('flex');
+    }
+    function closeAddModal() {
+        document.getElementById('addModal').classList.add('hidden');
+        document.getElementById('addModal').classList.remove('flex');
+    }
+    function deleteMatrix(id) {
+        if (confirm('Delete this permission assignment?')) {
+            const form = document.getElementById('deleteForm');
+            form.action = '/access-management/features/matrix/' + id;
+            form.submit();
+        }
+    }
+</script>
+@endpush

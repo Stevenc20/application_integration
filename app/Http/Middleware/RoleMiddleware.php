@@ -27,10 +27,18 @@ class RoleMiddleware
 
         $user = Auth::user();
 
-        if (strtolower($user->role) === 'superadmin') {
+        // 1. Superadmin overrides everything
+        if ($user->isSuperadmin()) {
             return $next($request);
         }
 
+        // 2. Check Admin role if requested explicitly
+        $normalizedRoles = array_map('strtolower', $roles);
+        if ($user->isAdmin() && in_array('admin', $normalizedRoles)) {
+            return $next($request);
+        }
+
+        // 3. Fallback to Legacy Role logic
         $userRole = $user->role;
         $normalizedUserRole = strtolower($userRole);
         if (str_starts_with($normalizedUserRole, 'leader') || $normalizedUserRole === 'shearing' || $normalizedUserRole === 'handwork') {
@@ -41,22 +49,25 @@ class RoleMiddleware
             $normalizedUserRole = 'hambatan';
         }
 
-        $normalizedRoles = array_map(function($role) {
+        $normalizedRoles = array_map(function($role) use ($hambatanRoles) {
             $r = strtolower($role);
             if (str_starts_with($r, 'leader') || $r === 'shearing' || $r === 'handwork') {
                 return 'leader';
             }
+            if (in_array($r, $hambatanRoles)) {
+                return 'hambatan';
+            }
             return $r;
         }, $roles);
-        $normalizedRoles = array_map(fn($r) => in_array($r, $hambatanRoles) ? 'hambatan' : $r, $normalizedRoles);
 
         // If the route requires 'operator', we also allow 'leader'
         if (in_array('operator', $normalizedRoles) && $normalizedUserRole === 'leader') {
             return $next($request);
         }
 
+        // Direct match
         if (!in_array($normalizedUserRole, $normalizedRoles) && !in_array($userRole, $roles)) {
-            // Position hierarchy check: allow higher positions to access lower role pages
+            // Position hierarchy check
             if (!$this->checkPositionHierarchy($user, $normalizedRoles)) {
                 abort(403, 'Unauthorized');
             }
@@ -87,6 +98,36 @@ class RoleMiddleware
             return false;
         }
 
-        return $userLevel <= $minRequiredLevel;
+        // Lower number is higher rank in target hierarchy: 
+        // Wait, target hierarchy: Tim Member = 1, Presdir = 8.
+        // If Presdir = 8, higher level means more access.
+        // Wait! The user's new target hierarchy:
+        // Tim Member (1), Leader (2), Foreman (3), SPV (4), Manager (5), Kadiv (6), Direktur (7), Presdir (8).
+        // Let's rewrite checkPositionHierarchy to use the new canonical level logically.
+        
+        // Let's map required role to new canonical levels
+        $targetMinLevel = null;
+        foreach ($normalizedRoles as $role) {
+            $reqLevel = null;
+            switch ($role) {
+                case 'operator': $reqLevel = 1; break;
+                case 'leader': $reqLevel = 2; break;
+                case 'foreman': $reqLevel = 3; break;
+                case 'supervisor': $reqLevel = 4; break;
+                case 'manager': $reqLevel = 5; break;
+                case 'kadiv': $reqLevel = 6; break;
+                case 'direktur': $reqLevel = 7; break;
+                case 'presdir': $reqLevel = 8; break;
+            }
+            if ($reqLevel !== null) {
+                if ($targetMinLevel === null || $reqLevel < $targetMinLevel) {
+                    $targetMinLevel = $reqLevel;
+                }
+            }
+        }
+
+        if ($targetMinLevel === null) return false;
+
+        return $userLevel >= $targetMinLevel;
     }
 }
