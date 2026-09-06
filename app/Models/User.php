@@ -22,7 +22,11 @@ class User extends Authenticatable
         'nrp',
         'password',
         'role',
+        'system_role',
+        'position_id',
+        'section_id',
         'avatar',
+        'is_active',
     ];
 
     /**
@@ -47,13 +51,65 @@ class User extends Authenticatable
         ];
     }
 
+    public function position()
+    {
+        return $this->belongsTo(Position::class);
+    }
+
+    public function section()
+    {
+        return $this->belongsTo(Section::class);
+    }
+
+    public function isSuperadmin(): bool
+    {
+        return $this->system_role === 'superadmin' || strtolower($this->role) === 'superadmin';
+    }
+
+    public function isAdmin(): bool
+    {
+        return $this->system_role === 'admin' || $this->isSuperadmin();
+    }
+
+    public function isUser(): bool
+    {
+        return $this->system_role === 'user';
+    }
+
+    public function hasPosition(string $positionName): bool
+    {
+        return $this->position && strtolower($this->position->position_name) === strtolower($positionName);
+    }
+
+    public function hasSection(string $sectionName): bool
+    {
+        return $this->section && strtolower($this->section->section_name) === strtolower($sectionName);
+    }
+
+    public function getOrganizationalRoleAttribute(): string
+    {
+        if ($this->isSuperadmin()) return 'Superadmin';
+        if ($this->isAdmin() && !$this->position_id) return 'Admin';
+
+        $pos = $this->position ? $this->position->position_name : '';
+        $sec = $this->section ? $this->section->section_name : '';
+
+        if ($pos && $sec) return trim("$pos $sec");
+        if ($pos) return $pos;
+        if ($sec) return $sec;
+
+        return ucfirst($this->role ?? 'Unassigned');
+    }
+
     public function hasFeature(string $featureCode): bool
     {
-        $role = strtolower($this->role);
-    
-        if ($role === 'superadmin') {
+        // 1. Superadmin override
+        if ($this->isSuperadmin()) {
             return true;
         }
+
+        // 2. Legacy fallback
+        $role = strtolower($this->role);
         if (str_starts_with($role, 'leader') || $role === 'shearing' || $role === 'handwork') {
             $role = 'leader';
         }
@@ -70,8 +126,7 @@ class User extends Authenticatable
             ->exists();
     }
 
-    // ── Role helpers for QA module ───────────────────────────
-
+    // Role helpers for legacy modules
     public function hasRole(string|array $roles): bool
     {
         if (is_array($roles)) {
@@ -80,10 +135,9 @@ class User extends Authenticatable
         return $this->role === $roles;
     }
 
-    public function isAdmin(): bool      { return $this->role === 'Admin' || strtolower($this->role) === 'superadmin' || strtolower($this->role) === 'admin'; }
-    public function isForeman(): bool    { return $this->role === 'Foreman' || strtolower($this->role) === 'foreman'; }
-    public function isProduction(): bool { return $this->role === 'Production' || strtolower($this->role) === 'production'; }
-    public function isCustomer(): bool   { return $this->role === 'Customer' || strtolower($this->role) === 'customer'; }
-    public function isSupervisor(): bool   { return $this->role === 'Supervisor' || strtolower($this->role) === 'supervisor'; }
-    public function isGroupLeader(): bool   { return $this->role === 'Group Leader' || strtolower($this->role) === 'group leader' || strtolower($this->role) === 'leader'; }
+    public function isForeman(): bool    { return $this->hasPosition('Foreman') || strtolower($this->role) === 'foreman'; }
+    public function isProduction(): bool { return $this->hasSection('Produksi') || strtolower($this->role) === 'production' || strtolower($this->role) === 'produksi'; }
+    public function isCustomer(): bool   { return strtolower($this->role) === 'customer'; }
+    public function isSupervisor(): bool { return $this->hasPosition('SPV') || strtolower($this->role) === 'supervisor'; }
+    public function isGroupLeader(): bool { return $this->hasPosition('Leader') || strtolower($this->role) === 'group leader' || str_starts_with(strtolower($this->role), 'leader'); }
 }
