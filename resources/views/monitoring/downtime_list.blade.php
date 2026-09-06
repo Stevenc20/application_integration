@@ -170,7 +170,7 @@
                     <select id="editJenis" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition bg-gray-50" disabled>
                         <option value="produksi">Produksi</option>
                         <option value="mesin">Mesin</option>
-                        <option value="dies">Dies (Daise)</option>
+                        <option value="dies">Dies</option>
                         <option value="logistic">Logistic</option>
                         <option value="material">Material</option>
                         <option value="try out">Try Out</option>
