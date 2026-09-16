@@ -472,18 +472,39 @@
             .single-top-header th{font-size:28px!important;padding:24px 32px!important}
         }
 
-        /* P1.1 FINAL TYPOGRAPHY RESPONSIVE PATCH */
+        /* P1.1.1 TYPOGRAPHY PATCH REFINEMENT */
         .right-detail-table th,
         .right-detail-table td {
-            font-size: clamp(10px, 0.7vw, 22px) !important;
-            padding: clamp(4px, 0.4vw, 16px) clamp(4px, 0.4vw, 16px) !important;
+            font-size: clamp(10px, 0.75vw, 22px) !important;
+            padding: clamp(4px, 0.4vw, 14px) clamp(4px, 0.4vw, 12px) !important;
         }
         .right-detail-table thead th {
-            font-size: clamp(9px, 0.65vw, 20px) !important;
+            font-size: clamp(9px, 0.6vw, 18px) !important;
         }
         .right-detail-table td.det-job {
-            font-size: clamp(10px, 0.75vw, 24px) !important;
+            font-size: clamp(8px, 0.5vw, 17px) !important; /* Smaller to prevent JOB NO blowout */
         }
+        .right-detail-table td.det-process {
+            padding: clamp(2px, 0.2vw, 8px) !important;
+        }
+        
+        /* PROCESS column specific */
+        .process-cell {
+            display: flex; gap: clamp(2px, 0.2vw, 6px); justify-content: center; align-items: center;
+        }
+        .process-item {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+        }
+        .process-lbl {
+            font-size: clamp(7px, 0.45vw, 14px); color: #64748b; line-height: 1; font-weight: 800;
+        }
+        .process-box {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: clamp(12px, 0.8vw, 24px); height: clamp(12px, 0.8vw, 24px);
+            border-radius: 2px; font-size: clamp(8px, 0.55vw, 16px); font-weight: 900; line-height: 1;
+        }
+        .process-box.ok { border: 1px solid #22c55e; background: #f0fdf4; color: #16a34a; }
+        .process-box.ng { background: #f3f4f6; color: #9ca3af; font-weight: 700; }
     </style>
 </head>
 <body>
@@ -722,7 +743,7 @@ function getClasses(desc, k){
 function dtCell(v,st,cls){ return `<td class="${cls||''}" style="${st||''}">${v}</td>`; }
 function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:1vw;height:1vw;border-radius:0.2vw;border:0.1vw solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:0.7vw;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 0.3vw;border-radius:0.2vw;background:#f3f4f6;color:#9ca3af;font-size:0.7vw;font-weight:700">-</span>'; }
 function chkP(c, lbl){
-    return `<div style="display:flex;flex-direction:column;align-items:center;gap:0.1vw;"><span style="font-size:0.5vw;color:#64748b;line-height:1;font-weight:800">${lbl}</span>` + (c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:0.8vw;height:0.8vw;border-radius:0.1vw;border:0.1vw solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:0.6vw;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;width:0.8vw;height:0.8vw;border-radius:0.1vw;background:#f3f4f6;color:#9ca3af;font-size:0.6vw;font-weight:700;line-height:1">-</span>') + `</div>`;
+    return `<div class="process-item"><span class="process-lbl">${lbl}</span><span class="process-box ${c?'ok':'ng'}">${c?'&#10003;':'-'}</span></div>`;
 }
 
 // ── Fit-to-screen + auto-rotate helpers ──
@@ -770,7 +791,7 @@ function buildRightBody(rows, maxRows, overallPlan){
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
                 ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
-                ${dtCell(`<div style="display:flex;gap:0.3vw;justify-content:center;align-items:center;">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`)}
+                ${dtCell(`<div class="process-cell">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`, '', 'det-process')}
                 ${dtCell(j.plan_qty, '', 'det-qty')}
                 ${dtCell(j.good, 'font-weight:600;', 'det-good')}
                 ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
