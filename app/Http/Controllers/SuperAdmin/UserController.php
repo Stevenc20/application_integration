@@ -4,19 +4,16 @@ namespace App\Http\Controllers\SuperAdmin;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
-use App\Models\Position;
-use App\Models\Section;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Validation\Rule;
 
 class UserController extends Controller
 {
     public function index()
     {
         $users = User::with(['position', 'section'])->latest()->paginate(10);
-        $positions = Position::orderBy('level')->get();
-        $sections = Section::orderBy('section_name')->get();
+        $positions = \Illuminate\Support\Facades\DB::table('positions')->orderBy('level')->get();
+        $sections = \Illuminate\Support\Facades\DB::table('sections')->orderBy('section_name')->get();
         return view('super_admin.users.index', compact('users', 'positions', 'sections'));
     }
 
@@ -26,24 +23,21 @@ class UserController extends Controller
             'name' => 'required',
             'nrp' => 'required|digits:4|unique:users,nrp',
             'password' => 'required|min:6',
-            'system_role' => ['required', Rule::in(['superadmin', 'admin', 'user'])],
-            'position_id' => 'required_if:system_role,user',
-            'section_id' => 'required_if:system_role,user',
+            'role' => 'required',
+            'position_id' => 'nullable|exists:positions,id',
+            'section_id' => 'nullable|exists:sections,id',
         ], [
             'nrp.digits' => 'NRP harus 4 digit angka.',
             'nrp.unique' => 'NRP sudah terdaftar, gunakan NRP yang lain.',
-            'position_id.required_if' => 'Jabatan wajib diisi untuk User biasa.',
-            'section_id.required_if' => 'Section wajib diisi untuk User biasa.',
         ]);
 
         User::create([
             'name' => $request->name,
             'nrp' => $request->nrp,
             'password' => Hash::make($request->password),
-            'system_role' => $request->system_role,
-            'position_id' => $request->system_role === 'user' ? $request->position_id : null,
-            'section_id' => $request->system_role === 'user' ? $request->section_id : null,
-            'role' => 'user', // Compatibility column
+            'role' => $request->role,
+            'position_id' => $request->position_id,
+            'section_id' => $request->section_id,
         ]);
 
         return redirect()->back()->with('success', 'User created successfully.');
@@ -54,29 +48,27 @@ class UserController extends Controller
         $request->validate([
             'name' => 'required',
             'nrp' => 'required|digits:4|unique:users,nrp,' . $user->id,
-            'system_role' => ['required', Rule::in(['superadmin', 'admin', 'user'])],
-            'position_id' => 'required_if:system_role,user',
-            'section_id' => 'required_if:system_role,user',
+            'role' => 'required',
+            'position_id' => 'nullable|exists:positions,id',
+            'section_id' => 'nullable|exists:sections,id',
         ], [
             'nrp.digits' => 'NRP harus 4 digit angka.',
             'nrp.unique' => 'NRP sudah digunakan user lain.',
-            'position_id.required_if' => 'Jabatan wajib diisi untuk User biasa.',
-            'section_id.required_if' => 'Section wajib diisi untuk User biasa.',
         ]);
 
         $data = [
             'name' => $request->name,
             'nrp' => $request->nrp,
-            'system_role' => $request->system_role,
-            'position_id' => $request->system_role === 'user' ? $request->position_id : null,
-            'section_id' => $request->system_role === 'user' ? $request->section_id : null,
+            'role' => $request->role,
+            'position_id' => $request->position_id,
+            'section_id' => $request->section_id,
         ];
 
         if ($request->filled('password')) {
             $data['password'] = Hash::make($request->password);
         }
 
-        if ($user->system_role === 'superadmin' && $user->id === auth()->id() && $request->system_role !== 'superadmin') {
+        if ($user->role === 'superadmin' && $user->id === auth()->id() && $request->role !== 'superadmin') {
             return back()->with('error', 'You cannot remove your own super admin status.');
         }
 
@@ -87,8 +79,8 @@ class UserController extends Controller
 
     public function destroy(User $user)
     {
-        if ($user->system_role === 'superadmin' || $user->isRole('superadmin')) {
-            $superadminCount = User::where('system_role', 'superadmin')->orWhere('role', 'superadmin')->count();
+        if ($user->role === 'superadmin') {
+            $superadminCount = User::where('role', 'superadmin')->count();
             if ($superadminCount <= 1) {
                 return back()->with('error', 'Cannot delete the last super admin.');
             }

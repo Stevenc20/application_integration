@@ -9,14 +9,8 @@ use App\Models\Downtime;
 use App\Models\Dandori;
 use App\Models\ProductionLog;
 use App\Models\HambatanJalur;
-use App\Models\ProductionPlan;
-use App\Models\RecoveryItem;
-use App\Models\RecoverySchedule;
-use App\Models\User;
-use App\Notifications\ItemTidakTercapaiNotification;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use App\Services\DashboardRealtimeService;
 
 class ProductionService
@@ -33,6 +27,17 @@ class ProductionService
                     'work_date' => now()->toDateString()
                 ]
             );
+
+            // Clear skipped_at if this plan was previously skipped
+            $planId = $this->resolvePlanId($jobId);
+            if ($planId) {
+                $plan = \App\Models\ProductionPlan::find($planId);
+                if ($plan && $plan->skipped_at !== null) {
+                    $plan->skipped_at = null;
+                    $plan->status = 'approved';
+                    $plan->save();
+                }
+            }
 
             $session->status = 'running';
             $session->save();
@@ -56,11 +61,6 @@ class ProductionService
                         'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($openDowntime->start_time)))
                     ]);
                 }
-
-                // Close any existing open dandori before starting
-                Dandori::where('next_job_id', $jobId)
-                    ->whereNull('finish_time')
-                    ->update(['finish_time' => $now]);
             }
 
             JobMaster::where('id', $jobId)->update($updateData);
@@ -80,11 +80,7 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
             $job = JobMaster::findOrFail($jobId);
-            $updateData = ['status' => 'running'];
-            if (!$job->started_at) {
-                $updateData['started_at'] = now();
-            }
-            $job->update($updateData);
+            $job->update(['status' => 'running']);
             $this->syncPlanStatus($jobId, 'running');
 
             ProductionSession::firstOrCreate(
@@ -143,62 +139,45 @@ class ProductionService
     public function finishDandori($jobId)
     {
         return DB::transaction(function () use ($jobId) {
-            $now = now();
-
-            // 1. Close dandori Downtime if still open
             $downtime = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
                 ->first();
 
             if ($downtime) {
+                $now = now();
                 $durationSeconds = abs($now->diffInSeconds(Carbon::parse($downtime->start_time)));
                 $downtime->update([
                     'finish_time' => $now,
                     'duration_seconds' => $durationSeconds
                 ]);
-            }
+                
+                $dandori = Dandori::where('next_job_id', $jobId)
+                    ->whereNull('finish_time')
+                    ->first();
+                
+                if ($dandori) {
+                    $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
+                    $dandori->update([
+                        'finish_time' => $now,
+                        'duration_minutes' => round($duration, 2)
+                    ]);
+                }
 
-            // 2. Close Dandori record ALWAYS (independent of Downtime)
-            $dandori = Dandori::where('next_job_id', $jobId)
-                ->whereNull('finish_time')
-                ->first();
-
-            if ($dandori) {
-                $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
-                $dandori->update([
-                    'finish_time' => $now,
-                    'duration_minutes' => round($duration, 2)
-                ]);
-            }
-
-            // 3. After dandori, job starts production IF no other active downtime
-            $otherActiveDowntime = Downtime::where('job_master_id', $jobId)
-                ->where('jenis_downtime', '!=', 'dandori')
-                ->whereNull('finish_time')
-                ->exists();
-
-            if (!$otherActiveDowntime) {
-                JobMaster::where('id', $jobId)->update(['status' => 'running']);
+                // After dandori, job starts production
+                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
                 $this->syncPlanStatus($jobId, 'running');
-
+                
                 $session = ProductionSession::firstOrCreate(
                     ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
                 );
                 $session->update(['start_time' => $now, 'status' => 'running']);
-            } else {
-                JobMaster::where('id', $jobId)->update(['status' => 'paused']);
-                $this->syncPlanStatus($jobId, 'paused');
 
-                $session = ProductionSession::firstOrCreate(
-                    ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
-                );
-                $session->update(['start_time' => clone $now, 'status' => 'paused', 'pause_time' => clone $now]);
+                $this->signalDashboard($jobId);
+
+                return true;
             }
-
-            $this->signalDashboard($jobId);
-
-            return true;
+            return false;
         });
     }
 
@@ -272,17 +251,21 @@ class ProductionService
                 'job_master_id' => $jobId,
                 'work_date' => $workDate
             ]);
-
-            // Delta-based: tambahkan delta ke nilai yang sudah ada (tidak SUM dari logs)
-            // SUM-based salah karena 5-log trimming menghapus history
-            $actualQty = ($daily->actual_ok ?? 0) + ($data['ok_qty'] ?? 0);
-            $actualRepair = ($daily->actual_repair ?? 0) + ($data['repair_qty'] ?? 0);
-            $actualReject = ($daily->actual_reject ?? 0) + ($data['reject_qty'] ?? 0);
+            
+            $actualQty = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())->sum('ok_qty');
+            $actualRepair = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())->sum('repair_qty');
+            $actualReject = ProductionLog::where('job_master_id', $jobId)
+                ->whereDate('created_at', now())->sum('reject_qty');
 
             $job = JobMaster::find($jobId);
-            $targetQty = $job?->target_qty ?? 0;
+            $targetQty = $job?->capacity ?? 0;
             
-            $efficiency = $this->calculateEfficiency($actualQty, $targetQty);
+            $efficiency = 0;
+            if ($targetQty > 0) {
+                $efficiency = round(($actualQty / $targetQty) * 100, 2);
+            }
 
             $runtimeSeconds = $this->calculateRuntime($jobId);
 
@@ -295,9 +278,7 @@ class ProductionService
                 'actual_reject' => $actualReject,
                 'runtime_seconds' => $runtimeSeconds,
                 'downtime_seconds' => Downtime::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())
-                    ->where('jenis_downtime', '!=', 'dandori')
-                    ->sum('duration_seconds'),
+                    ->whereDate('created_at', now())->sum('duration_seconds'),
                 'efficiency' => $efficiency
             ]);
 
@@ -362,54 +343,9 @@ class ProductionService
     /**
      * Resume a paused job.
      */
-    public function resumeJob($jobId, array $typesToClose = [])
+    public function resumeJob($jobId)
     {
-        return DB::transaction(function () use ($jobId, $typesToClose) {
-            // P0.2 - BREAKTIME STATE SYNC:
-            // 1. CONCURRENCY: Lock the rows to prevent race conditions
-            $query = Downtime::where('job_master_id', $jobId)->whereNull('finish_time')->lockForUpdate();
-            
-            if (empty($typesToClose)) {
-                $query->whereNotIn('jenis_downtime', ['dandori', 'try out', 'tryout', '1st check', '1st_check']);
-            } else {
-                $query->whereIn('jenis_downtime', $typesToClose);
-            }
-            
-            $unclosedDowntimes = $query->get();
-            $hasClosedDowntime = false;
-            $finishedAt = now(); // 2. TIMESTAMP CONSISTENCY
-            
-            foreach ($unclosedDowntimes as $dt) {
-                $startTime = \Carbon\Carbon::parse($dt->start_time);
-                $durationSeconds = $finishedAt->diffInSeconds($startTime);
-                if ($durationSeconds < 0) $durationSeconds = 0; // Guard against negative diffs instead of hiding with abs()
-                
-                $dt->update([
-                    'finish_time' => $finishedAt,
-                    'duration_seconds' => $durationSeconds
-                ]);
-                $hasClosedDowntime = true;
-            }
-
-            if ($hasClosedDowntime) {
-                // 3. SHIFT BOUNDARY: Use logical work_date, not just today's created_at
-                $logicalWorkDate = (int)$finishedAt->format('H') < 7 || ((int)$finishedAt->format('H') == 7 && (int)$finishedAt->format('i') < 30) 
-                    ? $finishedAt->copy()->subDay()->toDateString() 
-                    : $finishedAt->toDateString();
-
-                // Sum all downtime for this job within the same logical work_date shift
-                // (Using start_time to properly align with the shift boundary)
-                $totalDowntime = Downtime::where('job_master_id', $jobId)
-                    ->whereRaw('DATE(DATE_SUB(start_time, INTERVAL 7 HOUR 30 MINUTE)) = ?', [\Carbon\Carbon::parse($logicalWorkDate)->format('Y-m-d')])
-                    ->where('jenis_downtime', '!=', 'dandori')
-                    ->sum('duration_seconds');
-
-                DailyProduction::updateOrCreate(
-                    ['job_master_id' => $jobId, 'work_date' => $logicalWorkDate],
-                    ['downtime_seconds' => $totalDowntime]
-                );
-            }
-
+        return DB::transaction(function () use ($jobId) {
             $session = ProductionSession::where('job_master_id', $jobId)
                 ->whereDate('work_date', now()->toDateString())
                 ->first();
@@ -466,16 +402,11 @@ class ProductionService
     /**
      * Finish a job and sync metrics.
      */
-    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null, $skippedActions = [])
+    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null, array $skippedActions = [])
     {
         return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions) {
             // Auto-close any active downtimes for this job
             Downtime::where('job_master_id', $jobId)
-                ->whereNull('finish_time')
-                ->update(['finish_time' => now()]);
-
-            // Auto-close any active dandoris for this job
-            Dandori::where('next_job_id', $jobId)
                 ->whereNull('finish_time')
                 ->update(['finish_time' => now()]);
 
@@ -501,9 +432,8 @@ class ProductionService
 
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
                 // Finalisasi: replace semua log dengan nilai final
-                $workDate = $session?->work_date ?? now()->toDateString();
                 ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', $workDate)
+                    ->whereDate('created_at', now())
                     ->delete();
                 ProductionLog::create([
                     'job_master_id' => $jobId,
@@ -528,36 +458,9 @@ class ProductionService
                     'actual_qty'      => $totalOk,
                     'actual_repair'   => $totalRepair,
                     'actual_reject'   => $totalReject,
-                    'efficiency'      => $this->calculateEfficiency($totalOk, $job?->target_qty ?? 0)
+                    'efficiency'      => ($job && $job->capacity > 0) ? ($totalOk / $job->capacity) * 100 : 0
                 ]
             );
-
-            // QTY MISMATCH RECOVERY CHECK (current job)
-            $mismatch = $this->createRecoveryItem($job, 'waiting_approval', true, [
-                'ok'     => $totalOk,
-                'repair' => $totalRepair,
-                'reject' => $totalReject,
-            ]);
-
-            // SKIPPED ITEMS (jumped over by picking a next job that skips PPC order)
-            $skipped = [];
-            foreach ((array) $skippedActions as $jobMasterId => $action) {
-                $skippedJob = JobMaster::find($jobMasterId);
-                if (!$skippedJob) {
-                    continue;
-                }
-                $isContinue = strtolower((string) $action) === 'continue';
-                $item = $this->createRecoveryItem(
-                    $skippedJob,
-                    $isContinue ? 'continue' : 'waiting_approval',
-                    true,
-                    null,
-                    true
-                );
-                if ($item) {
-                    $skipped[] = $item;
-                }
-            }
 
             // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
             if ($nextJobId === 'STOP_SESSION' || $nextJobId === 'FINISH_ONLY') {
@@ -578,184 +481,79 @@ class ProductionService
 
             $this->signalDashboard($jobId);
 
-            return ['runtime' => $runtime, 'mismatch' => $mismatch, 'skipped' => $skipped];
-        });
-    }
+            // --- Auto-recovery: queue short-of-plan items ---
+            $planId = $this->resolvePlanId($jobId);
+            $mismatch = null;
+            $autoRecoveryItem = null;
+            $job = \App\Models\JobMaster::find($jobId);
+            $actualQty = $finalOk ?? 0;
 
-    /**
-     * Create a recovery item for a job whose plan was not reached.
-     *
-     * @param string $status 'waiting_approval' (needs leader) or 'continue' (dilanjut pindah jam)
-     */
-    private function createRecoveryItem($job, string $status, bool $notify = true, ?array $quantities = null, bool $markSkipped = false): ?array
-    {
-        if (!$job) {
-            return null;
-        }
-
-        $today = now()->toDateString();
-        $shiftName = $this->getShiftName();
-
-        $plan = $this->resolvePlanForJob($job, $today, $shiftName);
-        if (!$plan) {
-            Log::warning("Recovery item created without production_plan_id (plan not resolvable)", [
-                'job_id' => $job->id,
-                'job_number' => $job->job_number,
-                'date' => $today,
-                'shift' => $shiftName,
-            ]);
-        }
-        $planQty = $plan ? (float)($plan->plan ?? 0) : (float)($job->target_qty ?? 0);
-
-        $totalOk     = $quantities ? (float)($quantities['ok'] ?? 0) : (float)($job->dailyProduction?->actual_ok ?? 0);
-        $totalRepair = $quantities ? (float)($quantities['repair'] ?? 0) : (float)($job->dailyProduction?->actual_repair ?? 0);
-        $totalReject = $quantities ? (float)($quantities['reject'] ?? 0) : (float)($job->dailyProduction?->actual_reject ?? 0);
-        $totalProduced = $totalOk + $totalRepair + $totalReject;
-
-        if ($planQty <= 0 || $totalProduced >= $planQty) {
-            return null;
-        }
-
-        if ($markSkipped && $plan) {
-            $plan->update(['skipped_at' => now()]);
-        }
-
-        $recoveryQty = $planQty - $totalProduced;
-        $ctDetik = $plan ? (float)($plan->ct_detik ?? 0) : 0;
-        $dct = $plan ? (float)($plan->dct ?? 0) : 0;
-        $durationMinutes = $ctDetik > 0
-            ? (int)ceil(($ctDetik * $recoveryQty) / 60.0) + $dct
-            : 0;
-
-        $schedule = RecoverySchedule::firstOrCreate(
-            [
-                'plan_date'  => $today,
-                'shift_name' => $shiftName,
-                'press_name' => $job->line ?? '',
-            ],
-            ['status' => 'waiting_approval']
-        );
-
-        $recoveryItem = RecoveryItem::firstOrCreate(
-            [
-                'recovery_schedule_id' => $schedule->id,
-                'job_no'               => trim($job->job_number ?? ''),
-                'press_name'           => $job->line ?? '',
-            ],
-            [
-                'production_plan_id'   => $plan?->id,
-                'job_master'           => $job->job_number ?? '',
-                'plan_qty'             => $planQty,
-                'ok'                   => $totalOk,
-                'repair'               => $totalRepair,
-                'reject'               => $totalReject,
-                'ct_detik'             => $ctDetik,
-                'dct'                  => $dct,
-                'reg_active'           => $plan ? (float)($plan->reg_active ?? 0) : 0,
-                'total_mesin'          => $plan ? (int)($plan->total_mesin ?? 1) : 1,
-                'status'               => $status,
-                'original_date'        => $today,
-                'original_shift_name'  => $shiftName,
-                'source_date'          => $today,
-                'source_shift'         => $shiftName,
-                'actual_qty'           => $totalProduced,
-                'recovery_qty'         => $recoveryQty,
-                'duration_minutes'     => $durationMinutes,
-                'queued_at'            => now(),
-            ]
-        );
-
-        if ($notify) {
-            try {
-                $ppcUsers = User::whereIn('role', ['ppc', 'admin'])->get();
-                foreach ($ppcUsers as $ppcUser) {
-                    $ppcUser->notify(new ItemTidakTercapaiNotification($job, $recoveryItem));
+            if ($planId) {
+                $parts = explode('-', $job->job_number);
+                $embeddedPlanId = end($parts);
+                if (is_numeric($embeddedPlanId) && $planId != $embeddedPlanId) {
+                    $mismatch = [
+                        'embedded_plan_id' => (int) $embeddedPlanId,
+                        'resolved_plan_id' => $planId,
+                    ];
                 }
-            } catch (\Throwable $e) {
-                Log::warning('Failed to notify PPC about recovery item', [
-                    'job_id'      => $job->id,
+
+                $plan = \App\Models\ProductionPlan::find($planId);
+                if ($plan) {
+                    $planQty = (float) ($plan->plan ?? 0);
+                    if ($planQty > 0 && $actualQty < $planQty) {
+                        $recoveryQty = $planQty - $actualQty;
+                        $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQty, $recoveryQty, 'waiting_approval');
+                    }
+                }
+            }
+
+            if (!$planId && !$mismatch && !$autoRecoveryItem) {
+                $recoveryQty = (float) ($job->target_qty ?? 0) - $actualQty;
+                if ($recoveryQty < 0) $recoveryQty = 0;
+                $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQty, $recoveryQty, 'waiting_approval', true);
+            }
+
+            if ($autoRecoveryItem) {
+                $this->notifyPpcUsers($job, $autoRecoveryItem);
+            }
+
+            // --- Handle skipped jobs ---
+            $skippedResult = [];
+            foreach ($skippedActions as $skippedJobId => $action) {
+                $skippedJob = \App\Models\JobMaster::find($skippedJobId);
+                if (!$skippedJob) continue;
+
+                $skippedPlanId = $this->resolvePlanId($skippedJobId);
+                $skippedPlan = $skippedPlanId ? \App\Models\ProductionPlan::find($skippedPlanId) : null;
+                $status = $action === 'continue' ? 'continue' : 'waiting_approval';
+
+                if ($skippedPlan) {
+                    $planQty = (float) ($skippedPlan->plan ?? 0);
+                    $recoveryQty = $planQty;
+                    $recoveryItem = $this->createRecoveryItem($skippedPlan, $skippedJob, 0, $recoveryQty, $status);
+                    $skippedPlan->skipped_at = now();
+                    $skippedPlan->save();
+                } else {
+                    $recoveryQty = (float) ($skippedJob->target_qty ?? 0);
+                    $recoveryItem = $this->createRecoveryItem(null, $skippedJob, 0, $recoveryQty, $status);
+                }
+
+                $skippedResult[] = [
+                    'job_id' => $skippedJobId,
+                    'action' => $action,
                     'recovery_id' => $recoveryItem->id,
-                    'error'       => $e->getMessage(),
-                ]);
+                ];
+
+                $this->notifyPpcUsers($skippedJob, $recoveryItem);
             }
-        }
 
-        return [
-            'plan_qty'     => $planQty,
-            'actual_qty'   => $totalProduced,
-            'recovery_qty' => $recoveryQty,
-            'job_no'       => $job->job_number ?? '',
-            'recovery_id'  => $recoveryItem->id,
-            'status'       => $status,
-        ];
-    }
-
-    /**
-     * Resolve the ProductionPlan linked to a job.
-     *
-     * job_number carries the plan id as a trailing segment (JOB_NO-PLAN_ID or
-     * AUTO-SLUG-PLAN_ID). PPC re-imports renumber plan rows, so that embedded id
-     * can go stale. We verify the parsed id against the job, and fall back to a
-     * match on job_no / job_master for the current shift when it no longer exists.
-     */
-    private function resolvePlanForJob($job, string $date, string $shiftName): ?ProductionPlan
-    {
-        if (!$job) {
-            return null;
-        }
-
-        $jobNumber = trim((string) $job->job_number);
-        $line = $job->line ?? '';
-
-        $parts = explode('-', $jobNumber);
-        $suffix = (string) end($parts);
-
-        if ($suffix !== '' && is_numeric($suffix)) {
-            $planId = (int) $suffix;
-            $prefix = substr($jobNumber, 0, -(strlen($suffix) + 1));
-
-            $plan = ProductionPlan::find($planId);
-            if ($plan && $this->planBelongsToJob($plan, $job, $prefix)) {
-                return $plan;
-            }
-        } else {
-            $prefix = $jobNumber;
-        }
-
-        // Fallback: current plan on the same press & shift, matched by job_no/job_master
-        $query = ProductionPlan::whereDate('plan_date', $date)
-            ->where('shift_name', $shiftName)
-            ->where('row_type', 'job');
-
-        if ($line !== '') {
-            $query->where('press_name', $line);
-        }
-
-        $query->where(function ($q) use ($prefix, $job) {
-            $q->whereRaw('TRIM(job_no) = ?', [$prefix]);
-            if (trim((string) $job->job_name) !== '') {
-                $q->orWhereRaw('TRIM(job_master) = ?', [trim((string) $job->job_name)]);
-            }
+            return [
+                'runtime' => $runtime,
+                'mismatch' => $mismatch,
+                'skipped' => $skippedResult
+            ];
         });
-
-        return $query->orderBy('row_no')->first();
-    }
-
-    private function planBelongsToJob(ProductionPlan $plan, $job, string $prefix): bool
-    {
-        $samePress = $this->normalizePress($plan->press_name ?? '') !== ''
-            && $this->normalizePress($plan->press_name ?? '') === $this->normalizePress($job->line ?? '');
-        $sameJobNo = trim((string) $plan->job_no) !== ''
-            && strcasecmp(trim((string) $plan->job_no), $prefix) === 0;
-        $sameMaster = trim((string) $job->job_name) !== ''
-            && strcasecmp(trim((string) $plan->job_master ?? ''), trim((string) $job->job_name)) === 0;
-
-        return $samePress || $sameJobNo || $sameMaster;
-    }
-
-    private function normalizePress(string $press): string
-    {
-        return strtoupper(trim(str_replace(['PRESS ', 'LINE ', 'Line ', 'Press '], '', $press)));
     }
 
     // autoStartNextJobAsIdle removed — flow langsung Dandori
@@ -766,86 +564,17 @@ class ProductionService
     public function startDowntime($jobId, array $data)
     {
         return DB::transaction(function () use ($jobId, $data) {
-            $now = now();
-
-            // Check if 1st Check was active before downtime was triggered
-            $openFirstCheck = Dandori::where('next_job_id', $jobId)
-                ->where('jenis_dandori', '1st_check')
-                ->whereNull('finish_time')
-                ->first();
-
-            if ($openFirstCheck) {
-                // Pause 1st Check and save flag so it automatically resumes after downtime finishes
-                \Illuminate\Support\Facades\Cache::put('was_in_first_check_' . $jobId, true, 86400);
-                $openFirstCheck->update([
-                    'finish_time' => $now,
-                    'duration_minutes' => round(Carbon::parse($openFirstCheck->start_time)->diffInSeconds($now) / 60, 2)
-                ]);
-            }
-
-            // Close any open dandori downtime
-            $dandoriDt = Downtime::where('job_master_id', $jobId)
-                ->where('jenis_downtime', 'dandori')
-                ->whereNull('finish_time')
-                ->first();
-
-            if ($dandoriDt) {
-                \Illuminate\Support\Facades\Cache::put('was_in_dandori_' . $jobId, true, 86400);
-                $dandoriDt->update([
-                    'finish_time' => $now,
-                    'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($dandoriDt->start_time)))
-                ]);
-            }
-
             $downtime = Downtime::create([
                 'job_master_id' => $jobId,
                 'jenis_downtime' => $data['jenis_downtime'],
-                'source' => $data['source'] ?? null,
                 'problem' => $data['problem'],
                 'penyebab' => $data['penyebab'],
                 'action' => $data['action'],
                 'pic' => $data['pic'],
-                'start_time' => $now
+                'start_time' => now()
             ]);
 
-            // Pause the job and session
-            $session = ProductionSession::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
-                ->where('status', 'running')
-                ->first();
-            if ($session) {
-                $session->update(['status' => 'paused', 'pause_time' => $now]);
-            }
-            JobMaster::where('id', $jobId)->update(['status' => 'paused']);
-
             $this->syncHambatanJalur($downtime);
-
-            // Send notification reminder to Supervisor & Leaders
-            try {
-                $job = JobMaster::find($jobId);
-                $lineName = $job->line ?? 'Line';
-                $jobName = $job->job_name ?? 'Item';
-                $recipients = \App\Models\User::whereIn(DB::raw('LOWER(role)'), ['supervisor', 'spv', 'leader', 'leader a', 'leader b', 'leader c', 'leader d', 'admin', 'superadmin'])->get();
-                if (\Illuminate\Support\Facades\Schema::hasTable('notifications')) {
-                    foreach ($recipients as $recipient) {
-                        DB::table('notifications')->insert([
-                            'id'              => (string) \Illuminate\Support\Str::uuid(),
-                            'type'            => 'App\Notifications\DowntimeReminderNotification',
-                            'notifiable_type' => 'App\Models\User',
-                            'notifiable_id'   => $recipient->id,
-                            'data'            => json_encode([
-                                'message' => "Terjadi downtime {$data['jenis_downtime']} pada item {$jobName} ({$lineName}). Mohon periksa & lengkapi laporan detail downtime.",
-                                'line'    => $lineName,
-                                'job_id'  => $jobId
-                            ]),
-                            'created_at'      => $now,
-                            'updated_at'      => $now
-                        ]);
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Gracefully catch any notification error so Downtime creation never fails
-            }
 
             $this->signalDashboard($jobId);
 
@@ -918,7 +647,6 @@ class ProductionService
 
             $totalDowntime = Downtime::where('job_master_id', $downtime->job_master_id)
                 ->whereDate('created_at', now()->toDateString())
-                ->where('jenis_downtime', '!=', 'dandori')
                 ->sum('duration_seconds');
 
             DailyProduction::updateOrCreate(
@@ -926,53 +654,9 @@ class ProductionService
                 ['downtime_seconds' => $totalDowntime]
             );
 
-            // Auto-resume job if no other active downtimes exist
-            $otherActive = Downtime::where('job_master_id', $downtime->job_master_id)
-                ->whereNull('finish_time')
-                ->exists();
-
-            if (!$otherActive) {
-                $session = ProductionSession::where('job_master_id', $downtime->job_master_id)
-                    ->whereDate('work_date', now()->toDateString())
-                    ->whereIn('status', ['paused', 'running'])
-                    ->first();
-                if ($session) {
-                    $session->update(['status' => 'running']);
-                }
-                JobMaster::where('id', $downtime->job_master_id)->update(['status' => 'running']);
-            }
-
-            // AUTO-RESUME 1st Check if it was paused when downtime was triggered
-            $firstCheckResumed = false;
-            $resumedFirstCheck = null;
-            $jobId = $downtime->job_master_id;
-            if (\Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $jobId)) {
-                \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $jobId);
-                $resumedFirstCheck = $this->startFirstCheck($jobId);
-                $firstCheckResumed = true;
-            }
-
-            // AUTO-RESUME Dandori if it was paused when downtime was triggered
-            if (\Illuminate\Support\Facades\Cache::has('was_in_dandori_' . $jobId)) {
-                \Illuminate\Support\Facades\Cache::forget('was_in_dandori_' . $jobId);
-                Downtime::create([
-                    'job_master_id' => $jobId,
-                    'jenis_downtime' => 'dandori',
-                    'problem' => 'PERSIAPAN (DANDORI)',
-                    'start_time' => now(),
-                    'penyebab' => '-',
-                    'action' => '-',
-                    'pic' => 'OPERATOR'
-                ]);
-            }
-
             $this->signalDashboard($downtime->job_master_id);
 
-            return [
-                'downtime' => $downtime,
-                'first_check_resumed' => $firstCheckResumed,
-                'resumed_first_check' => $resumedFirstCheck,
-            ];
+            return $downtime;
         });
     }
 
@@ -990,7 +674,6 @@ class ProductionService
 
             $totalDowntime = Downtime::where('job_master_id', $jobId)
                 ->whereDate('created_at', now()->toDateString())
-                ->where('jenis_downtime', '!=', 'dandori')
                 ->sum('duration_seconds');
 
             DailyProduction::where('job_master_id', $jobId)
@@ -1024,18 +707,6 @@ class ProductionService
     }
 
     /**
-     * Calculate canonical efficiency / achievement metric.
-     * Uses Actual Output vs Target Output.
-     */
-    public function calculateEfficiency($actual, $target)
-    {
-        if (empty($target) || $target <= 0) {
-            return 0;
-        }
-        return round(((float)$actual / (float)$target) * 100, 2);
-    }
-
-    /**
      * Save daily production summary data.
      */
     public function saveDailyProduction($jobId, array $data)
@@ -1049,10 +720,13 @@ class ProductionService
             $downtime = (int) ($session->downtime_seconds ?? 0);
             $job = JobMaster::find($jobId);
 
-            $targetQty = $job?->target_qty ?? 0; // Use canonical target
+            $targetQty = $job?->capacity ?? 0;
             $actualQty = (int) ($data['actual_qty'] ?? 0);
 
-            $efficiency = $this->calculateEfficiency($actualQty, $targetQty);
+            $efficiency = 0;
+            if ($targetQty > 0) {
+                $efficiency = round(($actualQty / $targetQty) * 100, 2);
+            }
 
             DailyProduction::updateOrCreate(
                 [
@@ -1090,6 +764,77 @@ class ProductionService
         });
     }
 
+    private function resolvePlanId($jobId): ?int
+    {
+        $job = \App\Models\JobMaster::find($jobId);
+        if (!$job) return null;
+
+        $parts = explode('-', $job->job_number);
+        $planId = end($parts);
+
+        if (is_numeric($planId)) {
+            $exists = \App\Models\ProductionPlan::where('id', $planId)->exists();
+            if ($exists) {
+                return (int) $planId;
+            }
+        }
+
+        $jobPrefix = count($parts) > 1 ? implode('-', array_slice($parts, 0, -1)) : $job->job_number;
+        $plan = \App\Models\ProductionPlan::whereDate('plan_date', now()->toDateString())
+            ->where('row_type', 'job')
+            ->where('job_no', $jobPrefix)
+            ->first();
+
+        return $plan?->id;
+    }
+
+    private function createRecoveryItem($plan, $job, $actualOk, $recoveryQty, $status, $isUnresolvable = false)
+    {
+        $date = now()->toDateString();
+        $shiftName = $this->getShift();
+        $schedule = \App\Models\RecoverySchedule::firstOrCreate(
+            [
+                'plan_date' => $date,
+                'shift_name' => $shiftName,
+                'press_name' => $plan ? $plan->press_name : $job->line,
+            ],
+            ['status' => 'waiting_approval']
+        );
+
+        return \App\Models\RecoveryItem::create([
+            'recovery_schedule_id' => $schedule->id,
+            'production_plan_id' => $plan ? $plan->id : null,
+            'job_no' => $job->job_number,
+            'job_name' => $job->job_name,
+            'job_master' => $job->job_name,
+            'press_name' => $plan ? $plan->press_name : $job->line,
+            'line' => $job->line,
+            'plan_qty' => $plan ? (float) ($plan->plan ?? 0) : (float) ($job->target_qty ?? $recoveryQty),
+            'ok' => $actualOk,
+            'repair' => 0,
+            'reject' => 0,
+            'ct_detik' => $plan ? (float) ($plan->ct_detik ?? 0) : 0,
+            'dct' => $plan ? (float) ($plan->dct ?? 0) : 0,
+            'total_mesin' => $plan ? (int) ($plan->total_mesin ?? 1) : 1,
+            'original_date' => $date,
+            'original_shift_name' => $shiftName,
+            'source_date' => $date,
+            'source_shift' => $shiftName,
+            'actual_qty' => $actualOk,
+            'recovery_qty' => $recoveryQty,
+            'queued_at' => now(),
+            'status' => $status
+        ]);
+    }
+
+    private function notifyPpcUsers($job, $recoveryItem)
+    {
+        $ppcUsers = \App\Models\User::where('role', 'like', '%ppc%')->get();
+        foreach ($ppcUsers as $user) {
+            $user->notify(new \App\Notifications\ItemTidakTercapaiNotification($job, $recoveryItem));
+        }
+    }
+
     /**
      * Determine current work shift based on time.
      */
@@ -1118,30 +863,23 @@ class ProductionService
         $current = JobMaster::find($currentJobId);
         if (!$current) return null;
 
+        // Try resolving the next job using the planned sequence sheet
         $parts = explode('-', $current->job_number);
         $planId = end($parts);
 
         if (is_numeric($planId)) {
             $currentPlan = \App\Models\ProductionPlan::find($planId);
             if ($currentPlan) {
-                $planQuery = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
+                $nextPlan = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
                     ->where('shift_name', $currentPlan->shift_name)
                     ->where('press_name', $currentPlan->press_name)
                     ->where('row_type', 'job')
-                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
-
-                $nextPlan = (clone $planQuery)
+                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                     ->where('row_no', '>', $currentPlan->row_no)
                     ->orderBy('row_no', 'asc')
                     ->first();
 
-                if (!$nextPlan) {
-                    $nextPlan = (clone $planQuery)
-                        ->orderBy('row_no', 'asc')
-                        ->first();
-                }
-
-                if ($nextPlan && $nextPlan->id !== $currentPlan->id) {
+                if ($nextPlan) {
                     $nextIdentifier = $nextPlan->job_no ? ($nextPlan->job_no . '-' . $nextPlan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($nextPlan->job_master) . '-' . $nextPlan->id);
                     $nextJob = JobMaster::where('job_number', $nextIdentifier)
                         ->whereNotIn(DB::raw('LOWER(status)'), ['complete'])
@@ -1153,24 +891,13 @@ class ProductionService
             }
         }
 
-        $allLineJobs = JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
+        // Fallback to old query
+        return JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
             ->where('line', $current->line)
+            ->where('id', '!=', $currentJobId)
             ->orderBy('sequence_no')
             ->orderBy('id')
-            ->get();
-
-        $currentIdx = $allLineJobs->search(fn($j) => $j->id == $currentJobId);
-        if ($currentIdx !== false && $allLineJobs->count() > 1) {
-            $total = $allLineJobs->count();
-            for ($i = 1; $i < $total; $i++) {
-                $candidate = $allLineJobs[($currentIdx + $i) % $total];
-                if ($candidate->id != $currentJobId) {
-                    return $candidate;
-                }
-            }
-        }
-
-        return $allLineJobs->first(fn($j) => $j->id != $currentJobId);
+            ->first();
     }
 
     /**
@@ -1181,73 +908,69 @@ class ProductionService
         $jobMaster = \App\Models\JobMaster::find($jobId);
         if (!$jobMaster) return;
 
-        $plan = $this->resolvePlanForJob($jobMaster, now()->toDateString(), $this->getShiftName());
-        if (!$plan) return;
+        // Ekstrak Plan ID dari job_number (Format: JOB_NO-PLAN_ID atau AUTO-SLUG-PLAN_ID)
+        $parts = explode('-', $jobMaster->job_number);
+        $planId = end($parts);
 
-        $updateData = [];
-        $mappedStatus = null;
+        if (is_numeric($planId)) {
+            $updateData = [];
 
-        if ($status !== null) {
-            $mappedStatus = strtolower($status);
-            if ($mappedStatus === 'running' || $mappedStatus === 'paused') {
-                $mappedStatus = 'approved';
-            } elseif ($mappedStatus === 'complete') {
-                $mappedStatus = 'completed';
+            if ($status !== null) {
+                $mappedStatus = strtolower($status);
+                if ($mappedStatus === 'running' || $mappedStatus === 'paused') {
+                    $mappedStatus = 'approved';
+                } elseif ($mappedStatus === 'complete') {
+                    $mappedStatus = 'completed';
+                }
+
+                if (in_array($mappedStatus, ['pending', 'approved', 'completed'])) {
+                    $updateData['status'] = $mappedStatus;
+                }
             }
 
-            if (in_array($mappedStatus, ['pending', 'approved', 'completed'])) {
-                $updateData['status'] = $mappedStatus;
+            // Jika salah satu kuantitas bernilai null, ambil secara dinamis dari database harian
+            if ($ok === null || $repair === null || $reject === null) {
+                $daily = \App\Models\DailyProduction::where('job_master_id', $jobId)
+                    ->whereDate('work_date', now()->toDateString())
+                    ->first();
+                if ($daily) {
+                    $ok = $ok ?? $daily->actual_qty;
+                    $repair = $repair ?? ($daily->actual_repair ?: $daily->repair_qty);
+                    $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
+                } else {
+                    $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                        ->whereDate('created_at', now())->sum('ok_qty');
+                    $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                        ->whereDate('created_at', now())->sum('repair_qty');
+                    $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
+                        ->whereDate('created_at', now())->sum('reject_qty');
+                }
             }
-        }
 
-        // Jika salah satu kuantitas bernilai null, ambil secara dinamis dari database harian
-        if ($ok === null || $repair === null || $reject === null) {
-            $daily = \App\Models\DailyProduction::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
-                ->first();
-            if ($daily) {
-                $ok = $ok ?? $daily->actual_qty;
-                $repair = $repair ?? ($daily->actual_repair ?: $daily->repair_qty);
-                $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
-            } else {
-                $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())->sum('ok_qty');
-                $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())->sum('repair_qty');
-                $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())->sum('reject_qty');
+            $updateData['ok'] = (float) ($ok ?? 0);
+            $updateData['repair'] = (float) ($repair ?? 0);
+            $updateData['reject'] = (float) ($reject ?? 0);
+
+            // Sync actual times to PPC
+            if ($jobMaster->started_at) {
+                $updateData['act_start'] = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
             }
-        }
+            if ($jobMaster->finished_at) {
+                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
+            } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
+                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
+            }
 
-        $updateData['ok'] = (float) ($ok ?? 0);
-        $updateData['repair'] = (float) ($repair ?? 0);
-        $updateData['reject'] = (float) ($reject ?? 0);
+            \App\Models\ProductionPlan::where('id', $planId)->update($updateData);
 
-        // If this plan is being worked on again, clear the skipped (TIDAK TERCAPAI) marker
-        if ($mappedStatus === 'approved' || $mappedStatus === 'completed'
-            || (float)($ok ?? 0) > 0 || (float)($repair ?? 0) > 0 || (float)($reject ?? 0) > 0) {
-            $updateData['skipped_at'] = null;
-        }
-
-        // Sync actual times to PPC
-        if ($jobMaster->started_at) {
-            $updateData['act_start'] = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
-        }
-        if ($jobMaster->finished_at) {
-            $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
-        } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
-            $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
-        }
-
-        $plan->update($updateData);
-
-        // Recovery Lock: if this plan has a recovery_id and ok > 0,
-        // set the RecoveryItem status to in_production automatically
-        $plan->refresh();
-        if ($plan->recovery_id && (float)($plan->ok ?? 0) > 0) {
-            \App\Models\RecoveryItem::where('id', $plan->recovery_id)
-                ->where('status', 'scheduled')
-                ->update(['status' => 'in_production']);
+            // Recovery Lock: if this plan has a recovery_id and ok > 0,
+            // set the RecoveryItem status to in_production automatically
+            $plan = \App\Models\ProductionPlan::find($planId);
+            if ($plan && $plan->recovery_id && (float)($plan->ok ?? 0) > 0) {
+                \App\Models\RecoveryItem::where('id', $plan->recovery_id)
+                    ->where('status', 'scheduled')
+                    ->update(['status' => 'in_production']);
+            }
         }
     }
 
@@ -1264,13 +987,6 @@ class ProductionService
         $job = JobMaster::find($jobId);
         if ($job && $job->line) {
             DashboardRealtimeService::signalUpdate($job->line);
-            DashboardRealtimeService::signalOperators($job->line);
         }
-    }
-
-    private function getShiftName(): string
-    {
-        $hour = (int) now()->format('H');
-        return ($hour >= 7 && $hour < 19) ? 'Shift Pagi' : 'Shift Malam';
     }
 }
