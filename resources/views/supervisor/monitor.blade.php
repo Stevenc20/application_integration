@@ -471,6 +471,19 @@
             .large-table .status-1stcheck{font-size:27px!important;padding:24px!important}
             .single-top-header th{font-size:28px!important;padding:24px 32px!important}
         }
+
+        /* P1.1 FINAL TYPOGRAPHY RESPONSIVE PATCH */
+        .right-detail-table th,
+        .right-detail-table td {
+            font-size: clamp(10px, 0.7vw, 22px) !important;
+            padding: clamp(4px, 0.4vw, 16px) clamp(4px, 0.4vw, 16px) !important;
+        }
+        .right-detail-table thead th {
+            font-size: clamp(9px, 0.65vw, 20px) !important;
+        }
+        .right-detail-table td.det-job {
+            font-size: clamp(10px, 0.75vw, 24px) !important;
+        }
     </style>
 </head>
 <body>
