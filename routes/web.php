@@ -523,6 +523,7 @@ Route::middleware(['auth'])
 
     // End-of-shift submission
     Route::post('/shift/{lineId}/submit', [InputHarianController::class, 'submitShift'])->name('shift.submit');
+    Route::post('/shift/{lineId}/cancel', [InputHarianController::class, 'cancelShift'])->name('shift.cancel');
 
     /*
     ====================================================
@@ -1203,5 +1204,4 @@ Route::prefix('api/v1/ppc')->group(function () {
 Route::get('/run-migration-now', function () {
     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
     return \Illuminate\Support\Facades\Artisan::output();
-});Route::post('/shift/{lineId}/cancel', [\App\Http\Controllers\Operational\InputHarianController::class, 'cancelShift'])->name('shift.cancel');
-Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
+});

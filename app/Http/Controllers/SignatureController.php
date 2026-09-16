@@ -40,7 +40,7 @@ class SignatureController extends Controller
 
     private function authorizedForScope(string $lineName, string $shiftName): bool
     {
-        if ($this->userRole() === 'superadmin') {
+        if (in_array($this->userRole(), ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             return true;
         }
 
@@ -80,7 +80,7 @@ class SignatureController extends Controller
 
     private function ownsRole(string $userRole, string $sigRole): bool
     {
-        if ($userRole === 'superadmin') {
+        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             return true;
         }
 
@@ -95,7 +95,7 @@ class SignatureController extends Controller
     private function ownsLineAndShift(string $sigRole, string $lineName, string $shiftName): bool
     {
         $userRole = $this->userRole();
-        if ($userRole === 'superadmin') {
+        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             return true;
         }
         
