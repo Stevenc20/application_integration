@@ -475,14 +475,14 @@
         /* P1.1.1 TYPOGRAPHY PATCH REFINEMENT */
         .right-detail-table th,
         .right-detail-table td {
-            font-size: clamp(10px, 0.75vw, 22px) !important;
+            font-size: clamp(12px, 0.85vw, 28px) !important;
             padding: clamp(4px, 0.4vw, 14px) clamp(4px, 0.4vw, 12px) !important;
         }
         .right-detail-table thead th {
-            font-size: clamp(9px, 0.6vw, 18px) !important;
+            font-size: clamp(10px, 0.65vw, 22px) !important;
         }
         .right-detail-table td.det-job {
-            font-size: clamp(8px, 0.5vw, 17px) !important; /* Smaller to prevent JOB NO blowout */
+            font-size: clamp(11px, 0.7vw, 24px) !important;
         }
         .right-detail-table td.det-process {
             padding: clamp(2px, 0.2vw, 8px) !important;
@@ -496,12 +496,12 @@
             display: flex; flex-direction: column; align-items: center; gap: 2px;
         }
         .process-lbl {
-            font-size: clamp(7px, 0.45vw, 14px); color: #64748b; line-height: 1; font-weight: 800;
+            font-size: clamp(8px, 0.5vw, 16px); color: #64748b; line-height: 1; font-weight: 800;
         }
         .process-box {
             display: inline-flex; align-items: center; justify-content: center;
-            width: clamp(12px, 0.8vw, 24px); height: clamp(12px, 0.8vw, 24px);
-            border-radius: 2px; font-size: clamp(8px, 0.55vw, 16px); font-weight: 900; line-height: 1;
+            width: clamp(14px, 1.2vw, 36px); height: clamp(14px, 1.2vw, 36px);
+            border-radius: 2px; font-size: clamp(9px, 0.7vw, 20px); font-weight: 900; line-height: 1;
         }
         .process-box.ok { border: 1px solid #22c55e; background: #f0fdf4; color: #16a34a; }
         .process-box.ng { background: #f3f4f6; color: #9ca3af; font-weight: 700; }
