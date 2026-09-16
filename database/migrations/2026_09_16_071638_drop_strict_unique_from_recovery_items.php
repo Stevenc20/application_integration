@@ -12,6 +12,9 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('recovery_items', function (Blueprint $table) {
+            // Create a basic index so the foreign key constraint can rely on it
+            $table->index('production_plan_id', 'recovery_items_plan_id_index');
+            
             // Drop the overly strict unique constraint
             $table->dropUnique('recovery_items_plan_id_unique');
             
