@@ -1083,11 +1083,11 @@ function renderTable(){
             <tr class="progress-row">
                 <td colspan="4" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:2px; border-top-style:solid;">
                     <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
-                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                        <div style="flex:1; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; min-width:0;">
+                        <div style="flex:1; min-width:0; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                             <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
                         </div>
-                        <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; text-align:right;">${pct}%</div>
+                        <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; flex-shrink:0; text-align:right;">${pct}%</div>
                     </div>
                 </td>
             </tr>
@@ -1182,7 +1182,7 @@ function renderTable(){
                 </div>
                 <!-- Right Detail Table -->
                 <div style="width:72%; display:flex; flex-direction:column; overflow:hidden;">
-                    <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:auto; border-collapse:collapse; border-left:none;">
+                    <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
                                 <th colspan="15" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
@@ -1222,11 +1222,11 @@ function renderTable(){
                         <tr class="progress-row">
                             <td colspan="2" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:1px; border-top-style:solid; border-bottom:none;">
                                 <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
-                                <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                                    <div style="flex:1; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
+                                <div style="display:flex; align-items:center; gap:8px; width:100%; min-width:0;">
+                                    <div style="flex:1; min-width:0; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                                         <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
                                     </div>
-                                    <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; text-align:right;">${pct}%</div>
+                                    <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; flex-shrink:0; text-align:right;">${pct}%</div>
                                 </div>
                             </td>
                         </tr>

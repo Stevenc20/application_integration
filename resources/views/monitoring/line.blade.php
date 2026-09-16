@@ -89,8 +89,8 @@
   margin-top:2px;
 }
 .lm-job-header { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px; }
-.lm-job-name { font-size:11px; font-weight:900; color:#1e293b; }
-.lm-job-part { font-size:9px; color:#94a3b8; font-weight:700; margin-top:1px; }
+.lm-job-name { font-size:11px; font-weight:900; color:#1e293b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.lm-job-part { font-size:9px; color:#94a3b8; font-weight:700; margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .lm-job-badge {
   font-size:8px; font-weight:800; text-transform:uppercase;
   padding:2px 7px; border-radius:99px; flex-shrink:0;
@@ -592,7 +592,7 @@
 
                     jobsHtml += '<div class="lm-job-item">'
                         + '<div class="lm-job-header">'
-                            + '<div>'
+                            + '<div style="flex: 1; min-width: 0; padding-right: 8px;" title="' + job.job_number + ' - ' + (job.job_name || '') + '">'
                                 + '<div class="lm-job-name">' + job.job_number + '</div>'
                                 + '<div class="lm-job-part">' + job.job_name + '</div>'
                             + '</div>'
