@@ -14,7 +14,7 @@ return new class extends Migration
     {
         // Ambil semua LI, urut per tgl_bulan lalu created_at agar konsisten
         $items = LembarInspeksi::withTrashed()
-            ->orderByRaw('YEAR(COALESCE(tgl_bulan, created_at)), MONTH(COALESCE(tgl_bulan, created_at)), created_at ASC')
+            ->orderByRaw('SUBSTR(COALESCE(tgl_bulan, created_at), 1, 4), SUBSTR(COALESCE(tgl_bulan, created_at), 6, 2), created_at ASC')
             ->get(['id', 'tgl_bulan', 'created_at']);
 
         // Kelompokkan per YYYY/MM
@@ -42,7 +42,7 @@ return new class extends Migration
     public function down(): void
     {
         $items = LembarInspeksi::withTrashed()
-            ->orderByRaw('YEAR(created_at), created_at ASC')
+            ->orderByRaw('SUBSTR(created_at, 1, 4), created_at ASC')
             ->get(['id', 'created_at']);
 
         $yearCount = [];

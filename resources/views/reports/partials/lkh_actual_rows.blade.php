@@ -100,14 +100,14 @@
             <td class="text-center font-semibold">{{ number_format($ctRecord,1) }}</td>
             <td class="text-center font-semibold">{{ number_format($ctActual,1) }}</td>
             <td class="cell-qty">@fmtMin($procAct)</td>
-            <td class="text-center font-semibold">@fmtMin($job['dies_variant_time'] ?? 0)</td>
-            <td class="text-center">@fmtMin($job['qcheck_time'] ?? 0)</td>
-            <td class="cell-qty">@fmtMin($dctActual)</td>
-            <td class="cell-qty">@fmtMin($dtDies)</td>
-            <td class="cell-qty">@fmtMin($dtMach)</td>
-            <td class="cell-qty">@fmtMin($dtMatl)</td>
-            <td class="cell-qty">@fmtMin($dtLog)</td>
-            <td class="cell-qty">@fmtMin($dtProd)</td>
+            {!! $editTd($planId, 'dandori_dies_variant', 'mins', $job['dies_variant_time'] ?? 0, \App\Support\ProductionFormat::minutes($job['dies_variant_time'] ?? 0), 'text-center font-semibold') !!}
+            {!! $editTd($planId, 'dandori_qcheck', 'mins', $job['qcheck_time'] ?? 0, \App\Support\ProductionFormat::minutes($job['qcheck_time'] ?? 0), 'text-center') !!}
+            {!! $editTd($planId, 'dandori_total', 'mins', $dctActual, \App\Support\ProductionFormat::minutes($dctActual), 'cell-qty') !!}
+            {!! $editTd($planId, 'dt_dies', 'mins', $dtDies, \App\Support\ProductionFormat::minutes($dtDies), 'cell-qty') !!}
+            {!! $editTd($planId, 'dt_machine', 'mins', $dtMach, \App\Support\ProductionFormat::minutes($dtMach), 'cell-qty') !!}
+            {!! $editTd($planId, 'dt_material', 'mins', $dtMatl, \App\Support\ProductionFormat::minutes($dtMatl), 'cell-qty') !!}
+            {!! $editTd($planId, 'dt_log', 'mins', $dtLog, \App\Support\ProductionFormat::minutes($dtLog), 'cell-qty') !!}
+            {!! $editTd($planId, 'dt_production', 'mins', $dtProd, \App\Support\ProductionFormat::minutes($dtProd), 'cell-qty') !!}
             <td class="cell-qty font-bold">
                 @if ($planId && $dtTotal > 0)
                 <a href="{{ route('monitoring.history', ['type' => 'downtime', 'plan_id' => $planId, 'date' => $date]) }}" class="text-blue-600 hover:underline" title="Lihat detail downtime">DT</a>

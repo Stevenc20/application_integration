@@ -5,46 +5,72 @@ namespace App\Http\Controllers;
 use App\Models\Signature;
 use Illuminate\Http\Request;
 use App\Models\LineAssignment;
-use App\Models\LineMaster;
 use App\Models\ProductionPlan;
+use App\Support\SignatureScopeNormalizer;
 
 class SignatureController extends Controller
 {
     private function normalizeLine(string $line): string
     {
-        return strtoupper(trim(str_replace(['LINE', 'PRESS', ' '], '', strtoupper($line))));
+        return SignatureScopeNormalizer::normalizeLine($line);
     }
 
     private function normalizeShift(string $shift): string
     {
-        $norm = strtoupper(trim($shift));
-        if (str_contains($norm, 'PAGI') || $norm === '1' || $norm === 'S1' || $norm === 'SHIFT-1' || str_contains($norm, 'SHIFT 1')) return '1';
-        if (str_contains($norm, 'MALAM') || $norm === '2' || $norm === 'S2' || $norm === 'SHIFT-2' || str_contains($norm, 'SHIFT 2')) return '2';
-        if (str_contains($norm, 'NON') || $norm === '3') return '3';
-        return $norm;
+        return SignatureScopeNormalizer::normalizeShift($shift);
     }
 
     private function getStandardLineName(string $rawLine): string
     {
-        if (!$rawLine) return 'Line A';
-        $norm = $this->normalizeLine($rawLine);
-        $masters = LineMaster::pluck('line_name');
-        foreach ($masters as $m) {
-            if ($this->normalizeLine($m) === $norm) {
-                return $m;
-            }
-        }
-        return $rawLine;
+        return SignatureScopeNormalizer::standardLine((string) $rawLine);
     }
 
     private function getStandardShiftName(string $rawShift): string
     {
-        if (!$rawShift) return 'Shift Pagi';
-        $norm = $this->normalizeShift($rawShift);
-        if ($norm === '1') return 'Shift Pagi';
-        if ($norm === '2') return 'Shift Malam';
-        if ($norm === '3') return 'Non-Shift';
-        return $rawShift;
+        return SignatureScopeNormalizer::standardShift((string) $rawShift);
+    }
+
+    private function canonicalPair(string $lineName, string $shiftName): array
+    {
+        return [
+            $this->getStandardLineName($lineName),
+            $this->getStandardShiftName($shiftName),
+        ];
+    }
+
+    private function authorizedForScope(string $lineName, string $shiftName): bool
+    {
+        if ($this->userRole() === 'superadmin') {
+            return true;
+        }
+
+        $userId = auth()->id();
+        [$standardLine, $standardShift] = $this->canonicalPair($lineName, $shiftName);
+
+        $targetLine = $this->normalizeLine($standardLine);
+        $targetShift = $this->normalizeShift($standardShift);
+
+        $assignments = LineAssignment::where(function ($q) use ($userId) {
+            $q->where('leader_user_id', $userId)
+                ->orWhere('foreman_user_id', $userId)
+                ->orWhere('supervisor_user_id', $userId);
+        })->get();
+
+        foreach ($assignments as $assignment) {
+            $assignLine = $this->normalizeLine($assignment->line_name ?? '');
+            $assignShiftRaw = $assignment->shift_name ?? '';
+            $assignShift = $assignShiftRaw ? $this->normalizeShift($assignShiftRaw) : '';
+
+            if ($assignLine !== $targetLine) {
+                continue;
+            }
+
+            if ($assignShift === '' || $assignShift === $targetShift) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function userRole(): string
@@ -110,10 +136,18 @@ class SignatureController extends Controller
             return response()->json(['signature' => null]);
         }
 
+        if (!$this->authorizedForScope($lineName, $shiftName)) {
+            return response()->json([
+                'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
+            ], 403);
+        }
+
+        [$standardLine, $standardShift] = $this->canonicalPair($lineName, $shiftName);
+
         $signature = Signature::where('role', $role)
             ->where('work_date', $workDate)
-            ->where('line_name', $lineName)
-            ->where('shift_name', $shiftName)
+            ->where('line_name', $standardLine)
+            ->where('shift_name', $standardShift)
             ->first();
 
         return response()->json([
@@ -131,13 +165,15 @@ class SignatureController extends Controller
             'signature' => 'required|string',
         ]);
 
+        [$standardLine, $standardShift] = $this->canonicalPair($request->line_name, $request->shift_name);
+
         if (!$this->ownsRole($this->userRole(), $request->role)) {
             return response()->json([
                 'error' => 'Anda tidak berhak menandatangani TTD untuk role ini'
             ], 403);
         }
 
-        if (!$this->ownsLineAndShift($request->role, $request->line_name, $request->shift_name)) {
+        if (!$this->ownsLineAndShift($request->role, $standardLine, $standardShift)) {
             return response()->json([
                 'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
             ], 403);
@@ -150,8 +186,8 @@ class SignatureController extends Controller
             $prevRole = $chain[$currentIndex - 1];
             $prevSignature = Signature::where('role', $prevRole)
                 ->where('work_date', $request->work_date)
-                ->where('line_name', $request->line_name)
-                ->where('shift_name', $request->shift_name)
+                ->where('line_name', $standardLine)
+                ->where('shift_name', $standardShift)
                 ->first();
                 
             if (!$prevSignature) {
@@ -165,8 +201,8 @@ class SignatureController extends Controller
             [
                 'role' => $request->role, 
                 'work_date' => $request->work_date,
-                'line_name' => $request->line_name,
-                'shift_name' => $request->shift_name,
+                'line_name' => $standardLine,
+                'shift_name' => $standardShift,
             ],
             ['signature_data' => $request->signature]
         );
@@ -183,23 +219,33 @@ class SignatureController extends Controller
             'shift_name' => 'required|string',
         ]);
 
+        [$standardLine, $standardShift] = $this->canonicalPair($request->line_name, $request->shift_name);
+
         if (!$this->ownsRole($this->userRole(), $request->role)) {
             return response()->json([
                 'error' => 'Anda tidak berhak menghapus TTD ini'
             ], 403);
         }
 
-        if (!$this->ownsLineAndShift($request->role, $request->line_name, $request->shift_name)) {
+        if (!$this->ownsLineAndShift($request->role, $standardLine, $standardShift)) {
             return response()->json([
                 'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
             ], 403);
         }
 
-        Signature::where('role', $request->role)
+        $target = Signature::where('role', $request->role)
             ->where('work_date', $request->work_date)
-            ->where('line_name', $request->line_name)
-            ->where('shift_name', $request->shift_name)
-            ->delete();
+            ->where('line_name', $standardLine)
+            ->where('shift_name', $standardShift)
+            ->first();
+
+        if (!$target) {
+            return response()->json([
+                'error' => 'Tanda tangan tidak ditemukan pada scope ini'
+            ], 404);
+        }
+
+        $target->delete();
 
         return response()->json(['success' => true]);
     }
@@ -214,11 +260,19 @@ class SignatureController extends Controller
             return response()->json([]);
         }
 
+        if (!$this->authorizedForScope($lineName, $shiftName)) {
+            return response()->json([
+                'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
+            ], 403);
+        }
+
+        [$standardLine, $standardShift] = $this->canonicalPair($lineName, $shiftName);
+
         $chain = ['teamleader', 'foreman', 'supervisor'];
         $signedRoles = Signature::whereIn('role', $chain)
             ->where('work_date', $workDate)
-            ->where('line_name', $lineName)
-            ->where('shift_name', $shiftName)
+            ->where('line_name', $standardLine)
+            ->where('shift_name', $standardShift)
             ->pluck('role')->toArray();
 
         $result = [];
@@ -278,7 +332,29 @@ class SignatureController extends Controller
             $standardLine = $this->getStandardLineName($assignment->line_name ?? '');
             $standardShift = $this->getStandardShiftName($assignment->shift_name ?? '');
 
-            $hasPlan = ProductionPlan::whereDate('plan_date', $workDate)->exists();
+            $targetShift = $this->normalizeShift($standardShift);
+
+            $hasPlan = ProductionPlan::whereDate('plan_date', $workDate)
+                ->whereHas('line', function ($q) use ($standardLine) {
+                    $q->where('line_name', $standardLine);
+                })
+                ->where(function ($q) use ($targetShift) {
+                    if ($targetShift === '2') {
+                        $q->where(function ($w) {
+                            $w->whereNull('shift_name')
+                                ->orWhereRaw("UPPER(COALESCE(TRIM(shift_name), '')) = ''")
+                                ->orWhereRaw("UPPER(TRIM(shift_name)) LIKE '%MALAM%'");
+                        });
+                    } else {
+                        $q->where(function ($w) {
+                            $w->whereNull('shift_name')
+                                ->orWhereRaw("UPPER(COALESCE(TRIM(shift_name), '')) = ''")
+                                ->orWhereRaw("UPPER(TRIM(shift_name)) LIKE '%PAGI%'");
+                        });
+                    }
+                })
+                ->exists();
+
             if (!$hasPlan) continue;
 
             $signedRoles = Signature::whereIn('role', $chain)

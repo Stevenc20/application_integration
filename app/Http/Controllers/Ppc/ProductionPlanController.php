@@ -12,6 +12,7 @@ use App\Models\JobMaster;
 use App\Models\MasterStamping;
 use App\Models\RecoveryItem;
 use App\Models\RecoverySchedule;
+use App\Models\ShiftSubmission;
 use App\Services\BreakTimelineValidator;
 use App\Services\ExcelScheduleParser;
 use Illuminate\Http\Request;
@@ -830,6 +831,12 @@ class ProductionPlanController extends Controller
             ->where('shift_name', $shiftToDelete)
             ->where('row_type', 'break')
             ->whereNull('source_type')
+            ->delete();
+
+        // 4. UNLOCK shift submissions — allow foremen to re-enter data after re-upload
+        $shiftVal = str_contains(strtoupper($shiftToDelete), 'MALAM') ? 2 : 1;
+        ShiftSubmission::where('work_date', $parsedDate)
+            ->where('shift', $shiftVal)
             ->delete();
 
         // Revert approved/scheduled RecoveryItems back to waiting_approval queue

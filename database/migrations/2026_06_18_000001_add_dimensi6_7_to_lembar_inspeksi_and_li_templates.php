@@ -16,9 +16,11 @@ return new class extends Migration
      */
     public function up(): void
     {
-        // Ensure DYNAMIC row format so InnoDB stores off-page data efficiently.
-        DB::statement('ALTER TABLE `lembar_inspeksi` ROW_FORMAT=DYNAMIC');
-        DB::statement('ALTER TABLE `li_templates`    ROW_FORMAT=DYNAMIC');
+        // Ensure DYNAMIC row format so InnoDB stores off-page data efficiently (MySQL only).
+        if (DB::connection()->getDriverName() === 'mysql') {
+            DB::statement('ALTER TABLE `lembar_inspeksi` ROW_FORMAT=DYNAMIC');
+            DB::statement('ALTER TABLE `li_templates`    ROW_FORMAT=DYNAMIC');
+        }
 
         // ── lembar_inspeksi ──────────────────────────────────────────────────
         Schema::table('lembar_inspeksi', function (Blueprint $table) {

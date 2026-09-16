@@ -63,6 +63,11 @@ class AuthController extends Controller
         $sec = strtolower($user->section ? $user->section->section_name : '');
         $legacyRole = strtolower($user->role ?? '');
 
+        // Section-based redirects FIRST (PPC/Quality/Production need their dashboards)
+        if ($sec === 'ppc' || $legacyRole === 'ppc') return redirect()->route('ppc.dashboard');
+        if ($sec === 'quality' || $legacyRole === 'quality') return redirect()->route('quality.dashboard');
+        if ($sec === 'produksi' || $legacyRole === 'production') return redirect()->route('production.dashboard');
+
         if ($pos === 'tim member' || $legacyRole === 'operator') {
             return redirect()->route('operator.dashboard');
         } elseif ($pos === 'leader' || str_starts_with($legacyRole, 'leader') || in_array($legacyRole, ['shearing', 'handwork'])) {
@@ -80,11 +85,6 @@ class AuthController extends Controller
         } elseif ($pos === 'presdir' || $legacyRole === 'presdir') {
             return redirect()->route('presdir.dashboard');
         }
-
-        // Section based redirects
-        if ($sec === 'ppc' || $legacyRole === 'ppc') return redirect()->route('ppc.dashboard');
-        if ($sec === 'quality' || $legacyRole === 'quality') return redirect()->route('quality.dashboard');
-        if ($sec === 'produksi' || $legacyRole === 'production') return redirect()->route('production.dashboard');
         
         // Hambatan Jalur fallback
         $hambatanRoles = ['dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan', 'mesin'];

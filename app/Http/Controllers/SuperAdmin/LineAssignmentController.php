@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Models\LineMaster;
 use App\Models\LineAssignment;
+use App\Support\SignatureScopeNormalizer;
 use Illuminate\Http\Request;
 
 class LineAssignmentController extends Controller
@@ -57,8 +58,8 @@ class LineAssignmentController extends Controller
 
         LineAssignment::updateOrCreate(
             [
-                'line_name' => $request->line_name,
-                'shift_name' => $request->shift_name,
+                'line_name' => SignatureScopeNormalizer::standardLine((string) $request->line_name),
+                'shift_name' => SignatureScopeNormalizer::standardShift((string) $request->shift_name),
             ],
             [
                 'leader_user_id' => $request->leader_user_id,

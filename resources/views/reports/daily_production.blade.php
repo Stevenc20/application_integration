@@ -127,7 +127,7 @@
         @if ($canEdit && !$ttdLocked)
         <div id="lkh-edit-banner" class="no-print px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2" style="display:none">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
-            <span>Mode edit aktif — klik sel <b>Good / Repair / Reject / Act Start / Act Fin</b> untuk mengubah data actual, lalu tekan <b>Simpan</b>.</span>
+            <span>Mode edit aktif — klik sel <b>Good / Repair / Reject / Act Start / Act Fin / Uchi Dandori / Down Time</b> untuk mengubah data actual, lalu tekan <b>Simpan</b>.</span>
         </div>
         @endif
         <div class="p-6">
@@ -221,15 +221,8 @@
                             $sigState = $signatureStatus[$roleKey] ?? ['signed' => false, 'available' => false];
                             $isSigned = $sigState['signed'];
 
-                            $currentRole = strtolower(auth()->user()?->role ?? '');
-                            $isSuperadmin = $currentRole === 'superadmin';
-                            $isOwner = match ($roleKey) {
-                                'teamleader' => str_starts_with($currentRole, 'leader') || in_array($currentRole, ['teamleader', 'group leader']),
-                                'foreman'    => $currentRole === 'foreman',
-                                'supervisor' => $currentRole === 'supervisor',
-                                default      => false,
-                            };
-                            $canInteract = $isSuperadmin || $isOwner;
+                            $authorizedScope = $authorizedScope ?? false;
+                            $canInteract = $authorizedScope;
                             $clickable = $canInteract && $sigState['available'] && !$isSigned;
                             $showLock = !$isSigned && !$clickable;
                         @endphp
@@ -586,6 +579,7 @@ const sigLineName = @json($selectedLineName);
 const sigShiftName = @json($selectedShift);
 const SIG_USER_ROLE = @json(strtolower(auth()->user()?->role ?? ''));
 const SIG_IS_SUPERADMIN = SIG_USER_ROLE === 'superadmin';
+const SIG_AUTHORIZED = @json($authorizedScope ?? false);
 
 function sigRoleOwned(role) {
     if (SIG_IS_SUPERADMIN) return true;
@@ -757,7 +751,7 @@ function refreshSignatureStatus() {
                 const clickArea = document.getElementById('clickarea_ttd_' + role);
                 const card = document.getElementById('card_ttd_' + role);
                 if (!s) return;
-                const canClick = sigRoleOwned(role) && s.available && !s.signed;
+                const canClick = SIG_AUTHORIZED && sigRoleOwned(role) && s.available && !s.signed;
                 const showLock = !s.signed && !canClick;
                 if (lock) {
                     if (showLock) { lock.classList.remove('hidden'); lock.style.display = ''; }
@@ -861,7 +855,8 @@ function lkhCellToInput(cell) {
     const type = cell.dataset.type === 'time' ? 'time' : 'number';
     const input = document.createElement('input');
     input.type = type;
-    if (type === 'number') { input.step = '1'; input.min = '0'; }
+    if (cell.dataset.type === 'mins') { input.step = 'any'; input.min = '0'; }
+    else if (type === 'number') { input.step = '1'; input.min = '0'; }
     input.className = 'lkh-cell-input';
     input.value = cell.dataset.value;
     cell.textContent = '';
