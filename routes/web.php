@@ -149,21 +149,15 @@ Route::middleware(['auth','role:admin,supervisor,ppc'])->prefix('admin')->name('
         ->middleware('feature:user_management');
 
 });
-// ADMIN & SUPER ADMIN (Access Management)
-Route::middleware(['auth', 'role:superadmin,admin'])->prefix('access-management')->name('access-management.')->group(function () {
+// SUPER ADMIN
+Route::middleware(['auth', 'role:superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\SuperAdmin\DashboardController::class, 'index'])->name('dashboard');
     Route::get('/users', [\App\Http\Controllers\SuperAdmin\UserController::class, 'index'])->name('users.index');
     Route::post('/users', [\App\Http\Controllers\SuperAdmin\UserController::class, 'store'])->name('users.store');
     Route::put('/users/{user}', [\App\Http\Controllers\SuperAdmin\UserController::class, 'update'])->name('users.update');
     Route::delete('/users/{user}', [\App\Http\Controllers\SuperAdmin\UserController::class, 'destroy'])->name('users.destroy');
-    
     Route::get('/features', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'index'])->name('features.index');
-    Route::get('/features/ajax', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'getPermissions'])->name('features.ajax');
-    Route::post('/features/toggle', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'togglePermission'])->name('features.toggle');
-});
-
-// SUPER ADMIN ONLY
-Route::middleware(['auth', 'role:superadmin'])->prefix('super-admin')->name('super-admin.')->group(function () {
-    Route::get('/dashboard', [\App\Http\Controllers\SuperAdmin\DashboardController::class, 'index'])->name('dashboard');
+    Route::post('/features', [\App\Http\Controllers\SuperAdmin\FeatureController::class, 'update'])->name('features.update');
     Route::get('/assignments', [\App\Http\Controllers\SuperAdmin\LineAssignmentController::class, 'index'])->name('assignments.index');
     Route::post('/assignments', [\App\Http\Controllers\SuperAdmin\LineAssignmentController::class, 'store'])->name('assignments.store');
     Route::delete('/assignments/{assignment}', [\App\Http\Controllers\SuperAdmin\LineAssignmentController::class, 'destroy'])->name('assignments.destroy');
@@ -232,8 +226,7 @@ Route::middleware(['auth','role:supervisor,ppc,leader,foreman,manager,kadiv,dire
     // Reports
     Route::prefix('reports')->name('reports.')->group(function() {
         Route::get('/daily-production', [\App\Http\Controllers\Supervisor\ReportController::class, 'dailyProduction'])->middleware('feature:daily_report')->name('daily_production');
-        Route::get('/asakai', [\App\Http\Controllers\Supervisor\ReportController::class, 'asakaiReport'])->middleware('feature:daily_report')->name('asakai');
-        Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateLkhCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
+        Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
         Route::get('/performance', [\App\Http\Controllers\Supervisor\ReportController::class, 'performance'])->middleware('feature:performance_report')->name('performance');
         Route::get('/downtime-recap/{planId}', [\App\Http\Controllers\Supervisor\ReportController::class, 'downtimeRecap'])->middleware('feature:daily_report')->name('downtime_recap');
         Route::get('/downtime-recap-json/{planId}', [\App\Http\Controllers\Supervisor\ReportController::class, 'downtimeRecapJson'])->middleware('feature:daily_report')->name('downtime_recap_json');
@@ -329,19 +322,7 @@ Route::get('/', function(){
 
 // login
 Route::get('/login', [AuthController::class, 'login'])->name('login');
-Route::post('/login', [AuthController::class, 'loginProcess'])->name('login.process')->middleware('throttle:5,1');
-
-// DEVICE LINK (QR LOGIN)
-Route::post('/auth/device-link/create', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'create'])->name('device_link.create')->middleware('throttle:10,1');
-Route::get('/auth/device-link/{tokenHash}/status', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'status'])->name('device_link.status');
-Route::post('/auth/device-link/{tokenHash}/consume', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'consume'])->name('device_link.consume');
-
-Route::middleware('auth')->group(function () {
-    Route::get('/auth/device-link/scanner', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'scanner'])->name('device_link.scanner');
-    Route::get('/auth/device-link/scan', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'showScanPage'])->name('device_link.scan_page');
-    Route::post('/auth/device-link/{tokenHash}/approve', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'approve'])->name('device_link.approve');
-    Route::post('/auth/device-link/{tokenHash}/cancel', [\App\Http\Controllers\Auth\DeviceLinkController::class, 'cancel'])->name('device_link.cancel');
-});
+Route::post('/login', [AuthController::class, 'loginProcess'])->name('login.process');
 
 // MONITORING
 Route::prefix('monitoring')
@@ -385,7 +366,12 @@ Route::prefix('monitoring')
     });
 
 // logout
-Route::get('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::get('/logout', function () {
+    auth()->logout();
+    session()->invalidate();
+    session()->regenerateToken();
+    return redirect('/login');
+})->name('logout');
 
 /*
 |--------------------------------------------------------------------------
@@ -453,17 +439,22 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'getQty']
     )->name('job.qty');
 
-    Route::get('/job/{id}/sync',
-        [InputHarianController::class, 'sync']
-    )->name('job.sync');
-
-    Route::get('/realtime/stream',
-        [InputHarianController::class, 'streamLine']
-    )->name('realtime.stream');
-
     Route::get('/audit-trail',
         [InputHarianController::class, 'productionAudit']
     )->middleware('feature:audit_trail')->name('audit_trail');
+
+    /*
+    ====================================================
+    NEXT PROCESS
+    ====================================================
+    */
+    Route::get('/job/{id}/next-list',
+        [InputHarianController::class, 'nextList']
+    )->name('job.next_list');
+
+    Route::post('/job/{id}/next-process',
+        [InputHarianController::class, 'nextProcess']
+    )->name('job.next_process');
 
     /*
     ====================================================
@@ -523,6 +514,9 @@ Route::middleware(['auth'])
 
     // End-of-shift submission
     Route::post('/shift/{lineId}/submit', [InputHarianController::class, 'submitShift'])->name('shift.submit');
+
+    // End-of-shift cancellation (1×)
+    Route::post('/shift/{lineId}/cancel', [InputHarianController::class, 'cancelShift'])->name('shift.cancel');
 
     /*
     ====================================================
@@ -647,10 +641,8 @@ Route::middleware(['auth'])->group(function () {
 
 
 // quality dashboard
-Route::middleware(['auth', 'role:quality,member,board,manager,kadiv,presdir,direktur'])->prefix('quality')->name('quality.')->group(function () {
-    Route::get('/dashboard', [\App\Http\Controllers\Qa\Web\QualityDashboardController::class, 'index'])->middleware('feature:quality_dashboard')->name('dashboard');
-    Route::get('/defect-monitoring', [\App\Http\Controllers\Qa\Web\QualityDashboardController::class, 'defectMonitoring'])->middleware('feature:quality_control_defect')->name('defect_monitoring');
-    Route::get('/reject-analysis', [\App\Http\Controllers\Qa\Web\QualityDashboardController::class, 'rejectAnalysis'])->middleware('feature:quality_control_reject')->name('reject_analysis');
+Route::middleware(['auth', 'role:quality'])->prefix('quality')->name('quality.')->group(function () {
+    Route::get('/dashboard', [\App\Http\Controllers\Supervisor\DashboardController::class, 'index'])->middleware('feature:quality_dashboard')->name('dashboard');
 });
 
 // quality
@@ -661,7 +653,6 @@ Route::prefix('quality')->group(function () {
     Route::post('/store', [QualityController::class, 'store'])->name('quality.store');
 
     Route::get('/edit/{id}', [QualityController::class, 'edit'])->name('quality.edit');
-
 
     Route::post('/update/{id}', [QualityController::class, 'update'])->name('quality.update');
 
@@ -734,7 +725,6 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->group(function () {
 
     // Dashboard Stock
     Route::get('/stock', [StockController::class, 'index'])->name('stock.index');
-    Route::post('/stock/upload', [StockController::class, 'upload'])->name('stock.upload');
 
     // Rundown Stock
     Route::get('/rundown-stock', [RundownController::class, 'index'])->name('rundown.index');
@@ -1005,202 +995,8 @@ Route::middleware(['auth', 'role:production'])->prefix('production')->name('prod
 });
 
 // ======================
-// NETWORK MONITOR (ADMIN & SUPERADMIN ONLY)
-// ======================
-Route::middleware(['auth', 'role:admin,superadmin', 'feature:network_monitor'])
-    ->prefix('network-monitor')
-    ->name('network_monitor.')
-    ->group(function () {
-        Route::get('/', [\App\Http\Controllers\NetworkMonitorController::class, 'index'])->name('index');
-        Route::get('/containers', [\App\Http\Controllers\NetworkMonitorController::class, 'containers'])->name('containers');
-        Route::get('/logs', [\App\Http\Controllers\NetworkMonitorController::class, 'logs'])->name('logs');
-        Route::get('/latency', [\App\Http\Controllers\NetworkMonitorController::class, 'latency'])->name('latency');
-    });
-
-// ======================
-// DATA MINING
-// ======================
-Route::middleware(['auth', 'feature:data_mining'])
-    ->prefix('data-mining')
-    ->name('data_mining.')
-    ->group(function () {
-        Route::get('/', [\App\Http\Controllers\DataMiningController::class, 'index'])->name('index');
-        Route::get('/trend/{metric}', [\App\Http\Controllers\DataMiningController::class, 'getTrend'])->name('trend');
-        Route::get('/anomaly', [\App\Http\Controllers\DataMiningController::class, 'getAnomaly'])->name('anomaly');
-        Route::get('/pareto/{type}', [\App\Http\Controllers\DataMiningController::class, 'getPareto'])->name('pareto');
-        Route::get('/summary', [\App\Http\Controllers\DataMiningController::class, 'getSummary'])->name('summary');
-    });
-
-// ======================
 // SHARED GSPH API (accessible by all authenticated roles)
 // ======================
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::get('/gsph', [\App\Http\Controllers\Api\GrafikController::class, 'gsph']);
-});
-
-// ======================
-// SECURITY DASHBOARD (ADMIN & SUPERADMIN ONLY)
-// ======================
-Route::middleware(['auth', 'role:admin,superadmin', 'feature:security'])
-    ->prefix('security')
-    ->name('security.')
-    ->group(function () {
-        Route::get('/dashboard', [\App\Http\Controllers\SecurityController::class, 'index'])->name('dashboard');
-        Route::get('/logs', [\App\Http\Controllers\SecurityController::class, 'logs'])->name('logs');
-    });
-// ─── ROUTE QA MODULE ──────────────────────────
-use App\Http\Controllers\Qa\Web\LembarInspeksiWebController;
-use App\Http\Controllers\Qa\Web\QprWebController;
-use App\Http\Controllers\Qa\Web\AdminWebController;
-use App\Http\Controllers\Qa\Web\QCWebController;
-use App\Http\Controllers\Qa\Web\ItemCheckController as WebItemCheckController;
-use App\Http\Controllers\Qa\Api\QprController;
-use App\Http\Controllers\Qa\Api\LembarInspeksiController;
-use App\Http\Controllers\Qa\Api\ItemCheckController as ApiItemCheckController;
-use App\Http\Controllers\Qa\Api\ApprovalController;
-use App\Http\Controllers\Qa\Api\SignatureController;
-use App\Http\Controllers\Qa\Api\DefectMasterController;
-
-Route::middleware(['auth'])->group(function() {
-    // QA Web
-    Route::get('/li', [LembarInspeksiWebController::class, 'index'])->name('qa.li.index');
-    Route::get('/li/create', [LembarInspeksiWebController::class, 'create'])->name('qa.li.create');
-    Route::get('/li/summary', [LembarInspeksiWebController::class, 'summary'])->name('qa.li.summary');
-    Route::get('/li/rekap', [LembarInspeksiWebController::class, 'rekap'])->name('qa.li.rekap');
-    Route::get('/li/{id}/edit', [LembarInspeksiWebController::class, 'edit'])->name('qa.li.edit');
-    Route::get('/li/{id}/print', [LembarInspeksiWebController::class, 'print'])->name('qa.li.print');
-
-    Route::get('/qpr', [QprWebController::class, 'index'])->name('qa.qpr.index');
-    Route::get('/qpr/create', [QprWebController::class, 'create'])->name('qa.qpr.create');
-    Route::get('/qpr/registration', [QprWebController::class, 'registration'])->name('qa.qpr.registration');
-    Route::get('/qpr/{id}/edit', [QprWebController::class, 'edit'])->name('qa.qpr.edit');
-    Route::get('/qpr/{id}/preview', [QprWebController::class, 'preview'])->name('qa.qpr.preview');
-
-    Route::get('/admin/defects', [AdminWebController::class, 'defects'])->name('qa.admin.defects');
-    
-    Route::get('/li/master-template', [LembarInspeksiWebController::class, 'masterTemplate'])->name('qa.li.master-template');
-
-    // Item Check Routes
-    Route::get('/item-check', [WebItemCheckController::class, 'index'])->name('qa.item-check.index');
-    Route::post('/item-check/{scheduleId}/start', [WebItemCheckController::class, 'start'])->name('qa.item-check.start');
-    Route::get('/item-check/{id}/form', [WebItemCheckController::class, 'form'])->name('qa.item-check.form');
-    Route::get('/item-check/preview/{templateId}', [WebItemCheckController::class, 'preview'])->name('qa.item-check.preview');
-    Route::get('/item-check/{id}/print', [WebItemCheckController::class, 'print'])->name('qa.item-check.print');
-
-    Route::get('/qc/worklist', [QCWebController::class, 'worklist'])->name('qa.qc.worklist');
-    Route::get('/qc/leaderboard', [QCWebController::class, 'raporLeader'])->name('qa.qc.rapor-leader');
-    Route::get('/rapor-qc', [QCWebController::class, 'rapor'])->name('qa.qc.rapor');
-
-    // QA API (can be inside web.php to access session)
-    Route::prefix('api/qa')->group(function() {
-        Route::post('signature/verify-pin', [SignatureController::class, 'verifyPin']);
-        Route::get('signature/get-signature', [SignatureController::class, 'getSignature']);
-        Route::post('signature/save-master', [SignatureController::class, 'saveMaster']);
-
-        Route::prefix('qprs')->group(function () {
-            Route::get('/pending-approval',          [QprController::class, 'pendingApproval']);
-            Route::post('/upload-sketch',            [QprController::class, 'uploadSketch']);
-            Route::get('/',                          [QprController::class, 'index']);
-            Route::post('/',                         [QprController::class, 'store']);
-            Route::patch('/draft',                   [QprController::class, 'saveDraft']);
-            Route::get('/{id}',                      [QprController::class, 'show']);
-            Route::put('/{id}',                      [QprController::class, 'update']);
-            Route::patch('/{id}/draft',              [QprController::class, 'saveDraft']);
-            Route::delete('/{id}',                   [QprController::class, 'destroy']);
-            Route::post('/{id}/sign',                [QprController::class, 'sign']);
-            Route::post('/{id}/revision',            [QprController::class, 'requestRevision']);
-            Route::get('/{id}/signatures',           [QprController::class, 'signatures']);
-            Route::post('/{id}/generate-tokens',     [ApprovalController::class, 'generateTokens']);
-        });
-
-        Route::prefix('inspeksi')->group(function () {
-            Route::post('/import-excel',     [LembarInspeksiController::class, 'importExcel']);
-            Route::get('/',                  [LembarInspeksiController::class, 'index']);
-            Route::post('/',                 [LembarInspeksiController::class, 'store']);
-            Route::get('/pending-ttd',       [LembarInspeksiController::class, 'pendingTtd']);
-            Route::get('/leaderboard',       [LembarInspeksiController::class, 'leaderboard']);
-            Route::get('/search',            [LembarInspeksiController::class, 'search']);  
-            Route::get('/rekap-bulanan',     [LembarInspeksiController::class, 'rekapBulanan']);
-            Route::post('/upload-sketch',    [LembarInspeksiController::class, 'uploadSketch']);  
-            Route::get('/{id}',              [LembarInspeksiController::class, 'show']);
-            Route::post('/{id}/sign',        [LembarInspeksiController::class, 'sign']);
-            Route::put('/{id}',              [LembarInspeksiController::class, 'update']);        
-            Route::delete('/{id}',           [LembarInspeksiController::class, 'destroy']);       
-            Route::post('/{id}/reject',      [LembarInspeksiController::class, 'reject']); 
-            Route::post('/{id}/restore',     [LembarInspeksiController::class, 'restore']);
-            Route::post('/{id}/sign-column', [LembarInspeksiController::class, 'signColumn']);
-            Route::post('/{id}/generate-qpr',[LembarInspeksiController::class, 'generateQpr']);
-            Route::post('/{id}/assign',      [LembarInspeksiController::class, 'assign']);
-            Route::post('/{id}/claim',       [LembarInspeksiController::class, 'claim']);
-            Route::post('/{id}/field-revisions', [LembarInspeksiController::class, 'saveFieldRevisions']);
-            Route::post('/{id}/resolve-revision', [LembarInspeksiController::class, 'resolveFieldRevision']);       
-        });
-
-        Route::prefix('item-check')->group(function () {
-            Route::get('/pending-ttd',               [ApiItemCheckController::class, 'pendingTtd']);
-            Route::get('/search',                    [ApiItemCheckController::class, 'search']);
-            Route::get('/summary',                   [ApiItemCheckController::class, 'summaryList']);
-            Route::get('/{id}',                      [ApiItemCheckController::class, 'show']);
-            Route::put('/{id}',                      [ApiItemCheckController::class, 'update']);
-            Route::post('/{id}/start',               [ApiItemCheckController::class, 'start']);
-            Route::post('/{id}/sign',                [ApiItemCheckController::class, 'sign']);
-            Route::post('/{id}/assign',              [ApiItemCheckController::class, 'assign']);
-            Route::post('/{id}/field-revisions',     [ApiItemCheckController::class, 'saveFieldRevisions']);
-            Route::post('/{id}/resolve-revision',    [ApiItemCheckController::class, 'resolveFieldRevision']);
-            Route::post('/{id}/resume',              [ApiItemCheckController::class, 'resumeTimer']);
-        });
-
-        Route::prefix('production-plans')->group(function () {
-            Route::get('/{job_no}', [\App\Http\Controllers\Qa\Api\ProductionPlanController::class, 'getByJobNo']);
-        });
-
-        Route::prefix('li-templates')->group(function () {
-            Route::get('/',                          [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'index']);
-            Route::post('/',                         [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'store']);
-            Route::post('/sync-from-li',             [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'syncFromLi']);
-            Route::get('/{part_no}',                 [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'showByPartNo']);
-            Route::delete('/{part_no}',              [\App\Http\Controllers\Qa\Api\LiTemplateController::class, 'destroyByPartNo']);
-        });
-
-        Route::prefix('intercom')->group(function () {
-            Route::post('/call',                  [\App\Http\Controllers\Qa\Api\IntercomController::class, 'initiateCall']);
-            Route::get('/status/{liId}',          [\App\Http\Controllers\Qa\Api\IntercomController::class, 'checkCallStatus']);
-            Route::post('/respond',               [\App\Http\Controllers\Qa\Api\IntercomController::class, 'respondCall']);
-            Route::post('/arrive',                [\App\Http\Controllers\Qa\Api\IntercomController::class, 'arriveAtLine']);
-            Route::post('/complete/{liId}',       [\App\Http\Controllers\Qa\Api\IntercomController::class, 'completeCall']);
-            Route::get('/active-incoming',        [\App\Http\Controllers\Qa\Api\IntercomController::class, 'checkActiveIncoming']);
-        });
-
-        Route::apiResource('defects', DefectMasterController::class);
-    });
-});
-
-// ==========================================
-// PULL AHEAD REQUEST ROUTES
-// ==========================================
-Route::middleware(['auth'])->group(function() {
-    Route::post('/pull-ahead/mark-read', [App\Http\Controllers\PullAheadController::class, 'markAsRead'])->name('pull_ahead.mark_read');
-});
-
-// Route Leader/Operational
-Route::middleware(['auth', 'role:supervisor,foreman,leader,manager,kadiv'])->group(function() {
-    Route::get('/operational/next-shift', [App\Http\Controllers\PullAheadController::class, 'nextShiftData'])->name('operational.next_shift');
-    Route::post('/operational/pull-ahead', [App\Http\Controllers\PullAheadController::class, 'submitRequest'])->name('operational.pull_ahead.request');
-});
-
-// Route PPC
-Route::middleware(['auth', 'role:supervisor,ppc,manager,kadiv,direktur'])->group(function() {
-    Route::get('/ppc/pull-ahead', [App\Http\Controllers\PullAheadController::class, 'indexPpc'])->name('ppc.pull_ahead.index');
-    Route::post('/ppc/pull-ahead/{id}/approve', [App\Http\Controllers\PullAheadController::class, 'approve'])->name('ppc.pull_ahead.approve');
-    Route::post('/ppc/pull-ahead/{id}/reject', [App\Http\Controllers\PullAheadController::class, 'reject'])->name('ppc.pull_ahead.reject');
-});
-
-
-// 16. ROUTE API QA ITEM CHECK
-Route::prefix('api/v1/ppc')->group(function () {
-    Route::get('/item-check', [\App\Http\Controllers\Api\PpcItemCheckController::class, 'index']);
-});
-Route::get('/run-migration-now', function () {
-    \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
-    return \Illuminate\Support\Facades\Artisan::output();
 });
