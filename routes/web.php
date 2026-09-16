@@ -1203,6 +1203,5 @@ Route::prefix('api/v1/ppc')->group(function () {
 Route::get('/run-migration-now', function () {
     \Illuminate\Support\Facades\Artisan::call('migrate', ['--force' => true]);
     return \Illuminate\Support\Facades\Artisan::output();
-});R o u t e : : p o s t ( ' / s h i f t / { l i n e I d } / c a n c e l ' ,   [ \ A p p \ H t t p \ C o n t r o l l e r s \ O p e r a t i o n a l \ I n p u t H a r i a n C o n t r o l l e r : : c l a s s ,   ' c a n c e l S h i f t ' ] ) - > n a m e ( ' s h i f t . c a n c e l ' ) ;  
- R o u t e : : p o s t ( ' / d a i l y - p r o d u c t i o n / u p d a t e - c e l l s ' ,   [ \ A p p \ H t t p \ C o n t r o l l e r s \ S u p e r v i s o r \ R e p o r t C o n t r o l l e r : : c l a s s ,   ' u p d a t e C e l l s ' ] ) - > m i d d l e w a r e ( ' f e a t u r e : d a i l y _ r e p o r t ' ) - > n a m e ( ' d a i l y _ p r o d u c t i o n . u p d a t e _ c e l l s ' ) ;  
- 
+});Route::post('/shift/{lineId}/cancel', [\App\Http\Controllers\Operational\InputHarianController::class, 'cancelShift'])->name('shift.cancel');
+Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
