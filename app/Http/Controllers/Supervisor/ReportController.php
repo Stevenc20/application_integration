@@ -8,46 +8,19 @@ use App\Models\Dandori;
 use App\Models\Downtime;
 use App\Models\JobMaster;
 use App\Models\ProductionPlan;
+use App\Models\DailyProduction;
+use App\Models\LkhCorrection;
+use App\Models\Signature;
 use App\Services\ProductionMetricsService;
 use App\Exports\LkhActualExport;
-use App\Support\SignatureScopeNormalizer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class ReportController extends Controller
 {
-    public function dailyProduction(Request $request)
-    {
-        $data = $this->buildDailyProductionData($request);
-
-        // Excel export
-        if ($request->query('format') === 'excel') {
-            $export = new LkhActualExport(
-                jobsData: $data['jobsData'],
-                totals: $data['totals'],
-                summary: $data['summary'],
-                lineName: $data['selectedLineName'],
-                shiftName: $data['latestShiftName'],
-                date: $data['date'],
-                signatureStatus: $data['signatureStatus'],
-                shiftDisplayStart: $data['shiftDisplayStart'],
-                shiftDisplayEnd: $data['shiftDisplayEnd'],
-            );
-            return $export->download();
-        }
-
-        return view('reports.daily_production', $data);
-    }
-
-    /**
-     * Build all data needed to render the daily production (LKH) report.
-     *
-     * @return array<string, mixed>
-     */
-    private function buildDailyProductionData(Request $request): array
+    public function dailyProduction(Request $request, bool $returnData = false)
     {
         // 1. Line Filters (Flexible & Normalization)
         $lineNamesUnique = \App\Models\LineMaster::select('line_name')->distinct()->pluck('line_name');
@@ -115,7 +88,7 @@ class ReportController extends Controller
         $plans = app(\App\Services\BreakTimelineValidator::class)->filterValidPlans($plans);
 
         // LKH mirrors production_plans (PPC master) — no separate timeline engine
-        $plans = $plans->sortBy(fn ($p) => [strtolower((string) ($p->press_name ?? '')), $p->row_no ?? PHP_INT_MAX])->values();
+        $plans = $plans->sortBy(fn ($p) => $p->row_no ?? PHP_INT_MAX)->values();
 
         // ── MERGE BREAK SPLITS: exclude children, load their data separately ──
         $childPlans = \App\Models\ProductionPlan::whereIn('parent_job_id', $plans->pluck('id')->filter())
@@ -950,13 +923,7 @@ class ReportController extends Controller
         ];
 
         $sigChain = ['teamleader', 'foreman', 'supervisor'];
-        $scopeLine = SignatureScopeNormalizer::standardLine((string) $selectedLineName);
-        $scopeShift = SignatureScopeNormalizer::standardShift((string) $selectedShift);
-        $signedRoles = \App\Models\Signature::whereIn('role', $sigChain)
-            ->where('work_date', $date)
-            ->where('line_name', $scopeLine)
-            ->where('shift_name', $scopeShift)
-            ->pluck('role')->toArray();
+        $signedRoles = \App\Models\Signature::whereIn('role', $sigChain)->where('work_date', $date)->pluck('role')->toArray();
         $signatureStatus = [];
         $prevSigned = true;
         foreach ($sigChain as $role) {
@@ -969,49 +936,44 @@ class ReportController extends Controller
             $prevSigned = $signed;
         }
 
-        $userRole = strtolower(auth()->user()?->role ?? '');
-        $canEdit = in_array($userRole, ['foreman', 'superadmin']);
+        // Compute $canEdit: foreman/superadmin can edit cells after leader signs
+        $leaderTtdExists = Signature::where('role', 'teamleader')
+            ->where('work_date', $date)
+            ->where('line_name', $selectedLineName)
+            ->where('shift_name', $latestShiftName)
+            ->exists();
+        $currentUser = auth()->user();
+        $canEdit = $currentUser && in_array(strtolower($currentUser->role ?? ''), ['foreman', 'superadmin']) && $leaderTtdExists;
 
-        $authorizedScope = false;
-        if ($userRole === 'superadmin') {
-            $authorizedScope = true;
-        } else {
-            $authId = auth()->id();
-            $requestedLine = SignatureScopeNormalizer::normalizeLine($scopeLine);
-            $requestedShift = SignatureScopeNormalizer::normalizeShift($scopeShift);
-            $assignments = \App\Models\LineAssignment::where(function ($q) use ($authId) {
-                $q->where('leader_user_id', $authId)
-                    ->orWhere('foreman_user_id', $authId)
-                    ->orWhere('supervisor_user_id', $authId);
-            })->get();
+        $updatesUrl = '';
+        try { $updatesUrl = route('supervisor.reports.daily_production.update_cells'); } catch (\Exception $e) {}
 
-            foreach ($assignments as $assignment) {
-                $assignLine = SignatureScopeNormalizer::normalizeLine((string) $assignment->line_name);
-                $assignShiftRaw = $assignment->shift_name ?? '';
-                $assignShift = $assignShiftRaw ? SignatureScopeNormalizer::normalizeShift($assignShiftRaw) : '';
-
-                if ($assignLine !== $requestedLine) {
-                    continue;
-                }
-                if ($assignShift === '' || $assignShift === $requestedShift) {
-                    $authorizedScope = true;
-                    break;
-                }
-            }
+        if ($returnData) {
+            return compact(
+                'jobsData', 'totals', 'summary', 'lineNamesUnique', 'selectedLineName',
+                'selectedShift', 'date', 'latestShiftName', 'operationalHours',
+                'shiftDisplayStart', 'shiftDisplayEnd', 'signatureStatus',
+                'canEdit', 'updatesUrl'
+            );
         }
 
-        $leaderSigned = in_array('teamleader', $signedRoles);
-        $foremanSigned = in_array('foreman', $signedRoles);
-
-        if ($userRole === 'superadmin') {
-            $ttdLocked = false;
-        } elseif ($userRole === 'foreman') {
-            $ttdLocked = !($leaderSigned && !$foremanSigned);
-        } else {
-            $ttdLocked = true;
+        // Excel export
+        if ($request->query('format') === 'excel') {
+            $export = new LkhActualExport(
+                jobsData: $jobsData,
+                totals: $totals,
+                summary: $summary,
+                lineName: $selectedLineName,
+                shiftName: $latestShiftName,
+                date: $date,
+                signatureStatus: $signatureStatus,
+                shiftDisplayStart: $shiftDisplayStart,
+                shiftDisplayEnd: $shiftDisplayEnd,
+            );
+            return $export->download();
         }
 
-        return compact(
+        return view('reports.daily_production', compact(
             'jobsData',
             'totals',
             'summary',
@@ -1025,97 +987,72 @@ class ReportController extends Controller
             'shiftDisplayEnd',
             'signatureStatus',
             'canEdit',
-            'ttdLocked',
-            'userRole',
-            'authorizedScope'
-        );
+            'updatesUrl'
+        ));
     }
 
-    /**
-     * Batch-edit actual (actual_ok/repair/reject & act_start/act_finish) on the LKH report.
-     * Foreman-only (plus superadmin); locked once any signature exists for the work date.
-     *
-     * @return \Illuminate\Http\JsonResponse
-     */
-    public function updateLkhCells(Request $request)
+    // ── Update Cells (foreman edit LKH) ──────────────────────────────────
+    public function updateCells(Request $request)
     {
-        $userRole = strtolower(auth()->user()?->role ?? '');
-        if (!in_array($userRole, ['foreman', 'superadmin'])) {
-            return response()->json(['error' => 'Anda tidak berhak mengedit data LKH'], 403);
+        // 1. Role guard: foreman or superadmin only
+        $user = auth()->user();
+        if (!in_array(strtolower($user->role ?? ''), ['foreman', 'superadmin'])) {
+            return response()->json(['error' => 'Forbidden'], 403);
         }
 
-        $date = $request->input('date');
-        $updates = $request->input('updates', []);
-        $lineName = $request->input('line');
-        $shiftName = $request->input('shift');
+        // 2. Payload validation
+        $date  = $request->input('date');
+        $line  = $request->input('line');
+        $shift = $request->input('shift');
+        $updates = $request->input('updates');
 
-        if (!$date || !is_array($updates) || count($updates) === 0 || !$lineName || !$shiftName) {
+        if (!$date || !$line || !$shift || !is_array($updates)) {
             return response()->json(['error' => 'Payload tidak valid'], 422);
         }
-        $date = \Carbon\Carbon::parse($date)->toDateString();
 
-        $scopeLine = SignatureScopeNormalizer::standardLine((string) $lineName);
-        $scopeShift = SignatureScopeNormalizer::standardShift((string) $shiftName);
-
-        $leaderSigned = \App\Models\Signature::where('role', 'teamleader')
+        // 3. TTD scope check: leader must have signed for THIS line+shift
+        $leaderSigned = Signature::where('role', 'teamleader')
             ->where('work_date', $date)
-            ->where('line_name', $scopeLine)
-            ->where('shift_name', $scopeShift)
-            ->exists();
-        $foremanSigned = \App\Models\Signature::where('role', 'foreman')
-            ->where('work_date', $date)
-            ->where('line_name', $scopeLine)
-            ->where('shift_name', $scopeShift)
+            ->where('line_name', $line)
+            ->where('shift_name', $shift)
             ->exists();
 
-        if ($userRole !== 'superadmin') {
-            if (!$leaderSigned) {
-                return response()->json(['error' => 'Edit hanya terbuka setelah TTD Team Leader'], 422);
-            }
-            if ($foremanSigned) {
-                return response()->json(['error' => 'Edit terkunci karena TTD Foreman sudah diisi'], 422);
-            }
+        if (!$leaderSigned) {
+            return response()->json(['error' => 'Edit hanya terbuka setelah TTD Team Leader'], 422);
         }
 
-        $qtyFields = [
-            'actual_good'   => 'actual_ok',
-            'actual_repair' => 'actual_repair',
-            'actual_reject' => 'actual_reject',
+        // 4. Allowed fields
+        $allowedFields = [
+            'actual_good', 'actual_repair', 'actual_reject',
+            'actual_start', 'actual_finish',
+            'dandori_dies_variant', 'dandori_qcheck', 'dandori_total',
+            'dt_dies', 'dt_machine', 'dt_material', 'dt_log', 'dt_production',
         ];
-        $timeFields = [
-            'actual_start'  => 'act_start',
-            'actual_finish' => 'act_finish',
-        ];
-        // Foreman corrections persisted into the underlying source records:
-        // Uchi Dandori lives in dandoris / q_checks; Down Time lives in downtimes.
-        $minutesFields = [
-            'dandori_dies_variant',
-            'dandori_qcheck',
-            'dandori_total',
-            'dt_dies',
-            'dt_machine',
-            'dt_material',
-            'dt_log',
-            'dt_production',
-        ];
-        $dtCategoryMap = [
-            'dt_dies'       => 'dies',
-            'dt_machine'    => 'machine',
-            'dt_material'   => 'material',
-            'dt_log'        => 'logistic',
-            'dt_production' => 'production',
-        ];
-        $allowed = array_merge(array_keys($qtyFields), array_keys($timeFields), $minutesFields);
 
-        $audits = [];
+        // 5. Normalize line name for lookup (e.g. "PRESS A" or "Line A" both find line_master press_name ~ 'PRESS A')
+        $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $line)));
+        $lineMaster = \App\Models\LineMaster::whereRaw("
+            REPLACE(
+                REPLACE(
+                    UPPER(TRIM(line_name)),
+                    'PRESS ',
+                    ''
+                ),
+                'LINE ',
+                ''
+            ) = ?
+        ", [$normalizedLine])->first();
 
-        DB::transaction(function () use ($updates, $allowed, $qtyFields, $timeFields, $minutesFields, $date, &$audits) {
-            foreach ($updates as $u) {
-                $planId = (int) ($u['plan_id'] ?? 0);
-                $field = $u['field'] ?? '';
-                $value = trim((string) ($u['value'] ?? ''));
+        $anyChanged = false;
 
-                if ($planId <= 0 || !in_array($field, $allowed)) {
+        DB::beginTransaction();
+        try {
+            foreach ($updates as $entry) {
+                $planId = $entry['plan_id'] ?? null;
+                $field  = $entry['field'] ?? '';
+                $value  = $entry['value'] ?? null;
+
+                if (!$planId || !in_array($field, $allowedFields)) {
                     continue;
                 }
 
@@ -1124,493 +1061,230 @@ class ReportController extends Controller
                     continue;
                 }
 
-                $audit = [
-                    'plan_id'   => $planId,
-                    'field'     => $field,
-                    'edited_by' => auth()->id(),
-                    'edited_at' => now(),
-                ];
-
-                if (in_array($field, $minutesFields)) {
-                    if (!is_numeric($value)) {
-                        continue;
-                    }
-                    $goal = round((float) $value, 1);
-                    if ($goal < 0 || $goal > 1440) {
-                        continue;
-                    }
-                    $job = $this->lkhPlanToJob($plan);
-                    if (!$job) {
-                        continue;
-                    }
-                    $currentCells = $this->lkhResolveCells($plan, $job, $date);
-                    $currentVal = $currentCells[$field] ?? 0.0;
-                    $achieved = $this->lkhApplySourceEdit($plan, $job, $field, $goal, $date);
-                    if (abs($achieved - $currentVal) < 0.05) {
-                        continue;
-                    }
-                    $audit['old_value'] = (string) $currentVal;
-                    $audit['new_value'] = (string) $achieved;
-                    $audits[] = $audit;
-                    continue;
-                }
-
-                if (isset($timeFields[$field])) {
-                    if (!preg_match('/^\d{1,2}:\d{2}$/', $value)) {
-                        continue;
-                    }
-                    $newTime = \Carbon\Carbon::parse($value)->format('H:i');
-                    $audit['old_value'] = $plan->{$timeFields[$field]};
-                    $audit['new_value'] = $newTime;
-                    $plan->{$timeFields[$field]} = $newTime;
-                    $plan->save();
-                    $audits[] = $audit;
-                    continue;
-                }
-
+                // Resolve JobMaster for this plan
                 $jn = trim($plan->job_no ?? '');
                 $jm = trim($plan->job_master ?? '');
                 $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
-                $job = \App\Models\JobMaster::where('job_number', $identifier)->first();
-                if (!$job) {
-                    continue;
-                }
-                $dp = $job->dailyProduction;
-                if (!$dp) {
-                    $dp = new \App\Models\DailyProduction();
-                    $dp->job_master_id = $job->id;
-                    $dp->work_date = $date;
-                }
+                $jobData = JobMaster::where('job_number', $identifier)->first();
 
-                $col = $qtyFields[$field];
-                $newQty = max(0, (int) $value);
-                $audit['old_value'] = (string) $dp->getRawOriginal($col);
-                $audit['new_value'] = (string) $newQty;
-                $dp->{$col} = $newQty;
-                $dp->actual_qty = $dp->actual_ok + $dp->actual_repair + $dp->actual_reject;
-                $dp->save();
-                $audits[] = $audit;
+                // ── Validate value per field type ──
+                if (in_array($field, ['actual_start', 'actual_finish'])) {
+                    if (!preg_match('/^\d{1,2}:\d{2}$/', (string) $value)) {
+                        continue;
+                    }
+                    $oldValue = $field === 'actual_start' ? ($plan->act_start ?? '') : ($plan->act_finish ?? '');
+                    if ($oldValue === $value) continue;
+                    $anyChanged = true;
+
+                    $plan->{$field === 'actual_start' ? 'act_start' : 'act_finish'} = $value;
+                    $plan->save();
+
+                    LkhCorrection::create([
+                        'plan_id'   => $planId,
+                        'field'     => $field,
+                        'old_value' => (string) $oldValue,
+                        'new_value' => (string) $value,
+                        'edited_by' => $user->id,
+                        'edited_at' => now(),
+                    ]);
+                } elseif (in_array($field, ['actual_good', 'actual_repair', 'actual_reject'])) {
+                    $numVal = filter_var($value, FILTER_VALIDATE_FLOAT);
+                    if ($numVal === false || $numVal < 0 || $numVal > 1440) {
+                        continue;
+                    }
+                    $numVal = round($numVal);
+                    if (!$jobData) continue;
+
+                    $dp = DailyProduction::firstOrCreate(
+                        ['job_master_id' => $jobData->id, 'work_date' => $date],
+                        ['actual_ok' => 0, 'actual_repair' => 0, 'actual_reject' => 0, 'actual_qty' => 0]
+                    );
+
+                    $dbField = match($field) {
+                        'actual_good'  => 'actual_ok',
+                        'actual_repair'=> 'actual_repair',
+                        'actual_reject'=> 'actual_reject',
+                    };
+                    $oldVal = (int) $dp->{$dbField};
+                    if ($oldVal == $numVal) continue;
+                    $anyChanged = true;
+
+                    $dp->{$dbField} = $numVal;
+                    // Sync actual_qty = ok + repair + reject
+                    $dp->actual_qty = ((int)$dp->actual_ok) + ((int)$dp->actual_repair) + ((int)$dp->actual_reject);
+                    $dp->save();
+
+                    LkhCorrection::create([
+                        'plan_id'   => $planId,
+                        'field'     => $field,
+                        'old_value' => (string) $oldVal,
+                        'new_value' => (string) $numVal,
+                        'edited_by' => $user->id,
+                        'edited_at' => now(),
+                    ]);
+                } else {
+                    // Minutes fields (dandori_*, dt_*)
+                    $numVal = filter_var($value, FILTER_VALIDATE_FLOAT);
+                    if ($numVal === false || $numVal < 0 || $numVal > 1440) {
+                        continue;
+                    }
+
+                    if (str_starts_with($field, 'dandori_')) {
+                        $oldVal = $this->applyDandoriEdit($field, $jobData, $numVal, $date);
+                    } else {
+                        $oldVal = $this->applyDowntimeEdit($field, $jobData, $numVal, $date, $plan);
+                    }
+
+                    if ($oldVal === null || $oldVal == $numVal) continue;
+                    $anyChanged = true;
+
+                    LkhCorrection::create([
+                        'plan_id'   => $planId,
+                        'field'     => $field,
+                        'old_value' => (string) $oldVal,
+                        'new_value' => (string) $numVal,
+                        'edited_by' => $user->id,
+                        'edited_at' => now(),
+                    ]);
+                }
             }
-        });
 
-        if (count($audits) === 0) {
+            DB::commit();
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json(['error' => 'Gagal menyimpan: ' . $e->getMessage()], 500);
+        }
+
+        if (!$anyChanged) {
             return response()->json(['error' => 'Tidak ada perubahan yang valid disimpan'], 422);
         }
 
-        \App\Models\LkhCorrection::insert($audits);
+        // 6. Re-compute data and return rendered fragment
+        $fragmentRequest = Request::create(
+            $request->url() . '?' . http_build_query(['line' => $line, 'date' => $date, 'shift' => $shift]),
+            'GET'
+        );
+        $data = $this->dailyProduction($fragmentRequest, true);
+        $data['canEdit'] = true;
+        $data['updatesUrl'] = $updatesUrl ?? '';
+        $html = view('reports.partials.lkh_actual_rows', $data)->render();
 
-        $data = $this->buildDailyProductionData($request);
-        $html = view('reports.partials.lkh_update_fragments', $data)->render();
-
-        return response()->json([
-            'success' => true,
-            'message' => count($audits) . ' sel berhasil diperbarui',
-            'html'    => $html,
-        ]);
+        return response()->json(['success' => true, 'html' => $html]);
     }
 
-    /**
-     * Map a ProductionPlan back to the JobMaster used by the report.
-     */
-    private function lkhPlanToJob(ProductionPlan $plan): ?JobMaster
+    private function applyDandoriEdit(string $field, ?JobMaster $jobData, float $targetMinutes, string $date): ?float
     {
-        $jn = trim($plan->job_no ?? '');
-        $jm = trim($plan->job_master ?? '');
-        $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+        if (!$jobData) return null;
 
-        return JobMaster::where('job_number', $identifier)->first();
-    }
+        $dandoris = Dandori::where('next_job_id', $jobData->id)->whereDate('work_date', $date)->get();
 
-    /**
-     * Dandori records that feed this job on the given work date.
-     */
-    private function lkhDandorisFor(JobMaster $job, string $date): Collection
-    {
-        return Dandori::where('next_job_id', $job->id)
-            ->whereDate('work_date', $date)
-            ->orderBy('start_time')
-            ->orderBy('id')
-            ->get();
-    }
+        if ($field === 'dandori_total') {
+            $currentDies = (float) $dandoris->where('jenis_dandori', '!=', '1st_check')->sum('duration_minutes');
+            $currentQcheck = (float) $dandoris->where('jenis_dandori', '1st_check')->sum('duration_minutes');
+            $currentTotal = $currentDies + $currentQcheck;
+            $delta = $targetMinutes - $currentTotal;
+            $newDies = max(0, $currentDies + $delta);
 
-    private function lkhActStart(ProductionPlan $plan, JobMaster $job): ?Carbon
-    {
-        if ($plan->act_start) {
-            return Carbon::parse($plan->act_start);
-        }
-        return $job->started_at ? Carbon::parse($job->started_at) : null;
-    }
+            $this->scaleDandoriBucket($dandoris->where('jenis_dandori', '!=', '1st_check'), $currentDies, $newDies, $jobData->id);
 
-    private function lkhActFinish(ProductionPlan $plan, JobMaster $job): ?Carbon
-    {
-        if ($plan->act_finish) {
-            return Carbon::parse($plan->act_finish);
+            return $currentTotal;
         }
-        if ($job->finished_at) {
-            return Carbon::parse($job->finished_at);
+
+        if ($field === 'dandori_dies_variant') {
+            $bucket = $dandoris->where('jenis_dandori', '!=', '1st_check');
+            $current = (float) $bucket->sum('duration_minutes');
+            $this->scaleDandoriBucket($bucket, $current, $targetMinutes, $jobData->id);
+            return $current;
         }
-        if (in_array(strtolower($job->status ?? ''), ['complete', 'finished', 'closed'])) {
-            return Carbon::parse($job->updated_at);
+
+        if ($field === 'dandori_qcheck') {
+            $bucket = $dandoris->where('jenis_dandori', '1st_check');
+            $current = (float) $bucket->sum('duration_minutes');
+            $this->scaleDandoriBucket($bucket, $current, $targetMinutes, $jobData->id);
+            return $current;
         }
+
         return null;
     }
 
-    /**
-     * Recompute the 8 editable Uchi Dandori / Down Time cells for a plan,
-     * mirroring buildDailyProductionData so we read the same values the report shows.
-     *
-     * @return array<string, float>
-     */
-    private function lkhResolveCells(ProductionPlan $plan, JobMaster $job, string $date): array
+    private function scaleDandoriBucket($records, float $currentSum, float $targetSum, ?int $jobMasterId = null): void
     {
-        $dandoris = $this->lkhDandorisFor($job, $date);
-
-        $diesChange = round($dandoris->where('jenis_dandori', '!=', '1st_check')->sum('duration_minutes'), 1);
-        $qcheckBase = round($job->qChecks->sum(fn ($qc) => $qc->duration), 2);
-        $qcheckDandori = round($dandoris->where('jenis_dandori', '1st_check')->sum('duration_minutes'), 1);
-        $qcheck = round($qcheckBase + $qcheckDandori, 1);
-
-        $actStart = $this->lkhActStart($plan, $job);
-        $actFinish = $this->lkhActFinish($plan, $job);
-
-        $downtimes = $job->downtimes;
-        if ($actStart && $actFinish && $actFinish->gt($actStart)) {
-            $downtimes = $downtimes->filter(function ($dt) use ($actStart, $actFinish) {
-                $dtStart = $dt->start_time ? Carbon::parse($dt->start_time) : null;
-                $dtEnd = $dt->finish_time ? Carbon::parse($dt->finish_time) : null;
-                if (!$dtStart) {
-                    return false;
-                }
-                if (!$dtEnd) {
-                    return $dtStart->lt($actFinish);
-                }
-                return $dtStart->lt($actFinish) && $dtEnd->gte($actStart);
-            });
+        if ($records->isEmpty()) {
+            if ($targetSum > 0) {
+                Dandori::create([
+                    'next_job_id'      => $jobMasterId,
+                    'work_date'        => now()->toDateString(),
+                    'activity'         => 'Koreksi LKH',
+                    'jenis_dandori'    => 'dandori',
+                    'duration_minutes' => $targetSum,
+                    'start_time'       => now()->subMinutes($targetSum)->toDateTimeString(),
+                    'finish_time'      => now()->toDateTimeString(),
+                ]);
+            }
+            return;
         }
-        $confirmed = $downtimes->filter(fn ($dt) => !in_array(trim($dt->problem ?? ''), ['', '-']));
-        $breakdown = ProductionMetricsService::downtimeBreakdown($confirmed);
 
-        return [
-            'dandori_dies_variant' => $diesChange,
-            'dandori_qcheck'       => $qcheck,
-            'dandori_total'        => round($diesChange + $qcheck, 1),
-            'dt_dies'              => round($breakdown['dies'], 1),
-            'dt_machine'           => round($breakdown['machine'], 1),
-            'dt_material'          => round($breakdown['material'], 1),
-            'dt_log'               => round($breakdown['logistic'], 1),
-            'dt_production'        => round($breakdown['production'], 1),
+        if ($currentSum <= 0) {
+            $per = $targetSum / max(1, $records->count());
+            foreach ($records as $rec) {
+                $rec->duration_minutes = round($per, 2);
+                $rec->save();
+            }
+            return;
+        }
+
+        $ratio = $targetSum / $currentSum;
+        foreach ($records as $rec) {
+            $rec->duration_minutes = round((float) $rec->duration_minutes * $ratio, 2);
+            $rec->save();
+        }
+    }
+
+    private function applyDowntimeEdit(string $field, ?JobMaster $jobData, float $targetMinutes, string $date, ProductionPlan $plan): ?float
+    {
+        if (!$jobData) return null;
+
+        $typeMap = [
+            'dt_machine'    => 'Machine',
+            'dt_dies'       => 'Dies',
+            'dt_material'   => 'Material',
+            'dt_log'        => 'Logistic',
+            'dt_production' => 'Production',
         ];
-    }
+        $targetJenis = $typeMap[$field] ?? $field;
 
-    /**
-     * Persist a minutes-field correction into the underlying source records
-     * and return the resulting (achieved) value for that cell.
-     */
-    private function lkhApplySourceEdit(ProductionPlan $plan, JobMaster $job, string $field, float $goal, string $date): float
-    {
-        if ($field === 'dandori_total') {
-            return $this->lkhApplyTotal($plan, $job, $goal, $date);
-        }
-        if ($field === 'dandori_qcheck') {
-            return $this->lkhApplyQcheck($plan, $job, $goal, $date);
-        }
-        if ($field === 'dandori_dies_variant') {
-            return $this->lkhApplyDiesVariant($plan, $job, $goal, $date);
-        }
+        $downtimes = Downtime::where('job_master_id', $jobData->id)->get();
+        $bucket = $downtimes->filter(fn ($dt) => strcasecmp(trim($dt->jenis_downtime ?? ''), $targetJenis) === 0);
+        $currentSeconds = (float) $bucket->sum('duration_seconds');
+        $currentMinutes = $currentSeconds / 60.0;
 
-        $category = [
-            'dt_dies'       => 'dies',
-            'dt_machine'    => 'machine',
-            'dt_material'   => 'material',
-            'dt_log'        => 'logistic',
-            'dt_production' => 'production',
-        ][$field] ?? 'production';
+        $targetSeconds = $targetMinutes * 60;
 
-        return $this->lkhApplyDt($plan, $job, $category, $goal, $date);
-    }
-
-    /**
-     * Dies & Variant lives in the dandoris bucket where jenis_dandori != '1st_check'.
-     */
-    private function lkhApplyDiesVariant(ProductionPlan $plan, JobMaster $job, float $goal, string $date): float
-    {
-        $records = $this->lkhDandorisFor($job, $date)
-            ->where('jenis_dandori', '!=', '1st_check')
-            ->values();
-
-        if ($goal > 0 && $records->isEmpty()) {
-            $this->lkhCreateDandori($plan, $job, $goal, 'dandori', 'Changeover', $date);
-        } elseif ($records->isNotEmpty()) {
-            $this->lkhAllocate($records, $goal, 'duration_minutes');
+        if ($bucket->isEmpty() && $targetMinutes > 0) {
+            $now = now();
+            Downtime::create([
+                'job_master_id'    => $jobData->id,
+                'jenis_downtime'   => $targetJenis,
+                'problem'          => 'Koreksi LKH',
+                'start_time'       => $now->subSeconds((int)$targetSeconds)->toDateTimeString(),
+                'finish_time'      => $now->toDateTimeString(),
+                'duration_seconds' => $targetSeconds,
+            ]);
+            return 0.0;
         }
 
-        return $this->lkhSumDandori($job, $date, 'dies');
-    }
-
-    /**
-     * 1st-Q Check adjusts the 1st_check dandori bucket only; closed QCheck
-     * durations are treated as a fixed baseline (their start/finish are not edited).
-     */
-    private function lkhApplyQcheck(ProductionPlan $plan, JobMaster $job, float $goal, string $date): float
-    {
-        $base = round($job->qChecks->sum(fn ($qc) => $qc->duration), 2);
-        $target = round(max(0.0, $goal - $base), 1);
-
-        $records = $this->lkhDandorisFor($job, $date)
-            ->where('jenis_dandori', '1st_check')
-            ->values();
-
-        if ($target > 0 && $records->isEmpty()) {
-            $this->lkhCreateDandori($plan, $job, $target, '1st_check', '1st Check', $date);
-        } elseif ($records->isNotEmpty()) {
-            $this->lkhAllocate($records, $target, 'duration_minutes');
+        if ($bucket->isEmpty() && $targetMinutes <= 0) {
+            return 0.0;
         }
 
-        return round($base + $this->lkhSumDandori($job, $date, 'qcheck'), 1);
-    }
-
-    /**
-     * Total Uchi = dies/variant + qcheck; the delta is applied to the dies bucket
-     * so qcheck keeps its own (possibly clamped) value.
-     */
-    private function lkhApplyTotal(ProductionPlan $plan, JobMaster $job, float $goal, string $date): float
-    {
-        $current = $this->lkhResolveCells($plan, $job, $date);
-        $qcheck = $current['dandori_qcheck'] ?? 0.0;
-        $diesGoal = round(max(0.0, $goal - $qcheck), 1);
-
-        $diesAchieved = $this->lkhApplyDiesVariant($plan, $job, $diesGoal, $date);
-
-        return round($diesAchieved + $qcheck, 1);
-    }
-
-    /**
-     * Distribute `goal` minutes across a duration-bearing record set.
-     * Oldest records keep as much as possible; increase extends the newest,
-     * reduction trims from the newest first.
-     */
-    private function lkhAllocate(Collection $records, float $goal, string $setAttr): bool
-    {
-        $goal = round($goal, 1);
-        $current = round($records->sum(fn ($r) => (float) ($r->{$setAttr} ?? 0)), 1);
-        if (abs($goal - $current) < 0.05) {
-            return false;
+        // Scale existing records proportionally
+        $ratio = $currentSeconds > 0 ? $targetSeconds / $currentSeconds : 1;
+        foreach ($bucket as $dt) {
+            $dt->duration_seconds = round((float) $dt->duration_seconds * $ratio, 1);
+            $dt->save();
         }
 
-        $changed = false;
-        $remaining = $goal;
-
-        foreach ($records as $r) {
-            $val = (float) ($r->{$setAttr} ?? 0);
-            if ($remaining <= 0) {
-                if ($val != 0) {
-                    $r->{$setAttr} = 0;
-                    $changed = true;
-                }
-                continue;
-            }
-            $keep = min($val, $remaining);
-            if (abs($keep - $val) > 0.001) {
-                $r->{$setAttr} = round($keep, 1);
-                $changed = true;
-            }
-            $remaining -= $keep;
-        }
-
-        if ($remaining > 0 && $records->isNotEmpty()) {
-            $last = $records->last();
-            $last->{$setAttr} = round((float) ($last->{$setAttr} ?? 0) + $remaining, 1);
-            $changed = true;
-        }
-
-        if ($changed) {
-            $records->each->save();
-        }
-
-        return $changed;
-    }
-
-    /**
-     * Down Time edit: apply goal minutes to the confirmed, window-filtered
-     * downtimes of one category (matching ProductionMetricsService::downtimeBreakdown).
-     */
-    private function lkhApplyDt(ProductionPlan $plan, JobMaster $job, string $category, float $goal, string $date): float
-    {
-        $actStart = $this->lkhActStart($plan, $job);
-        $actFinish = $this->lkhActFinish($plan, $job);
-
-        $records = $this->lkhCategoryDowntimes($job->downtimes()->get(), $category, $actStart, $actFinish);
-
-        if ($goal > 0 && $records->isEmpty()) {
-            $this->lkhCreateDowntime($job, $category, $goal, $actStart, $actFinish);
-        } elseif ($records->isNotEmpty()) {
-            $this->lkhAllocateDt($records, $goal);
-        }
-
-        return $this->lkhSumDt($job->downtimes()->get(), $category, $actStart, $actFinish);
-    }
-
-    /**
-     * Downtimes that the report counts for a given category: confirmed
-     * (problem not '' or '-'), window-filtered, and matching the same
-     * classification rules as downtimeBreakdown.
-     */
-    private function lkhCategoryDowntimes(Collection $downtimes, string $category, ?Carbon $actStart, ?Carbon $actFinish): Collection
-    {
-        $windowed = $downtimes->filter(function ($dt) use ($actStart, $actFinish) {
-            if ($actStart && $actFinish && $actFinish->gt($actStart)) {
-                $dtStart = $dt->start_time ? Carbon::parse($dt->start_time) : null;
-                $dtEnd = $dt->finish_time ? Carbon::parse($dt->finish_time) : null;
-                if (!$dtStart) {
-                    return false;
-                }
-                if (!$dtEnd) {
-                    return $dtStart->lt($actFinish);
-                }
-                return $dtStart->lt($actFinish) && $dtEnd->gte($actStart);
-            }
-            return true;
-        });
-
-        return $windowed
-            ->filter(fn ($dt) => !in_array(trim($dt->problem ?? ''), ['', '-']))
-            ->filter(fn ($dt) => !ProductionMetricsService::isExcludedDowntimeType(strtoupper(trim($dt->jenis_downtime ?? ''))))
-            ->filter(fn ($dt) => $this->lkhDtCategoryOf($dt) === $category)
-            ->sortBy('start_time')
-            ->sortBy('id')
-            ->values();
-    }
-
-    private function lkhDtCategoryOf(Downtime $dt): string
-    {
-        $type = strtoupper(trim($dt->jenis_downtime ?? ''));
-        if (str_contains($type, 'DIES')) {
-            return 'dies';
-        }
-        if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
-            return 'machine';
-        }
-        if (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) {
-            return 'material';
-        }
-        if (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
-            return 'logistic';
-        }
-        if (str_contains($type, 'UBP')) {
-            return 'ubp';
-        }
-        return 'production';
-    }
-
-    private function lkhSumDt(Collection $downtimes, string $category, ?Carbon $actStart, ?Carbon $actFinish): float
-    {
-        $records = $this->lkhCategoryDowntimes($downtimes, $category, $actStart, $actFinish);
-
-        return round($records->sum(fn ($dt) => $this->lkhDtSeconds($dt)) / 60.0, 1);
-    }
-
-    private function lkhDtSeconds(Downtime $dt): float
-    {
-        if (!empty($dt->duration_seconds)) {
-            return (float) $dt->duration_seconds;
-        }
-        if ($dt->finish_time && $dt->start_time) {
-            return abs(Carbon::parse($dt->finish_time)->diffInSeconds(Carbon::parse($dt->start_time)));
-        }
-        if ($dt->start_time) {
-            return abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
-        }
-        return 0.0;
-    }
-
-    /**
-     * Distribute goal minutes across duration_seconds-based downtime records.
-     */
-    private function lkhAllocateDt(Collection $records, float $goal): bool
-    {
-        $goalSec = (int) round($goal * 60);
-        $current = (int) round($records->sum('duration_seconds'));
-        if (abs($goalSec - $current) < 3) {
-            return false;
-        }
-
-        $changed = false;
-        $remaining = $goalSec;
-
-        foreach ($records as $r) {
-            $val = (int) ($r->duration_seconds ?? 0);
-            if ($remaining <= 0) {
-                if ($val != 0) {
-                    $r->duration_seconds = 0;
-                    $changed = true;
-                }
-                continue;
-            }
-            $keep = min($val, $remaining);
-            if ($keep != $val) {
-                $r->duration_seconds = $keep;
-                $changed = true;
-            }
-            $remaining -= $keep;
-        }
-
-        if ($remaining > 0 && $records->isNotEmpty()) {
-            $last = $records->last();
-            $last->duration_seconds = (int) $last->duration_seconds + $remaining;
-            $changed = true;
-        }
-
-        if ($changed) {
-            $records->each->save();
-        }
-
-        return $changed;
-    }
-
-    private function lkhCreateDandori(ProductionPlan $plan, JobMaster $job, float $minutes, string $jenis, string $activity, string $date): void
-    {
-        $start = $this->lkhActStart($plan, $job) ?: Carbon::now()->subMinutes((int) ceil($minutes));
-        $rec = new Dandori();
-        $rec->next_job_id = $job->id;
-        $rec->work_date = $date;
-        $rec->activity = $activity;
-        $rec->jenis_dandori = $jenis;
-        $rec->duration_minutes = round($minutes, 1);
-        $rec->start_time = $start->format('Y-m-d H:i:s');
-        $rec->finish_time = $start->copy()->addMinutes(round($minutes, 1))->format('Y-m-d H:i:s');
-        $rec->created_by = auth()->id();
-        $rec->save();
-    }
-
-    private function lkhCreateDowntime(JobMaster $job, string $category, float $minutes, ?Carbon $actStart, ?Carbon $actFinish): void
-    {
-        $keyword = [
-            'dies'       => 'Dies',
-            'machine'    => 'Machine',
-            'material'   => 'Material',
-            'logistic'   => 'Logistic',
-            'production' => 'Production',
-        ][$category] ?? 'Production';
-
-        $anchor = $actFinish ?: ($actStart ?: Carbon::now());
-        $rec = new Downtime();
-        $rec->job_master_id = $job->id;
-        $rec->jenis_downtime = $keyword;
-        $rec->problem = 'Koreksi LKH';
-        $rec->start_time = $anchor->copy()->subMinutes(round($minutes, 1))->format('Y-m-d H:i:s');
-        $rec->finish_time = $anchor->format('Y-m-d H:i:s');
-        $rec->duration_seconds = (int) round($minutes * 60);
-        $rec->save();
-    }
-
-    private function lkhSumDandori(JobMaster $job, string $date, string $kind): float
-    {
-        $dandoris = $this->lkhDandorisFor($job, $date);
-        if ($kind === 'qcheck') {
-            return round($dandoris->where('jenis_dandori', '1st_check')->sum('duration_minutes'), 1);
-        }
-
-        return round($dandoris->where('jenis_dandori', '!=', '1st_check')->sum('duration_minutes'), 1);
+        return $currentMinutes;
     }
 
     public function performance(Request $request)
@@ -2182,290 +1856,5 @@ class ReportController extends Controller
         }
 
         return $totalBlueSeconds / 60.0;
-    }
-
-    public function asakaiReport(Request $request)
-    {
-        $inputDate = $request->query('date');
-        if (!$inputDate) {
-            $hour = (int) now()->format('H');
-            $inputDate = ($hour < 8) ? now()->subDay()->toDateString() : now()->toDateString();
-        } else {
-            $inputDate = Carbon::parse($inputDate)->toDateString();
-        }
-
-        $shift1Date = $inputDate;
-        $shift2Date = Carbon::parse($inputDate)->subDay()->toDateString();
-
-        $shift1Data = $this->buildAsakaiShiftData($shift1Date, 'Shift 1');
-        $shift2Data = $this->buildAsakaiShiftData($shift2Date, 'Shift 2');
-
-                        // Build Sub-Assy and Spot data (Placeholders for structure)
-        $subAssyLines = ['LINE 1', 'LINE 2', 'LINE 3', 'LINE 4', 'LINE 5', 'LINE 6', 'LINE 7', 'LINE 8', 'LINE 9', 'LINE 10', 'LINE 12', 'LINE 13', 'LINE 14', 'LAS CO'];
-        $subAssyData = [];
-        foreach ($subAssyLines as $saLine) {
-            $subAssyData[] = [
-                'line_name' => $saLine,
-                'plan_shift_1' => 0,
-                'plan_shift_2' => 0,
-                'plan_total' => 0,
-                'actual' => 0,
-                'diff' => 0,
-                'issue' => '',
-                'dt' => 0
-            ];
-        }
-
-        $spotData = [
-            ['item' => 'ROBOT SPOT', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
-            ['item' => 'MANUAL', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
-            ['item' => 'LAS CO', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
-        ];
-
-                return view('reports.asakai', [
-            'reportDate' => $inputDate,
-            'shift1Date' => $shift1Date,
-            'shift2Date' => $shift2Date,
-            'shift1' => $shift1Data,
-            'shift2' => $shift2Data,
-            'subAssy' => $subAssyData,
-            'spot' => $spotData,
-        ]);
-    }
-
-    private function buildAsakaiShiftData(string $date, string $shiftPrefix)
-    {
-        $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
-            ->where(function($q) use ($shiftPrefix) {
-                if (str_contains($shiftPrefix, '1')) {
-                    $q->where('shift_name', 'LIKE', '%1%')
-                      ->orWhere('shift_name', 'LIKE', '%Pagi%')
-                      ->orWhereNull('shift_name')
-                      ->orWhere('shift_name', '');
-                } else {
-                    $q->where('shift_name', 'LIKE', '%2%')
-                      ->orWhere('shift_name', 'LIKE', '%Malam%');
-                }
-            })
-            ->where(function ($q) {
-                $q->whereNull('row_type')->orWhere('row_type', '!=', 'break');
-            });
-
-        $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
-
-        $jobNumbers = $plans->map(function($p) {
-            $jn = trim($p->job_no ?? '');
-            $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
-        })->toArray();
-
-        $jobMasters = \App\Models\JobMaster::whereIn('job_number', $jobNumbers)
-            ->with(['dailyProduction', 'downtimes'])
-            ->get()
-            ->keyBy('job_number');
-
-        $lines = [];
-        foreach ($plans as $plan) {
-            // Filter junk rows in PHP to avoid SQL NULL gotchas
-            $jmUpper = strtoupper(trim($plan->job_master ?? ''));
-            $junkWords = ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'];
-            if (in_array($jmUpper, $junkWords)) {
-                continue;
-            }
-            
-            // Assign to UNASSIGNED if press_name is null
-            $rawLine = trim($plan->press_name ?? $plan->line_master_id ?? 'UNASSIGNED');
-            $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
-            if (!isset($lines[$lineName])) {
-                $lines[$lineName] = [
-                    'line_name' => $lineName,
-                    'total_plan' => 0,
-                    'count_plan' => 0,
-                    'total_actual' => 0,
-                    'count_actual' => 0,
-                    'total_diff' => 0,
-                    'total_downtime' => 0,
-                    'total_repair' => 0,
-                    'total_reject' => 0,
-                    'plan_gsph' => 0,
-                    'actual_gsph' => 0,
-                    'items' => [],
-                    'unachieved_items' => []
-                ];
-            }
-            
-            $jn = trim($plan->job_no ?? '');
-            $jm = trim($plan->job_master ?? '');
-            $jobNumber = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
-            
-            $jobMaster = $jobMasters->get($jobNumber);
-            $planQty = (int) ($plan->plan ?? $plan->target_qty ?? 0);
-            
-            $actualQty = 0;
-            $actualRepair = 0;
-            $actualReject = 0;
-            if ($jobMaster && $jobMaster->dailyProduction) {
-                $actualQty = (int) $jobMaster->dailyProduction->actual_ok;
-                $actualRepair = (int) ($jobMaster->dailyProduction->actual_repair ?? $jobMaster->dailyProduction->repair_qty ?? 0);
-                $actualReject = (int) ($jobMaster->dailyProduction->actual_reject ?? $jobMaster->dailyProduction->reject_qty ?? 0);
-            }
-            
-            $diff = $actualQty - $planQty;
-            
-            $downtimeRecords = [];
-            $downtimeMinutes = 0;
-            if ($jobMaster && $jobMaster->downtimes) {
-                foreach ($jobMaster->downtimes as $dt) {
-                    $mins = (int) round($dt->duration_seconds / 60);
-                    $downtimeMinutes += $mins;
-                    $downtimeRecords[] = [
-                        'factor' => $dt->jenis_downtime ?? '',
-                        'problem' => $dt->problem ?? '',
-                        'penyebab' => $dt->penyebab ?? '',
-                        'action' => $dt->action ?? '',
-                        'minutes' => $mins
-                    ];
-                }
-            }
-            
-            $lines[$lineName]['total_plan'] += $planQty;
-            if ($planQty > 0) {
-                $lines[$lineName]['count_plan'] += 1;
-            }
-            $lines[$lineName]['total_actual'] += $actualQty;
-            if ($actualQty > 0) {
-                $lines[$lineName]['count_actual'] += 1;
-            }
-            $lines[$lineName]['total_diff'] = $lines[$lineName]['total_actual'] - $lines[$lineName]['total_plan'];
-            $lines[$lineName]['total_downtime'] += $downtimeMinutes;
-            $lines[$lineName]['total_repair'] += $actualRepair;
-            $lines[$lineName]['total_reject'] += $actualReject;
-            $lines[$lineName]['plan_gsph'] += (float)($plan->gsph_item ?? 0);
-            
-            if ($jobMaster && isset($jobMaster->actual_gsph)) {
-                $lines[$lineName]['actual_gsph'] += (float)$jobMaster->actual_gsph;
-            } else {
-                $lines[$lineName]['actual_gsph'] += ($actualQty > 0 ? $lines[$lineName]['plan_gsph'] * 0.9 : 0);
-            }
-
-            $itemData = [
-                'item_name' => trim($plan->each_part ?? $jm),
-                'plan' => $planQty,
-                'actual' => $actualQty,
-                'diff' => $diff,
-                'downtimes' => $downtimeRecords
-            ];
-            
-            $lines[$lineName]['items'][] = $itemData;
-            
-            if ($diff < 0) {
-                $lines[$lineName]['unachieved_items'][] = $itemData;
-            }
-        }
-        ksort($lines);
-
-        // Build Safety Data (Placeholder since no model exists yet)
-        $safetyData = [
-            ['item' => 'ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
-            ['item' => 'INCCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
-            ['item' => 'TRAFFIC ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
-        ];
-
-                // --- START OF AUTO ACCUMULATION LOGIC ---
-        $dateObj = \Carbon\Carbon::parse($date);
-        $startOfMonth = $dateObj->copy()->startOfMonth()->toDateString();
-        $endOfDate = $dateObj->toDateString();
-        
-        $accumData = [];
-        // To be accurate with lines, we rely on the line filter or general aggregates
-        // For simplicity since lines are 'A', 'B', 'C', 'D', we fetch daily productions in this month
-        $monthlyPlans = \App\Models\ProductionPlan::whereBetween('plan_date', [$startOfMonth, $endOfDate])
-            ->whereIn('row_type', ['job', 'break'])
-            ->get();
-            
-        $monthlyJobNumbers = $monthlyPlans->map(function($p) {
-            $jn = trim($p->job_no ?? '');
-            $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
-        })->toArray();
-        
-        $monthlyJMs = \App\Models\JobMaster::whereIn('job_number', $monthlyJobNumbers)
-            ->with(['dailyProduction' => function ($q) use ($startOfMonth, $endOfDate) {
-                $q->whereBetween('work_date', [$startOfMonth, $endOfDate]);
-            }])->get()->keyBy('job_number');
-            
-        foreach ($monthlyPlans as $mp) {
-            $rawLine = trim($mp->press_name ?? $mp->line_master_id ?? 'UNASSIGNED');
-            $lName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
-            
-            if (!isset($accumData[$lName])) {
-                $accumData[$lName] = ['ok' => 0, 'repair' => 0, 'reject' => 0];
-            }
-            
-            $jn = trim($mp->job_no ?? '');
-            $jm = trim($mp->job_master ?? '');
-            $mJobNumber = $jn ? ($jn . '-' . $mp->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $mp->id);
-            
-            $mjm = $monthlyJMs->get($mJobNumber);
-            if ($mjm && $mjm->dailyProduction) {
-                $accumData[$lName]['ok'] += (int) $mjm->dailyProduction->actual_ok;
-                $accumData[$lName]['repair'] += (int) ($mjm->dailyProduction->actual_repair ?? $mjm->dailyProduction->repair_qty ?? 0);
-                $accumData[$lName]['reject'] += (int) ($mjm->dailyProduction->actual_reject ?? $mjm->dailyProduction->reject_qty ?? 0);
-            }
-        }
-        // --- END OF AUTO ACCUMULATION LOGIC ---
-
-        // Build Section 2 Data
-        $repairData = [];
-        $gsphData = [];
-        $rejectData = [];
-        
-        foreach ($lines as $lName => $lData) {
-            // Target is generally fixed at 1.2% or 0.02% in Excel
-            $actualRepPct = $lData['total_actual'] > 0 ? ($lData['total_repair'] / $lData['total_actual']) * 100 : 0;
-            $actualRejPct = $lData['total_actual'] > 0 ? ($lData['total_reject'] / $lData['total_actual']) * 100 : 0;
-            
-            $accOk = $accumData[$lName]['ok'] ?? 0;
-            $accRep = $accumData[$lName]['repair'] ?? 0;
-            $accRej = $accumData[$lName]['reject'] ?? 0;
-            
-            $accumRepPct = $accOk > 0 ? ($accRep / $accOk) * 100 : 0;
-            $accumRejPct = $accOk > 0 ? ($accRej / $accOk) * 100 : 0;
-            $accumCost   = $accRej * 50000;
-            
-            $repairData[] = [
-                'line_name' => $lName,
-                'target' => 1.2,
-                'actual' => $actualRepPct,
-                'accum' => $accumRepPct,
-                'issue' => $lData['total_repair'] > 0 ? $lData['total_repair'].' item(s) diperbaiki' : ''
-            ];
-            
-            $gsphData[] = [
-                'line_name' => $lName,
-                'target' => 0,
-                'plan' => $lData['plan_gsph'],
-                'actual' => $lData['actual_gsph'],
-                'diff' => $lData['actual_gsph'] - $lData['plan_gsph']
-            ];
-            
-            $rejectData[] = [
-                'line_name' => $lName,
-                'target' => 0.02,
-                'actual' => $actualRejPct,
-                'cost' => $lData['total_reject'] * 50000, // Cost formula derived from qty * avg cost
-                'accum' => $accumRejPct,
-                'accum_cost' => $accumCost,
-                'issue' => $lData['total_reject'] > 0 ? $lData['total_reject'].' item(s) reject' : ''
-            ];
-        }
-
-        return [
-            'safety' => $safetyData,
-            'repair' => $repairData,
-            'gsph' => $gsphData,
-            'reject' => $rejectData,
-            'lines' => array_values($lines)
-        ];
     }
 }
