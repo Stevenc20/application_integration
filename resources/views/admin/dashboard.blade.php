@@ -75,8 +75,9 @@
 
     </div>
 
-    <!-- RECENT PRODUCTION -->
-    <div class="bg-white border border-gray-200 shadow-sm rounded-xl p-5">
+    @include('components.grafik-gsph')
+
+    <div class="mt-6 bg-white border border-gray-200 shadow-sm rounded-xl p-5">
 
         <div class="flex justify-between items-center mb-4">
             <h2 class="font-semibold text-sm md:text-base text-gray-700">
@@ -106,7 +107,7 @@
 
                 <!-- ORDER -->
                 <td class="px-4 py-3 font-medium text-gray-700">
-                    {{ $p->production_order_number }}
+                    {{ $p->jobMaster->job_number ?? '-' }}
                 </td>
 
                 <!-- LINE -->
@@ -117,14 +118,14 @@
                 <!-- OK -->
                 <td class="px-4 py-3 text-center">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-700">
-                        {{ $p->qty_ok }}
+                        {{ $p->actual_ok }}
                     </span>
                 </td>
 
                 <!-- REJECT -->
                 <td class="px-4 py-3 text-center">
                     <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100 text-red-700">
-                        {{ $p->qty_reject }}
+                        {{ $p->actual_reject }}
                     </span>
                 </td>
 
@@ -149,4 +150,10 @@
 
 
 </div>
+
+@endsection
+
+@section('scripts')
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 @endsection

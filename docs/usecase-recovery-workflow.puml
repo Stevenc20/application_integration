@@ -1,0 +1,63 @@
+@startuml Use Case - Recovery (Cut-Off) Workflow
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #FFF3E0
+  BorderColor #E65100
+}
+skinparam rectangle {
+  BackgroundColor #FCE4EC
+  BorderColor #C62828
+}
+
+title Use Case Diagram - Recovery (Cut-Off) Workflow
+
+' ===== AKTOR KIRI =====
+actor "Operator" as OP
+actor "Supervisor" as SPV
+
+rectangle "Recovery Workflow" {
+  usecase "Shift Submission" as UC_SHIFT
+
+  usecase "Generate Cut-Off" as UC_CUTOFF
+  usecase "Identifikasi Incomplete Job" as UC_IDENT
+  usecase "Buat Recovery Item (auto)" as UC_AUTO_CREATE
+
+  usecase "Recovery Schedule" as UC_SCHED_REC
+  usecase "Review Recovery Items" as UC_REVIEW
+  usecase "Approve Recovery" as UC_APPROVE
+  usecase "Reject Recovery" as UC_REJECT
+
+  usecase "Schedule ke Production Plan" as UC_TO_PLAN
+  usecase "Edit Recovery Plan" as UC_EDIT_REC
+  usecase "Override Plan Date" as UC_OVERRIDE_DATE
+
+  usecase "Monitor Status Recovery" as UC_MON_STATUS
+  usecase "History Recovery" as UC_HIST_REC
+  usecase "Export Recovery Report" as UC_EXP_REC
+
+  ' ===== RELATIONSHIPS =====
+  UC_SHIFT ..> UC_CUTOFF : <<extend>>
+  UC_CUTOFF ..> UC_IDENT : <<include>>
+  UC_CUTOFF ..> UC_AUTO_CREATE : <<include>>
+  UC_SCHED_REC ..> UC_REVIEW : <<include>>
+  UC_SCHED_REC ..> UC_APPROVE : <<extend>>
+  UC_SCHED_REC ..> UC_REJECT : <<extend>>
+  UC_SCHED_REC ..> UC_TO_PLAN : <<include>>
+  UC_SCHED_REC ..> UC_EDIT_REC : <<extend>>
+  UC_TO_PLAN ..> UC_OVERRIDE_DATE : <<extend>>
+  UC_MON_STATUS ..> UC_HIST_REC : <<extend>>
+  UC_SCHED_REC ..> UC_EXP_REC : <<include>>
+}
+
+' ===== AKTOR KANAN =====
+actor "PPC Staff" as PPC
+
+OP --> UC_SHIFT
+SPV --> UC_SCHED_REC
+SPV --> UC_MON_STATUS
+PPC --> UC_SCHED_REC
+PPC --> UC_TO_PLAN
+PPC --> UC_MON_STATUS
+
+@enduml

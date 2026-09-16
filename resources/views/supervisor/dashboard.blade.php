@@ -27,7 +27,11 @@
             <button id="s1btn" onclick="setShift(1)" class="filter-btn px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm">Shift 1</button>
             <button id="s2btn" onclick="setShift(2)" class="filter-btn px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">Shift 2</button>
         </div>
-        <div class="ml-auto">
+        <div class="flex items-center gap-2 ml-auto">
+            <a href="{{ route('supervisor.monitor') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors">
+                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                Monitor
+            </a>
             <span class="live-badge inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-50 border border-green-200 text-green-700 text-xs font-bold">
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block"></span>LIVE
             </span>
@@ -35,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6" id="linesGrid"></div>
+    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -48,60 +52,73 @@
     </div>
 
     <!-- ===== CHARTS TODAY ===== -->
-    <div id="todayCharts" class="chart-grid grid grid-cols-1 sm:grid-cols-2 gap-4 2xl:gap-6">
+    <div class="flex items-center gap-2 mb-2">
+        <span class="text-xs text-gray-400 font-medium">🔄 Drag = select zoom, Shift+Drag = pan</span>
+    </div>
+    <div id="todayCharts" class="chart-grid grid grid-cols-1 gap-4 2xl:gap-6">
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>Pencapaian Produksi (Pcs)
+                <button onclick="resetChart('cQty')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 chart-min-h min-h-[220px] 2xl:min-h-[320px]"><canvas id="cQty"></canvas></div>
+            <div class="p-4 flex-1 chart-min-h min-h-[350px] 2xl:min-h-[500px]"><canvas id="cQty"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>Total Downtime (Menit)
+                <button onclick="resetChart('cDt')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cDt"></canvas></div>
+            <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cDt"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>Repair &amp; Reject (Pcs)
+                <button onclick="resetChart('cRr')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cRr"></canvas></div>
+            <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cRr"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>Pencapaian GSPH
+                <button onclick="fitGsphChart('cGsph')" class="text-xs text-gray-400 hover:text-blue-500 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50" title="Sesuaikan skala ke data">↺ Fit</button>
+                <button onclick="resetChart('cGsph')" class="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cGsph"></canvas></div>
+            <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cGsph"></canvas></div>
         </div>
     </div>
 
     <!-- ===== CHARTS TREND ===== -->
     <div id="trendCharts" class="hidden space-y-4">
         <div class="text-center font-black text-gray-600 text-sm sm:text-lg uppercase tracking-widest" id="trendLabel"></div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 2xl:gap-6">
+        <div class="grid grid-cols-1 gap-4 2xl:gap-6">
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>Tren Pencapaian Produksi (Pcs)
+                    <button onclick="resetChart('cTQty')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTQty"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTQty"></canvas></div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>Tren Total Downtime (Menit)
+                    <button onclick="resetChart('cTDt')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTDt"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTDt"></canvas></div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>Tren Repair &amp; Reject (Pcs)
+                    <button onclick="resetChart('cTRr')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTRr"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTRr"></canvas></div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>Tren Pencapaian GSPH
+                    <button onclick="fitGsphChart('cTGsph')" class="text-xs text-gray-400 hover:text-blue-500 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50" title="Sesuaikan skala ke data">↺ Fit</button>
+                    <button onclick="resetChart('cTGsph')" class="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTGsph"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTGsph"></canvas></div>
             </div>
         </div>
     </div>
@@ -182,12 +199,109 @@
   .day-label               { font-size: 1.2rem !important; }
   #linesGrid               { grid-template-columns: repeat(2, 1fr) !important; gap: 2.5rem !important; }
 }
+
+/* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
+.det-scroll {
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 320px;
+  scrollbar-width: thin;
+  scrollbar-color: #e5e7eb #f9fafb;
+}
+.det-scroll::-webkit-scrollbar        { height: 5px; width: 5px; }
+.det-scroll::-webkit-scrollbar-track  { background: #f9fafb; }
+.det-scroll::-webkit-scrollbar-thumb  { background: #d1d5db; border-radius: 99px; }
+.det-scroll::-webkit-scrollbar-thumb:hover { background: #9ca3af; }
+
+.det-table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 900px;
+  font-size: 11px;
+}
+.det-table thead tr {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  background: #f8fafc;
+}
+.det-table thead th {
+  padding: 7px 8px;
+  font-size: 9px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #6b7280;
+  white-space: nowrap;
+  border-bottom: 2px solid #e5e7eb;
+  background: #f8fafc;
+}
+.det-table thead th:first-child  { border-left: 3px solid #e5e7eb; }
+.det-table thead th:last-child    { border-right: 3px solid #e5e7eb; }
+.det-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.12s;
+}
+.det-table tbody tr:nth-child(even) { background: #f9fafb; }
+.det-table tbody tr:hover           { background: #eff6ff !important; }
+.det-table tbody tr:last-child      { border-bottom: none; }
+.det-table td {
+  padding: 6px 8px;
+  font-size: 10px;
+  white-space: nowrap;
+  vertical-align: middle;
+  color: #6b7280;
+}
+
+.det-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: linear-gradient(90deg, #f1f5f9 0%, #f8fafc 100%);
+  border-top: 2px solid #e5e7eb;
+  border-bottom: 1px solid #e9ecef;
+}
+.det-section-label span.label-text {
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #64748b;
+}
+.det-section-label span.label-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 99px;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+.det-section-label span.label-badge.zero {
+  background: #f3f4f6;
+  color: #9ca3af;
+}
+.det-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 28px 16px;
+  background: #fafafa;
+  color: #c4c8d0;
+}
+.det-empty svg  { width: 32px; height: 32px; opacity: 0.5; }
+.det-empty span { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #b0b7c3; }
 </style>
 
 @endsection
 
 @section('scripts')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{{-- PART A: fetch data ASAP (starts before Chart.js loads) --}}
 <script>
 const LINES = @json($lines);
 const SELECTED_LINE = @json($selectedLine);
@@ -196,13 +310,45 @@ let selectedShift = 1;
 let selectedDays  = 1;
 let charts = {};
 let LINE_KPI = {};
+let LINE_META = {};
 let DETAIL_DATA = {};
+let LAST_KPI_HASH = '';
+let LAST_DETAIL_HASH = '';
+
+// Incremental render cache
+let CARDS_CACHED = false;
+let CELL_CACHE = {};
+let LAST_DETAIL_RENDER_HASH = '';
+
+function setText(el, v) {
+  if (el && el.textContent !== v) el.textContent = v;
+}
 
 /**
  * FUNGSI UTAMA PENARIKAN DATA (REAL-TIME API)
  * Fungsi ini memanggil endpoint backend untuk mendapatkan data Qty, Downtime, 
  * dan rincian kualitas secara asli dari database.
  */
+let LINE_DETAIL = {};
+
+async function fetchDetailData() {
+    const date = document.getElementById('dateInput').value;
+    const shift = selectedShift;
+    try {
+        let url = `{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`;
+        if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
+        const response = await fetch(url);
+        const data = await response.json();
+        const newDetailHash = JSON.stringify(data.detail);
+        if (newDetailHash === LAST_DETAIL_HASH) return;
+        LAST_DETAIL_HASH = newDetailHash;
+        LINE_DETAIL = data.detail || {};
+        renderLineCards();
+    } catch (error) {
+        console.error("Error fetching detail data:", error);
+    }
+}
+
 async function fetchDashboardData() {
     const date = document.getElementById('dateInput').value;
     const shift = selectedShift;
@@ -211,27 +357,43 @@ async function fetchDashboardData() {
         let url = `{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
 
-        // Mengirim request ke Laravel Controller (SupervisorDashboardController@getApiData)
         const response = await fetch(url);
         const data = await response.json();
         
-        // Memasukkan hasil hitungan database ke dalam variabel dashboard
+        const newHash = JSON.stringify(data.line_kpi);
+        const detailChanged = newHash !== LAST_KPI_HASH;
+        LAST_KPI_HASH = newHash;
+        
         LINE_KPI = data.line_kpi;
+        LINE_META = data.line_meta || {};
         DETAIL_DATA = data.detail_data;
         
-        // Memperbarui tampilan kartu per Line dan grafik secara otomatis
-        renderLineCards();
-        if(selectedDays === 1) renderTodayCharts();
+        if (detailChanged) {
+            renderLineCards();
+            if(selectedDays === 1 && typeof renderTodayCharts === 'function') renderTodayCharts();
+        }
+        fetchDetailData();
     } catch (error) {
         console.error("Error fetching dashboard data:", error);
     }
 }
 
+
+
 // Menjalankan penarikan data pertama kali saat halaman dibuka
 fetchDashboardData();
+setTimeout(fetchDetailData, 100);
 
-// AUTO-REFRESH: Mengupdate data dashboard setiap 30 detik secara otomatis
-setInterval(fetchDashboardData, 30000);
+// Real-time via BroadcastChannel (instant from Input Harian saves)
+try {
+    const statusChan = new BroadcastChannel('line_status');
+    statusChan.onmessage = (e) => {
+        if (e.data.type === 'status-changed') fetchDashboardData();
+    };
+} catch (e) { /* fallback to polling */ }
+
+// AUTO-REFRESH: Mengupdate data dashboard setiap 5 detik + BroadcastChannel dari Input Harian
+setInterval(fetchDashboardData, 5000);
 
 function pad(n){ return String(n).padStart(2,'0'); }
 
@@ -246,7 +408,10 @@ updateClock();
 
 (function(){
   const now = new Date();
-  document.getElementById('dateInput').value = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  let saved;
+  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
+  document.getElementById('dateInput').value = saved || today;
 })();
 
 function setShift(s){
@@ -263,10 +428,14 @@ function setShift(s){
       s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
   }
   
+  flushCardCache();
   fetchDashboardData();
 }
 
 function onDateChange(){
+  const val = document.getElementById('dateInput').value;
+  try { localStorage.setItem('dash_filter_date', val); } catch(e) {}
+  flushCardCache();
   fetchDashboardData();
 }
 
@@ -286,64 +455,267 @@ function setDays(d){
       document.getElementById('todayCharts').classList.remove('hidden');
       document.getElementById('todayCharts').classList.add('grid');
       document.getElementById('trendCharts').classList.add('hidden');
-      renderTodayCharts();
+      if(typeof renderTodayCharts === 'function') renderTodayCharts();
   } else {
       document.getElementById('todayCharts').classList.add('hidden');
       document.getElementById('todayCharts').classList.remove('grid');
       document.getElementById('trendCharts').classList.remove('hidden');
       document.getElementById('trendLabel').textContent = `Grafik Tren ${d} Hari — Semua Line`;
-      renderTrendCharts(d);
+      if(typeof renderTrendCharts === 'function') renderTrendCharts(d);
   }
+}
+
+function dCell(v, cls){ return `<td class="px-2 py-1.5 text-center text-[10px] sm:text-xs ${cls || 'text-gray-500'}">${v}</td>`; }
+
+function detailCells(r){
+  const chk = c => c ? '<span class="inline-flex items-center justify-center w-4 h-4 sm:w-5 sm:h-5 rounded border-2 border-green-500 bg-green-50 text-green-600 text-[10px] sm:text-xs font-black leading-none">&#10003;</span>' : '<span class="inline-flex items-center justify-center px-1.5 py-0.5 rounded bg-gray-100 text-gray-400 text-[10px] sm:text-xs font-semibold">-</span>';
+  const pt = r.press_time > 0 ? r.press_time + ' m' : '-';
+  const dn = r.dandori > 0 ? r.dandori + ' m' : '-';
+  const iq = r.iq_check > 0 ? r.iq_check + ' m' : '-';
+  const dt = r.downtime > 0 ? r.downtime + ' m' : '-';
+  const tp = r.tpt > 0 ? r.tpt + ' m' : '-';
+  return dCell(r.no) +
+    dCell(r.job_number, 'text-left font-semibold text-gray-800 whitespace-nowrap') +
+    dCell(chk(r.p1)) + dCell(chk(r.p2)) + dCell(chk(r.p3)) + dCell(chk(r.p4)) +
+    dCell(r.plan_qty, 'text-gray-700') +
+    dCell(r.good, 'text-green-600 font-semibold') +
+    dCell(r.repair, 'text-amber-600 font-semibold') +
+    dCell(r.reject, 'text-red-600 font-semibold') +
+    dCell(pt) + dCell(dn) + dCell(iq) + dCell(dt) +
+    dCell(tp, 'text-blue-600 font-bold') +
+    dCell(r.plan_finish) + dCell(r.actual_finish);
 }
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
-  const trs = rows.map(kpi => {
+  const meta = LINE_META[line] || {};
+  const jobLabel = meta.job || '-';
+  const jobPlan = meta.jobPlan || '0';  
+  const jobActual = meta.jobActual || '0/0';
+  const strokeVal = meta.stroke || '0';
+  const currStrokeVal = meta.currStroke || '-';
+  const detailRows = LINE_DETAIL[line] || [];
+
+  // KPI table rows
+  let kpiRows = `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
+    <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">JOB</td>
+    <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">${jobPlan}</td>
+    <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${jobActual}</td>
+    <td class="px-4 py-3 text-center text-gray-800 font-semibold text-xs sm:text-sm">${jobLabel}</td>
+  </tr>`;
+
+  rows.forEach((kpi) => {
     const dangerRowCls = kpi.danger ? 'bg-red-50' : 'hover:bg-gray-50/70';
     const textDescCls  = kpi.danger ? 'text-red-700 font-extrabold' : 'text-gray-700 font-bold';
-    const borderCls    = kpi.danger ? 'border-l-[4px] border-red-500' : 'border-l-[4px] border-transparent';
-
-    let actualCell = '';
     let clickAttr = kpi.popup || kpi.actualLink ? `onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
     let cursorCls = kpi.popup || kpi.actualLink ? 'cursor-pointer hover:bg-red-50 transition-colors' : '';
     let underlineCls = kpi.popup || kpi.actualLink ? 'underline decoration-dotted decoration-red-300 underline-offset-4' : '';
 
+    let actualCell = '';
     if(kpi.popup && (kpi.desc==='REPAIR' || kpi.desc==='REJECT')){
       actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
     } else {
       actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span>`;
     }
 
-    return `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
-      <td class="kpi-table-cell px-4 py-3 text-left ${textDescCls} ${borderCls} text-xs sm:text-sm lg:text-base">${kpi.desc}</td>
+    kpiRows += `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
+      <td class="kpi-table-cell px-4 py-3 text-left ${textDescCls} border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base">${kpi.desc}</td>
       <td class="kpi-table-cell px-4 py-3 text-center text-gray-500 text-xs sm:text-sm lg:text-base">${kpi.plan}</td>
       <td class="kpi-table-cell px-4 py-3 text-center text-xs sm:text-sm lg:text-base ${cursorCls}" ${clickAttr}>${actualCell}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.current}</td>
+      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.currentPct ? `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>` : kpi.current}</td>
     </tr>`;
-  }).join('');
 
+    if(kpi.desc === 'GSPH'){
+      kpiRows += `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
+        <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">STROKE</td>
+        <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">-</td>
+        <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${Number(strokeVal).toLocaleString('id-ID')}</td>
+        <td class="px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm">${currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID')}</td>
+      </tr>`;
+    }
+  });
+
+  // Detail rows
+  const hasDetail = detailRows.length > 0;
+  const rowCount  = detailRows.length;
+
+  let detRows = '';
+  detailRows.forEach((r, idx) => {
+    detRows += `<tr>
+      ${detailCells(r)}
+    </tr>`;
+  });
+
+  // Detail section: label badge + table/empty state
+  const detSection = `
+    <div class="det-section-label">
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+        <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
+        <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
+        <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+      </svg>
+      <span class="label-text">Detail Produksi</span>
+      <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
+    </div>
+    ${hasDetail ? `
+    <div class="det-scroll">
+      <table class="det-table">
+        <thead>
+          <tr>
+            <th style="text-align:center">No</th>
+            <th style="text-align:left">Job No</th>
+            <th style="text-align:center">P1</th>
+            <th style="text-align:center">P2</th>
+            <th style="text-align:center">P3</th>
+            <th style="text-align:center">P4</th>
+            <th style="text-align:center">Plan Qty</th>
+            <th style="text-align:center;color:#16a34a">Good</th>
+            <th style="text-align:center;color:#d97706">Rep</th>
+            <th style="text-align:center;color:#dc2626">Rej</th>
+            <th style="text-align:center">Press Time</th>
+            <th style="text-align:center">Dandori</th>
+            <th style="text-align:center">IQ Check</th>
+            <th style="text-align:center">Downtime</th>
+            <th style="text-align:center;color:#2563eb">TPT</th>
+            <th style="text-align:center">Plan Finish</th>
+            <th style="text-align:center">Act Finish</th>
+          </tr>
+        </thead>
+        <tbody>${detRows}</tbody>
+      </table>
+    </div>` : `
+    <div class="det-empty">
+      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <span>Belum ada data produksi</span>
+    </div>`}
+  `;
+      
   return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
     <div class="card-line-title bg-red-50 border-b border-red-100 px-5 py-4 text-center text-red-700 font-black tracking-[0.2em] text-sm sm:text-base lg:text-lg uppercase">
       ${line}
     </div>
-    <div class="overflow-x-auto flex-1">
-      <table class="w-full border-collapse">
+    <div class="overflow-x-auto">
+      <table class="border-collapse w-full">
         <thead>
           <tr class="bg-gray-100 border-b-2 border-gray-200 text-gray-500">
-            <th class="kpi-table-header px-4 py-3 text-left text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest w-[35%]">DESC</th>
+            <th class="kpi-table-header px-4 py-3 text-left text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">DESC</th>
             <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">PLAN</th>
             <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">ACTUAL</th>
             <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">CURR</th>
           </tr>
         </thead>
-        <tbody>${trs}</tbody>
+        <tbody>
+          ${kpiRows}
+        </tbody>
       </table>
     </div>
+    ${detSection}
   </div>`;
 }
 
-function renderLineCards(){
-  document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
+function renderLineCards(forceDetail){
+  const grid = document.getElementById('linesGrid');
+  if (!CARDS_CACHED) {
+    grid.innerHTML = LINES.map(buildLineCard).join('');
+    CARDS_CACHED = true;
+    cacheCards();
+    return;
+  }
+  updateCards(forceDetail);
+}
+
+function cacheCards() {
+  CELL_CACHE = {};
+  document.querySelectorAll('#linesGrid .bg-white').forEach(card => {
+    const line = card.querySelector('.card-line-title').textContent.trim();
+    CELL_CACHE[line] = { el: card };
+    card.querySelectorAll('tbody tr').forEach(row => {
+      const cells = row.querySelectorAll('td');
+      if (cells.length < 4) return;
+      const desc = cells[0].textContent.trim();
+      CELL_CACHE[`${line}-${desc}-plan`]   = cells[1];
+      CELL_CACHE[`${line}-${desc}-actual`] = cells[2];
+      CELL_CACHE[`${line}-${desc}-curr`]   = cells[3];
+    });
+  });
+}
+
+function updateCards(forceDetail) {
+  // Detail changed: skip KPI update, rebuild everything
+  if (forceDetail || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH) {
+    LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
+    flushCardCache();
+    document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
+    CARDS_CACHED = true;
+    cacheCards();
+    return;
+  }
+
+  // Only KPI data changed — incremental cell update
+  LINES.forEach(line => {
+    const rows = LINE_KPI[line] || [];
+    const meta = LINE_META[line] || {};
+
+    setText(CELL_CACHE[`${line}-JOB-plan`],   meta.jobPlan || '0');
+    setText(CELL_CACHE[`${line}-JOB-actual`],  meta.jobActual || '0/0');
+    setText(CELL_CACHE[`${line}-JOB-curr`],    meta.job || '-');
+
+    const st = meta.stroke || '0';
+    const cs = meta.currStroke || '-';
+    setText(CELL_CACHE[`${line}-STROKE-plan`], '-');
+    setText(CELL_CACHE[`${line}-STROKE-actual`], Number(st).toLocaleString('id-ID'));
+    setText(CELL_CACHE[`${line}-STROKE-curr`], cs==='-'?'-':Number(cs||0).toLocaleString('id-ID'));
+
+    rows.forEach(kpi => {
+      const planCell   = CELL_CACHE[`${line}-${kpi.desc}-plan`];
+      const actualCell = CELL_CACHE[`${line}-${kpi.desc}-actual`];
+      const currCell   = CELL_CACHE[`${line}-${kpi.desc}-curr`];
+
+      if (planCell) setText(planCell, kpi.plan || '-');
+
+      if (actualCell) {
+        if (kpi.popup && (kpi.desc==='REPAIR'||kpi.desc==='REJECT')) {
+          const h = `<span class="text-red-600 font-extrabold underline decoration-dotted decoration-red-300 underline-offset-4">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
+          if (actualCell.innerHTML !== h) actualCell.innerHTML = h;
+        } else {
+          setText(actualCell, kpi.actual);
+        }
+      }
+
+      if (currCell) {
+        if (kpi.currentPct) {
+          const h = `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>`;
+          if (currCell.innerHTML !== h) currCell.innerHTML = h;
+        } else {
+          setText(currCell, kpi.current);
+        }
+      }
+
+      if (planCell) {
+        const row  = planCell.closest('tr');
+        const dsc  = row ? row.cells[0] : null;
+        if (row && dsc) {
+          const dangerCls = 'border-b border-gray-100 transition-colors bg-red-50';
+          const safeCls   = 'border-b border-gray-100 transition-colors hover:bg-gray-50/70';
+          const wantDanger = kpi.danger ? dangerCls : safeCls;
+          if (row.className !== wantDanger) row.className = wantDanger;
+          const txtCls = kpi.danger
+            ? 'kpi-table-cell px-4 py-3 text-left text-red-700 font-extrabold border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base'
+            : 'kpi-table-cell px-4 py-3 text-left text-gray-700 font-bold border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base';
+          if (dsc.className !== txtCls) dsc.className = txtCls;
+        }
+      }
+    });
+  });
+}
+
+function flushCardCache() {
+  CARDS_CACHED = false;
+  CELL_CACHE = {};
+  LAST_DETAIL_RENDER_HASH = '';
 }
 
 function openKpiDetailModal(type, line){
@@ -369,85 +741,156 @@ function openKpiDetailModal(type, line){
         console.warn(`No data found for type: ${type}`);
         showKpiModalEmpty(); return; 
     }
-    const lineData = typeData[line];
-    if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
-        console.warn(`No rows found for line: ${line} in type: ${type}`);
-        showKpiModalEmpty(); return; 
-    }
 
     let html = '';
-    if(typeData.type === 'quality'){
+
+    if(typeData.type === 'production'){
+      const lineData = typeData[line];
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
+
       html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-600"><tr>
-          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Countermeasure</th>
-          <th class="px-4 py-3 text-center border-b border-gray-200">Qty</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">OK Qty</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
-        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+        ${lineData.rows.map((r, i) => `<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${i + 1}</td>
           <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
-          <td class="px-4 py-3 text-gray-600">${r.problem}</td>
-          <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
+          <td class="px-4 py-3 text-center text-green-600 font-black">${r.ok}</td>
         </tr>`).join('')}
         <tr class="bg-gray-50">
-          <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
           <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
         </tr>
         </tbody></table></div>`;
 
-    } else if(typeData.type === 'dt_summary'){
-      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-600"><tr>
-          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
-          <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-100">
-        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
-          <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
-          <td class="px-4 py-3 text-gray-600">${r.problem}</td>
-          <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
-          <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
-        </tr>`).join('')}
-        <tr class="bg-gray-50 font-black">
-          <td colspan="4" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
-          <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
-        </tr>
-        </tbody></table></div>`;
-
     } else {
-      // dt_detail
-      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
-        <thead class="bg-gray-50 text-gray-600"><tr>
-          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
-          <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
-        </tr></thead>
-        <tbody class="divide-y divide-gray-100">
-        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
-          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
-          <td class="px-4 py-3 text-gray-600">${r.problem}</td>
-          <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
-          <td class="px-4 py-3 text-gray-600">${r.action}</td>
-          <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
-        </tr>`).join('')}
-        <tr class="bg-gray-50">
-          <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
-          <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td>
-        </tr>
-        </tbody></table></div>`;
+      const lineData = typeData[line];
+      if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
+          console.warn(`No rows found for line: ${line} in type: ${type}`);
+          showKpiModalEmpty(); return; 
+      }
+
+      if(typeData.type === 'quality'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-20">Qty</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50">
+            <td colspan="3" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
+          </tr>
+          </tbody></table></div>`;
+
+      } else if(typeData.type === 'dt_summary'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
+            <td class="px-4 py-3 font-semibold text-blue-700">${r.job || '-'}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+            <td class="px-4 py-3 text-gray-600">${r.action || '-'}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50 font-black">
+            <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+            <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
+          </tr>
+          </tbody></table></div>`;
+
+      } else if(typeData.type === 'runtime'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50">
+            <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
+          </tr>
+          </tbody></table></div>`;
+
+      } else if(typeData.type === 'idle_detail'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item / Job</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200">Idle Start</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200">Idle End</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-center text-gray-600">${r.start}</td>
+            <td class="px-4 py-3 text-center text-gray-600">${r.end}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50">
+            <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL IDLE</td>
+            <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td>
+          </tr>
+          </tbody></table></div>`;
+
+      } else {
+        // dt_detail
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+            <td class="px-4 py-3 text-gray-600">${r.action}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50">
+            <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td>
+          </tr>
+          </tbody></table></div>`;
+      }
     }
+
     body.innerHTML = html;
     } catch (e) {
     console.error("Error in openModal:", e);
@@ -478,6 +921,93 @@ function closeKpiDetailModal(){
 function onBackdropClick(e){
   if(e.target === document.getElementById('modalBackdrop')) closeModal();
 }
+</script>
+
+{{-- PART B: Chart.js (loads after Part A, so API call starts first) --}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+Chart.register(ChartZoom);
+if(typeof ChartDataLabels !== 'undefined'){ Chart.register(ChartDataLabels); }
+
+function resetChart(id){
+  if(!charts[id]) return;
+  charts[id].resetZoom();
+  if(id === 'cGsph' || id === 'cTGsph'){
+    charts[id].options.scales.x.beginAtZero = true;
+    charts[id].options.scales.x.min = undefined;
+    charts[id].options.scales.x.max = undefined;
+    charts[id].update();
+  }
+}
+
+function renderGsphChart(id, labels, plan, actual){
+  const posActual = actual.filter(v => v > 0);
+  const minVal = posActual.length > 0 ? Math.min(...posActual) : 0;
+  const maxPlan = Math.max(...plan);
+  const isSmall = minVal > 0 && maxPlan > 0 && (maxPlan / minVal) > 5;
+
+  const opts = baseOpts('GSPH');
+  opts.indexAxis = 'y';
+  opts.scales.y.beginAtZero = true;
+  opts.scales.y.grid.display = false;
+  opts.scales.x.beginAtZero = !isSmall;
+  if(isSmall){
+    opts.scales.x.min = Math.max(0, minVal * 0.8);
+    opts.scales.x.max = maxPlan * 1.1;
+  }
+  opts.scales.x.title = { display: true, text: 'GSPH', color: '#9ca3af', font:{size: 13, weight: 'bold'} };
+  opts.plugins.tooltip = {
+    callbacks: {
+      label: function(ctx){
+        if(ctx.datasetIndex === 0) return 'Plan: ' + ctx.parsed.x.toLocaleString();
+        var planVal = ctx.chart.data.datasets[0].data[ctx.dataIndex];
+        var pct = planVal > 0 ? ((ctx.parsed.x / planVal) * 100).toFixed(2) + '%' : '-';
+        return 'Actual: ' + ctx.parsed.x.toLocaleString() + ' (' + pct + ')';
+      }
+    }
+  };
+  opts.plugins.datalabels = {
+    display: function(ctx){ return ctx.datasetIndex === 1; },
+    anchor: 'end',
+    align: 'end',
+    color: '#374151',
+    font: { weight: 'bold', size: 11 },
+    formatter: function(val){
+      if(val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+      if(val >= 1000) return (val / 1000).toFixed(1) + 'K';
+      return val.toLocaleString();
+    }
+  };
+
+  const chart = new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Plan',   data: plan,   backgroundColor:'#e5e7eb', borderRadius: 4, minBarLength: 10 },
+      { label:'Actual', data: actual, backgroundColor:'#3b82f6', borderRadius: 4, minBarLength: 10 }
+    ]},
+    options: opts
+  });
+  chart.__gsphData = { plan, actual };
+  return chart;
+}
+
+function fitGsphChart(id){
+  const chart = charts[id];
+  if(!chart || !chart.__gsphData) return;
+  const { plan, actual } = chart.__gsphData;
+  const posActual = actual.filter(v => v > 0);
+  if(posActual.length === 0) return;
+  const minVal = Math.min(...posActual);
+  const maxVal = Math.max(...plan);
+  if(maxVal <= 0) return;
+  chart.options.scales.x.beginAtZero = false;
+  chart.options.scales.x.min = Math.max(0, minVal * 0.8);
+  chart.options.scales.x.max = maxVal * 1.1;
+  chart.resetZoom();
+  chart.update();
+}
 
 function destroyChart(id){
   if(charts[id]){ charts[id].destroy(); delete charts[id]; }
@@ -485,14 +1015,19 @@ function destroyChart(id){
 
 const CHART_TEXT  = '#6b7280';
 const CHART_GRID  = '#f3f4f6';
-const FONT_SZ     = 11;
+const FONT_SZ     = 13;
 
 function baseOpts(yLabel){
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: CHART_TEXT, font:{size: FONT_SZ, family: "'Inter', sans-serif"} } }
+      legend: { labels: { color: CHART_TEXT, font:{size: FONT_SZ, family: "'Inter', sans-serif"} } },
+        zoom: {
+          pan: { enabled: true, mode: 'xy', modifierKey: 'shift' },
+          zoom: { wheel: { enabled: false }, pinch: { enabled: true }, drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 } },
+          limits: { x: { minRange: 0.5 }, y: { minRange: 0.5 } }
+        }
     },
     scales: {
       x: {
@@ -509,6 +1044,15 @@ function baseOpts(yLabel){
   };
 }
 
+function updChart(id, datasets) {
+  const c = charts[id];
+  if (!c) return;
+  datasets.forEach((ds, i) => {
+    if (c.data.datasets[i]) c.data.datasets[i].data = ds.data;
+  });
+  c.update('none');
+}
+
 function renderTodayCharts(){
   const labels_src = Object.keys(LINE_KPI);
   if(labels_src.length === 0) return;
@@ -521,7 +1065,27 @@ function renderTodayCharts(){
   const gsph_plan  = labels_src.map(l => parseFloat((LINE_KPI[l]?.find(r=>r.desc==='GSPH')||{}).plan||'0'));
   const gsph_act   = labels_src.map(l => parseFloat((LINE_KPI[l]?.find(r=>r.desc==='GSPH')||{}).actual||'0'));
 
-  destroyChart('cQty');
+  if (charts['cQty']) {
+    updChart('cQty', [
+      { data: qty_plan },
+      { data: qty_actual }
+    ]);
+    updChart('cDt', [
+      { data: downtime }
+    ]);
+    updChart('cRr', [
+      { data: repair },
+      { data: reject }
+    ]);
+    if (charts['cGsph']) {
+      charts['cGsph'].data.datasets[0].data = gsph_plan;
+      charts['cGsph'].data.datasets[1].data = gsph_act;
+      charts['cGsph'].update('none');
+    }
+    return;
+  }
+
+  // First-time creation
   charts['cQty'] = new Chart(document.getElementById('cQty'), {
     type:'bar',
     data:{ labels, datasets:[
@@ -531,7 +1095,6 @@ function renderTodayCharts(){
     options: baseOpts('Pcs')
   });
 
-  destroyChart('cDt');
   charts['cDt'] = new Chart(document.getElementById('cDt'), {
     type:'bar',
     data:{ labels, datasets:[
@@ -540,7 +1103,6 @@ function renderTodayCharts(){
     options: baseOpts('Menit')
   });
 
-  destroyChart('cRr');
   charts['cRr'] = new Chart(document.getElementById('cRr'), {
     type:'bar',
     data:{ labels, datasets:[
@@ -550,15 +1112,7 @@ function renderTodayCharts(){
     options: baseOpts('Pcs')
   });
 
-  destroyChart('cGsph');
-  charts['cGsph'] = new Chart(document.getElementById('cGsph'), {
-    type:'bar',
-    data:{ labels, datasets:[
-      { label:'Plan',   data: gsph_plan, backgroundColor:'#e5e7eb', borderRadius: 4 },
-      { label:'Actual', data: gsph_act,  backgroundColor:'#3b82f6', borderRadius: 4 }
-    ]},
-    options: baseOpts('GSPH')
-  });
+  charts['cGsph'] = renderGsphChart('cGsph', labels, gsph_plan, gsph_act);
 }
 
 function renderTrendCharts(d){
@@ -605,13 +1159,27 @@ function renderTrendCharts(d){
     options: baseOpts('Pcs')
   });
 
-  charts['cTGsph'] = new Chart(document.getElementById('cTGsph'), {
-    type:'line',
-    data:{ labels, datasets:[{
-      label:'GSPH', data:gs, borderColor:'#3b82f6', backgroundColor:'rgba(59, 130, 246, 0.1)', fill:true, tension:0.4, borderWidth: 2
-    }]},
-    options: baseOpts('GSPH')
-  });
+  destroyChart('cTGsph');
+  {
+    const trendGsphOpts = baseOpts('GSPH');
+    const trendPos = gs.filter(v => v > 0);
+    const trendMin = trendPos.length > 0 ? Math.min(...trendPos) : 0;
+    const trendMax = Math.max(...gs);
+    const trendSmall = trendMin > 0 && trendMax > 0 && (trendMax / trendMin) > 5;
+    trendGsphOpts.scales.y.beginAtZero = !trendSmall;
+    if(trendSmall){
+      trendGsphOpts.scales.y.min = Math.max(0, trendMin * 0.8);
+      trendGsphOpts.scales.y.max = trendMax * 1.1;
+    }
+    charts['cTGsph'] = new Chart(document.getElementById('cTGsph'), {
+      type:'line',
+      data:{ labels, datasets:[{
+        label:'GSPH', data:gs, borderColor:'#3b82f6', backgroundColor:'rgba(59, 130, 246, 0.1)', fill:true, tension:0.4, borderWidth: 2
+      }]},
+      options: trendGsphOpts
+    });
+    charts['cTGsph'].__gsphData = { plan: gs, actual: gs };
+  }
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{

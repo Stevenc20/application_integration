@@ -1,0 +1,83 @@
+@startuml Use Case - Supervisor
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - Supervisor
+
+' ===== AKTOR KIRI =====
+actor "Supervisor" as SPV
+
+rectangle "Supervisor Module" {
+  usecase "Login" as UC_LOGIN
+  usecase "Dashboard Realtime (SSE)" as UC_DASH
+  usecase "Monitor Status Line" as UC_LINE
+  usecase "Analisis Performance" as UC_PERF
+
+  usecase "LKH Report" as UC_LKH
+  usecase "Print LKH" as UC_PRINT_LKH
+  usecase "Downtime Recap" as UC_DT_RECAP
+  usecase "Handwork Recap" as UC_HW_RECAP
+  usecase "Sign LKH (TTD)" as UC_TTD
+
+  usecase "Trouble History" as UC_TROUBLE
+  usecase "Grafik Downtime" as UC_GRAFIK_DT
+
+  usecase "Grafik GSPH" as UC_GSPH
+  usecase "Grafik Achievement" as UC_ACHIEVE
+
+  usecase "Q-Check Management" as UC_QC_MGMT
+  usecase "Defect Monitoring" as UC_DEFECT
+  usecase "Reject Analysis" as UC_REJECT
+
+  usecase "Break Time Management" as UC_BT_MGMT
+
+  usecase "Approval Recovery Items" as UC_APPROVE
+
+  usecase "Hambatan Jalur" as UC_HAMBATAN
+  usecase "Dandori History" as UC_DAND_HIST
+
+  ' ===== RELATIONSHIPS =====
+  UC_DASH ..> UC_LINE : <<include>>
+  UC_DASH ..> UC_PERF : <<extend>>
+  UC_LKH ..> UC_PRINT_LKH : <<include>>
+  UC_LKH ..> UC_DT_RECAP : <<include>>
+  UC_LKH ..> UC_HW_RECAP : <<include>>
+  UC_LKH ..> UC_TTD : <<include>>
+  UC_PERF ..> UC_GRAFIK_DT : <<include>>
+  UC_PERF ..> UC_GSPH : <<include>>
+  UC_PERF ..> UC_ACHIEVE : <<extend>>
+  UC_TROUBLE ..> UC_GRAFIK_DT : <<include>>
+  UC_QC_MGMT ..> UC_DEFECT : <<include>>
+  UC_QC_MGMT ..> UC_REJECT : <<extend>>
+  UC_APPROVE ..> UC_DAND_HIST : <<extend>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Foreman" as FRM
+actor "Manager" as MGR
+actor "Kadiv" as KDV
+
+' ===== RELASI AKTOR =====
+SPV --> UC_LOGIN
+SPV --> UC_DASH
+SPV --> UC_LKH
+SPV --> UC_PERF
+SPV --> UC_TROUBLE
+SPV --> UC_QC_MGMT
+SPV --> UC_BT_MGMT
+SPV --> UC_APPROVE
+SPV --> UC_GRAFIK_DT
+SPV --> UC_HAMBATAN
+FRM --> UC_LINE
+MGR --> UC_DASH
+KDV --> UC_DASH
+
+@enduml

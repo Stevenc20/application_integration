@@ -52,16 +52,6 @@
 
     </div>
 
-    {{-- QUICK ACTION --}}
-    <div class="bg-white p-4 rounded-xl shadow">
-        <h2 class="font-semibold mb-3">Production Input</h2>
-
-        <a href="{{ route('production_entry') }}"
-           class="block w-full text-center bg-red-600 text-white py-3 rounded-lg hover:bg-red-700">
-            Input Produksi
-        </a>
-    </div>
-
     {{-- LINE STATUS --}}
     <div class="bg-white p-4 rounded-xl shadow">
         <h2 class="font-semibold mb-4">Line Status</h2>
@@ -87,6 +77,35 @@
         </div>
     </div>
 
+    {{-- SHIFT COMMENTS --}}
+    @if(isset($shiftComments) && $shiftComments->isNotEmpty())
+    <div class="bg-white p-4 rounded-xl shadow">
+        <h2 class="font-semibold mb-4">Catatan Akhir Shift</h2>
+
+        <div class="space-y-3">
+            @foreach($shiftComments as $comment)
+            <div class="flex items-start gap-3 bg-gray-50 border border-gray-200 rounded-lg p-3">
+                <div class="w-8 h-8 rounded-lg bg-amber-500 text-white flex items-center justify-center shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/>
+                    </svg>
+                </div>
+                <div class="min-w-0">
+                    <p class="text-sm text-gray-800">{{ $comment->comment }}</p>
+                    <p class="text-xs text-gray-500 mt-1">
+                        {{ $comment->line?->line_name ?? 'Line' }} &bull;
+                        {{ $comment->submitter?->name ?? 'Leader' }} &bull;
+                        {{ $comment->submitted_at?->format('d M Y H:i') }}
+                    </p>
+                </div>
+            </div>
+            @endforeach
+        </div>
+    </div>
+    @endif
+
+    @include('components.grafik-gsph')
+
     {{-- RECENT INPUT --}}
     <div class="bg-white p-4 rounded-xl shadow">
         <h2 class="font-semibold mb-4">Recent Production</h2>
@@ -106,10 +125,10 @@
                 <tbody>
                     @forelse($recentProductions as $item)
                     <tr class="border-b">
-                        <td class="px-3 py-2">{{ $item->production_order_number }}</td>
+                        <td class="px-3 py-2">{{ $item->jobMaster->job_number ?? '-' }}</td>
                         <td class="px-3 py-2">{{ $item->line }}</td>
-                        <td class="px-3 py-2 text-green-600">{{ $item->qty_ok }}</td>
-                        <td class="px-3 py-2 text-red-600">{{ $item->qty_reject }}</td>
+                        <td class="px-3 py-2 text-green-600">{{ $item->actual_ok }}</td>
+                        <td class="px-3 py-2 text-red-600">{{ $item->actual_reject }}</td>
                     </tr>
                     @empty
                     <tr>

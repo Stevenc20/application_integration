@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views/supervisor';
+@source '../views/admin';
+@source '../views/super_admin';
+@source '../views/layouts/supervisor.blade.php';
+@source '../views/layouts/super_admin.blade.php';
+@source '../views/components';
+@source '../views/hambatan-jalur';
+@source '../views/reports';
+@source '../views/notifications';
+@source '../js/app.js';
+
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+}

@@ -13,6 +13,7 @@ class ProductionPlan extends Model
         'status',
         'notes',
         'shift_name',
+        'shift_master_id',
         'press_name',
         'hari',
         'tgl',

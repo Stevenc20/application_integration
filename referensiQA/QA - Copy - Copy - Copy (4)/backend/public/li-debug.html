@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LI Template Debug</title>
+<style>
+body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #eee; }
+h1 { color: #f0a500; }
+.btn { padding: 10px 20px; background: #e94560; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 14px; margin: 5px; }
+.result { background: #16213e; padding: 15px; border-radius: 8px; margin-top: 15px; white-space: pre-wrap; font-size: 12px; max-height: 500px; overflow: auto; }
+.ok { color: #4ade80; }
+.err { color: #f87171; }
+.warn { color: #fbbf24; }
+input { padding: 8px; background: #16213e; border: 1px solid #444; color: white; border-radius: 4px; width: 300px; }
+</style>
+</head>
+<body>
+<h1>🔍 LI Template Autofill Debugger</h1>
+<div>
+  <input type="text" id="partno" value="53711-BZ071" placeholder="Masukkan Part No...">
+  <button class="btn" onclick="testApi()">Test API Call</button>
+  <button class="btn" onclick="testWithAuth()">Test With Auth Cookie</button>
+</div>
+<div id="result" class="result">Klik tombol untuk mulai test...</div>
+
+<script>
+const log = (msg, type='ok') => {
+  const el = document.getElementById('result');
+  const line = document.createElement('div');
+  line.className = type;
+  line.textContent = msg;
+  el.appendChild(line);
+};
+
+async function testApi() {
+  document.getElementById('result').innerHTML = '';
+  const partNo = document.getElementById('partno').value.trim();
+  log('=== TEST API CALL ===', 'warn');
+  log('Part No: ' + JSON.stringify(partNo));
+  log('Encoded: ' + encodeURIComponent(partNo));
+
+  const url = '/api/li-templates/' + encodeURIComponent(partNo) + '?t=' + Date.now();
+  log('URL: ' + url);
+
+  try {
+    const res = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    });
+    log('HTTP Status: ' + res.status + ' ' + res.statusText);
+
+    const data = await res.json();
+    log('Response:', 'warn');
+    log(JSON.stringify(data, null, 2));
+
+    if (data && data.part_no) {
+      log('\n=== DATA CHECK ===', 'warn');
+      log('part_no: ' + data.part_no);
+      log('dimensi1: ' + JSON.stringify(data.dimensi1));
+      log('dimensi1_method: ' + JSON.stringify(data.dimensi1_method));
+      log('appearance6: ' + JSON.stringify(data.appearance6));
+      log('image_path: ' + JSON.stringify(data.image_path));
+      log('\n=== ALL GOOD! Data ditemukan ✅', 'ok');
+    } else {
+      log('\n❌ Template tidak ditemukan / response tidak punya part_no!', 'err');
+      if (data.message) log('Message: ' + data.message, 'err');
+    }
+  } catch (e) {
+    log('ERROR: ' + e.message, 'err');
+  }
+}
+
+async function testWithAuth() {
+  document.getElementById('result').innerHTML = '';
+  log('=== CHECKING SESSION / AUTH ===', 'warn');
+  try {
+    const res = await fetch('/api/auth/me', {
+      credentials: 'include',
+      headers: { 'Accept': 'application/json' }
+    });
+    log('Auth Status: ' + res.status);
+    const data = await res.json();
+    log(JSON.stringify(data, null, 2));
+    if (res.status === 200) {
+      log('\n✅ Anda sudah login! Sekarang test API template...', 'ok');
+      await testApi();
+    } else {
+      log('\n❌ Belum login atau session expired!', 'err');
+      log('Silakan login dulu di halaman utama, lalu refresh halaman ini.', 'warn');
+    }
+  } catch (e) {
+    log('ERROR: ' + e.message, 'err');
+  }
+}
+</script>
+</body>
+</html>

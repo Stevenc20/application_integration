@@ -9,12 +9,11 @@ return new class extends Migration
   public function up(): void
 {
     Schema::create('users', function (Blueprint $table) {
-        $table->id();
+        $table->id();   
 
         $table->string('name');
         $table->string('nrp')->unique(); 
-        $table->string('password');
-
+        $table->string('password');         
         $table->string('role'); // admin, supervisor, foreman, operator, leader a/b/c/d, shearing, handwork
         $table->boolean('is_active')->default(true);
 

@@ -1,0 +1,93 @@
+@startuml Use Case - Monitoring & Dashboard
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - Monitoring & Dashboard
+
+' ===== AKTOR KIRI =====
+actor "Operator" as OP
+actor "Foreman" as FRM
+actor "Leader" as LDR
+actor "Supervisor" as SPV
+
+rectangle "Monitoring Module" {
+  usecase "Login" as UC_LOGIN
+
+  usecase "Dashboard Realtime (SSE)" as UC_REALTIME
+  usecase "Lihat Status Line" as UC_STATUS_LINE
+  usecase "Lihat KPI" as UC_KPI
+  usecase "Drill-down Detail Line" as UC_DRILL
+
+  usecase "Line Monitoring View" as UC_LINE_MON
+  usecase "Lihat Semua Line Cards" as UC_LINE_CARDS
+  usecase "Cek Machine Status" as UC_MACHINE
+
+  usecase "Downtime List (Aktif)" as UC_DT_LIST
+  usecase "Trouble History" as UC_TROUBLE
+
+  usecase "Tryout Monitoring" as UC_TRYOUT
+
+  usecase "Hambatan Jalur" as UC_HAMBATAN
+  usecase "Sign by Leader (TTD)" as UC_SIGN_LEADER
+
+  usecase "Production Analytics" as UC_ANALYTICS
+
+  ' ===== RELATIONSHIPS =====
+  UC_REALTIME ..> UC_STATUS_LINE : <<include>>
+  UC_REALTIME ..> UC_KPI : <<include>>
+  UC_REALTIME ..> UC_DRILL : <<extend>>
+  UC_LINE_MON ..> UC_LINE_CARDS : <<include>>
+  UC_LINE_MON ..> UC_MACHINE : <<extend>>
+  UC_HAMBATAN ..> UC_SIGN_LEADER : <<include>>
+  UC_ANALYTICS ..> UC_DRILL : <<extend>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Manager" as MGR
+actor "Kadiv" as KDV
+actor "Direktur" as DIR
+actor "Presiden Dir." as PD
+actor "Dies Shop" as DS
+actor "Plant Service" as PS
+
+' ===== KIRI =====
+OP --> UC_LOGIN
+OP --> UC_REALTIME
+FRM --> UC_LOGIN
+FRM --> UC_REALTIME
+FRM --> UC_LINE_MON
+FRM --> UC_DT_LIST
+LDR --> UC_LOGIN
+LDR --> UC_REALTIME
+LDR --> UC_HAMBATAN
+SPV --> UC_LOGIN
+SPV --> UC_REALTIME
+SPV --> UC_LINE_MON
+SPV --> UC_TROUBLE
+SPV --> UC_ANALYTICS
+
+' ===== KANAN =====
+MGR --> UC_LOGIN
+MGR --> UC_REALTIME
+MGR --> UC_TROUBLE
+KDV --> UC_LOGIN
+KDV --> UC_REALTIME
+KDV --> UC_TROUBLE
+DIR --> UC_LOGIN
+DIR --> UC_REALTIME
+PD --> UC_LOGIN
+PD --> UC_REALTIME
+DS --> UC_LOGIN
+DS --> UC_HAMBATAN
+PS --> UC_LOGIN
+PS --> UC_HAMBATAN
+
+@enduml

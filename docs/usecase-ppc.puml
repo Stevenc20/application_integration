@@ -1,0 +1,100 @@
+@startuml Use Case - PPC
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - PPC (Production Planning & Control)
+
+' ===== AKTOR KIRI =====
+actor "PPC Staff" as PPC
+
+rectangle "PPC Module" {
+  usecase "Login" as UC_LOGIN
+  usecase "Dashboard PPC" as UC_DASH
+
+  usecase "Production Plan" as UC_PLAN
+  usecase "Import Excel Plan" as UC_IMPORT_PLAN
+  usecase "Edit Plan (inline)" as UC_EDIT_PLAN
+  usecase "Reorder Sequence" as UC_REORDER
+  usecase "Clear Plan" as UC_CLEAR_PLAN
+
+  usecase "Schedule Stamping" as UC_SCHED
+  usecase "Upload Schedule" as UC_UPLOAD_SCHED
+  usecase "Inline Update" as UC_INLINE_SCHED
+  usecase "Rekalibrasi" as UC_REKAL
+  usecase "Export Schedule" as UC_EXP_SCHED
+
+  usecase "Recovery Schedule" as UC_RECOVERY
+  usecase "Generate Cut-Off" as UC_CUTOFF
+  usecase "Approve/Reject Item" as UC_APPROVE_RECOVERY
+  usecase "Schedule ke Plan" as UC_SCHED_RECOVERY
+
+  usecase "BOM" as UC_BOM
+  usecase "Import BOM" as UC_IMPORT_BOM
+  usecase "Export BOM (PDF/Excel)" as UC_EXP_BOM
+
+  usecase "Production Order (SPP)" as UC_PO
+  usecase "Release Order" as UC_REL_ORDER
+  usecase "Goods Issue Order" as UC_GI_ORDER
+  usecase "Confirm Order" as UC_CONF_ORDER
+  usecase "Cancel Order" as UC_CANCEL_ORDER
+  usecase "Print Order" as UC_PRINT_ORDER
+
+  usecase "MRP" as UC_MRP
+  usecase "Run MRP" as UC_RUN_MRP
+  usecase "Import Demand" as UC_IMP_DEMAND
+  usecase "Export MRP (PDF/Excel)" as UC_EXP_MRP
+
+  usecase "Master Stamping" as UC_MASTER
+  usecase "Import Master Stamping" as UC_IMP_MASTER
+
+  usecase "Rundown Press" as UC_RUNDOWN
+
+  ' ===== RELATIONSHIPS =====
+  UC_PLAN ..> UC_IMPORT_PLAN : <<include>>
+  UC_PLAN ..> UC_EDIT_PLAN : <<include>>
+  UC_PLAN ..> UC_REORDER : <<extend>>
+  UC_SCHED ..> UC_UPLOAD_SCHED : <<include>>
+  UC_SCHED ..> UC_INLINE_SCHED : <<include>>
+  UC_SCHED ..> UC_REKAL : <<extend>>
+  UC_SCHED ..> UC_EXP_SCHED : <<include>>
+  UC_RECOVERY ..> UC_CUTOFF : <<include>>
+  UC_RECOVERY ..> UC_APPROVE_RECOVERY : <<include>>
+  UC_RECOVERY ..> UC_SCHED_RECOVERY : <<include>>
+  UC_RECOVERY ..> UC_PLAN : <<include>>
+  UC_BOM ..> UC_IMPORT_BOM : <<extend>>
+  UC_BOM ..> UC_EXP_BOM : <<include>>
+  UC_PO ..> UC_REL_ORDER : <<include>>
+  UC_PO ..> UC_GI_ORDER : <<extend>>
+  UC_PO ..> UC_CONF_ORDER : <<extend>>
+  UC_PO ..> UC_CANCEL_ORDER : <<extend>>
+  UC_PO ..> UC_PRINT_ORDER : <<include>>
+  UC_MRP ..> UC_RUN_MRP : <<include>>
+  UC_MRP ..> UC_IMP_DEMAND : <<extend>>
+  UC_MRP ..> UC_EXP_MRP : <<include>>
+  UC_MASTER ..> UC_IMP_MASTER : <<extend>>
+}
+
+' ===== AKTOR KANAN =====
+actor "Supervisor" as SPV
+
+PPC --> UC_LOGIN
+PPC --> UC_DASH
+PPC --> UC_PLAN
+PPC --> UC_SCHED
+PPC --> UC_RECOVERY
+PPC --> UC_BOM
+PPC --> UC_PO
+PPC --> UC_MRP
+PPC --> UC_MASTER
+PPC --> UC_RUNDOWN
+SPV --> UC_RECOVERY : <<extend>>
+
+@enduml

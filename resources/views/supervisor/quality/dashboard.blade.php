@@ -36,7 +36,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6" id="linesGrid"></div>
+    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -49,60 +49,73 @@
     </div>
 
     <!-- ===== CHARTS TODAY ===== -->
-    <div id="todayCharts" class="chart-grid grid grid-cols-1 sm:grid-cols-2 gap-4 2xl:gap-6">
+    <div class="flex items-center gap-2 mb-2">
+        <span class="text-xs text-gray-400 font-medium">Drag = select zoom, Shift+Drag = pan</span>
+    </div>
+    <div id="todayCharts" class="chart-grid grid grid-cols-1 gap-4 2xl:gap-6">
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>Pencapaian Produksi (Pcs)
+                <button onclick="resetChart('cQty')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 chart-min-h min-h-[220px] 2xl:min-h-[320px]"><canvas id="cQty"></canvas></div>
+            <div class="p-4 flex-1 chart-min-h min-h-[350px] 2xl:min-h-[500px]"><canvas id="cQty"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>Total Downtime (Menit)
+                <button onclick="resetChart('cDt')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cDt"></canvas></div>
+            <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cDt"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>Repair &amp; Reject (Pcs)
+                <button onclick="resetChart('cRr')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cRr"></canvas></div>
+            <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cRr"></canvas></div>
         </div>
         <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
             <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                 <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>Pencapaian GSPH
+                <button onclick="fitGsphChart('cGsph')" class="text-xs text-gray-400 hover:text-blue-500 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50" title="Sesuaikan skala ke data">↺ Fit</button>
+                <button onclick="resetChart('cGsph')" class="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
             </div>
-            <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cGsph"></canvas></div>
+            <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cGsph"></canvas></div>
         </div>
     </div>
 
     <!-- ===== CHARTS TREND ===== -->
     <div id="trendCharts" class="hidden space-y-4">
         <div class="text-center font-black text-gray-600 text-sm sm:text-lg uppercase tracking-widest" id="trendLabel"></div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 2xl:gap-6">
+        <div class="grid grid-cols-1 gap-4 2xl:gap-6">
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-emerald-500 shrink-0"></span>Tren Pencapaian Produksi (Pcs)
+                    <button onclick="resetChart('cTQty')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTQty"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTQty"></canvas></div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-red-500 shrink-0"></span>Tren Total Downtime (Menit)
+                    <button onclick="resetChart('cTDt')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTDt"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTDt"></canvas></div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-amber-500 shrink-0"></span>Tren Repair &amp; Reject (Pcs)
+                    <button onclick="resetChart('cTRr')" class="ml-auto text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTRr"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTRr"></canvas></div>
             </div>
             <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden flex flex-col">
                 <div class="px-5 py-3 border-b border-gray-100 font-bold text-gray-700 flex items-center gap-2 text-sm">
                     <span class="w-3 h-3 rounded-full bg-blue-500 shrink-0"></span>Tren Pencapaian GSPH
+                    <button onclick="fitGsphChart('cTGsph')" class="text-xs text-gray-400 hover:text-blue-500 transition-colors px-2 py-1 rounded-lg hover:bg-blue-50" title="Sesuaikan skala ke data">↺ Fit</button>
+                    <button onclick="resetChart('cTGsph')" class="text-xs text-gray-400 hover:text-red-500 transition-colors px-2 py-1 rounded-lg hover:bg-red-50" title="Reset zoom">↺ Reset</button>
                 </div>
-                <div class="p-4 flex-1 min-h-[220px] 2xl:min-h-[320px]"><canvas id="cTGsph"></canvas></div>
+                <div class="p-4 flex-1 min-h-[350px] 2xl:min-h-[500px]"><canvas id="cTGsph"></canvas></div>
             </div>
         </div>
     </div>
@@ -188,7 +201,7 @@
 @endsection
 
 @section('scripts')
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+{{-- PART A: fetch data ASAP (starts before Chart.js loads) --}}
 <script>
 const LINES = @json($lines);
 const SELECTED_LINE = @json($selectedLine);
@@ -197,7 +210,9 @@ let selectedShift = 1;
 let selectedDays  = 1;
 let charts = {};
 let LINE_KPI = {};
+let LINE_META = {};
 let DETAIL_DATA = {};
+let LAST_KPI_HASH = '';
 
 /**
  * FUNGSI UTAMA PENARIKAN DATA (REAL-TIME API)
@@ -216,13 +231,19 @@ async function fetchDashboardData() {
         const response = await fetch(url);
         const data = await response.json();
         
+        // Cek apakah data berubah untuk menghindari re-render yang tidak perlu
+        const newHash = JSON.stringify(data.line_kpi);
+        if(newHash === LAST_KPI_HASH) return;
+        LAST_KPI_HASH = newHash;
+        
         // Memasukkan hasil hitungan database ke dalam variabel dashboard
         LINE_KPI = data.line_kpi;
+        LINE_META = data.line_meta || {};
         DETAIL_DATA = data.detail_data;
         
         // Memperbarui tampilan kartu per Line dan grafik secara otomatis
         renderLineCards();
-        if(selectedDays === 1) renderTodayCharts();
+        if(selectedDays === 1 && typeof renderTodayCharts === 'function') renderTodayCharts();
     } catch (error) {
         console.error("Error fetching dashboard data:", error);
     }
@@ -231,8 +252,41 @@ async function fetchDashboardData() {
 // Menjalankan penarikan data pertama kali saat halaman dibuka
 fetchDashboardData();
 
-// AUTO-REFRESH: Mengupdate data dashboard setiap 30 detik secara otomatis
-setInterval(fetchDashboardData, 30000);
+// Real-time via BroadcastChannel (instant from Input Harian saves)
+try {
+    const statusChan = new BroadcastChannel('line_status');
+    statusChan.onmessage = (e) => {
+        if (e.data.type === 'status-changed') fetchDashboardData();
+    };
+} catch (e) { /* fallback to polling */ }
+
+// AUTO-REFRESH: Mengupdate data dashboard setiap 10 detik
+setInterval(fetchDashboardData, 10000);
+
+// SSE Real-Time Push
+let eventSrc = null;
+function connectSSE(){
+    let url = `{{ route('supervisor.dashboard.stream') }}?date=${document.getElementById('dateInput').value}&shift=${selectedShift}`;
+    if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
+    if(eventSrc) eventSrc.close();
+    eventSrc = new EventSource(url);
+    eventSrc.onmessage = function(e){
+        try {
+            const data = JSON.parse(e.data);
+            if(data.line_kpi && data.detail_data){
+                const newHash = JSON.stringify(data.line_kpi);
+                if(newHash === LAST_KPI_HASH) return;
+                LAST_KPI_HASH = newHash;
+                LINE_KPI = data.line_kpi;
+                DETAIL_DATA = data.detail_data;
+                renderLineCards();
+                if(selectedDays === 1 && typeof renderTodayCharts === 'function') renderTodayCharts();
+            }
+        } catch(err) {}
+    };
+    eventSrc.onerror = function(){ setTimeout(connectSSE, 3000); };
+}
+connectSSE();
 
 function pad(n){ return String(n).padStart(2,'0'); }
 
@@ -265,10 +319,12 @@ function setShift(s){
   }
   
   fetchDashboardData();
+  connectSSE();
 }
 
 function onDateChange(){
   fetchDashboardData();
+  connectSSE();
 }
 
 function setDays(d){
@@ -287,22 +343,36 @@ function setDays(d){
       document.getElementById('todayCharts').classList.remove('hidden');
       document.getElementById('todayCharts').classList.add('grid');
       document.getElementById('trendCharts').classList.add('hidden');
-      renderTodayCharts();
+      if(typeof renderTodayCharts === 'function') renderTodayCharts();
   } else {
       document.getElementById('todayCharts').classList.add('hidden');
       document.getElementById('todayCharts').classList.remove('grid');
       document.getElementById('trendCharts').classList.remove('hidden');
       document.getElementById('trendLabel').textContent = `Grafik Tren ${d} Hari — Semua Line`;
-      renderTrendCharts(d);
+      if(typeof renderTrendCharts === 'function') renderTrendCharts(d);
   }
 }
 
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
-  const trs = rows.map(kpi => {
+  const meta = LINE_META[line] || {};
+  const jobLabel = meta.job || '-';
+  const jobPlan = meta.jobPlan || '0';
+  const jobActual = meta.jobActual || '0/0';
+  const strokeVal = meta.stroke || '0';
+  const currStrokeVal = meta.currStroke || '-';
+
+  const jobRow = `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
+    <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">JOB</td>
+    <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">${jobPlan}</td>
+    <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${jobActual}</td>
+    <td class="px-4 py-3 text-center text-gray-800 font-semibold text-xs sm:text-sm">${jobLabel}</td>
+  </tr>`;
+
+  const trs = rows.map((kpi, idx) => {
     const dangerRowCls = kpi.danger ? 'bg-red-50' : 'hover:bg-gray-50/70';
     const textDescCls  = kpi.danger ? 'text-red-700 font-extrabold' : 'text-gray-700 font-bold';
-    const borderCls    = kpi.danger ? 'border-l-[4px] border-red-500' : 'border-l-[4px] border-transparent';
+    const borderCls    = kpi.danger ? 'border-l-[4px] border-transparent' : 'border-l-[4px] border-transparent';
 
     let actualCell = '';
     let clickAttr = kpi.popup || kpi.actualLink ? `onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
@@ -315,12 +385,23 @@ function buildLineCard(line){
       actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span>`;
     }
 
-    return `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
+    let row = `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
       <td class="kpi-table-cell px-4 py-3 text-left ${textDescCls} ${borderCls} text-xs sm:text-sm lg:text-base">${kpi.desc}</td>
       <td class="kpi-table-cell px-4 py-3 text-center text-gray-500 text-xs sm:text-sm lg:text-base">${kpi.plan}</td>
       <td class="kpi-table-cell px-4 py-3 text-center text-xs sm:text-sm lg:text-base ${cursorCls}" ${clickAttr}>${actualCell}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.current}</td>
+      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.currentPct ? `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>` : kpi.current}</td>
     </tr>`;
+
+    if(kpi.desc === 'GSPH'){
+      row += `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
+        <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">STROKE</td>
+        <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">-</td>
+        <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${Number(strokeVal).toLocaleString('id-ID')}</td>
+        <td class="px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm">${currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID')}</td>
+      </tr>`;
+    }
+
+    return row;
   }).join('');
 
   return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
@@ -337,7 +418,10 @@ function buildLineCard(line){
             <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">CURR</th>
           </tr>
         </thead>
-        <tbody>${trs}</tbody>
+        <tbody>
+          ${jobRow}
+          ${trs}
+        </tbody>
       </table>
     </div>
   </div>`;
@@ -377,15 +461,32 @@ function openKpiDetailModal(type, line){
     }
 
     let html = '';
-    if(typeData.type === 'quality'){
+    if(typeData.type === 'production'){
       html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-600"><tr>
-          <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">OK Qty</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-center text-green-600 font-black">${r.ok}</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50">
+          <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
+        </tr>
+        </tbody></table></div>`;
+
+    } else if(typeData.type === 'quality'){
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
-          <th class="px-4 py-3 text-left border-b border-gray-200">Countermeasure</th>
-          <th class="px-4 py-3 text-center border-b border-gray-200">Qty</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-20">Qty</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
         ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
@@ -395,7 +496,7 @@ function openKpiDetailModal(type, line){
           <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
         </tr>`).join('')}
         <tr class="bg-gray-50">
-          <td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td colspan="3" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
           <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
         </tr>
         </tbody></table></div>`;
@@ -405,21 +506,44 @@ function openKpiDetailModal(type, line){
         <thead class="bg-gray-50 text-gray-600"><tr>
           <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
           <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
         ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
           <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
           <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
+          <td class="px-4 py-3 font-semibold text-blue-700">${r.job || '-'}</td>
           <td class="px-4 py-3 text-gray-600">${r.problem}</td>
           <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+          <td class="px-4 py-3 text-gray-600">${r.action || '-'}</td>
           <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
         </tr>`).join('')}
         <tr class="bg-gray-50 font-black">
-          <td colspan="4" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+          <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
           <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
+        </tr>
+        </tbody></table></div>`;
+
+    } else if(typeData.type === 'runtime'){
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50">
+          <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
         </tr>
         </tbody></table></div>`;
 
@@ -479,6 +603,93 @@ function closeKpiDetailModal(){
 function onBackdropClick(e){
   if(e.target === document.getElementById('modalBackdrop')) closeModal();
 }
+</script>
+
+{{-- PART B: Chart.js (loads after Part A, so API call starts first) --}}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
+<script>
+Chart.register(ChartZoom);
+if(typeof ChartDataLabels !== 'undefined'){ Chart.register(ChartDataLabels); }
+
+function resetChart(id){
+  if(!charts[id]) return;
+  charts[id].resetZoom();
+  if(id === 'cGsph' || id === 'cTGsph'){
+    charts[id].options.scales.x.beginAtZero = true;
+    charts[id].options.scales.x.min = undefined;
+    charts[id].options.scales.x.max = undefined;
+    charts[id].update();
+  }
+}
+
+function renderGsphChart(id, labels, plan, actual){
+  const posActual = actual.filter(v => v > 0);
+  const minVal = posActual.length > 0 ? Math.min(...posActual) : 0;
+  const maxPlan = Math.max(...plan);
+  const isSmall = minVal > 0 && maxPlan > 0 && (maxPlan / minVal) > 5;
+
+  const opts = baseOpts('GSPH');
+  opts.indexAxis = 'y';
+  opts.scales.y.beginAtZero = true;
+  opts.scales.y.grid.display = false;
+  opts.scales.x.beginAtZero = !isSmall;
+  if(isSmall){
+    opts.scales.x.min = Math.max(0, minVal * 0.8);
+    opts.scales.x.max = maxPlan * 1.1;
+  }
+  opts.scales.x.title = { display: true, text: 'GSPH', color: '#9ca3af', font:{size: 13, weight: 'bold'} };
+  opts.plugins.tooltip = {
+    callbacks: {
+      label: function(ctx){
+        if(ctx.datasetIndex === 0) return 'Plan: ' + ctx.parsed.x.toLocaleString();
+        var planVal = ctx.chart.data.datasets[0].data[ctx.dataIndex];
+        var pct = planVal > 0 ? ((ctx.parsed.x / planVal) * 100).toFixed(2) + '%' : '-';
+        return 'Actual: ' + ctx.parsed.x.toLocaleString() + ' (' + pct + ')';
+      }
+    }
+  };
+  opts.plugins.datalabels = {
+    display: function(ctx){ return ctx.datasetIndex === 1; },
+    anchor: 'end',
+    align: 'end',
+    color: '#374151',
+    font: { weight: 'bold', size: 11 },
+    formatter: function(val){
+      if(val >= 1000000) return (val / 1000000).toFixed(1) + 'M';
+      if(val >= 1000) return (val / 1000).toFixed(1) + 'K';
+      return val.toLocaleString();
+    }
+  };
+
+  const chart = new Chart(document.getElementById(id), {
+    type:'bar',
+    data:{ labels, datasets:[
+      { label:'Plan',   data: plan,   backgroundColor:'#e5e7eb', borderRadius: 4, minBarLength: 10 },
+      { label:'Actual', data: actual, backgroundColor:'#3b82f6', borderRadius: 4, minBarLength: 10 }
+    ]},
+    options: opts
+  });
+  chart.__gsphData = { plan, actual };
+  return chart;
+}
+
+function fitGsphChart(id){
+  const chart = charts[id];
+  if(!chart || !chart.__gsphData) return;
+  const { plan, actual } = chart.__gsphData;
+  const posActual = actual.filter(v => v > 0);
+  if(posActual.length === 0) return;
+  const minVal = Math.min(...posActual);
+  const maxVal = Math.max(...plan);
+  if(maxVal <= 0) return;
+  chart.options.scales.x.beginAtZero = false;
+  chart.options.scales.x.min = Math.max(0, minVal * 0.8);
+  chart.options.scales.x.max = maxVal * 1.1;
+  chart.resetZoom();
+  chart.update();
+}
 
 function destroyChart(id){
   if(charts[id]){ charts[id].destroy(); delete charts[id]; }
@@ -486,14 +697,19 @@ function destroyChart(id){
 
 const CHART_TEXT  = '#6b7280';
 const CHART_GRID  = '#f3f4f6';
-const FONT_SZ     = 11;
+const FONT_SZ     = 13;
 
 function baseOpts(yLabel){
   return {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
-      legend: { labels: { color: CHART_TEXT, font:{size: FONT_SZ, family: "'Inter', sans-serif"} } }
+      legend: { labels: { color: CHART_TEXT, font:{size: FONT_SZ, family: "'Inter', sans-serif"} } },
+        zoom: {
+          pan: { enabled: true, mode: 'xy', modifierKey: 'shift' },
+          zoom: { wheel: { enabled: false }, pinch: { enabled: true }, drag: { enabled: true, backgroundColor: 'rgba(59,130,246,0.08)', borderColor: '#3b82f6', borderWidth: 1 } },
+          limits: { x: { minRange: 0.5 }, y: { minRange: 0.5 } }
+        }
     },
     scales: {
       x: {
@@ -552,14 +768,7 @@ function renderTodayCharts(){
   });
 
   destroyChart('cGsph');
-  charts['cGsph'] = new Chart(document.getElementById('cGsph'), {
-    type:'bar',
-    data:{ labels, datasets:[
-      { label:'Plan',   data: gsph_plan, backgroundColor:'#e5e7eb', borderRadius: 4 },
-      { label:'Actual', data: gsph_act,  backgroundColor:'#3b82f6', borderRadius: 4 }
-    ]},
-    options: baseOpts('GSPH')
-  });
+  charts['cGsph'] = renderGsphChart('cGsph', labels, gsph_plan, gsph_act);
 }
 
 function renderTrendCharts(d){
@@ -606,13 +815,27 @@ function renderTrendCharts(d){
     options: baseOpts('Pcs')
   });
 
-  charts['cTGsph'] = new Chart(document.getElementById('cTGsph'), {
-    type:'line',
-    data:{ labels, datasets:[{
-      label:'GSPH', data:gs, borderColor:'#3b82f6', backgroundColor:'rgba(59, 130, 246, 0.1)', fill:true, tension:0.4, borderWidth: 2
-    }]},
-    options: baseOpts('GSPH')
-  });
+  destroyChart('cTGsph');
+  {
+    const trendGsphOpts = baseOpts('GSPH');
+    const trendPos = gs.filter(v => v > 0);
+    const trendMin = trendPos.length > 0 ? Math.min(...trendPos) : 0;
+    const trendMax = Math.max(...gs);
+    const trendSmall = trendMin > 0 && trendMax > 0 && (trendMax / trendMin) > 5;
+    trendGsphOpts.scales.y.beginAtZero = !trendSmall;
+    if(trendSmall){
+      trendGsphOpts.scales.y.min = Math.max(0, trendMin * 0.8);
+      trendGsphOpts.scales.y.max = trendMax * 1.1;
+    }
+    charts['cTGsph'] = new Chart(document.getElementById('cTGsph'), {
+      type:'line',
+      data:{ labels, datasets:[{
+        label:'GSPH', data:gs, borderColor:'#3b82f6', backgroundColor:'rgba(59, 130, 246, 0.1)', fill:true, tension:0.4, borderWidth: 2
+      }]},
+      options: trendGsphOpts
+    });
+    charts['cTGsph'].__gsphData = { plan: gs, actual: gs };
+  }
 }
 
 document.addEventListener('DOMContentLoaded', ()=>{

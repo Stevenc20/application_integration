@@ -15,6 +15,8 @@ class LineMaster extends Model
     protected $fillable = [
         'line_code',
         'line_name',
+        'production_start',
+        'production_end',
         'capacity',
         'machine_count',
         'shift',

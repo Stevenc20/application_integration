@@ -1,0 +1,62 @@
+@startuml Use Case - Logistik
+!theme cerulean
+skinparam actorStyle awesome
+skinparam usecase {
+  BackgroundColor #F1F8E9
+  BorderColor #558B2F
+}
+skinparam rectangle {
+  BackgroundColor #E3F2FD
+  BorderColor #1565C0
+}
+
+title Use Case Diagram - Logistik
+
+' ===== AKTOR KIRI =====
+actor "Logistik" as LOG
+
+rectangle "Logistics Module" {
+  usecase "Login" as UC_LOGIN
+
+  usecase "Rundown Incoming" as UC_RUNDOWN_INC
+  usecase "Upload Rundown (Excel)" as UC_UPLOAD_INC
+  usecase "Add/Delete Incoming Job" as UC_ADD_DEL_INC
+  usecase "Inline Update" as UC_INLINE_INC
+  usecase "Export Rundown (Excel)" as UC_EXP_INC
+  usecase "Download Template" as UC_TMPL_INC
+
+  usecase "Pallet Mutation" as UC_PALLET
+  usecase "Catat Pallet Keluar/Masuk" as UC_CATAT_PALLET
+
+  usecase "SMR Vendor" as UC_SMR_V
+  usecase "View SMR Vendor" as UC_VIEW_SMR_V
+
+  usecase "SMR Customer" as UC_SMR_C
+  usecase "View SMR Customer" as UC_VIEW_SMR_C
+
+  usecase "Data GR" as UC_DATA_GR
+  usecase "Data Scrap" as UC_DATA_SCRAP
+
+  ' ===== RELATIONSHIPS =====
+  UC_RUNDOWN_INC ..> UC_UPLOAD_INC : <<extend>>
+  UC_RUNDOWN_INC ..> UC_ADD_DEL_INC : <<include>>
+  UC_RUNDOWN_INC ..> UC_INLINE_INC : <<include>>
+  UC_RUNDOWN_INC ..> UC_EXP_INC : <<include>>
+  UC_RUNDOWN_INC ..> UC_TMPL_INC : <<extend>>
+  UC_SMR_V ..> UC_VIEW_SMR_V : <<include>>
+  UC_SMR_C ..> UC_VIEW_SMR_C : <<include>>
+}
+
+' ===== AKTOR KANAN =====
+actor "IRM Staff" as IRM
+
+LOG --> UC_LOGIN
+LOG --> UC_RUNDOWN_INC
+LOG --> UC_PALLET
+LOG --> UC_SMR_V
+LOG --> UC_SMR_C
+LOG --> UC_DATA_GR
+LOG --> UC_DATA_SCRAP
+IRM --> UC_DATA_GR : <<extend>>
+
+@enduml

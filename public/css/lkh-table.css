@@ -1,0 +1,221 @@
+/* New LKH Table Shell Architecture & Responsive Grid System */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+
+/* Shell & Container wrappers */
+.lkh-table-shell {
+    width: 100%;
+    overflow: hidden;
+    border-radius: 12px;
+    border: 1px solid #E5CACA;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+    background-color: #ffffff;
+}
+
+.lkh-scroll-x {
+    overflow-x: auto;
+    overflow-y: hidden;
+    width: 100%;
+    -webkit-overflow-scrolling: touch;
+}
+
+.lkh-sticky-shadow {
+    position: relative;
+    width: 100%;
+}
+
+/* Grid & Table rules */
+.lkh-grid-table,
+.lkh-ppc-table {
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 2600px;
+    width: max-content;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-size: 11px;
+    color: #1F2937;
+    background-color: #ffffff;
+}
+
+/* Dense 38px row heights */
+.lkh-grid-table tr,
+.lkh-ppc-table tr {
+    height: 38px;
+}
+
+.lkh-grid-table th,
+.lkh-grid-table td,
+.lkh-ppc-table th,
+.lkh-ppc-table td {
+    padding: 0 8px;
+    vertical-align: middle;
+    box-sizing: border-box;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    border-right: 1px solid #E5CACA;
+    border-bottom: 1px solid #E5CACA;
+}
+
+/* Premium Headers using Red `#991B1B` */
+.lkh-grid-table thead th,
+.lkh-ppc-table thead th {
+    background-color: #991B1B !important;
+    color: #ffffff !important;
+    font-weight: 700;
+    text-transform: uppercase;
+    font-size: 11px;
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    border-bottom: 1.5px solid #991B1B;
+}
+
+.lkh-grid-table thead tr:first-child th,
+.lkh-ppc-table thead tr:first-child th {
+    top: 0;
+    z-index: 25;
+}
+
+.lkh-grid-table thead tr:nth-child(2) th,
+.lkh-ppc-table thead tr:nth-child(2) th {
+    top: 38px;
+    z-index: 24;
+}
+
+/* Left-only Sticky Columns: NO (0px) & JOB MASTER (60px) */
+.lkh-grid-table .lkh-sticky-no,
+.lkh-ppc-table .lkh-sticky-no {
+    position: sticky;
+    left: 0;
+    z-index: 10;
+    background-color: #ffffff;
+    border-right: 1px solid #E5CACA;
+}
+
+.lkh-grid-table .lkh-sticky-jm,
+.lkh-ppc-table .lkh-sticky-jm {
+    position: sticky;
+    left: 60px;
+    z-index: 10;
+    background-color: #ffffff;
+    border-right: 2px solid #E5CACA; /* demarcation bar */
+}
+
+/* Double-row Header sticky offsets (Z-index 30 to stay above body sticky elements) */
+.lkh-grid-table thead tr:nth-child(2) .lkh-sticky-no,
+.lkh-ppc-table thead tr:nth-child(2) .lkh-sticky-no {
+    left: 0;
+    z-index: 30;
+    background-color: #991B1B;
+}
+
+.lkh-grid-table thead tr:nth-child(2) .lkh-sticky-jm,
+.lkh-ppc-table thead tr:nth-child(2) .lkh-sticky-jm {
+    left: 60px;
+    z-index: 30;
+    background-color: #991B1B;
+    border-right: 2px solid #E5CACA;
+}
+
+/* Zebra Striping using Soft Red `#FFF7F7` */
+.lkh-grid-table tbody tr.lkh-row-alt,
+.lkh-ppc-table tbody tr.lkh-row-alt {
+    background-color: #FFF7F7;
+}
+
+.lkh-grid-table tbody tr.lkh-row-alt .lkh-sticky-no,
+.lkh-grid-table tbody tr.lkh-row-alt .lkh-sticky-jm,
+.lkh-ppc-table tbody tr.lkh-row-alt .lkh-sticky-no,
+.lkh-ppc-table tbody tr.lkh-row-alt .lkh-sticky-jm {
+    background-color: #FFF7F7;
+}
+
+/* High-Contrast hover styling */
+.lkh-grid-table tbody tr:hover,
+.lkh-ppc-table tbody tr:hover {
+    background-color: #FEE2E2 !important; /* premium hover highlight */
+}
+
+.lkh-grid-table tbody tr:hover .lkh-sticky-no,
+.lkh-grid-table tbody tr:hover .lkh-sticky-jm,
+.lkh-ppc-table tbody tr:hover .lkh-sticky-no,
+.lkh-ppc-table tbody tr:hover .lkh-sticky-jm {
+    background-color: #FEE2E2 !important;
+}
+
+/* Soft Amber Break Rows */
+.lkh-grid-table tbody tr.lkh-row-break,
+.lkh-ppc-table tbody tr.lkh-row-break {
+    background-color: #FFFBEB !important;
+    height: 38px;
+}
+
+.lkh-grid-table tbody tr.lkh-row-break td,
+.lkh-ppc-table tbody tr.lkh-row-break td {
+    border-bottom: 1.5px solid #FDE68A;
+    border-right: 1px solid #FDE68A;
+}
+
+.lkh-grid-table tbody tr.lkh-row-break .lkh-sticky-no,
+.lkh-ppc-table tbody tr.lkh-row-break .lkh-sticky-no {
+    background-color: #FFFBEB !important;
+    color: #B45309;
+}
+
+/* Footer layout */
+.lkh-grid-table tfoot td,
+.lkh-ppc-table tfoot td {
+    position: sticky;
+    bottom: 0;
+    z-index: 15;
+    background-color: #FFE4E6 !important; /* Soft rose footer */
+    font-weight: 800;
+    border-top: 2.5px solid #991B1B;
+    color: #4C0519;
+}
+
+.lkh-grid-table tfoot .lkh-sticky-no,
+.lkh-ppc-table tfoot .lkh-sticky-no {
+    left: 0;
+    z-index: 16;
+    background-color: #FFE4E6 !important;
+}
+
+.lkh-grid-table tfoot .lkh-sticky-jm,
+.lkh-ppc-table tfoot .lkh-sticky-jm {
+    left: 60px;
+    z-index: 16;
+    background-color: #FFE4E6 !important;
+    border-right: 2px solid #E5CACA;
+}
+
+/* Tabular figures for aligned manufacturing numbers */
+.lkh-grid-table font-mono,
+.lkh-ppc-table font-mono,
+.lkh-grid-table td:not([title]),
+.lkh-ppc-table td:not([title]) {
+    font-variant-numeric: tabular-nums;
+}
+
+/* Badges for status signals */
+.lkh-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    font-size: 10px;
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border: 1px solid transparent;
+}
+
+/* Custom empty states */
+.lkh-empty-state {
+    padding: 64px 32px;
+    text-align: center;
+    background-color: #FBFBFB;
+    border-radius: 0 0 12px 12px;
+}

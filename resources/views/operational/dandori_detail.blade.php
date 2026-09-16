@@ -13,12 +13,6 @@
             <p class="text-sm text-gray-500 mt-1">Pencatatan Changeover untuk Job #{{ $job->job_number }}</p>
         </div>
         <div class="flex items-center gap-3">
-            <a href="{{ route('production_entry') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 text-sm font-semibold hover:bg-blue-100 transition-colors shadow-sm">
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 00-4-4H5m11 4h2a4 4 0 014 4v2m-9-9h.01M9 3h.01M15 3h.01M21 3h.01M3 9h.01M3 15h.01M3 21h.01M9 21h.01M15 21h.01M21 21h.01"/>
-                </svg>
-                Ke Input Harian
-            </a>
             <a href="{{ route('operational.dandori') }}" class="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-white border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition-colors shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/>

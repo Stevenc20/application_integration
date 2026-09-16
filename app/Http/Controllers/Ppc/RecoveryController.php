@@ -70,12 +70,23 @@ class RecoveryController extends Controller
             ]);
         }
 
+        $press = $item->press_name;
         $item->update([
             'status'          => 'rejected',
             'rejected_at'     => now(),
             'rejected_by'     => auth()->id(),
             'rejection_notes' => $request->input('notes'),
         ]);
+
+        // Continuous resimulation
+        try {
+            $today = now()->format('Y-m-d');
+            $timelineGenerator = app(\App\Services\TimelineGenerationService::class);
+            $timelineGenerator->regenerateSection($today, 'Shift Pagi', $press);
+            $timelineGenerator->regenerateSection($today, 'Shift Malam', $press);
+        } catch (\Throwable $e) {
+            \Log::warning('Resimulation after reject failed: ' . $e->getMessage());
+        }
 
         return response()->json([
             'success' => true,
@@ -108,6 +119,8 @@ class RecoveryController extends Controller
             ]);
         }
 
+        $presses = $items->pluck('press_name')->unique()->values()->toArray();
+
         foreach ($items as $item) {
             $item->update([
                 'status'          => 'rejected',
@@ -115,6 +128,18 @@ class RecoveryController extends Controller
                 'rejected_by'     => auth()->id(),
                 'rejection_notes' => $notes,
             ]);
+        }
+
+        // Continuous resimulation
+        try {
+            $today = now()->format('Y-m-d');
+            $timelineGenerator = app(\App\Services\TimelineGenerationService::class);
+            foreach ($presses as $press) {
+                $timelineGenerator->regenerateSection($today, 'Shift Pagi', $press);
+                $timelineGenerator->regenerateSection($today, 'Shift Malam', $press);
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Resimulation after reject failed: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -145,6 +170,7 @@ class RecoveryController extends Controller
 
     /**
      * Run scheduler for a specific date, shift, and press.
+     * Delegates to TimelineGenerationService for regeneration.
      */
     public function runScheduler(Request $request)
     {
@@ -154,18 +180,26 @@ class RecoveryController extends Controller
             'press' => 'required|string',
         ]);
 
-        $schedulerService = app(\App\Services\RecoverySchedulerService::class);
-        $stats = $schedulerService->scheduleForShift(
-            $request->input('date'),
-            $request->input('shift'),
-            $request->input('press')
-        );
+        try {
+            $timelineGenerator = app(\App\Services\TimelineGenerationService::class);
+            $result = $timelineGenerator->regenerateSection(
+                $request->input('date'),
+                $request->input('shift'),
+                $request->input('press')
+            );
 
-        return response()->json([
-            'success' => true,
-            'message' => "Scheduler selesai: recovery {$stats['recovery_scheduled']}/{$stats['recovery_total']} dijadwalkan, baru {$stats['new_scheduled']}/{$stats['new_total']} dijadwalkan.",
-            'stats'   => $stats,
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => "Scheduler selesai: {$result['updated']} item diproses." . (!empty($result['overflow']) ? ' ' . count($result['overflow']) . ' item overflow.' : ''),
+                'stats'   => $result,
+            ]);
+        } catch (\Throwable $e) {
+            \Log::error('Scheduler failed: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Scheduler gagal: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 
     /**

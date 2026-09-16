@@ -1,0 +1,211 @@
+Buatkan presentasi PPT tentang **Dokumentasi Database & Flowchart – PPC Schedule & Production Flow** untuk PT. IPPI (Stamping Manufacturing).
+
+Ini adalah hasil dokumentasi database REAL dari sistem yang sudah berjalan (production). Gunakan bahasa Indonesia.
+
+---
+
+## Slide 1 – Judul
+Dokumentasi Database & Flowchart Produksi
+Sistem Application Integration – Modul PPC Schedule & Production Flow
+PT. IPPI - Stamping Manufacturing
+
+*Berdasarkan dokumentasi real dari sistem yang sudah berjalan*
+
+---
+
+## Slide 2 – Gambaran Umum
+
+{masukan gambar ERD full 25 tabel}
+
+Hasil dokumentasi dari **25 tabel database real** dalam 7 kelompok:
+
+| Kelompok | Jumlah | Fungsi |
+|----------|:------:|--------|
+| PPC Schedule | 9 | Perencanaan & penjadwalan produksi |
+| Breaktime | 2 | Pengaturan jam istirahat |
+| Production Flow | 4 | Eksekusi produksi real-time |
+| Downtime & Machine | 4 | Tracking hambatan & kerusakan mesin |
+| Quality | 2 | Tracking defect (repair & reject) |
+| Changeover / Dandori | 4 | Tracking pergantian job |
+
+Teknologi: Laravel 12, MySQL
+Sumber: 126 file migration + 74 model Laravel
+
+---
+
+## Slide 3 – PPC Schedule: Master Data
+
+4 tabel master data:
+
+**line_masters** – Definisi line produksi: line_code (unique), line_name, shift (Pagi/Malam), capacity, machine_count, status (active/inactive/maintenance)
+
+**job_masters** – Tabel sentral setiap job: job_number (unique), job_name, target_qty, status, plan_start, plan_end. Penghubung utama ke hampir semua tabel lainnya.
+
+**job_processes** – Proses kerja per job: job_master_id FK (cascade), process_name, sequence_no, standard_minutes
+
+**master_stampings** – Data referensi stamping: job_no, part_no, part_name, ct_detik, dct, mct, tpt, customer
+
+{masukan gambar struktur tabel master data}
+
+---
+
+## Slide 4 – PPC Schedule: Penjadwalan
+
+5 tabel penjadwalan inti:
+
+**production_plans** – Tabel TERBESAR dengan 60+ kolom. Mencakup: line_master_id FK, plan_date, shift_name, press_name, row_type (job/break), job_no, plan, ok, repair, reject, ct_detik, dct, mct, dt_menit, p1-p4 (status mesin), start_time, finish_time, act_start, act_finish, source_type (ppc/recovery)
+
+**schedule_stampings** – Upload Excel jadwal stamping: upload_date, press_name, shift_name, job_no
+
+**recovery_schedules** – Recovery dengan approval workflow: status (waiting_approval/approved/rejected/scheduled)
+
+**recovery_items** – Item recovery: recovery_schedule_id FK, production_plan_id FK, plan_qty, ok, repair, reject
+
+**schedule_revisions** – Audit trail: snapshot_before & snapshot_after (JSON)
+
+{masukan gambar jadwal produksi di website}
+
+---
+
+## Slide 5 – Breaktime
+
+2 tabel pengaturan jam istirahat:
+
+**master_break_times** – Master jadwal istirahat: hari, shift, waktu_mulai (time), waktu_selesai (time), type (istirahat/cinkorak), is_active
+
+**break_times** – Versi lama: nama_istirahat, shift, hari, waktu_mulai, waktu_selesai
+
+Terhubung secara logis ke production_plans melalui pencocokan hari + shift
+
+{masukan gambar form breaktime di website}
+
+---
+
+## Slide 6 – Production Flow
+
+4 tabel tracking eksekusi produksi real-time:
+
+**production_sessions** – Sesi produksi: job_master_id FK, work_date, start_time, pause_time, finish_time, status (idle → running → paused → finished)
+
+**daily_productions** – Rekap harian: job_master_id FK, work_date, line, shift, target_qty, actual_ok, actual_repair, actual_reject, efficiency
+
+**production_logs** – Log per event: job_master_id, ok_qty, repair_qty, reject_qty
+
+**production_targets** – Target produksi: target_date, job_id FK, process_type, shift, target_qty
+
+{masukan gambar dashboard monitoring produksi}
+
+{masukan gambar flowchart alur eksekusi: PPC Schedule → Start Sesi → Produksi → Catat Hasil → End Shift → Rekap Harian}
+
+---
+
+## Slide 7 – Downtime & Machine
+
+4 tabel tracking hambatan dan kerusakan:
+
+**machines** – name, line
+
+**machine_logs** – machine_id FK, status (running/downtime/maintenance)
+
+**downtimes** – job_master_id FK, jenis_downtime (Produksi/Mesin/Dies/Logistic/Material/Try out), problem, duration_seconds
+
+**hambatan_jalur** – downtime_id FK, jenis_hambatan, status, signature_image (digital signature leader + foreman)
+
+{masukan gambar form downtime di website}
+
+{masukan gambar flowchart handling masalah: Produksi → Ada Masalah? → Mesin Rusak / Hambatan → Downtime → Hambatan Jalur → TTD Digital}
+
+---
+
+## Slide 8 – Quality (Repair & Reject)
+
+2 tabel tracking kualitas:
+
+**repair_reject_logs** – job_master_id FK, type (repair/reject), defect_name, qty_a, qty_b, root_cause, countermeasure
+
+**repair_reject_images** – repair_reject_log_id FK, image_path, image_type (before/after)
+
+{masukan gambar form input defect di website}
+
+{masukan gambar flowchart alur defect: Cek Quality → OK/Defect → Foto Before → Catat Defect → Root Cause → Perbaikan → Foto After}
+
+---
+
+## Slide 9 – Changeover / Dandori
+
+4 tabel struktur hirarki tracking changeover:
+
+**dandoris** – previous_job_id, next_job_id, duration_minutes, work_date
+
+**dandori_sessions** – job_master_id, total_minutes, status (waiting/running/done)
+
+**dandori_groups** – session_id FK, group_name, total_minutes
+
+**dandori_details** – group_id FK, activity_name, duration_minutes
+
+{masukan gambar form dandori di website}
+
+{masukan gambar flowchart changeover: Job Selesai → Siapkan Mesin/Dies/Material → Setup → Trial → OK? → Job Baru}
+
+---
+
+## Slide 10 – Key Performance Indicators
+
+8 metrik utama yang didukung data real:
+
+| KPI | Rumus | Sumber Data |
+|-----|-------|-------------|
+| Plan vs Actual | plan − actual_ok | production_plans + daily_productions |
+| Efficiency | (actual_ok ÷ target_qty) × 100% | daily_productions |
+| Repair Rate | actual_repair ÷ total produksi | daily_productions |
+| Reject Rate | actual_reject ÷ total produksi | daily_productions |
+| Downtime | Total per jenis_downtime | downtimes |
+| Changeover Time | Rata-rata duration_minutes | dandoris |
+| Recovery | plan_qty vs actual_qty | recovery_items |
+| OEE | Availability × Performance × Quality | Gabungan seluruh domain |
+
+{masukan gambar dashboard KPI / grafik}
+
+---
+
+## Slide 11 – Sumber Data Laporan Manajerial
+
+| Laporan | Sumber Data |
+|---------|-------------|
+| Dashboard Harian | production_plans + daily_productions + production_sessions |
+| Laporan Per Shift | production_plans.shift_name + daily_productions |
+| Laporan Downtime | downtimes + hambatan_jalur |
+| Laporan Defect | repair_reject_logs + repair_reject_images |
+| Laporan Changeover | dandoris + dandori_sessions + groups + details |
+| Laporan Recovery | recovery_schedules + recovery_items |
+| Laporan OEE | production_sessions + daily_productions + downtimes |
+| Audit Jadwal | schedule_revisions (JSON before/after) |
+
+{masukan gambar dashboard laporan manajerial}
+
+---
+
+## Slide 12 – Flowchart Alur Produksi Keseluruhan
+
+{masukan gambar flowchart alur lengkap dari hulu ke hilir}
+
+**Alur lengkap:**
+1. **Perencanaan (PPC):** Upload jadwal → Validasi master data → Jika target tidak tercapai → Recovery (approval)
+2. **Eksekusi (Operator):** Start sesi → Produksi → Catat hasil → End shift → Rekap harian + Efficiency
+3. **Handling Masalah:** Mesin rusak → Machine log | Hambatan → Downtime | Defect → Repair/reject log | Ganti job → Dandori
+4. **Evaluasi (Manager):** 8 KPI utama + 8 laporan manajerial + Audit trail JSON
+
+---
+
+## Slide 13 – Kesimpulan
+
+**Hasil dokumentasi real dari sistem yang sudah berjalan di PT. IPPI:**
+
+- **25 tabel terintegrasi** mencakup seluruh siklus produksi: Perencanaan → Eksekusi → Handling Masalah → Evaluasi KPI
+- **job_masters** sebagai tabel sentral penghubung hampir semua tabel
+- **production_plans** sebagai tabel terbesar dengan 60+ kolom
+- Mendukung **digital signature ganda** (leader + foreman) di hambatan_jalur
+- Mendukung **audit trail** via JSON snapshot di schedule_revisions
+- Mendukung **8 KPI manajerial** dengan data yang sudah tersedia di database
+
+{masukan gambar tampilan sistem secara keseluruhan}

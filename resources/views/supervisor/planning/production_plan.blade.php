@@ -144,12 +144,12 @@
                                        class="w-full bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-600 text-center p-0">
                             </td>
                             <td class="px-4 py-3 text-center border-r border-slate-100">
-                                <input type="number" step="0.1" value="{{ $plan->ct_detik }}" 
-                                       onchange="updateInline({{ $plan->id }}, 'ct_detik', this.value)"
-                                       class="w-full bg-transparent border-none focus:ring-0 text-sm font-bold text-slate-600 text-center p-0">
+                                <span class="text-sm font-bold text-slate-700">
+                                    {{ number_format((float) $plan->ct_detik, 1, '.', '') }}
+                                </span>
                             </td>
                             <td class="px-4 py-3 text-center border-r border-slate-100 font-bold text-slate-500 text-sm">
-                                {{ number_format($plan->process_time, 1) }}
+                                {{ (int) ceil((float) $plan->process_time) }}
                             </td>
                             <td class="px-4 py-3 text-center border-r border-slate-100">
                                 <input type="number" value="{{ $plan->reg_active }}" 

@@ -25,13 +25,17 @@
             <!-- FILTER -->
             @if(($type ?? 'daily') == 'daily')
                 <input type="date" name="date" class="border px-2 py-2 rounded"
+                    value="{{ request('date', now()->toDateString()) }}"
                     onchange="this.form.submit()">
             @elseif($type == 'weekly')
-                <input type="date" name="start" class="border px-2 py-2 rounded">
+                <input type="date" name="start" class="border px-2 py-2 rounded"
+                    value="{{ request('start') }}">
                 <input type="date" name="end" class="border px-2 py-2 rounded"
+                    value="{{ request('end', now()->toDateString()) }}"
                     onchange="this.form.submit()">
             @else
                 <input type="month" name="month" class="border px-2 py-2 rounded"
+                    value="{{ request('month', now()->format('Y-m')) }}"
                     onchange="this.form.submit()">
             @endif
 
@@ -87,15 +91,18 @@
 
 <thead class="bg-gray-100 text-gray-700">
 <tr>
-    <th class="p-3">Order</th>
+    <th class="p-3">Date</th>
     <th class="p-3">Job</th>
     <th class="p-3">Line</th>
-    <th class="p-3">Process</th>
     <th class="p-3">Shift</th>
+    <th class="p-3">Target</th>
     <th class="p-3 text-green-600">OK</th>
     <th class="p-3 text-yellow-500">Repair</th>
     <th class="p-3 text-red-600">Reject</th>
     <th class="p-3">Total</th>
+    <th class="p-3">Runtime</th>
+    <th class="p-3">Downtime</th>
+    <th class="p-3">Efisiensi</th>
 </tr>
 </thead>
 
@@ -105,38 +112,52 @@
 
 <tr class="border-t hover:bg-gray-50 transition">
 
-<td class="p-3">{{ $p->production_order_number }}</td>
-
 <td class="p-3">
-    {{ $p->job->job_name ?? '-' }}
+    {{ \Carbon\Carbon::parse($p->work_date)->format('d/m') }}
 </td>
 
 <td class="p-3">
-    {{ $p->job->line ?? '-' }}
+    {{ $p->jobMaster->job_name ?? $p->jobMaster->job_number ?? '-' }}
 </td>
 
 <td class="p-3">
-    {{ $p->process_type }}
+    {{ $p->line ?? $p->jobMaster->line ?? '-' }}
 </td>
 
 <td class="p-3">
-    {{ $p->shift }}
+    {{ $p->shift ?? '-' }}
+</td>
+
+<td class="p-3">
+    {{ number_format($p->target_qty) }}
 </td>
 
 <td class="p-3 text-green-600 font-medium">
-    {{ $p->qty_ok }}
+    {{ number_format($p->actual_ok) }}
 </td>
 
 <td class="p-3 text-yellow-500 font-medium">
-    {{ $p->qty_repair }}
+    {{ number_format($p->actual_repair) }}
 </td>
 
 <td class="p-3 text-red-600 font-medium">
-    {{ $p->qty_reject }}
+    {{ number_format($p->actual_reject) }}
 </td>
 
 <td class="p-3 font-bold">
-    {{ $p->qty_ok + $p->qty_repair + $p->qty_reject }}
+    {{ number_format($p->actual_ok + $p->actual_repair + $p->actual_reject) }}
+</td>
+
+<td class="p-3">
+    {{ gmdate('H:i', $p->runtime_seconds) }}
+</td>
+
+<td class="p-3">
+    {{ gmdate('H:i', $p->downtime_seconds) }}
+</td>
+
+<td class="p-3">
+    {{ number_format($p->efficiency, 1) }}%
 </td>
 
 </tr>
@@ -144,7 +165,7 @@
 @empty
 
 <tr>
-    <td colspan="9" class="p-4 text-gray-400">
+    <td colspan="12" class="p-4 text-gray-400">
         No data available
     </td>
 </tr>

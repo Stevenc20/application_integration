@@ -25,13 +25,10 @@ class UserFactory extends Factory
     {
         return [
         'name' => fake()->name(),
-        'nip' => fake()->unique()->numerify('EMP###'),
-        'email' => fake()->unique()->safeEmail(),
-        'email_verified_at' => now(),
+        'nrp' => fake()->unique()->numerify('####'),
         'password' => Hash::make('password'),
         'role' => 'operator',
         'is_active' => 1,
-        'remember_token' => Str::random(10),
 ];
     }
 

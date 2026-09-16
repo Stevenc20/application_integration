@@ -405,20 +405,24 @@ function openKpiDetailModal(type, line){
         <thead class="bg-gray-50 text-gray-600"><tr>
           <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
           <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
           <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
         </tr></thead>
         <tbody class="divide-y divide-gray-100">
         ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
           <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
           <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
+          <td class="px-4 py-3 font-semibold text-blue-700">${r.job || '-'}</td>
           <td class="px-4 py-3 text-gray-600">${r.problem}</td>
           <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+          <td class="px-4 py-3 text-gray-600">${r.action || '-'}</td>
           <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
         </tr>`).join('')}
         <tr class="bg-gray-50 font-black">
-          <td colspan="4" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+          <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
           <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
         </tr>
         </tbody></table></div>`;

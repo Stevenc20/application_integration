@@ -16,46 +16,45 @@ use Illuminate\Support\Facades\Schema;
  */
 class TimelineGenerationService
 {
-    public function regenerateSection(string $date, string $shiftName, ?string $pressName = null, bool $forceMaster = false): int
+    public function regenerateSection(string $date, string $shiftName, ?string $pressName = null, bool $forceMaster = false): array
     {
         // Normalize date to Y-m-d format (handles "2026-05-08 00:00:00" from DB queries)
         $date = \Carbon\Carbon::parse($date)->format('Y-m-d');
 
-        // 1. Fetch initial plans to extract context (like line_master_id, hari)
-        $query = ProductionPlan::query()
-            ->whereDate('plan_date', $date)
+        \Log::info('[REGEN START]', [
+            'date' => $date,
+            'shift' => $shiftName,
+            'press' => $pressName,
+        ]);
+
+        // Pre-cleanup: reset orphaned recovery plans that have no valid RecoveryItem
+        // so they are included as PPC items instead of being permanently filtered out
+        $orphanBase = ProductionPlan::whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
-            ->where('row_type', 'job')
-            ->whereNotIn('job_no', [
-                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
-            ])
-            ->whereNotIn('job_master', [
-                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
-            ]);
+            ->where('source_type', 'recovery');
 
         if ($pressName) {
-            $this->applyPressFilter($query, $pressName);
+            $orphanBase->where('press_name', $pressName);
         }
 
-        $plans = $query->orderBy('row_no')->get();
-        if ($plans->isEmpty()) {
-            return 0;
+        $orphanBase->whereNull('recovery_id')
+            ->update(['source_type' => 'ppc']);
+
+        $orphanBase2 = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('source_type', 'recovery')
+            ->whereNotNull('recovery_id')
+            ->whereDoesntHave('recoveryItem', function ($q) {
+                $q->whereIn('status', ['approved', 'scheduled', 'in_production', 'completed']);
+            });
+
+        if ($pressName) {
+            $orphanBase2->where('press_name', $pressName);
         }
 
-        $firstPlan = $plans->first();
-        $lineMasterId = $firstPlan->line_master_id;
-        if (!$lineMasterId && Schema::hasTable('line_masters')) {
-            $lineMasterId = DB::table('line_masters')->first()->id ?? 1;
-        }
-        if (!$lineMasterId) {
-            $lineMasterId = 1;
-        }
-        // Use the plan's actual press_name so breaks stay under the same press_name as jobs,
-        // preventing phantom press_names (e.g. 'Line A') from clobbering real ones (e.g. 'PRESS A').
-        $resolvedPressName = $firstPlan->press_name ?? ($pressName ?: 'PRESS A');
-        $hari = $firstPlan->hari;
+        $orphanBase2->update(['source_type' => 'ppc', 'recovery_id' => null]);
 
-        // Clean up previous splits to ensure deterministic regeneration
+        // 2. Clean slate — remove previous computed data
         $previousChildren = ProductionPlan::whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
             ->whereNotNull('parent_job_id');
@@ -64,10 +63,13 @@ class TimelineGenerationService
         }
         $previousChildren->delete();
 
-        // Restore parents to original plan values
         $parents = ProductionPlan::whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
-            ->whereNotNull('original_plan');
+            ->whereNotNull('original_plan')
+            ->where(function ($q) {
+                $q->whereNull('source_type')
+                  ->orWhere('source_type', '!=', 'recovery');
+            });
         if ($pressName) {
             $this->applyPressFilter($parents, $pressName);
         }
@@ -93,7 +95,6 @@ class TimelineGenerationService
             $parent->save();
         }
 
-        // Delete all old break rows to avoid duplicates or out of order entries
         $previousBreaks = ProductionPlan::whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
             ->where('row_type', 'break');
@@ -102,41 +103,144 @@ class TimelineGenerationService
         }
         $previousBreaks->delete();
 
-        // Reset timing fields on all job rows so anchor recalculates from shift start time
-        $resetTiming = ProductionPlan::whereDate('plan_date', $date)
-            ->where('shift_name', $shiftName)
-            ->where('row_type', 'job');
-        if ($pressName) {
-            $this->applyPressFilter($resetTiming, $pressName);
-        }
-        $resetTiming->update(['start_time' => null, 'finish_time' => null]);
-
-        // 2a. Insert approved recovery items into production_plans (source_type='recovery')
-        $this->insertApprovedRecoveryForSection($date, $shiftName, $resolvedPressName, $lineMasterId, $hari);
-
-        // 2b. Re-fetch all clean job plans for processing
-        $query = ProductionPlan::query()
-            ->whereDate('plan_date', $date)
+        // Hanya reset timing recovery items (start/finish dihapus)
+        $resetRecovery = ProductionPlan::whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
             ->where('row_type', 'job')
-            ->whereNotIn('job_no', [
+            ->where('source_type', 'recovery');
+        if ($pressName) {
+            $this->applyPressFilter($resetRecovery, $pressName);
+        }
+        $resetRecovery->update([
+            'start_time'   => null,
+            'finish_time'  => null,
+            'process_time' => null,
+            'tpt'          => null,
+        ]);
+
+        // Reset perhitungan PPC items (timing dari import dipertahankan)
+        $resetPpcCalc = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('row_type', 'job')
+            ->where(function ($q) {
+                $q->whereNull('source_type')
+                  ->orWhere('source_type', '!=', 'recovery');
+            });
+        if ($pressName) {
+            $this->applyPressFilter($resetPpcCalc, $pressName);
+        }
+        $resetPpcCalc->update([
+            'process_time' => null,
+            'tpt'          => null,
+        ]);
+
+        // 3. Build merged queue: Recovery items first, then PPC items
+        $baseConditions = function ($q) use ($date, $shiftName, $pressName) {
+            $q->whereDate('plan_date', $date)
+              ->where('shift_name', $shiftName)
+              ->where('row_type', 'job');
+            if ($pressName) {
+                $this->applyPressFilter($q, $pressName);
+            }
+        };
+
+        $excludeTotals = function ($q) {
+            $q->whereNotIn('job_no', [
                 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
             ])
             ->whereNotIn('job_master', [
-                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
-            ]);
+                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL',
+                'JOB MASTER'
+            ])
+            ->whereNotNull('job_no')
+            ->where('job_no', '!=', '');
+        };
 
-        if ($pressName) {
-            $this->applyPressFilter($query, $pressName);
+        // 3a. Recovery items (source_type='recovery' with valid RecoveryItem status)
+        $recoveryQuery = ProductionPlan::query();
+        $baseConditions($recoveryQuery);
+        $excludeTotals($recoveryQuery);
+        $recoveryQuery->where('source_type', 'recovery')
+            ->whereHas('recoveryItem', function ($q) {
+                $q->whereIn('status', ['approved', 'scheduled', 'in_production', 'completed']);
+            });
+        $recoveryPlans = $recoveryQuery->get();
+        $recoveryJobNos = $recoveryPlans->pluck('job_no')->unique()->toArray();
+
+        // 3b. PPC items (source_type IS NULL or != 'recovery'), excluding job_no already in recovery
+        $ppcQuery = ProductionPlan::query();
+        $baseConditions($ppcQuery);
+        $excludeTotals($ppcQuery);
+        $ppcQuery->where(function ($q) {
+            $q->whereNull('source_type')
+              ->orWhere('source_type', '!=', 'recovery');
+        });
+        if (!empty($recoveryJobNos)) {
+            $ppcQuery->whereNotIn('job_no', $recoveryJobNos);
         }
+        $ppcPlans = $ppcQuery->get();
 
-        $plans = $query->orderBy('row_no')->get();
+        // 3c. Merge & sort by row_no — respects user's drag-drop order
+        // Items with null row_no (Fase 13 orphan cleanup) sort at the end
+        $plans = $recoveryPlans->concat($ppcPlans)
+            ->sortBy(function ($p) {
+                return (int)($p->row_no ?? 999999);
+            })
+            ->values();
+
         if ($plans->isEmpty()) {
-            return 0;
+            \Log::info('[REGEN] Aborted — no job plans found', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName]);
+            return ['updated' => 0, 'overflow' => []];
         }
 
-        $hari = $plans->first()->hari;
+        \Log::info('[REGEN] Plans loaded', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'count' => $plans->count()]);
+
+        $firstPlan = $plans->first();
+        $resolvedPressName = $pressName ?: ($firstPlan->press_name ?? 'PRESS A');
+        $hari = $firstPlan->hari;
+
+        // Resolve line_master_id dari pressName parameter, bukan dari firstPlan
+        // Karena firstPlan bisa jadi recovery item dengan line_master_id yang salah (fallback 1)
+        $lineMasterId = null;
+        $pressMeta = null;
+        if ($pressName && Schema::hasTable('line_masters')) {
+            $cleanPress = strtoupper(str_replace([' ', '-', 'LINE'], '', $pressName));
+            $lm = DB::table('line_masters')
+                ->whereRaw('REPLACE(REPLACE(UPPER(line_name), " ", ""), "-", "") LIKE ?', ['%' . $cleanPress . '%'])
+                ->orWhereRaw('REPLACE(REPLACE(UPPER(line_code), " ", ""), "-", "") LIKE ?', ['%' . $cleanPress . '%'])
+                ->first(['id', 'production_start', 'production_end']);
+            if ($lm) {
+                $lineMasterId = $lm->id;
+                $pressMeta = $lm;
+            }
+        }
+        // Fallback: jika pressName tidak cocok, pakai line_master_id dari firstPlan
+        if (!$lineMasterId) {
+            $lineMasterId = $firstPlan->line_master_id;
+        }
+        if (!$lineMasterId && Schema::hasTable('line_masters')) {
+            $lineMasterId = DB::table('line_masters')->first()->id ?? 1;
+        }
+        if (!$lineMasterId) {
+            $lineMasterId = 1;
+        }
+        // Jika pressMeta belum di-set, baca dari DB berdasarkan lineMasterId
+        if (!$pressMeta) {
+            $pressMeta = DB::table('line_masters')
+                ->where('id', $lineMasterId)
+                ->first(['production_start', 'production_end']);
+        }
+
+        \Log::info('[REGEN] Press config resolved', [
+            'lineMasterId' => $lineMasterId,
+            'pressName' => $pressName,
+            'resolvedPressName' => $resolvedPressName,
+            'production_start' => $pressMeta->production_start ?? 'null',
+            'production_end' => $pressMeta->production_end ?? 'null',
+        ]);
+
         $breakWindows = $this->resolveBreakWindows($date, $shiftName, $hari);
+        \Log::info('[REGEN] Break windows resolved', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'count' => count($breakWindows)]);
         
         // Sort breaks chronologically by start time
         usort($breakWindows, fn ($a, $b) => MasterBreakTime::timeToMinutes($a['start']) <=> MasterBreakTime::timeToMinutes($b['start']));
@@ -146,9 +250,31 @@ class TimelineGenerationService
         $currentTimeMins = MasterBreakTime::timeToMinutes($shiftStart->format('H:i'));
 
         $shiftEnd = $this->shiftEndTime($date, $shiftName, $isShiftMalam);
-        $shiftEndMins = MasterBreakTime::timeToMinutes($shiftEnd->format('H:i'));
+        $shiftEndMins = MasterBreakTime::timeToMinutes(
+            $pressMeta->production_end ?? $shiftEnd->format('H:i')
+        );
         if ($isShiftMalam) {
             $shiftEndMins += 1440;
+        }
+
+        // PPC anchor: earliest start_time dari data import (untuk Press D dkk)
+        // Kalo press punya production_start di line_masters, pakai itu
+        // Kalo tidak, cari start_time PPC terkecil dari DB
+        $ppcAnchorMins = null;
+        if ($pressMeta && $pressMeta->production_start) {
+            $ppcAnchorMins = MasterBreakTime::timeToMinutes($pressMeta->production_start);
+        } else {
+            $importedStart = ProductionPlan::whereDate('plan_date', $date)
+                ->where('shift_name', $shiftName)
+                ->where('press_name', $resolvedPressName)
+                ->whereNull('source_type')
+                ->whereNotNull('start_time')
+                ->where('row_type', 'job')
+                ->orderBy('start_time')
+                ->value('start_time');
+            if ($importedStart) {
+                $ppcAnchorMins = MasterBreakTime::timeToMinutes($importedStart);
+            }
         }
 
         // Normalize break times for night shift: breaks that fall after midnight
@@ -172,7 +298,6 @@ class TimelineGenerationService
         $plansArray = $plans->all();
         $i = 0;
         $loopGuard = 0;
-
         while ($i < count($plansArray)) {
             $loopGuard++;
             if ($loopGuard > 200) {
@@ -181,27 +306,49 @@ class TimelineGenerationService
 
             $itemPlan = $plansArray[$i];
             
-            // A. Check if there are any uninserted break windows that start BEFORE or AT the current timeline cursor
-            foreach ($breakWindows as $idx => $b) {
-                if (in_array($idx, $insertedBreaks)) {
-                    continue;
-                }
-                $bStartMins = $b['_normStart'] ?? MasterBreakTime::timeToMinutes($b['start']);
-                $bEndMins = $b['_normEnd'] ?? MasterBreakTime::timeToMinutes($b['finish']);
-                
-                if ($bStartMins <= $currentTimeMins) {
-                    // Push the break row to output sequence at the exact current time!
-                    $outputSequence[] = [
-                        'type' => 'break',
-                        'label' => $b['label'],
-                        'start' => $b['start'],
-                        'finish' => $b['finish'],
-                        'type_break' => $b['type'],
-                    ];
-                    $insertedBreaks[] = $idx;
+            \Log::info("=========== ITERATION ===========\n" .
+                "Index : {$i}\n" .
+                "Job : {$itemPlan->job_no}\n" .
+                "source_type : " . ($itemPlan->source_type ?? 'ppc') . "\n" .
+                "db_start : " . ($itemPlan->start_time ?? 'NULL') . "\n" .
+                "db_finish : " . ($itemPlan->finish_time ?? 'NULL') . "\n" .
+                "db_process_time : " . ($itemPlan->process_time ?? 'NULL') . "\n" .
+                "db_tpt : " . ($itemPlan->tpt ?? 'NULL') . "\n" .
+                "cursor_before : " . MasterBreakTime::minutesToTime($currentTimeMins) . "\n" .
+                "================================");
+            
+            // A. RE-SCAN: Insert uninserted breaks that have been passed by the cursor.
+            // Skip breaks that have fully ended before or at current time (e.g., ISTIRAHAT SIANG
+            // ends at 12:45 but cursor starts at 12:45+)
+            $reScan = true;
+            while ($reScan) {
+                $reScan = false;
+                foreach ($breakWindows as $idx => $b) {
+                    if (in_array($idx, $insertedBreaks)) {
+                        continue;
+                    }
+                    $bStartMins = $b['_normStart'] ?? MasterBreakTime::timeToMinutes($b['start']);
+                    $bEndMins = $b['_normEnd'] ?? MasterBreakTime::timeToMinutes($b['finish']);
                     
-                    // Advance cursor to end of break
-                    $currentTimeMins = max($currentTimeMins, $bEndMins);
+                    // Break yang udah full lewat — skip render
+                    if ($bEndMins <= $currentTimeMins) {
+                        $insertedBreaks[] = $idx;
+                        continue;
+                    }
+
+                    if ($bStartMins <= $currentTimeMins) {
+                        $outputSequence[] = [
+                            'type' => 'break',
+                            'label' => $b['label'],
+                            'start' => $b['start'],
+                            'finish' => $b['finish'],
+                            'type_break' => $b['type'],
+                        ];
+                        $insertedBreaks[] = $idx;
+                        $currentTimeMins = max($currentTimeMins, $bEndMins);
+                        $reScan = true;
+                        break; // restart scan after cursor moved
+                    }
                 }
             }
 
@@ -218,12 +365,7 @@ class TimelineGenerationService
             }
             $tpt = (float)($itemPlan->tpt ?? 0);
             if ($tpt <= 0) {
-                $tpt = $processTime + $dct;
-            }
-
-            // Jika plan qty 0, jangan buang waktu untuk setup (dct)
-            if ($planQty <= 0) {
-                $tpt = 0;
+                $tpt = $processTime + ($planQty > 0 ? $dct : 0);
             }
             
             $startTimeMins = $currentTimeMins;
@@ -235,11 +377,11 @@ class TimelineGenerationService
                 $i++;
                 continue;
             }
-            // Cap finish di batas shift (21:00 Pagi / 07:30 Malam)
-            $wasCapped = false;
-            if ($adjustedFinishMins > $shiftEndMins) {
-                $adjustedFinishMins = $shiftEndMins;
-                $wasCapped = true;
+            // Jika item tidak muat penuh dalam shift → full overflow (no partial)
+            if ($adjustedFinishMins >= $shiftEndMins) {
+                $cutoffPlans[] = $itemPlan;
+                $i++;
+                continue;
             }
             
            // =====================================
@@ -285,27 +427,43 @@ foreach ($breakWindows as $idx => $b) {
         // =====================================
 
         if ($availableProcessMinute <= 0) {
+            $outputSequence[] = [
+                'type' => 'break',
+                'label' => $b['label'],
+                'start' => $b['start'],
+                'finish' => $b['finish'],
+                'type_break' => $b['type'],
+            ];
+            $insertedBreaks[] = $idx;
             $currentTimeMins = $bEndMins;
             continue 2;
         }
 
         // =====================================
-        // BERAPA PCS YANG BISA DIPROSES
+        // BERAPA PCS YANG BISA DIPROSES SEBELUM BREAK
         // =====================================
 
-        // SKIP jika CT = 0 (tidak bisa dihitung)
-        if ($ct <= 0) {
-            continue;
+        $actualProcessTime = $tpt - $dct;
+
+        if ($actualProcessTime > 0) {
+            $timeRatio = $availableProcessMinute / $actualProcessTime;
+            $timeRatio = max(0, min(1, $timeRatio));
+            $processableQty = floor(($planQty * $timeRatio) + 0.00001);
+        } else {
+            $timeRatio = 0;
+            $processableQty = 0;
         }
 
-        $processableQty =
-            floor(
-                ($availableProcessMinute * 60)
-                / $ct
-            );
-
-        // JIKA TIDAK CUKUP WAKTU UNTUK 1 PCS, defer ke setelah break
+        // JIKA TIDAK CUKUP WAKTU UNTUK 1 PCS, defer seluruh item ke setelah break
         if ($processableQty <= 0) {
+            $outputSequence[] = [
+                'type' => 'break',
+                'label' => $b['label'],
+                'start' => $b['start'],
+                'finish' => $b['finish'],
+                'type_break' => $b['type'],
+            ];
+            $insertedBreaks[] = $idx;
             $currentTimeMins = $bEndMins;
             continue 2;
         }
@@ -315,14 +473,11 @@ foreach ($breakWindows as $idx => $b) {
             max(1, min($planQty, $processableQty));
 
         // =====================================
-        // SESSION A
+        // SESSION A — sebelum break
         // =====================================
 
         $sessionAProcessTime =
-            round(
-                ($ct * $processableQty) / 60,
-                1
-            );
+            round($actualProcessTime * ($processableQty / max(1, $planQty)), 1);
 
         $sessionATpt =
             ceil($sessionAProcessTime + $dct);
@@ -370,6 +525,13 @@ foreach ($breakWindows as $idx => $b) {
             ],
         ];
 
+        \Log::info('[REGEN] Job split (Session A)', [
+            'job' => $itemPlan->job_no,
+            'start' => MasterBreakTime::minutesToTime($startTimeMins),
+            'finish' => $b['start'],
+            'cursor_after' => $b['finish'],
+        ]);
+
         // =====================================
         // INSERT BREAK ROW
         // =====================================
@@ -385,9 +547,7 @@ foreach ($breakWindows as $idx => $b) {
         $insertedBreaks[] = $idx;
 
         // =====================================
-        // SESSION B — replace current array item
-        // so the main loop continues processing
-        // the clone (which may hit more breaks)
+        // SESSION B — clone sisa item untuk setelah break
         // =====================================
 
         $remainingQty = $planQty - $processableQty;
@@ -399,10 +559,16 @@ foreach ($breakWindows as $idx => $b) {
             $clone->plan = $remainingQty;
             $clone->start_time = $b['finish'];
 
-            $sessionBProcessTime = round(($ct * $remainingQty) / 60, 1);
+            $sessionBProcessTime = max(0, $processTime - $sessionAProcessTime);
             $sessionBTpt = ceil($sessionBProcessTime + $dct);
             $clone->process_time = $sessionBProcessTime;
             $clone->tpt = $sessionBTpt;
+
+            \Log::info("SESSION B CREATED\n" .
+                "Old Job : {$itemPlan->job_no}\n" .
+                "Remaining Qty : {$remainingQty}\n" .
+                "Inserted Index : {$i}\n" .
+                "Current Index : {$i}");
 
             // Replace current plan with clone so the normal loop
             // processes it from after the break
@@ -417,27 +583,8 @@ foreach ($breakWindows as $idx => $b) {
     }
 }
 
-            // Jika plan qty 0, tempatkan setelah break terdekat
-            if ($planQty <= 0) {
-                foreach ($breakWindows as $idx => $b) {
-                    if (in_array($idx, $insertedBreaks)) continue;
-                    $bEndMins = $b['_normEnd'] ?? MasterBreakTime::timeToMinutes($b['finish']);
-                    if ($currentTimeMins < $bEndMins) {
-                        $outputSequence[] = [
-                            'type' => 'break',
-                            'label' => $b['label'],
-                            'start' => $b['start'],
-                            'finish' => $b['finish'],
-                            'type_break' => $b['type'],
-                        ];
-                        $insertedBreaks[] = $idx;
-                        $currentTimeMins = max($currentTimeMins, $bEndMins);
-                    }
-                    break;
-                }
-                $startTimeMins = $currentTimeMins;
-                $adjustedFinishMins = $startTimeMins;
-            }
+            // C. Zero-qty items advance cursor by 0 minutes (no work done).
+            // The re-scan in section A already handles any breaks that start at cursor.
 
             // Calculate metrics for the job
             $metrics = [
@@ -464,14 +611,47 @@ foreach ($breakWindows as $idx => $b) {
                 'metrics' => $metrics,
             ];
 
-            // Advance cursor to the shifted finish time (min +1 to avoid stalls)
-            $currentTimeMins = max($startTimeMins + 1, $adjustedFinishMins);
+            // Advance cursor to finish time (continuous, no gaps except from breaks)
+            $currentTimeMins = $adjustedFinishMins;
             $i++;
+
+            \Log::info('[REGEN] Job normal', [
+                'job' => $itemPlan->job_no,
+                'source_type' => $itemPlan->source_type ?? 'ppc',
+                'start' => $jobStartStr,
+                'finish' => $jobFinishStr,
+                'cursor_after' => MasterBreakTime::minutesToTime($currentTimeMins),
+            ]);
         }
 
-        // Post-loop: Insert any remaining break windows
+        // Post-loop: Insert any remaining break windows at their correct chronological position
         foreach ($breakWindows as $idx => $b) {
-            if (!in_array($idx, $insertedBreaks)) {
+            if (in_array($idx, $insertedBreaks)) {
+                continue;
+            }
+            $bStart = $b['start'];
+            $bStartMins = $b['_normStart'] ?? MasterBreakTime::timeToMinutes($bStart);
+            $inserted = false;
+            for ($pos = 0; $pos < count($outputSequence); $pos++) {
+                $item = $outputSequence[$pos];
+                if ($item['type'] === 'break') {
+                    continue;
+                }
+                $itemFinish = $item['finish'];
+                if ($itemFinish && MasterBreakTime::timeToMinutes($itemFinish) > $bStartMins) {
+                    array_splice($outputSequence, $pos, 0, [[
+                        'type' => 'break',
+                        'label' => $b['label'],
+                        'start' => $b['start'],
+                        'finish' => $b['finish'],
+                        'type_break' => $b['type'],
+                    ]]);
+                    $inserted = true;
+                    $insertedBreaks[] = $idx;
+                    break;
+                }
+            }
+            if (!$inserted) {
                 $outputSequence[] = [
                     'type' => 'break',
                     'label' => $b['label'],
@@ -483,180 +663,49 @@ foreach ($breakWindows as $idx => $b) {
             }
         }
 
+        $jobCount = count(array_filter($outputSequence, fn ($o) => $o['type'] === 'job'));
+        $breakCount = count(array_filter($outputSequence, fn ($o) => $o['type'] === 'break'));
+        \Log::info('[REGEN] Output sequence built', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'total' => count($outputSequence), 'jobs' => $jobCount, 'breaks' => $breakCount]);
+
         // Sequence is already in processing order (Excel row order), which is the desired
         // user-facing order.  Breaks are inserted inline when they overlap, so no re-sort needed.
         // The old usort() by start time was removed because it scrambled the Excel row order.
 
-        // 2b. Extend job finish to the next break if there is a gap.
-        // This ensures items that finish before a break still visually
-        // "stop at the break boundary" (user confirmed "semua item sebelum break").
-        for ($i = 0; $i < count($outputSequence) - 1; $i++) {
-            if ($outputSequence[$i]['type'] === 'job' && $outputSequence[$i + 1]['type'] === 'break') {
-                $jobFinish = MasterBreakTime::timeToMinutes($outputSequence[$i]['finish']);
-                $breakStart = MasterBreakTime::timeToMinutes($outputSequence[$i + 1]['start']);
-                if ($jobFinish < $breakStart) {
-                    $outputSequence[$i]['finish'] = $outputSequence[$i + 1]['start'];
-                }
-            }
-        }
 
-        // 2c. Maximise remaining time until shift boundary.
-        // (21:00 for pagi, 07:30 for malam).
-        // Strategy:
-        //   A. If last job finish < shiftEnd → calculate additional pcs from CT
-        //   B. If that fails → find approved recovery item to fill the gap
-        //   C. If last job finish == shiftEnd but was CAPPED (tpt > available mins) → add more pcs
-        //   D. Visual extension fallback
-        $lastJobIdx = null;
-        for ($i = count($outputSequence) - 1; $i >= 0; $i--) {
-            if ($outputSequence[$i]['type'] === 'job') {
-                $lastJobIdx = $i;
-                break;
-            }
-        }
-
-        if ($lastJobIdx === null) {
-            // No jobs to extend — nothing to do
-        } else {
-            $lastJob = &$outputSequence[$lastJobIdx];
-            $lastFinish = MasterBreakTime::timeToMinutes($lastJob['finish']);
-            $lastStart = MasterBreakTime::timeToMinutes($lastJob['start']);
-            $lastPlanModel = $lastJob['plan'];
-            $lastCt = (float)($lastPlanModel->ct_detik ?? 0);
-            $lastDct = (float)($lastPlanModel->dct ?? 0);
-            $lastTpt = (float)($lastJob['metrics']['tpt'] ?? 0);
-
-            // Berapa menit yg tersedia dari start job terakhir sampai shift end?
-            $availableFromStart = $shiftEndMins - $lastStart;
-
-            // Apakah item terakhir di-cap? (finish == shiftEnd tapi tpt > waktu yg tersedia)
-            $wasCapped = ($lastFinish >= $shiftEndMins && $lastTpt > $availableFromStart);
-
-            // Berapa menit yg "terbuang" karena cap / gap?
-            $unusedMins = 0;
-            if ($wasCapped) {
-                // Waktu dari finish skrg (shiftEnd) sampai seharusnya finish (start + tpt)
-                $naturalFinish = $lastStart + $lastTpt;
-                $unusedMins = ($naturalFinish > $shiftEndMins) ? ($naturalFinish - $shiftEndMins) : 0;
-            } else if ($lastFinish < $shiftEndMins) {
-                $unusedMins = $shiftEndMins - $lastFinish;
-            }
-
-            // --- Attempt A: extend plan qty ---
-            $didFillWithPcs = false;
-            if ($unusedMins > 0 && $lastCt > 0) {
-                // Hitung MAXIMUM pcs yg muat dari start item sampai shiftEnd
-                // (dikurangi dct karena setup time tetap).
-                // Idempoten: kalo dipanggil berulang hasilnya tetap sama.
-                $availableProcessMins = ($shiftEndMins - $lastStart) - $lastDct;
-                if ($availableProcessMins > 0) {
-                    $maxPcs = (int)floor(($availableProcessMins * 60) / $lastCt);
-                    $currentPlan = (float)$lastPlanModel->plan;
-                    if ($maxPcs > $currentPlan) {
-                        $lastPlanModel->plan = $maxPcs;
-                        $newProcessTime = (int)ceil(($lastCt * $maxPcs) / 60.0);
-                        $newTpt = $newProcessTime + $lastDct;
-                        $lastJob['metrics']['process_time'] = $newProcessTime;
-                        $lastJob['metrics']['tpt'] = $newTpt;
-                        $lastJob['finish'] = MasterBreakTime::minutesToTime($shiftEndMins);
-                        $didFillWithPcs = true;
-                    }
-                }
-            }
-
-            // --- Visual extension fallback ---
-            $actualLastIdx = null;
-            for ($i = count($outputSequence) - 1; $i >= 0; $i--) {
-                if ($outputSequence[$i]['type'] === 'job') {
-                    $actualLastIdx = $i;
-                    break;
-                }
-            }
-            if ($actualLastIdx !== null) {
-                $actualLastFinish = MasterBreakTime::timeToMinutes($outputSequence[$actualLastIdx]['finish']);
-                if ($actualLastFinish < $shiftEndMins) {
-                    $outputSequence[$actualLastIdx]['finish'] = MasterBreakTime::minutesToTime($shiftEndMins);
-                }
-            }
-            unset($lastJob);
-        }
-
-        // 2d. Cutoff items (start >= shiftEnd) → null timestamps & create recovery items
+        // 2c. Cutoff items (start >= shiftEnd) → null timestamps & collect overflow for alert
+        $overflow = [];
         if (!empty($cutoffPlans)) {
-            $schedule = \App\Models\RecoverySchedule::firstOrCreate(
-                [
-                    'plan_date'  => $date,
-                    'shift_name' => $shiftName,
-                    'press_name' => $resolvedPressName,
-                ],
-                [
-                    'status' => 'waiting_approval',
-                ]
-            );
             foreach ($cutoffPlans as $cp) {
                 $cp->start_time = null;
                 $cp->finish_time = null;
                 $cp->save();
-                $cpJobNo = trim($cp->job_no ?? '');
-                $cpPlan = (float)($cp->plan ?? 0);
-                if ($cpJobNo === '' || $cpPlan <= 0) {
-                    continue;
-                }
-                $actualQty = (float)($cp->ok ?? 0);
-                $recoveryQty = max(0, $cpPlan - $actualQty);
-                $ctDetik = (float)($cp->ct_detik ?? 0);
-                $dct = (float)($cp->dct ?? 0);
-                $durationMinutes = $ctDetik > 0
-                    ? (int)ceil(($ctDetik * $recoveryQty) / 60.0) + $dct
-                    : 0;
 
-                \App\Models\RecoveryItem::firstOrCreate(
-                    [
-                        'recovery_schedule_id' => $schedule->id,
-                        'job_no'               => $cpJobNo,
-                        'press_name'           => $resolvedPressName,
-                    ],
-                    [
-                        'production_plan_id'  => $cp->id,
-                        'job_master'          => $cp->job_master ?? $cpJobNo,
-                        'plan_qty'            => $cpPlan,
-                        'ok'                  => $actualQty,
-                        'repair'              => (float)($cp->repair ?? 0),
-                        'reject'              => (float)($cp->reject ?? 0),
-                        'ct_detik'            => $ctDetik,
-                        'dct'                 => $dct,
-                        'reg_active'          => (float)($cp->reg_active ?? 0),
-                        'total_mesin'         => (int)($cp->total_mesin ?? 1),
-                        'status'              => 'waiting_approval',
-                        'original_date'       => $date,
-                        'original_shift_name' => $shiftName,
-                        'source_date'         => $date,
-                        'source_shift'        => $shiftName,
-                        'actual_qty'          => $actualQty,
-                        'recovery_qty'        => $recoveryQty,
-                        'duration_minutes'    => $durationMinutes,
-                        'queued_at'           => now(),
-                    ]
-                );
+                $planQty = (float)($cp->plan ?? 0);
+                $okQty = (float)($cp->ok ?? 0);
+                $repairQty = (float)($cp->repair ?? 0);
+                $rejectQty = (float)($cp->reject ?? 0);
+                $balance = max(0, $planQty - $okQty - $repairQty - $rejectQty);
+                $recoveryQty = max(0, $planQty - $okQty);
+                $ct = (float)($cp->ct_detik ?? 0);
+                $durationMinutes = $ct > 0 ? (int)ceil(($ct * $recoveryQty) / 60.0) : 0;
+
+                $overflow[] = [
+                    'plan_id'         => $cp->id,
+                    'job_no'          => $cp->job_no,
+                    'job_master'      => $cp->job_master,
+                    'plan'            => $planQty,
+                    'ok'              => $okQty,
+                    'repair'          => $repairQty,
+                    'reject'          => $rejectQty,
+                    'balance'         => $balance,
+                    'recovery_qty'    => $recoveryQty,
+                    'duration_minutes' => $durationMinutes,
+                    'position'        => $cp->row_no,
+                ];
             }
         }
 
-        // 2e. Revert recovery items that didn't fit (start_time is null)
-        $unusedRecovery = ProductionPlan::whereDate('plan_date', $date)
-            ->where('shift_name', $shiftName)
-            ->where('press_name', $resolvedPressName)
-            ->where('source_type', 'recovery')
-            ->whereNull('start_time')
-            ->get();
-
-        foreach ($unusedRecovery as $ur) {
-            if ($ur->recovery_id) {
-                RecoveryItem::where('id', $ur->recovery_id)
-                    ->where('status', 'scheduled')
-                    ->update(['status' => 'approved']);
-            }
-            $ur->delete();
-        }
+        \Log::info('[REGEN] Persisting output sequence', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'rows' => count($outputSequence)]);
 
         // 3. Database transaction persist
         $updated = 0;
@@ -706,21 +755,108 @@ foreach ($breakWindows as $idx => $b) {
                     $plan->p2 = $metrics['a2'] > 0;
                     $plan->p3 = $metrics['a3'] > 0;
                     $plan->p4 = $metrics['a4'] > 0;
-                    
+
                     // Explicitly preserve split state fields
                     $plan->parent_job_id = $item['plan']->parent_job_id;
                     $plan->split_group = $item['plan']->split_group;
                     $plan->session_no = $item['plan']->session_no;
                     $plan->original_plan = $item['plan']->original_plan;
                     $plan->remaining_plan = $item['plan']->remaining_plan;
+
+                    // Recovery rows: DELETE old placeholder + INSERT fresh (new ID, clean state)
+                    // PPC rows: UPDATE existing record (preserve original ID)
+                    $saveType = ($plan->source_type === 'recovery' && $plan->id)
+                        ? 'DELETE+INSERT'
+                        : ($plan->id ? 'UPDATE' : 'INSERT');
+                    $logData = [
+                        'job_no' => $plan->job_no ?? $item['label'],
+                        'source_type' => $plan->source_type ?? 'ppc',
+                        'row_type' => $item['type'],
+                        'save_type' => $saveType,
+                        'start' => $item['start'],
+                        'finish' => $item['finish'],
+                        'row_no' => $rowNo - 1,
+                        'recovery_id' => $plan->recovery_id,
+                    ];
+                    if ($plan->source_type === 'recovery' && $plan->id) {
+                        $logData['old_id'] = $plan->id;
+                        $oldId = $plan->id;
+                        $plan->id = null;
+                        $plan->exists = false;
+                        ProductionPlan::where('id', $oldId)->where('source_type', 'recovery')->delete();
+                    }
                     $plan->save();
+                    if ($plan->source_type === 'recovery') {
+                        $logData['new_id'] = $plan->id;
+                    }
+                    \Log::info('[REGEN TRACE PERSIST]', $logData);
                 }
                 $updated++;
             }
 
         });
 
-        return $updated;
+        // 2d. Recovery items that couldn't be scheduled: revert to waiting_approval queue
+        // OR reset orphaned plans (source_type='recovery' but RecoveryItem already reverted)
+        // so they re-enter the timeline as PPC items on next regeneration
+        $unusedRecovery = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('press_name', $resolvedPressName)
+            ->where('source_type', 'recovery')
+            ->whereNull('start_time')
+            ->get();
+
+        foreach ($unusedRecovery as $ur) {
+            if ($ur->recovery_id) {
+                $affected = RecoveryItem::where('id', $ur->recovery_id)
+                    ->whereIn('status', ['approved', 'scheduled'])
+                    ->update(['status' => 'waiting_approval']);
+
+                if ($affected > 0) {
+                    \Log::info('[REGEN UNUSED RECOVERY] Reverted to waiting_approval', [
+                        'plan_id' => $ur->id,
+                        'job_no' => $ur->job_no,
+                        'recovery_item_id' => $ur->recovery_id,
+                        'row_no' => $ur->row_no,
+                    ]);
+                }
+
+                if ($affected === 0) {
+                    $ur->update(['source_type' => 'ppc', 'recovery_id' => null]);
+                }
+            } else {
+                // No recovery_id — reset to PPC to avoid orphan
+                $ur->update(['source_type' => 'ppc', 'recovery_id' => null]);
+            }
+        }
+
+        // 2e. Cleanup PPC originals that match recovery job_no — set row_no to NULL
+        // so they don't create duplicate row_no conflicts in the view sort order
+        $recoveryJobNos = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('press_name', $resolvedPressName)
+            ->where('source_type', 'recovery')
+            ->whereNotNull('recovery_id')
+            ->pluck('job_no')
+            ->unique()
+            ->toArray();
+
+        if (!empty($recoveryJobNos)) {
+            ProductionPlan::whereDate('plan_date', $date)
+                ->where('shift_name', $shiftName)
+                ->where('press_name', $resolvedPressName)
+                ->where(function ($q) {
+                    $q->whereNull('source_type')->orWhere('source_type', '!=', 'recovery');
+                })
+                ->whereIn('job_no', $recoveryJobNos)
+                ->whereNull('start_time')
+                ->update(['row_no' => null]);
+        }
+
+        \Log::info('[REGEN END]');
+        \Log::info('[REGEN] Complete', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'updated' => $updated, 'overflow_count' => count($overflow)]);
+
+        return ['updated' => $updated, 'overflow' => $overflow];
     }
 
     private function insertBreakRow(
@@ -787,65 +923,6 @@ foreach ($breakWindows as $idx => $b) {
         }
     }
 
-    /**
-     * Load approved recovery items for this press and insert them into production_plans
-     * as source_type='recovery' entries. Items that don't fit capacity will be reverted
-     * by revertUnusedRecoveryItems() after the main processing loop.
-     */
-    private function insertApprovedRecoveryForSection(string $date, string $shiftName, string $pressName, int $lineMasterId, ?string $hari): void
-    {
-        $approvedRecovery = RecoveryItem::approved()
-            ->where('press_name', $pressName)
-            ->orderBy('source_date', 'asc')
-            ->orderBy('source_shift', 'asc')
-            ->orderBy('original_row_no', 'asc')
-            ->get();
-
-        if ($approvedRecovery->isEmpty()) {
-            return;
-        }
-
-        $existingRecoveryNo = ProductionPlan::whereDate('plan_date', $date)
-            ->where('shift_name', $shiftName)
-            ->where('press_name', $pressName)
-            ->where('source_type', 'recovery')
-            ->max('row_no') ?? 0;
-
-        $rowNo = $existingRecoveryNo > 0 ? $existingRecoveryNo + 1 : 1;
-
-        foreach ($approvedRecovery as $ri) {
-            $planQty = $ri->recovery_qty > 0 ? (float)$ri->recovery_qty : (float)($ri->plan_qty ?? 0);
-            $ctDetik = (float)($ri->ct_detik ?? 0);
-            $dct = (float)($ri->dct ?? 0);
-            $processTime = $ctDetik > 0 ? (int)ceil(($ctDetik * $planQty) / 60.0) : 0;
-
-            ProductionPlan::create([
-                'line_master_id' => $lineMasterId,
-                'plan_date'      => $date,
-                'shift_name'     => $shiftName,
-                'press_name'     => $pressName,
-                'hari'           => $hari,
-                'row_no'         => $rowNo++,
-                'row_type'       => 'job',
-                'job_master'     => $ri->job_master,
-                'job_no'         => $ri->job_no,
-                'plan'           => $planQty,
-                'ok'             => (float)($ri->ok ?? 0),
-                'repair'         => (float)($ri->repair ?? 0),
-                'reject'         => (float)($ri->reject ?? 0),
-                'ct_detik'       => $ctDetik,
-                'dct'            => $dct,
-                'reg_active'     => (float)($ri->reg_active ?? 0),
-                'total_mesin'    => (int)($ri->total_mesin ?? 1),
-                'process_time'   => $processTime,
-                'recovery_id'    => $ri->id,
-                'source_type'    => 'recovery',
-                'status'         => 'pending',
-            ]);
-
-            $ri->update(['status' => 'scheduled']);
-        }
-    }
 
     private function breakWindowsFromCaptured(\Illuminate\Support\Collection $captured): array
     {
@@ -886,7 +963,14 @@ foreach ($breakWindows as $idx => $b) {
     public function resolveBreakWindows(string $date, string $shiftName, ?string $hari = null): array
     {
         $dayKey = $this->resolveDayKey($date, $hari);
-        
+
+        \Log::info('[TRACE BREAK DB]', [
+            'date' => $date,
+            'shiftName' => $shiftName,
+            'hari_raw' => $hari,
+            'dayKey' => $dayKey,
+        ]);
+
         if (!Schema::hasTable('master_break_times')) {
             return $this->legacyFixedBreaks($dayKey);
         }
@@ -918,6 +1002,13 @@ foreach ($breakWindows as $idx => $b) {
                 'type' => $b->type === 'cinkorak' ? 'cinkorak' : 'istirahat',
                 'label' => strtoupper($b->label),
             ];
+        }
+
+        // Fallback to legacy fixed breaks when no DB entries match this shift
+        if (empty($windows)) {
+            $legacy = $this->legacyFixedBreaks($dayKey);
+            \Log::info("resolveBreakWindows: DB empty for {$date} {$shiftName} ({$dayKey}), using legacy: " . count($legacy) . " breaks");
+            return $legacy;
         }
 
         return $windows;
@@ -1096,10 +1187,21 @@ foreach ($breakWindows as $idx => $b) {
         if (!$pressName) {
             return;
         }
-        $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $pressName)));
-        $query->whereRaw("
-            REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
-        ", ["%{$normalized}%"]);
+        $query->where(function ($q) use ($pressName) {
+            // (a) Direct fuzzy match on raw press_name
+            $q->whereRaw('UPPER(TRIM(press_name)) LIKE ?', ['%' . strtoupper(trim($pressName)) . '%']);
+
+            // (b) Fallback via line_master_id — resolves mismatched formats
+            //     e.g. filter 'PA' should match DB row with press_name 'PRESS A'
+            //     when both share the same line_master_id via LineMaster.
+            $lmIds = \App\Models\LineMaster::where(function ($lm) use ($pressName) {
+                $lm->where('line_code', 'like', '%' . $pressName . '%')
+                   ->orWhere('line_name', 'like', '%' . $pressName . '%');
+            })->pluck('id');
+            if ($lmIds->isNotEmpty()) {
+                $q->orWhereIn('line_master_id', $lmIds->toArray());
+            }
+        });
     }
 
     private function legacyFixedBreaks(string $dayKey): array
@@ -1118,23 +1220,33 @@ foreach ($breakWindows as $idx => $b) {
         return $windows;
     }
 
+    private function normalizeDayName(string $day): string
+    {
+        $normalized = strtolower(trim($day));
+        $normalized = preg_replace('/\s+(pagi|malam|shift\s*(pagi|malam)?)$/i', '', $normalized);
+        $enToId = [
+            'monday' => 'senin', 'tuesday' => 'selasa', 'wednesday' => 'rabu',
+            'thursday' => 'kamis', 'friday' => 'jumat', 'saturday' => 'sabtu', 'sunday' => 'minggu',
+        ];
+        if (isset($enToId[$normalized])) {
+            return $enToId[$normalized];
+        }
+        if (in_array($normalized, ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu', 'semua'], true)) {
+            return $normalized;
+        }
+        return $normalized;
+    }
+
     private function resolveDayKey(string $date, ?string $hari): string
     {
         if ($hari) {
-            $normalized = strtolower(trim($hari));
-            $map = [
-                'monday' => 'senin', 'tuesday' => 'selasa', 'wednesday' => 'rabu',
-                'thursday' => 'kamis', 'friday' => 'jumat', 'saturday' => 'sabtu', 'sunday' => 'minggu',
-            ];
-            if (isset($map[$normalized])) {
-                return $map[$normalized];
-            }
-            if (in_array($normalized, ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu', 'semua'], true)) {
-                return $normalized;
-            }
+            return $this->normalizeDayName($hari);
         }
 
-        return strtolower(Carbon::parse($date)->locale('id')->isoFormat('dddd'));
+        $carbonDay = strtolower(Carbon::parse($date)->locale('id')->isoFormat('dddd'));
+        $resolved = $this->normalizeDayName($carbonDay);
+
+        return $resolved;
     }
 
     private function isShiftMalam(string $shiftName): bool
@@ -1147,16 +1259,16 @@ foreach ($breakWindows as $idx => $b) {
     private function shiftAnchorTime(string $date, string $shiftName, bool $isShiftMalam): Carbon
     {
         $config = config("shift.{$shiftName}", $isShiftMalam
-            ? ['start' => '21:00', 'end' => '07:30']
-            : ['start' => '07:30', 'end' => '21:00']);
+            ? ['start' => '21:30', 'end' => '07:30']
+            : ['start' => '07:30', 'end' => '21:30']);
         return $this->parsePlanTime($date, $config['start'], $isShiftMalam);
     }
 
     private function shiftEndTime(string $date, string $shiftName, bool $isShiftMalam): Carbon
     {
         $config = config("shift.{$shiftName}", $isShiftMalam
-            ? ['start' => '21:00', 'end' => '07:30']
-            : ['start' => '07:30', 'end' => '21:00']);
+            ? ['start' => '21:30', 'end' => '07:30']
+            : ['start' => '07:30', 'end' => '21:30']);
         return $this->parsePlanTime($date, $config['end'], $isShiftMalam);
     }
 
@@ -1336,4 +1448,97 @@ foreach ($breakWindows as $idx => $b) {
 
         return $affected;
     }
+
+    /**
+     * Validate a section's timeline for consistency.
+     * Returns an array of error messages (empty = valid).
+     */
+    public function validateTimeline(string $date, string $shiftName, string $pressName): array
+    {
+        $errors = [];
+
+        $plans = ProductionPlan::whereDate('plan_date', $date)
+            ->where('shift_name', $shiftName)
+            ->where('press_name', $pressName)
+            ->whereIn('row_type', ['job', 'break'])
+            ->orderBy('row_no')
+            ->get();
+
+        if ($plans->isEmpty()) {
+            return [];
+        }
+
+        $prevFinish = null;
+        $recoveryIds = [];
+        $totalPlanQtyBefore = 0;
+        $totalPlanQtyAfter = 0;
+        $jobCount = 0;
+
+        foreach ($plans as $plan) {
+            if ($plan->row_type === 'job') {
+                $jobCount++;
+
+                // Track total plan qty (excluding split children)
+                if (!$plan->parent_job_id) {
+                    $totalPlanQtyAfter += (float)($plan->plan ?? 0);
+                }
+
+                // No time overlap
+                if ($plan->start_time && $prevFinish !== null) {
+                    $startMins = MasterBreakTime::timeToMinutes(substr($plan->start_time, 0, 5));
+                    if ($startMins < $prevFinish) {
+                        $errors[] = "Time overlap at row {$plan->row_no}: start {$plan->start_time} < previous finish " . MasterBreakTime::minutesToTime($prevFinish);
+                    }
+                }
+
+                // No duplicate recovery
+                if ($plan->recovery_id) {
+                    if (in_array($plan->recovery_id, $recoveryIds)) {
+                        $errors[] = "Duplicate recovery_id {$plan->recovery_id} at row {$plan->row_no}";
+                    }
+                    $recoveryIds[] = $plan->recovery_id;
+
+                    // No locked recovery in timeline
+                    $recoveryItem = RecoveryItem::find($plan->recovery_id);
+                    if ($recoveryItem && $recoveryItem->status === 'in_production') {
+                        $errors[] = "Locked recovery item {$plan->recovery_id} (IN_PRODUCTION) appears in timeline at row {$plan->row_no}";
+                    }
+                }
+
+                // Finish time within shift
+                if ($plan->start_time && $plan->finish_time) {
+                    $finishMins = MasterBreakTime::timeToMinutes(substr($plan->finish_time, 0, 5));
+                    $shiftEndTime = $this->shiftEndTime($date, $shiftName, $this->isShiftMalam($shiftName));
+                    $shiftEndMins = MasterBreakTime::timeToMinutes($shiftEndTime->format('H:i'));
+                    if ($this->isShiftMalam($shiftName)) {
+                        $shiftEndMins += 1440;
+                    }
+                    if ($finishMins > $shiftEndMins) {
+                        $errors[] = "Finish time {$plan->finish_time} exceeds shift end at row {$plan->row_no}";
+                    }
+
+                    $prevFinish = $finishMins;
+                }
+
+                // Track finish for non-overlap check
+                if ($plan->start_time && $plan->finish_time) {
+                    $prevFinish = MasterBreakTime::timeToMinutes(substr($plan->finish_time, 0, 5));
+                }
+            } elseif ($plan->row_type === 'break') {
+                // Break start must be before finish
+                if ($plan->start_time && $plan->finish_time) {
+                    $bStart = MasterBreakTime::timeToMinutes(substr($plan->start_time, 0, 5));
+                    $bFinish = MasterBreakTime::timeToMinutes(substr($plan->finish_time, 0, 5));
+                    if ($bStart >= $bFinish) {
+                        $errors[] = "Break '{$plan->job_no}' at row {$plan->row_no} has invalid times: start {$plan->start_time} >= finish {$plan->finish_time}";
+                    }
+                }
+            }
+        }
+
+        // Total qty match (only if we have a reference point — skipped for now)
+        return $errors;
+    }
 }
+
+

@@ -8,6 +8,7 @@ export default defineConfig({
         laravel({
             input: [
                 'resources/css/app.css',
+                'resources/css/supervisor.css',
                 'resources/js/app.js',
                 'resources/js/operational/production-engine.js',
                 'resources/js/ppc/planning.js'
@@ -20,12 +21,12 @@ export default defineConfig({
         }),
     ],
     server: {
-        host: '0.0.0.0',
+        host: '0.0.0.0', // Listen on all network interfaces so other devices can access
         port: 5173,
         strictPort: true,
         cors: true,
         hmr: {
-            host: '192.168.8.100'
+            host: 'localhost' // Explicit localhost so hot file uses localhost, not [::] (IPv6)
         },
         watch: {
             ignored: ['**/storage/framework/views/**'],

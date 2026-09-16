@@ -144,6 +144,15 @@
             </div>
         </div>
 
+        {{-- JENIS FILTER TABS --}}
+        <div class="px-6 py-3 border-b border-gray-100 bg-white flex items-center gap-2">
+            <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-2">Filter:</span>
+            <input type="hidden" id="historyJenis" value="">
+            <button onclick="setJenisFilter('')" class="jenis-filter-btn px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 border-blue-500 bg-blue-500 text-white" data-jenis="">Semua</button>
+            <button onclick="setJenisFilter('dandori')" class="jenis-filter-btn px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 border-gray-200 bg-white text-gray-500 hover:border-blue-300" data-jenis="dandori">Dandori</button>
+            <button onclick="setJenisFilter('1st_check')" class="jenis-filter-btn px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 border-gray-200 bg-white text-gray-500 hover:border-indigo-300" data-jenis="1st_check">1st Check</button>
+        </div>
+
         {{-- HISTORY FEED --}}
         <div class="px-6 py-6">
             <div id="historyBody" class="space-y-4">
@@ -543,18 +552,34 @@ function showToast(msg, type = 'success') {
 /* =========================================================
    HISTORY & OTHERS
    ========================================================= */
+function setJenisFilter(jenis) {
+    document.getElementById('historyJenis').value = jenis;
+    document.querySelectorAll('.jenis-filter-btn').forEach(btn => {
+        if (btn.dataset.jenis === jenis) {
+            btn.className = 'jenis-filter-btn px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 ' +
+                (jenis === '' ? 'border-blue-500 bg-blue-500 text-white' :
+                 jenis === '1st_check' ? 'border-indigo-500 bg-indigo-500 text-white' :
+                 'border-blue-500 bg-blue-500 text-white');
+        } else {
+            btn.className = 'jenis-filter-btn px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all border-2 border-gray-200 bg-white text-gray-500 hover:border-blue-300';
+        }
+    });
+    loadHistory();
+}
+
 function resetFilter() {
     document.getElementById('historyDate').value = '{{ now()->format("Y-m-d") }}';
     document.getElementById('historyLine').value = '';
-    loadHistory();
+    setJenisFilter('');
 }
 
 function loadHistory(page = 1) {
     let date = document.getElementById('historyDate').value;
     let line = document.getElementById('historyLine').value;
+    let jenis = document.getElementById('historyJenis').value;
     document.getElementById('historyBody').innerHTML = `<tr><td colspan="6" class="py-16 text-center"><div class="flex flex-col items-center gap-2 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 animate-spin text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span class="text-sm">Memuat history...</span></div></td></tr>`;
 
-    fetch(`{{ route('operational.dandori.history') }}?date=${date}&line=${line}&page=${page}`)
+    fetch(`{{ route('operational.dandori.history') }}?date=${date}&line=${line}&jenis=${jenis}&page=${page}`)
     .then(res => res.json())
     .then(data => {
         let body = '';
@@ -587,13 +612,17 @@ function loadHistory(page = 1) {
                                 
                                 {{-- FLAT ACTIVITY LIST --}}
                                 <div class="flex flex-wrap gap-2">
-                                    ${group.activities.map(a => `
-                                        <div class="flex items-center gap-2 px-3 py-1.5 bg-slate-50 border border-slate-100 rounded-xl">
-                                            <div class="w-1.5 h-1.5 rounded-full bg-blue-500"></div>
+                                    ${group.activities.map(a => {
+                                        let dotColor = a.jenis_dandori === '1st_check' ? 'bg-indigo-500' : 'bg-blue-500';
+                                        let badgeClass = a.jenis_dandori === '1st_check' ? 'bg-indigo-50 border-indigo-200' : 'bg-slate-50 border-slate-100';
+                                        return `
+                                        <div class="flex items-center gap-2 px-3 py-1.5 ${badgeClass} border rounded-xl">
+                                            <div class="w-1.5 h-1.5 rounded-full ${dotColor}"></div>
                                             <span class="text-[9px] font-black text-slate-700 uppercase tracking-tighter">${a.type}</span>
                                             <span class="text-[9px] font-bold text-slate-400 font-mono">${a.start} - ${a.finish}</span>
-                                        </div>
-                                    `).join('')}
+                                            ${a.duration ? `<span class="text-[9px] font-black text-slate-500 font-mono">(${formatDuration(a.duration)})</span>` : ''}
+                                        </div>`;
+                                    }).join('')}
                                 </div>
                             </div>
                         </div>

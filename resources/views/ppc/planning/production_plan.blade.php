@@ -156,7 +156,7 @@
         </div>
         <div>
             <p class="text-sm font-black text-purple-800 uppercase tracking-wide">EXTENDED SHIFT — {{ strtoupper($currentPress) }}</p>
-            <p class="text-xs font-semibold text-purple-700">Produksi diizinkan hingga <span class="font-black">{{ $rawEnd }}</span>. Jika masih overflow, gunakan tombol <strong>OVERRIDE</strong> di banner cut off.</p>
+            <p class="text-xs font-semibold text-purple-700">Produksi diizinkan hingga <span class="font-black">{{ $rawEnd }}</span>.@if($overflowCount > 0) Jika masih overflow, gunakan tombol <strong>OVERRIDE</strong> di banner cut off.@endif</p>
         </div>
     </div>
     @endif
@@ -164,7 +164,7 @@
     {{-- SCHEDULER OVERFLOW ALERT — §11 SRS: Detail item cut off --}}
     @if($overflowCount > 0)
     @foreach($overflowByPress as $press => $items)
-    <div class="bg-red-50 border-l-4 border-red-400 rounded-xl p-4 shadow-sm">
+    <div class="bg-red-50 border-l-4 border-red-400 rounded-xl p-4 shadow-sm" data-press="{{ $press }}">
         <div class="flex items-center justify-between mb-3">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center text-red-600">
@@ -181,7 +181,7 @@
             </div>
             <div class="flex items-center gap-2">
                 @if($isExtendedShift)
-                <button onclick="showOverrideModal()"
+                <button onclick="showOverrideModal(this)"
                         class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-sm">
                     ⚡ OVERRIDE
                 </button>
@@ -196,6 +196,9 @@
             <table class="w-full text-xs border-collapse">
                 <thead>
                     <tr class="bg-red-100/60 text-red-800">
+                        <th class="px-2 py-1.5 text-center w-8 font-bold">
+                            <input type="checkbox" onchange="toggleAllOverflow(this, '{{ $press }}')" class="rounded border-red-300">
+                        </th>
                         <th class="px-2 py-1.5 text-left font-bold">Job No</th>
                         <th class="px-2 py-1.5 text-left font-bold">Job Master</th>
                         <th class="px-2 py-1.5 text-center font-bold">Qty Plan</th>
@@ -220,6 +223,10 @@
                         $estDurasi = $ct > 0 ? (int)ceil(($ct * $recoveryQty) / 60.0) . ' mnt' : '—';
                     @endphp
                     <tr class="hover:bg-red-50/50">
+                        <td class="px-2 py-1.5 text-center">
+                            <input type="checkbox" class="overflow-checkbox overflow-checkbox-{{ Str::slug($press) }}"
+                                   value="{{ $item->id }}" data-plan-id="{{ $item->id }}">
+                        </td>
                         <td class="px-2 py-1.5 text-left font-medium text-red-900">{{ $item->job_no }}</td>
                         <td class="px-2 py-1.5 text-left text-red-800">{{ $item->job_master }}</td>
                         <td class="px-2 py-1.5 text-center text-red-800">{{ number_format($planQty) }}</td>
@@ -322,6 +329,10 @@
                         }
                         // 1b. SKIP NOTE/SUMMARY ROWS (TOTAL STROKE, TARGET GSPH, etc.)
                         if ($plan->row_type === 'note') {
+                            continue;
+                        }
+                        // 1c. SKIP BOUNDARY OVERFLOW — shown only in overflow banner, not in timeline
+                        if (!empty($boundaryOverflowIds) && in_array($plan->id, $boundaryOverflowIds)) {
                             continue;
                         }
                     @endphp
@@ -1356,7 +1367,7 @@ document.addEventListener('click', function(e) {
                     </svg>
                 </div>
                 <h3 class="text-xl font-black text-slate-800">Override — Atur Overflow</h3>
-                <p class="text-slate-500 text-sm mt-1">{{ $overflowCount }} item tidak muat di <strong class="text-slate-700">{{ strtoupper($currentPress) }}</strong> {{ $currentShift }}. Pilih tindakan:</p>
+                <p class="text-slate-500 text-sm mt-1"><span id="overrideCount">{{ $overflowCount }}</span> item dipilih di <strong class="text-slate-700">{{ strtoupper($currentPress) }}</strong> {{ $currentShift }}. Pilih tindakan:</p>
 
                 <div class="mt-6 space-y-3">
                     <button onclick="forceTimeline()" class="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-emerald-200 hover:border-emerald-400 bg-emerald-50 hover:bg-emerald-100 transition-all text-left group">
@@ -1459,7 +1470,21 @@ document.addEventListener('click', function(e) {
         });
     }
 
-    function showOverrideModal() {
+    function toggleAllOverflow(checkbox, press) {
+        const slug = press.toLowerCase().replace(/\s+/g, '-');
+        document.querySelectorAll('.overflow-checkbox-' + slug).forEach(cb => cb.checked = checkbox.checked);
+    }
+
+    function showOverrideModal(btn) {
+        const section = btn.closest('[data-press]');
+        const checked = section.querySelectorAll('.overflow-checkbox:checked');
+        const ids = Array.from(checked).map(cb => parseInt(cb.value));
+        if (ids.length === 0) {
+            showToast('Pilih item yang ingin di-override.', 'error');
+            return;
+        }
+        window._overridePlanIds = ids;
+        document.getElementById('overrideCount').textContent = ids.length;
         document.getElementById('overrideModal').classList.remove('hidden');
         document.getElementById('overrideModal').classList.add('flex');
     }
@@ -1471,12 +1496,13 @@ document.addEventListener('click', function(e) {
 
     function forceTimeline() {
         closeOverrideModal();
-        const planIds = @json($overflowItems->pluck('id'));
-        showConfirm('Tetap di timeline untuk ' + planIds.length + ' item? Item akan di-schedule ulang melewati batas shift.', function() {
+        const ids = window._overridePlanIds || [];
+        if (ids.length === 0) { showToast('Tidak ada item dipilih.', 'error'); return; }
+        showConfirm('Tetap di timeline untuk ' + ids.length + ' item? Item akan di-schedule ulang melewati batas shift.', function() {
             fetch('{{ route("ppc.planning.production_plan.force_overflow") }}', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_ids: planIds, action: 'force_timeline' })
+                body: JSON.stringify({ plan_ids: ids, action: 'force_timeline' })
             })
             .then(r => r.json())
             .then(data => {
@@ -1489,12 +1515,13 @@ document.addEventListener('click', function(e) {
 
     function toRecovery() {
         closeOverrideModal();
-        const planIds = @json($overflowItems->pluck('id'));
-        showConfirm('Pindahkan ' + planIds.length + ' item ke recovery queue? Item akan dihapus dari timeline utama.', function() {
+        const ids = window._overridePlanIds || [];
+        if (ids.length === 0) { showToast('Tidak ada item dipilih.', 'error'); return; }
+        showConfirm('Pindahkan ' + ids.length + ' item ke recovery queue? Item akan dihapus dari timeline utama.', function() {
             fetch('{{ route("ppc.planning.production_plan.force_overflow") }}', {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' },
-                body: JSON.stringify({ plan_ids: planIds, action: 'to_recovery' })
+                body: JSON.stringify({ plan_ids: ids, action: 'to_recovery' })
             })
             .then(r => r.json())
             .then(data => {
@@ -1526,8 +1553,8 @@ document.addEventListener('click', function(e) {
         .then(r => r.json())
         .then(data => {
             if (data.success) {
-                showToast(data.message || 'Cut-off selesai.', 'success');
-                setTimeout(() => location.reload(), 1000);
+                showToast('Cut-off selesai!', 'success');
+                setTimeout(() => { window.location.href = '{{ route("ppc.planning.recovery.index") }}'; }, 800);
             } else {
                 showToast(data.message || 'Gagal.', 'error');
             }
