@@ -442,71 +442,7 @@ class ProductionPlanController extends Controller
                 }
 
                 foreach (array_keys($uniqueShifts) as $shiftToDelete) {
-                    // 1. DELETE old PPC baseline rows (source_type = 'ppc')
-                    $ppcPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'ppc')
-                        ->pluck('id');
-
-                    if ($ppcPlanIds->isNotEmpty()) {
-                        // Disassociate recovery queue items — DON'T delete them
-                        \App\Models\RecoveryItem::whereIn('production_plan_id', $ppcPlanIds)
-                            ->update(['production_plan_id' => null]);
-                    }
-
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'ppc')
-                        ->delete();
-
-                    // 2. DELETE recovery-generated timeline rows (source_type = 'recovery')
-                    //    BUT keep plans for items that are already in_production or completed
-                    $recoveryPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'recovery')
-                        ->whereDoesntHave('recoveryItem', function ($q) {
-                            $q->whereIn('status', ['in_production', 'completed']);
-                        })
-                        ->pluck('id');
-
-                    if ($recoveryPlanIds->isNotEmpty()) {
-                        \App\Models\RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
-                            ->update(['production_plan_id' => null]);
-                    }
-
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'recovery')
-                        ->whereDoesntHave('recoveryItem', function ($q) {
-                            $q->whereIn('status', ['in_production', 'completed']);
-                        })
-                        ->delete();
-
-                    // 3. DELETE timeline-generated breaks (source_type = null from regenerateSection)
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('row_type', 'break')
-                        ->whereNull('source_type')
-                        ->delete();
-
-                    // Revert approved/scheduled RecoveryItems back to waiting_approval queue
-                    // First get the IDs of items to revert (all, not just those with null production_plan_id)
-                    $revertRecoveryIds = \App\Models\RecoveryItem::whereDate('source_date', $parsedDate)
-                        ->where('source_shift', $shiftToDelete)
-                        ->whereIn('status', ['approved', 'scheduled'])
-                        ->pluck('id');
-
-                    if ($revertRecoveryIds->isNotEmpty()) {
-                        // Reset any ProductionPlan rows linked to these RecoveryItems
-                        // This handles orphaned plans on other dates/shifts that weren't deleted above
-                        \App\Models\ProductionPlan::whereIn('recovery_id', $revertRecoveryIds)
-                            ->where('source_type', 'recovery')
-                            ->update(['source_type' => 'ppc', 'recovery_id' => null]);
-
-                        // Revert the RecoveryItems
-                        \App\Models\RecoveryItem::whereIn('id', $revertRecoveryIds)
-                            ->update(['status' => 'waiting_approval']);
-                    }
+                    $this->resetScheduleForShift($parsedDate, $shiftToDelete);
                 }
 
                 // PRE-PASS: deteksi grup (cleanShift||press) yang punya sheet REV
@@ -832,6 +768,87 @@ class ProductionPlanController extends Controller
         } catch (\Throwable $e) {
             \Log::error("Python Import Error: " . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal import: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Reset existing timeline rows for a date+shift before a fresh schedule import.
+     * Recovery items that were locked in production (in_production) are UNLOCKED:
+     * their timeline row is removed and they return to the waiting_approval queue
+     * so the newly uploaded schedule re-decides them. Completed items are kept.
+     */
+    private function resetScheduleForShift($parsedDate, $shiftToDelete)
+    {
+        // 1. DELETE old PPC baseline rows (source_type = 'ppc')
+        $ppcPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
+            ->where('shift_name', $shiftToDelete)
+            ->where('source_type', 'ppc')
+            ->pluck('id');
+
+        if ($ppcPlanIds->isNotEmpty()) {
+            // Disassociate recovery queue items — DON'T delete them
+            RecoveryItem::whereIn('production_plan_id', $ppcPlanIds)
+                ->update(['production_plan_id' => null]);
+        }
+
+        ProductionPlan::whereDate('plan_date', $parsedDate)
+            ->where('shift_name', $shiftToDelete)
+            ->where('source_type', 'ppc')
+            ->delete();
+
+        // 2. DELETE recovery-generated timeline rows (source_type = 'recovery')
+        //    BUT keep plans for items that are already completed.
+        //    in_production items are unlocked: removed from timeline, back to the queue.
+        $recoveryPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
+            ->where('shift_name', $shiftToDelete)
+            ->where('source_type', 'recovery')
+            ->whereDoesntHave('recoveryItem', function ($q) {
+                $q->where('status', 'completed');
+            })
+            ->pluck('id');
+
+        if ($recoveryPlanIds->isNotEmpty()) {
+            // Unlock locked items before releasing the plan link
+            RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
+                ->where('status', 'in_production')
+                ->update(['status' => 'waiting_approval']);
+
+            RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
+                ->update(['production_plan_id' => null]);
+        }
+
+        ProductionPlan::whereDate('plan_date', $parsedDate)
+            ->where('shift_name', $shiftToDelete)
+            ->where('source_type', 'recovery')
+            ->whereDoesntHave('recoveryItem', function ($q) {
+                $q->where('status', 'completed');
+            })
+            ->delete();
+
+        // 3. DELETE timeline-generated breaks (source_type = null from regenerateSection)
+        ProductionPlan::whereDate('plan_date', $parsedDate)
+            ->where('shift_name', $shiftToDelete)
+            ->where('row_type', 'break')
+            ->whereNull('source_type')
+            ->delete();
+
+        // Revert approved/scheduled RecoveryItems back to waiting_approval queue
+        // First get the IDs of items to revert (all, not just those with null production_plan_id)
+        $revertRecoveryIds = RecoveryItem::whereDate('source_date', $parsedDate)
+            ->where('source_shift', $shiftToDelete)
+            ->whereIn('status', ['approved', 'scheduled'])
+            ->pluck('id');
+
+        if ($revertRecoveryIds->isNotEmpty()) {
+            // Reset any ProductionPlan rows linked to these RecoveryItems
+            // This handles orphaned plans on other dates/shifts that weren't deleted above
+            ProductionPlan::whereIn('recovery_id', $revertRecoveryIds)
+                ->where('source_type', 'recovery')
+                ->update(['source_type' => 'ppc', 'recovery_id' => null]);
+
+            // Revert the RecoveryItems
+            RecoveryItem::whereIn('id', $revertRecoveryIds)
+                ->update(['status' => 'waiting_approval']);
         }
     }
 
