@@ -32,13 +32,33 @@ class RoleMiddleware
             return $next($request);
         }
 
-        // 2. Check Admin role if requested explicitly
         $normalizedRoles = array_map('strtolower', $roles);
+
+        // 1b. Admin role
         if ($user->isAdmin() && in_array('admin', $normalizedRoles)) {
             return $next($request);
         }
 
-        // 3. Fallback to Legacy Role logic
+        // 1c. Section-based access for module dashboards (PPC / Quality / Production).
+        //     role:ppc has no ROLE_LEVEL_MAP entry, so position-hierarchy fallback
+        //     would 403 users whose section is the module but whose role string differs.
+        $sectionKeywordMap = [
+            'ppc'        => ['ppc'],
+            'quality'    => ['process quality'],
+            'production' => ['produksi', 'production'],
+        ];
+        foreach ($normalizedRoles as $requiredRole) {
+            $keywords = $sectionKeywordMap[$requiredRole] ?? [];
+            if (empty($keywords)) {
+                continue;
+            }
+            $section = strtolower($user->section ? $user->section->section_name : '');
+            if ($section !== '' && $this->sectionMatchesAny($section, $keywords)) {
+                return $next($request);
+            }
+        }
+
+        // 2. Legacy Role logic
         $userRole = $user->role;
         $normalizedUserRole = strtolower($userRole);
         if (str_starts_with($normalizedUserRole, 'leader') || $normalizedUserRole === 'shearing' || $normalizedUserRole === 'handwork') {
@@ -74,6 +94,16 @@ class RoleMiddleware
         }
 
         return $next($request);
+    }
+
+    private function sectionMatchesAny(string $section, array $keywords): bool
+    {
+        foreach ($keywords as $keyword) {
+            if (str_contains($section, $keyword)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function checkPositionHierarchy($user, array $normalizedRoles): bool

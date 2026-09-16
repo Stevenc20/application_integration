@@ -63,10 +63,13 @@ class AuthController extends Controller
         $sec = strtolower($user->section ? $user->section->section_name : '');
         $legacyRole = strtolower($user->role ?? '');
 
-        // Section-based redirects FIRST (PPC/Quality/Production need their dashboards)
-        if ($sec === 'ppc' || $legacyRole === 'ppc') return redirect()->route('ppc.dashboard');
-        if ($sec === 'quality' || $legacyRole === 'quality') return redirect()->route('quality.dashboard');
-        if ($sec === 'produksi' || $legacyRole === 'production') return redirect()->route('production.dashboard');
+        // Section-based redirects FIRST (PPC/Quality/Production need their dashboards).
+        // RoleMiddleware grants these routes to users whose SECTION matches the module
+        // keyword, so redirecting by section is safe (no 403). 'Incoming Quality' (IRM)
+        // must NOT match the quality module, hence the 'process quality' check.
+        if (str_contains($sec, 'ppc') || $legacyRole === 'ppc') return redirect()->route('ppc.dashboard');
+        if (str_contains($sec, 'process quality') || $legacyRole === 'quality') return redirect()->route('quality.dashboard');
+        if (str_contains($sec, 'produksi') || str_contains($sec, 'production') || $legacyRole === 'production') return redirect()->route('production.dashboard');
 
         if ($pos === 'tim member' || $legacyRole === 'operator') {
             return redirect()->route('operator.dashboard');
