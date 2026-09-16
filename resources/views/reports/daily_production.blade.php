@@ -582,6 +582,8 @@
 <script>
 let activeSignatureRole = null;
 const sigWorkDate = '{{ $date }}';
+const sigLineName = @json($selectedLineName);
+const sigShiftName = @json($selectedShift);
 const SIG_USER_ROLE = @json(strtolower(auth()->user()?->role ?? ''));
 const SIG_IS_SUPERADMIN = SIG_USER_ROLE === 'superadmin';
 
@@ -678,7 +680,7 @@ function saveSignature() {
     fetch('{{ $sigSaveUrl }}', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({ role: activeSignatureRole, signature: dataUrl, work_date: sigWorkDate })
+        body: JSON.stringify({ role: activeSignatureRole, signature: dataUrl, work_date: sigWorkDate, line_name: sigLineName, shift_name: sigShiftName })
     })
     .then(r => {
         if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Gagal menyimpan'); });
@@ -736,7 +738,7 @@ function deleteSignature(role) {
         fetch('{{ $sigDeleteUrl }}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-            body: JSON.stringify({ role: role, work_date: sigWorkDate })
+            body: JSON.stringify({ role: role, work_date: sigWorkDate, line_name: sigLineName, shift_name: sigShiftName })
         })
             .then(r => r.json())
             .then(d => { refreshSignatureStatus(); })
@@ -745,7 +747,7 @@ function deleteSignature(role) {
 }
 
 function refreshSignatureStatus() {
-    fetch('{{ $sigStatusUrl }}?work_date=' + encodeURIComponent(sigWorkDate))
+    fetch('{{ $sigStatusUrl }}?work_date=' + encodeURIComponent(sigWorkDate) + '&line_name=' + encodeURIComponent(sigLineName) + '&shift_name=' + encodeURIComponent(sigShiftName))
         .then(r => r.json())
         .then(status => {
             const chain = ['teamleader', 'foreman', 'supervisor'];
@@ -783,7 +785,7 @@ function refreshSignatureStatus() {
 
 document.addEventListener('DOMContentLoaded', function() {
     @foreach (['supervisor','foreman','teamleader'] as $role)
-    fetch('{{ $sigGetUrl }}?role={{ $role }}&work_date=' + encodeURIComponent(sigWorkDate))
+    fetch('{{ $sigGetUrl }}?role={{ $role }}&work_date=' + encodeURIComponent(sigWorkDate) + '&line_name=' + encodeURIComponent(sigLineName) + '&shift_name=' + encodeURIComponent(sigShiftName))
         .then(r => r.json())
         .then(d => {
             if (d.signature) {
