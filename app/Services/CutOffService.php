@@ -20,9 +20,67 @@ class CutOffService
         $stats = ['created' => 0, 'skipped' => 0, 'total_unfinished' => 0];
 
         DB::transaction(function () use ($date, $shiftName, &$stats) {
+            $stats['carried'] = 0;
+            $stats['cancelled'] = 0;
+
+            // --- Phase 1: Handle existing 'continue' items ---
+            $continueItems = RecoveryItem::where('status', 'continue')
+                ->whereDate('source_date', $date)
+                ->where('source_shift', $shiftName)
+                ->get();
+
+            $nextShiftName = $shiftName === 'Shift Pagi' ? 'Shift Malam' : 'Shift Pagi';
+            $nextDate = $shiftName === 'Shift Pagi' ? $date : \Carbon\Carbon::parse($date)->addDay()->toDateString();
+
+            foreach ($continueItems as $item) {
+                $linkedPlan = $item->production_plan_id ? \App\Models\ProductionPlan::find($item->production_plan_id) : null;
+                $actualQty = $linkedPlan ? (float)($linkedPlan->ok ?? 0) : 0;
+                $planQty = $linkedPlan ? (float)($linkedPlan->plan ?? 0) : (float)$item->plan_qty;
+
+                if ($actualQty >= $planQty) {
+                    $item->update(['status' => 'completed']);
+                    $stats['cancelled']++;
+                    continue;
+                }
+
+                $recoveryQty = max(0, $planQty - $actualQty);
+
+                $item->update([
+                    'status' => 'scheduled',
+                    'source_date' => $nextDate,
+                    'source_shift' => $nextShiftName,
+                    'recovery_qty' => $recoveryQty
+                ]);
+
+                \App\Models\ProductionPlan::create([
+                    'line_master_id' => $linkedPlan ? $linkedPlan->line_master_id : 1,
+                    'plan_date' => $nextDate,
+                    'shift_name' => $nextShiftName,
+                    'press_name' => $item->press_name,
+                    'row_type' => 'job',
+                    'job_no' => $item->job_no,
+                    'job_master' => $item->job_master ?? $item->job_name,
+                    'plan' => $recoveryQty,
+                    'ct_detik' => $item->ct_detik,
+                    'dct' => $item->dct,
+                    'total_mesin' => $item->total_mesin,
+                    'source_type' => 'recovery',
+                    'recovery_id' => $item->id,
+                    'row_no' => 9999, // push to end
+                ]);
+
+                $stats['carried']++;
+            }
+
+            $existingPlanIds = RecoveryItem::whereIn('status', ['waiting_approval', 'scheduled', 'in_production', 'continue'])
+                ->pluck('production_plan_id')
+                ->filter()
+                ->toArray();
+
             $unfinishedPlans = ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $shiftName)
                 ->where('row_type', 'job')
+                ->whereNotIn('id', $existingPlanIds)
                 ->where(function ($q) {
                     $q->whereRaw('COALESCE(ok, 0) < COALESCE(plan, 0)')
                       ->orWhereNull('ok');

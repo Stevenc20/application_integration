@@ -28,6 +28,17 @@ class ProductionService
                 ]
             );
 
+            // Clear skipped_at if this plan was previously skipped
+            $planId = $this->resolvePlanId($jobId);
+            if ($planId) {
+                $plan = \App\Models\ProductionPlan::find($planId);
+                if ($plan && $plan->skipped_at !== null) {
+                    $plan->skipped_at = null;
+                    $plan->status = 'approved';
+                    $plan->save();
+                }
+            }
+
             $session->status = 'running';
             $session->save();
 
@@ -391,9 +402,9 @@ class ProductionService
     /**
      * Finish a job and sync metrics.
      */
-    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null)
+    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null, array $skippedActions = [])
     {
-        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject) {
+        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions) {
             // Auto-close any active downtimes for this job
             Downtime::where('job_master_id', $jobId)
                 ->whereNull('finish_time')
@@ -452,7 +463,7 @@ class ProductionService
             );
 
             // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
-            if ($nextJobId === 'STOP_SESSION') {
+            if ($nextJobId === 'STOP_SESSION' || $nextJobId === 'FINISH_ONLY') {
                 $resolvedNextJobId = null;
             } else {
                 $resolvedNextJobId = $nextJobId;
@@ -470,7 +481,78 @@ class ProductionService
 
             $this->signalDashboard($jobId);
 
-            return $runtime;
+            // --- Auto-recovery: queue short-of-plan items ---
+            $planId = $this->resolvePlanId($jobId);
+            $mismatch = null;
+            $autoRecoveryItem = null;
+            $job = \App\Models\JobMaster::find($jobId);
+            $actualQty = $finalOk ?? 0;
+
+            if ($planId) {
+                $parts = explode('-', $job->job_number);
+                $embeddedPlanId = end($parts);
+                if (is_numeric($embeddedPlanId) && $planId != $embeddedPlanId) {
+                    $mismatch = [
+                        'embedded_plan_id' => (int) $embeddedPlanId,
+                        'resolved_plan_id' => $planId,
+                    ];
+                }
+
+                $plan = \App\Models\ProductionPlan::find($planId);
+                if ($plan) {
+                    $planQty = (float) ($plan->plan ?? 0);
+                    if ($planQty > 0 && $actualQty < $planQty) {
+                        $recoveryQty = $planQty - $actualQty;
+                        $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQty, $recoveryQty, 'waiting_approval');
+                    }
+                }
+            }
+
+            if (!$planId && !$mismatch && !$autoRecoveryItem) {
+                $recoveryQty = (float) ($job->target_qty ?? 0) - $actualQty;
+                if ($recoveryQty < 0) $recoveryQty = 0;
+                $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQty, $recoveryQty, 'waiting_approval', true);
+            }
+
+            if ($autoRecoveryItem) {
+                $this->notifyPpcUsers($job, $autoRecoveryItem);
+            }
+
+            // --- Handle skipped jobs ---
+            $skippedResult = [];
+            foreach ($skippedActions as $skippedJobId => $action) {
+                $skippedJob = \App\Models\JobMaster::find($skippedJobId);
+                if (!$skippedJob) continue;
+
+                $skippedPlanId = $this->resolvePlanId($skippedJobId);
+                $skippedPlan = $skippedPlanId ? \App\Models\ProductionPlan::find($skippedPlanId) : null;
+                $status = $action === 'continue' ? 'continue' : 'waiting_approval';
+
+                if ($skippedPlan) {
+                    $planQty = (float) ($skippedPlan->plan ?? 0);
+                    $recoveryQty = $planQty;
+                    $recoveryItem = $this->createRecoveryItem($skippedPlan, $skippedJob, 0, $recoveryQty, $status);
+                    $skippedPlan->skipped_at = now();
+                    $skippedPlan->save();
+                } else {
+                    $recoveryQty = (float) ($skippedJob->target_qty ?? 0);
+                    $recoveryItem = $this->createRecoveryItem(null, $skippedJob, 0, $recoveryQty, $status);
+                }
+
+                $skippedResult[] = [
+                    'job_id' => $skippedJobId,
+                    'action' => $action,
+                    'recovery_id' => $recoveryItem->id,
+                ];
+
+                $this->notifyPpcUsers($skippedJob, $recoveryItem);
+            }
+
+            return [
+                'runtime' => $runtime,
+                'mismatch' => $mismatch,
+                'skipped' => $skippedResult
+            ];
         });
     }
 
@@ -680,6 +762,77 @@ class ProductionService
                 'efficiency' => $efficiency
             ];
         });
+    }
+
+    private function resolvePlanId($jobId): ?int
+    {
+        $job = \App\Models\JobMaster::find($jobId);
+        if (!$job) return null;
+
+        $parts = explode('-', $job->job_number);
+        $planId = end($parts);
+
+        if (is_numeric($planId)) {
+            $exists = \App\Models\ProductionPlan::where('id', $planId)->exists();
+            if ($exists) {
+                return (int) $planId;
+            }
+        }
+
+        $jobPrefix = count($parts) > 1 ? implode('-', array_slice($parts, 0, -1)) : $job->job_number;
+        $plan = \App\Models\ProductionPlan::whereDate('plan_date', now()->toDateString())
+            ->where('row_type', 'job')
+            ->where('job_no', $jobPrefix)
+            ->first();
+
+        return $plan?->id;
+    }
+
+    private function createRecoveryItem($plan, $job, $actualOk, $recoveryQty, $status, $isUnresolvable = false)
+    {
+        $date = now()->toDateString();
+        $shiftName = $this->getShift();
+        $schedule = \App\Models\RecoverySchedule::firstOrCreate(
+            [
+                'plan_date' => $date,
+                'shift_name' => $shiftName,
+                'press_name' => $plan ? $plan->press_name : $job->line,
+            ],
+            ['status' => 'waiting_approval']
+        );
+
+        return \App\Models\RecoveryItem::create([
+            'recovery_schedule_id' => $schedule->id,
+            'production_plan_id' => $plan ? $plan->id : null,
+            'job_no' => $job->job_number,
+            'job_name' => $job->job_name,
+            'job_master' => $job->job_name,
+            'press_name' => $plan ? $plan->press_name : $job->line,
+            'line' => $job->line,
+            'plan_qty' => $plan ? (float) ($plan->plan ?? 0) : (float) ($job->target_qty ?? $recoveryQty),
+            'ok' => $actualOk,
+            'repair' => 0,
+            'reject' => 0,
+            'ct_detik' => $plan ? (float) ($plan->ct_detik ?? 0) : 0,
+            'dct' => $plan ? (float) ($plan->dct ?? 0) : 0,
+            'total_mesin' => $plan ? (int) ($plan->total_mesin ?? 1) : 1,
+            'original_date' => $date,
+            'original_shift_name' => $shiftName,
+            'source_date' => $date,
+            'source_shift' => $shiftName,
+            'actual_qty' => $actualOk,
+            'recovery_qty' => $recoveryQty,
+            'queued_at' => now(),
+            'status' => $status
+        ]);
+    }
+
+    private function notifyPpcUsers($job, $recoveryItem)
+    {
+        $ppcUsers = \App\Models\User::where('role', 'like', '%ppc%')->get();
+        foreach ($ppcUsers as $user) {
+            $user->notify(new \App\Notifications\ItemTidakTercapaiNotification($job, $recoveryItem));
+        }
     }
 
     /**
