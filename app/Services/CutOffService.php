@@ -15,15 +15,25 @@ class CutOffService
      * Finds production plans where ok < plan (unfinished items)
      * and creates pending RecoveryItems for them.
      */
-    public function processCutOff(string $date, string $shiftName): array
+    public function processCutOff(string $date, string $shiftName, $lineId = null, $shiftMasterId = null, $actualCutoffTime = null): array
     {
         $stats = ['created' => 0, 'skipped' => 0, 'total_unfinished' => 0, 'carried' => 0, 'cancelled' => 0];
 
-        DB::transaction(function () use ($date, $shiftName, &$stats) {
-            $unfinishedPlans = ProductionPlan::whereDate('plan_date', $date)
-                ->where('shift_name', $shiftName)
-                ->where('row_type', 'job')
-                ->where(function ($q) {
+        DB::transaction(function () use ($date, $shiftName, $lineId, $shiftMasterId, &$stats) {
+            $query = ProductionPlan::whereDate('plan_date', $date)
+                ->where('row_type', 'job');
+                
+            if ($lineId) {
+                $query->where('line_master_id', $lineId);
+            }
+            
+            if ($shiftMasterId) {
+                $query->where('shift_master_id', $shiftMasterId);
+            } else {
+                $query->where('shift_name', 'like', "%" . (str_contains(strtoupper($shiftName), 'MALAM') ? 'Malam' : 'Pagi') . "%");
+            }
+            
+            $unfinishedPlans = $query->where(function ($q) {
                     $q->whereRaw('COALESCE(ok, 0) < COALESCE(plan, 0)')
                       ->orWhereNull('ok');
                 })
@@ -64,14 +74,11 @@ class CutOffService
                     ]
                 );
 
-                RecoveryItem::firstOrCreate(
-                    [
+                RecoveryItem::create([
+                        'production_plan_id'   => $plan->id,
                         'recovery_schedule_id' => $schedule->id,
                         'job_no'               => trim($plan->job_no ?? ''),
                         'press_name'           => $plan->press_name,
-                    ],
-                    [
-                        'production_plan_id' => $plan->id,
                         'job_master'         => $plan->job_master ?? trim($plan->job_no ?? ''),
                         'plan_qty'           => $planQty,
                         'ok'                 => $actualQty,

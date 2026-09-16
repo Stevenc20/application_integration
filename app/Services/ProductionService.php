@@ -362,9 +362,54 @@ class ProductionService
     /**
      * Resume a paused job.
      */
-    public function resumeJob($jobId)
+    public function resumeJob($jobId, array $typesToClose = [])
     {
-        return DB::transaction(function () use ($jobId) {
+        return DB::transaction(function () use ($jobId, $typesToClose) {
+            // P0.2 - BREAKTIME STATE SYNC:
+            // 1. CONCURRENCY: Lock the rows to prevent race conditions
+            $query = Downtime::where('job_master_id', $jobId)->whereNull('finish_time')->lockForUpdate();
+            
+            if (empty($typesToClose)) {
+                $query->whereNotIn('jenis_downtime', ['dandori', 'try out', 'tryout', '1st check', '1st_check']);
+            } else {
+                $query->whereIn('jenis_downtime', $typesToClose);
+            }
+            
+            $unclosedDowntimes = $query->get();
+            $hasClosedDowntime = false;
+            $finishedAt = now(); // 2. TIMESTAMP CONSISTENCY
+            
+            foreach ($unclosedDowntimes as $dt) {
+                $startTime = \Carbon\Carbon::parse($dt->start_time);
+                $durationSeconds = $finishedAt->diffInSeconds($startTime);
+                if ($durationSeconds < 0) $durationSeconds = 0; // Guard against negative diffs instead of hiding with abs()
+                
+                $dt->update([
+                    'finish_time' => $finishedAt,
+                    'duration_seconds' => $durationSeconds
+                ]);
+                $hasClosedDowntime = true;
+            }
+
+            if ($hasClosedDowntime) {
+                // 3. SHIFT BOUNDARY: Use logical work_date, not just today's created_at
+                $logicalWorkDate = (int)$finishedAt->format('H') < 7 || ((int)$finishedAt->format('H') == 7 && (int)$finishedAt->format('i') < 30) 
+                    ? $finishedAt->copy()->subDay()->toDateString() 
+                    : $finishedAt->toDateString();
+
+                // Sum all downtime for this job within the same logical work_date shift
+                // (Using start_time to properly align with the shift boundary)
+                $totalDowntime = Downtime::where('job_master_id', $jobId)
+                    ->whereRaw('DATE(DATE_SUB(start_time, INTERVAL 7 HOUR 30 MINUTE)) = ?', [\Carbon\Carbon::parse($logicalWorkDate)->format('Y-m-d')])
+                    ->where('jenis_downtime', '!=', 'dandori')
+                    ->sum('duration_seconds');
+
+                DailyProduction::updateOrCreate(
+                    ['job_master_id' => $jobId, 'work_date' => $logicalWorkDate],
+                    ['downtime_seconds' => $totalDowntime]
+                );
+            }
+
             $session = ProductionSession::where('job_master_id', $jobId)
                 ->whereDate('work_date', now()->toDateString())
                 ->first();

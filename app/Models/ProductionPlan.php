@@ -6,6 +6,20 @@ use Illuminate\Database\Eloquent\Model;
 
 class ProductionPlan extends Model
 {
+    protected static function boot()
+    {
+        parent::boot();
+
+        static::saving(function ($plan) {
+            if ($plan->shift_name && empty($plan->shift_master_id)) {
+                $master = \App\Models\MasterShift::where('name', 'like', '%' . (str_contains(strtoupper($plan->shift_name), 'MALAM') ? 'Malam' : 'Pagi') . '%')->first();
+                if ($master) {
+                    $plan->shift_master_id = $master->id;
+                }
+            }
+        });
+    }
+
     protected $fillable = [
         'line_master_id',
         'target_qty',

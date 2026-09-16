@@ -1251,20 +1251,54 @@ class InputHarianController extends Controller
 
     public function submitShift(Request $request, $lineId)
     {
-        return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $lineId) {
         try {
-            $date = $this->getLogicalDate($request->get('date'));
+            return \Illuminate\Support\Facades\DB::transaction(function () use ($request, $lineId) {
+                $date = $this->getLogicalDate($request->get('date'));
             $shift = $request->get('shift');
+
+            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineId)));
+            $lineMaster = \App\Models\LineMaster::whereRaw("
+                REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+            ", ["%{$normalized}%"])->first();
+            if (!$lineMaster) {
+                $lineMaster = \App\Models\LineMaster::where('line_name', 'LIKE', "%{$normalized}%")->first();
+            }
+            $lineMasterId = $lineMaster?->id ?? throw new \Exception("Line '{$lineId}' not found");
+
+            $shiftMasterId = $request->get('shift_master_id');
+            if (!$shiftMasterId) {
+                // Legacy Import Mapping for older frontend versions
+                $master = \App\Models\MasterShift::where('name', 'like', '%' . (str_contains(strtoupper($shift ?? ''), 'MALAM') ? 'Malam' : 'Pagi') . '%')->first();
+                $shiftMasterId = $master?->id;
+            }
+
+            // Idempotency Check with row locking
+            $existing = \App\Models\ShiftSubmission::where([
+                'line_id' => $lineMasterId,
+                'work_date' => $date,
+                'shift_master_id' => $shiftMasterId
+            ])->lockForUpdate()->first();
+
+            if ($existing) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Shift sudah disubmit sebelumnya (Idempotent).',
+                    'recovered' => 0,
+                ]);
+            }
 
             $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
-            if ($shift) {
-                $planQuery->where('shift_name', 'like', "{$shift}%");
+            if ($shiftMasterId) {
+                $planQuery->where('shift_master_id', $shiftMasterId);
+            } else {
+                if ($shift) {
+                    $planQuery->where('shift_name', 'like', "{$shift}%");
+                }
             }
 
-            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineId)));
             $planQuery->whereRaw("
                 REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
             ", ["%{$normalized}%"]);
@@ -1360,31 +1394,35 @@ class InputHarianController extends Controller
                 ], 422);
             }
 
-            // All valid — create submission record
-            $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineId)));
-            $lineMaster = \App\Models\LineMaster::whereRaw("
-                REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
-            ", ["%{$normalizedLine}%"])->first();
-            if (!$lineMaster) {
-                $lineMaster = \App\Models\LineMaster::where('line_name', 'LIKE', "%{$normalizedLine}%")->first();
-            }
-            \App\Models\ShiftSubmission::create([
-                'line_id' => $lineMaster?->id ?? throw new \Exception("Line '{$lineId}' not found"),
-                'work_date' => $date,
-                'shift' => $shift ? ($shift === 'Shift Malam' ? 2 : 1) : 1,
-                'submitted_by' => auth()->id(),
-            ]);
-
-            // Auto-recovery: create pending RecoveryItems for every plan item
-            // not meeting target (ok < plan), so the shift can finalize even
-            // when multiple items are not achieved.
-            $shiftName = $shift ? (str_contains(strtoupper($shift), 'MALAM') ? 'Shift Malam' : 'Shift Pagi') : 'Shift Pagi';
-            $recovered = 0;
+            // All valid - create submission record (Atomic insertion)
+            $actualCutoffTime = now();
+            
             try {
-                $recovered = app(\App\Services\CutOffService::class)->processCutOff($date, $shiftName)['created'] ?? 0;
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('[SHIFT SUBMIT] Auto-recovery failed', ['error' => $e->getMessage()]);
+                \App\Models\ShiftSubmission::create([
+                    'line_id' => $lineMasterId,
+                    'work_date' => $date,
+                    'shift' => $shift ? ($shift === 'Shift Malam' ? 2 : 1) : 1,
+                    'shift_master_id' => $shiftMasterId,
+                    'submitted_by' => auth()->id(),
+                ]);
+            } catch (\Exception $e) {
+                // If unique constraint violation occurs due to exact concurrent request passing lock
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Shift sudah disubmit (Concurrent safety).',
+                    'recovered' => 0,
+                ]);
             }
+
+            // Auto-recovery
+            $shiftName = $shiftMasterId 
+                ? (\App\Models\MasterShift::find($shiftMasterId)?->name ?? 'Shift Pagi')
+                : ($shift ? (str_contains(strtoupper($shift), 'MALAM') ? 'Shift Malam' : 'Shift Pagi') : 'Shift Pagi');
+            $recovered = 0;
+            
+            // Pass $lineMasterId, $shiftMasterId, and $actualCutoffTime to processCutOff
+            // Let any exception bubble up to trigger the DB transaction rollback
+            $recovered = app(\App\Services\CutOffService::class)->processCutOff($date, $shiftName, $lineMasterId, $shiftMasterId, $actualCutoffTime)['created'] ?? 0;
 
             \Illuminate\Support\Facades\Log::info("[SHIFT SUBMIT] Shift submitted", [
                 'line' => $lineId,
@@ -1399,14 +1437,14 @@ class InputHarianController extends Controller
                 'message' => 'Shift berhasil disubmit!',
                 'recovered' => $recovered,
             ]);
+            }); // End of DB::transaction
         } catch (\Throwable $e) {
             \Illuminate\Support\Facades\Log::error('[SHIFT SUBMIT] Error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Terjadi kesalahan sistem atau Recovery gagal. Transaksi dibatalkan. (' . $e->getMessage() . ')',
             ], 500);
         }
-        });
     }
 
     public function productionAudit(Request $request)
