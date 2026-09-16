@@ -47,7 +47,7 @@ class DashboardController extends Controller
         return view('production.dashboard', compact(
             'totalOk', 'totalRepair', 'totalReject', 'totalProduction',
             'targetQty', 'achievementPercent', 'rejectRate',
-            'lineSummaries', 'downtimeToday', 'recent   Production', 'today'
+            'lineSummaries', 'downtimeToday', 'recentProduction', 'today'
         ));
     }
 }
