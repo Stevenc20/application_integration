@@ -973,7 +973,7 @@ class ReportController extends Controller
         $canEdit = in_array($userRole, ['foreman', 'superadmin']);
 
         $authorizedScope = false;
-        if ($userRole === 'superadmin') {
+        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             $authorizedScope = true;
         } else {
             $authId = auth()->id();
@@ -1003,7 +1003,7 @@ class ReportController extends Controller
         $leaderSigned = in_array('teamleader', $signedRoles);
         $foremanSigned = in_array('foreman', $signedRoles);
 
-        if ($userRole === 'superadmin') {
+        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             $ttdLocked = false;
         } elseif ($userRole === 'foreman') {
             $ttdLocked = !($leaderSigned && !$foremanSigned);
