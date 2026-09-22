@@ -1,7 +1,7 @@
 @php
     $dashboardActive = request()->routeIs('super-admin.dashboard');
-    $userActive = request()->routeIs('super-admin.users.*');
-    $featureActive = request()->routeIs('super-admin.features.*');
+    $userActive = request()->routeIs('access-management.users.*');
+    $featureActive = request()->routeIs('access-management.features.*');
     $assignmentActive = request()->routeIs('super-admin.assignments.*');
     $recycleBinActive = request()->routeIs('super-admin.recycle-bin.*');
 @endphp

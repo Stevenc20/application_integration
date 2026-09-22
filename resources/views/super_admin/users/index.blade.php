@@ -116,7 +116,7 @@
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
-        <form action="{{ route('super-admin.users.store') }}" method="POST" class="space-y-4">
+        <form action="{{ route('access-management.users.store') }}" method="POST" class="space-y-4">
             @csrf
             <div>
                 <label class="text-sm font-medium text-gray-700">Name</label>
