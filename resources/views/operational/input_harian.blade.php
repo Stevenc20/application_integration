@@ -686,12 +686,21 @@ function goToIssue(type, planId, jobMasterId, dtId) {
 </script>
 
 @php
-    $peLegacyFiles = glob(public_path('build/assets/production-engine-legacy-*.js'));
-    if (!empty($peLegacyFiles)) {
-        usort($peLegacyFiles, function($a, $b) {
-            return filemtime($b) - filemtime($a);
-        });
-        echo '<script src="' . asset('build/assets/' . basename($peLegacyFiles[0])) . '"></script>';
+    // Load Production Engine JS without depending on a built asset.
+    // After `git pull`, the source below always powers the Dandori buttons even
+    // if public/build is missing or stale (public/build is gitignored).
+    $peSource = resource_path('js/operational/production-engine.js');
+    $peSourceMtime = file_exists($peSource) ? filemtime($peSource) : 0;
+    $peLegacy = glob(public_path('build/assets/production-engine-legacy-*.js'));
+    $peBest = null;
+    if (!empty($peLegacy)) {
+        usort($peLegacy, function ($a, $b) { return filemtime($b) - filemtime($a); });
+        $peBest = $peLegacy[0];
+    }
+    if ($peBest !== null && filemtime($peBest) >= $peSourceMtime) {
+        echo '<script src="' . asset('build/assets/' . basename($peBest)) . '"></script>';
+    } elseif ($peSourceMtime > 0) {
+        echo '<script>' . file_get_contents($peSource) . '</script>';
     }
 @endphp
 @endsection
