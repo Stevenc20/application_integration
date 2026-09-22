@@ -425,7 +425,7 @@
                                 <th colspan="2" class="group-border">CT Actual</th>
                                 <th class="group-border">Press Time</th>
                                 <th colspan="3" class="group-border">Uchi Dandori</th>
-                                <th colspan="6" class="group-border">Down Time</th>
+                                <th colspan="7" class="group-border">Down Time</th>
                                 <th colspan="2" class="group-border">TPT</th>
                                 <th colspan="2" class="group-border">Break</th>
                                 <th class="group-border">Work Time</th>
@@ -457,6 +457,7 @@
                                 <th style="width:55px">Material</th>
                                 <th style="width:55px">Log</th>
                                 <th style="width:60px">Production</th>
+                                <th style="width:55px">Others</th>
                                 <th style="width:55px" class="group-border">Total</th>
                                 <th style="width:50px">Plan</th>
                                 <th style="width:50px" class="group-border">Actual</th>

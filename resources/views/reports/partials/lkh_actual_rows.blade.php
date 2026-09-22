@@ -42,7 +42,7 @@
                 </span>
                 @endif
             </td>
-            <td colspan="24" class="font-bold text-amber-700 text-center">
+            <td colspan="25" class="font-bold text-amber-700 text-center">
                 @if ($job['schedule_start'] && $job['schedule_finish'])
                 <span class="px-2 py-0.5 rounded-full bg-white border border-amber-200 text-[10px] font-bold text-amber-700">
                     {{ abs($job['schedule_finish']->diffInMinutes($job['schedule_start'])) }} MINS
@@ -81,6 +81,7 @@
             $dtMatl = $job['dt_breakdown']['mat_t'] ?? 0;
             $dtLog = $job['dt_breakdown']['log_t'] ?? 0;
             $dtProd = $job['dt_breakdown']['prod_t'] ?? 0;
+            $dtOth = $job['dt_breakdown']['others_t'] ?? 0;
             $dtTotal = $job['dt_total'] ?? 0;
             $planId = $job['plan_id'] ?? 0;
         @endphp
@@ -108,6 +109,7 @@
             {!! $editTd($planId, 'dt_material', 'mins', $dtMatl, \App\Support\ProductionFormat::minutes($dtMatl), 'cell-qty') !!}
             {!! $editTd($planId, 'dt_log', 'mins', $dtLog, \App\Support\ProductionFormat::minutes($dtLog), 'cell-qty') !!}
             {!! $editTd($planId, 'dt_production', 'mins', $dtProd, \App\Support\ProductionFormat::minutes($dtProd), 'cell-qty') !!}
+            {!! $editTd($planId, 'dt_others', 'mins', $dtOth, \App\Support\ProductionFormat::minutes($dtOth), 'cell-qty') !!}
             <td class="cell-qty font-bold">
                 @if ($planId && $dtTotal > 0)
                 <a href="{{ route('monitoring.history', ['type' => 'downtime', 'plan_id' => $planId, 'date' => $date]) }}" class="text-blue-600 hover:underline" title="Lihat detail downtime">DT</a>
@@ -132,7 +134,7 @@
         </tr>
         @endif
     @empty
-        <tr><td colspan="34" class="text-center py-8 text-gray-500 font-bold">Tidak ada jadwal produksi</td></tr>
+        <tr><td colspan="35" class="text-center py-8 text-gray-500 font-bold">Tidak ada jadwal produksi</td></tr>
     @endforelse
 </tbody>
 @php
@@ -154,6 +156,7 @@
     $tDtMatl = $actRows->sum(fn($r) => $r['dt_breakdown']['mat_t'] ?? 0);
     $tDtLog = $actRows->sum(fn($r) => $r['dt_breakdown']['log_t'] ?? 0);
     $tDtProd = $actRows->sum(fn($r) => $r['dt_breakdown']['prod_t'] ?? 0);
+    $tDtOth = $actRows->sum(fn($r) => $r['dt_breakdown']['others_t'] ?? 0);
     $tDtTotal = $actRows->sum(fn($r) => $r['dt_total'] ?? 0);
     $tActPassRate = $tActStroke > 0 ? ($tActGood / $tActStroke * 100) : 0;
     $tActRepRate = $tActStroke > 0 ? ($tActRepair / $tActStroke * 100) : 0;
@@ -183,6 +186,7 @@
         <td class="cell-qty font-bold">@fmtMin($tDtMatl)</td>
         <td class="cell-qty font-bold">@fmtMin($tDtLog)</td>
         <td class="cell-qty font-bold">@fmtMin($tDtProd)</td>
+        <td class="cell-qty font-bold">@fmtMin($tDtOth)</td>
         <td class="cell-qty font-bold">@fmtMin($tDtTotal)</td>
         <td class="cell-qty font-bold">@fmtMin($tActTptPlan)</td>
         <td class="cell-qty font-bold">@fmtMin($tActTpt)</td>

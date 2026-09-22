@@ -174,7 +174,7 @@
                 <th colspan="2" style="border-right:1px solid #7a1414;">CT</th>
                 <th style="border-right:1px solid #7a1414;">Press</th>
                 <th colspan="4" style="border-right:1px solid #7a1414;">Uchi Dandori</th>
-                <th colspan="5" style="border-right:1px solid #7a1414;">Down Time</th>
+                <th colspan="6" style="border-right:1px solid #7a1414;">Down Time</th>
                 <th colspan="2" style="border-right:1px solid #7a1414;">TPT</th>
                 <th colspan="2" style="border-right:1px solid #7a1414;">Break</th>
                 <th style="border-right:1px solid #7a1414;">Work</th>
@@ -193,7 +193,7 @@
                 <th style="border-right:1px solid #7a1414;">Menit</th>
                 <th>Dies</th><th>Var</th><th>1stQ</th>
                 <th style="border-right:1px solid #7a1414;">Dan</th>
-                <th>M/C</th><th>Mat</th><th>Log</th><th>Prod</th>
+                <th>M/C</th><th>Mat</th><th>Log</th><th>Prod</th><th>Oth</th>
                 <th style="border-right:1px solid #7a1414;">Total</th>
                 <th>Plan</th><th style="border-right:1px solid #7a1414;">Act</th>
                 <th>Typ</th><th style="border-right:1px solid #7a1414;">Min</th>
@@ -208,7 +208,7 @@
             @php
                 $actNo = 0;
                 $aPlan = 0; $aGood = 0; $aRep = 0; $aRej = 0; $aStroke = 0;
-                $aDan = 0; $aQc = 0; $aDtM = 0; $aDtMat = 0; $aDtLog = 0; $aDtProd = 0; $aDtTot = 0;
+                $aDan = 0; $aQc = 0; $aDtM = 0; $aDtMat = 0; $aDtLog = 0; $aDtProd = 0; $aDtOth = 0; $aDtTot = 0;
                 $aTptP = 0; $aTptA = 0; $aBreak = 0; $aWork = 0;
             @endphp
             @forelse($jobsData as $job)
@@ -238,7 +238,8 @@
                         $dtMatl = (float)($dtBd['mat_t'] ?? 0);
                         $dtLog  = (float)($dtBd['log_t'] ?? 0);
                         $dtProd = (float)($dtBd['prod_t'] ?? 0);
-                        $dtTot  = $dtMach + $dtMatl + $dtLog + $dtProd;
+                        $dtOth  = (float)($dtBd['others_t'] ?? 0);
+                        $dtTot  = $dtMach + $dtMatl + $dtLog + $dtProd + $dtOth;
                         $tptPlan = (float)($job['tpt_plan'] ?? 0);
                         $tptActual = (float)($job['tpt_act'] ?? 0);
                         $breakTime = (float)($job['break_time_duration'] ?? 0);
@@ -251,7 +252,7 @@
 
                         $aPlan += $planQ; $aGood += $actGood; $aRep += $actRep; $aRej += $actRej;
                         $aStroke += $totalS; $aDan += $dctAct; $aQc += intval($job['qcheck_time'] ?? 0); $aDtM += $dtMach;
-                        $aDtMat += $dtMatl; $aDtLog += $dtLog; $aDtProd += $dtProd; $aDtTot += $dtTot;
+                        $aDtMat += $dtMatl; $aDtLog += $dtLog; $aDtProd += $dtProd; $aDtOth += $dtOth; $aDtTot += $dtTot;
                         $aTptP += $tptPlan; $aTptA += $tptActual;
                         $aBreak += $breakTime; $aWork += $workTime;
 
@@ -272,7 +273,7 @@
                     <td>-</td><td style="border-right:1px solid #7a1414;">-</td>
                     <td style="border-right:1px solid #7a1414;">-</td>
                     <td>-</td><td>-</td><td>-</td><td style="border-right:1px solid #7a1414;">-</td>
-                    <td>-</td><td>-</td><td>-</td><td>-</td><td style="border-right:1px solid #7a1414;">-</td>
+                    <td>-</td><td>-</td><td>-</td><td>-</td><td>-</td><td style="border-right:1px solid #7a1414;">-</td>
                     <td>-</td><td style="border-right:1px solid #7a1414;">-</td>
                     <td>-</td><td style="border-right:1px solid #7a1414;">-</td>
                     <td style="border-right:1px solid #7a1414;">-</td>
@@ -303,6 +304,7 @@
                     <td>{{ \App\Support\ProductionFormat::minutes($dtMatl) }}</td>
                     <td>{{ \App\Support\ProductionFormat::minutes($dtLog) }}</td>
                     <td>{{ \App\Support\ProductionFormat::minutes($dtProd) }}</td>
+                    <td>{{ \App\Support\ProductionFormat::minutes($dtOth) }}</td>
                     <td class="b" style="border-right:1px solid #7a1414;">{{ \App\Support\ProductionFormat::minutes($dtTot) }}</td>
                     <td>{{ \App\Support\ProductionFormat::minutes($tptPlan) }}</td>
                     <td class="b" style="border-right:1px solid #7a1414;">{{ \App\Support\ProductionFormat::minutes($tptActual) }}</td>
@@ -317,7 +319,7 @@
                 </tr>
                 @endif
             @empty
-                <tr><td colspan="34" style="color:#9ca3af;padding:8pt;">Tidak ada jadwal produksi</td></tr>
+                <tr><td colspan="35" style="color:#9ca3af;padding:8pt;">Tidak ada jadwal produksi</td></tr>
             @endforelse
         </tbody>
         @php
@@ -350,6 +352,7 @@
                 <td>{{ \App\Support\ProductionFormat::minutes($aDtMat) }}</td>
                 <td>{{ \App\Support\ProductionFormat::minutes($aDtLog) }}</td>
                 <td>{{ \App\Support\ProductionFormat::minutes($aDtProd) }}</td>
+                <td>{{ \App\Support\ProductionFormat::minutes($aDtOth) }}</td>
                 <td class="bb" style="border-right:1px solid #7a1414;">{{ \App\Support\ProductionFormat::minutes($aDtTot) }}</td>
                 <td>{{ \App\Support\ProductionFormat::minutes($aTptP) }}</td>
                 <td class="bb" style="border-right:1px solid #7a1414;">{{ \App\Support\ProductionFormat::minutes($aTptA) }}</td>

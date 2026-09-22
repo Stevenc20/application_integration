@@ -100,6 +100,7 @@
                             <option value="try out">Try Out</option>
                             <option value="break time">Break Time</option>
                             <option value="produksi">Produksi</option>
+                            <option value="others">Others</option>
                         </select>
                     </div>
                     <div>

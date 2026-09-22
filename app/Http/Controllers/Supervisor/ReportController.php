@@ -242,6 +242,7 @@ class ReportController extends Controller
             'downtime_matl' => 0.0,
             'downtime_log' => 0.0,
             'downtime_ubp' => 0.0,
+            'downtime_oth' => 0.0,
             'tpt_plan' => 0.0,
             'tpt_act' => 0.0,
         ];
@@ -407,7 +408,7 @@ class ReportController extends Controller
 
             $dandoriTime = 0.0;
             $downtimeTime = 0.0;
-            $dtBreakdown = ['prod_t' => 0.0, 'dies_t' => 0.0, 'mach_t' => 0.0, 'mat_t' => 0.0, 'log_t' => 0.0, 'ubp_t' => 0.0];
+            $dtBreakdown = ['prod_t' => 0.0, 'dies_t' => 0.0, 'mach_t' => 0.0, 'mat_t' => 0.0, 'log_t' => 0.0, 'ubp_t' => 0.0, 'others_t' => 0.0];
 
             $qcheckTime = 0.0;
             $diesChangeTime = 0.0;
@@ -432,6 +433,7 @@ class ReportController extends Controller
                     'mat_t' => $breakdownConfirmed['material'],
                     'log_t' => $breakdownConfirmed['logistic'],
                     'ubp_t' => $breakdownConfirmed['ubp'],
+                    'others_t' => $breakdownConfirmed['others'],
                 ];
                 $qcheckTime = $jobData->total_qcheck_minutes;
                 if ($jobDandoris) {
@@ -485,6 +487,7 @@ class ReportController extends Controller
                     'mat_t' => $breakdownConfirmed['material'],
                     'log_t' => $breakdownConfirmed['logistic'],
                     'ubp_t' => $breakdownConfirmed['ubp'],
+                    'others_t' => $breakdownConfirmed['others'],
                 ];
             }
 
@@ -736,6 +739,7 @@ class ReportController extends Controller
             $totals['downtime_matl'] += $dtBreakdown['mat_t'];
             $totals['downtime_log'] += $dtBreakdown['log_t'];
             $totals['downtime_ubp'] += $dtBreakdown['ubp_t'];
+            $totals['downtime_oth'] += $dtBreakdown['others_t'];
             $totals['total_panel_record_ct'] += $planCt;
             $totals['total_break_time'] += $jobBreakDuration;
             $totals['total_work_time'] += $workTimeDuration;
@@ -1026,7 +1030,7 @@ class ReportController extends Controller
             'actual_good', 'actual_repair', 'actual_reject',
             'actual_start', 'actual_finish',
             'dandori_dies_variant', 'dandori_qcheck', 'dandori_total',
-            'dt_dies', 'dt_machine', 'dt_material', 'dt_log', 'dt_production',
+            'dt_dies', 'dt_machine', 'dt_material', 'dt_log', 'dt_production', 'dt_others',
         ];
 
         // 5. Normalize line name for lookup (e.g. "PRESS A" or "Line A" both find line_master press_name ~ 'PRESS A')
@@ -1250,6 +1254,7 @@ class ReportController extends Controller
             'dt_material'   => 'Material',
             'dt_log'        => 'Logistic',
             'dt_production' => 'Production',
+            'dt_others'     => 'Others',
         ];
         $targetJenis = $typeMap[$field] ?? $field;
 

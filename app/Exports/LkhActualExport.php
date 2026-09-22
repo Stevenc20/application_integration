@@ -23,7 +23,7 @@ class LkhActualExport
     protected $shiftDisplayStart;
     protected $shiftDisplayEnd;
 
-    const COLUMNS = 34;
+    const COLUMNS = 35;
     const RED = 'FF991B1B';
     const WHITE = 'FFFFFFFF';
     const LIGHT_GRAY = 'FFF9FAFB';
@@ -123,13 +123,13 @@ class LkhActualExport
             ['label' => 'CT Actual', 'colStart' => 13, 'colEnd' => 14],
             ['label' => 'Press Time', 'colStart' => 15, 'colEnd' => 15],
             ['label' => 'Uchi Dandori', 'colStart' => 16, 'colEnd' => 18],
-            ['label' => 'Down Time', 'colStart' => 19, 'colEnd' => 24],
-            ['label' => 'TPT', 'colStart' => 25, 'colEnd' => 26],
-            ['label' => 'Break', 'colStart' => 27, 'colEnd' => 28],
-            ['label' => 'Work Time', 'colStart' => 29, 'colEnd' => 29],
-            ['label' => 'Quality Rate', 'colStart' => 30, 'colEnd' => 32],
-            ['label' => 'OEE', 'colStart' => 33, 'colEnd' => 33],
-            ['label' => 'GSPH', 'colStart' => 34, 'colEnd' => 34],
+            ['label' => 'Down Time', 'colStart' => 19, 'colEnd' => 25],
+            ['label' => 'TPT', 'colStart' => 26, 'colEnd' => 27],
+            ['label' => 'Break', 'colStart' => 28, 'colEnd' => 29],
+            ['label' => 'Work Time', 'colStart' => 30, 'colEnd' => 30],
+            ['label' => 'Quality Rate', 'colStart' => 31, 'colEnd' => 33],
+            ['label' => 'OEE', 'colStart' => 34, 'colEnd' => 34],
+            ['label' => 'GSPH', 'colStart' => 35, 'colEnd' => 35],
         ];
 
         $groupStyle = [
@@ -177,17 +177,18 @@ class LkhActualExport
             21 => 'Material',
             22 => 'Log',
             23 => 'Production',
-            24 => 'Total',
-            25 => 'Plan',
-            26 => 'Actual',
-            27 => 'Type',
-            28 => 'Time',
-            29 => 'Work Time',
-            30 => 'Pass%',
-            31 => 'Rep%',
-            32 => 'Rej%',
-            33 => 'OEE (%)',
-            34 => 'GSPH',
+            24 => 'Others',
+            25 => 'Total',
+            26 => 'Plan',
+            27 => 'Actual',
+            28 => 'Type',
+            29 => 'Time',
+            30 => 'Work Time',
+            31 => 'Pass%',
+            32 => 'Rep%',
+            33 => 'Rej%',
+            34 => 'OEE (%)',
+            35 => 'GSPH',
         ];
 
         $colHeaderStyle = [
@@ -265,6 +266,7 @@ class LkhActualExport
             $dtMatl = $job['dt_breakdown']['mat_t'] ?? 0;
             $dtLog = $job['dt_breakdown']['log_t'] ?? 0;
             $dtProd = $job['dt_breakdown']['prod_t'] ?? 0;
+            $dtOth = $job['dt_breakdown']['others_t'] ?? 0;
             $dtTotal = $job['dt_total'] ?? 0;
 
             $timeCell = fn($dt) => $dt ? (is_string($dt) ? $dt : $dt->format('H:i')) : '-';
@@ -293,17 +295,18 @@ class LkhActualExport
                 21 => $dtMatl,
                 22 => $dtLog,
                 23 => $dtProd,
-                24 => $dtTotal,
-                25 => $tptPlan,
-                26 => $tptActual,
-                27 => $breakTime > 0 ? 'BREAK' : '-',
-                28 => $breakTime,
-                29 => $workTime,
-                30 => $passRate,
-                31 => $repairRate,
-                32 => $rejectRate,
-                33 => $oee,
-                34 => $gsphActual,
+                24 => $dtOth,
+                25 => $dtTotal,
+                26 => $tptPlan,
+                27 => $tptActual,
+                28 => $breakTime > 0 ? 'BREAK' : '-',
+                29 => $breakTime,
+                30 => $workTime,
+                31 => $passRate,
+                32 => $repairRate,
+                33 => $rejectRate,
+                34 => $oee,
+                35 => $gsphActual,
             ];
 
             $isAlt = $idx % 2 === 1;
@@ -350,6 +353,7 @@ class LkhActualExport
         $tDtMatl = $actRows->sum(fn($r) => $r['dt_breakdown']['mat_t'] ?? 0);
         $tDtLog = $actRows->sum(fn($r) => $r['dt_breakdown']['log_t'] ?? 0);
         $tDtProd = $actRows->sum(fn($r) => $r['dt_breakdown']['prod_t'] ?? 0);
+        $tDtOth = $actRows->sum(fn($r) => $r['dt_breakdown']['others_t'] ?? 0);
         $tDtTotal = $actRows->sum(fn($r) => $r['dt_total'] ?? 0);
         $tPassRate = $tActStroke > 0 ? round($tActGood / $tActStroke * 100, 1) : 0;
         $tRepRate = $tActStroke > 0 ? round($tActRepair / $tActStroke * 100, 1) : 0;
@@ -372,22 +376,23 @@ class LkhActualExport
             16 => $actRows->sum('dies_variant_time'),
             17 => $tActQcheck,
             18 => $tActDct,
-            19 => $tDtDies,
-            20 => $tDtMach,
-            21 => $tDtMatl,
-            22 => $tDtLog,
-            23 => $tDtProd,
-            24 => $tDtTotal,
-            25 => $tActTptPlan,
-            26 => $tActTpt,
-            27 => '',
-            28 => $tActBreak,
-            29 => $tActWork,
-            30 => $tPassRate,
-            31 => $tRepRate,
-            32 => $tRejRate,
-            33 => $tOee,
-            34 => $tGsph,
+19 => $tDtDies,
+                20 => $tDtMach,
+                21 => $tDtMatl,
+                22 => $tDtLog,
+                23 => $tDtProd,
+                24 => $tDtOth,
+                25 => $tDtTotal,
+                26 => $tActTptPlan,
+                27 => $tActTpt,
+                28 => '',
+                29 => $tActBreak,
+                30 => $tActWork,
+                31 => $tPassRate,
+                32 => $tRepRate,
+                33 => $tRejRate,
+                34 => $tOee,
+                35 => $tGsph,
         ];
 
         $totalRowStyle = [
@@ -548,17 +553,18 @@ class LkhActualExport
             21 => 8,   // Material
             22 => 7,   // Log
             23 => 9,   // Prod Handl
-            24 => 7,   // Total
-            25 => 7,   // Plan (TPT)
-            26 => 7,   // Actual (TPT)
-            27 => 7,   // Type (Break)
-            28 => 7,   // Time (Break)
-            29 => 9,   // Work Time
-            30 => 7,   // Pass%
-            31 => 7,   // Rep%
-            32 => 7,   // Rej%
-            33 => 8,   // OEE (%)
-            34 => 8,   // GSPH
+            24 => 7,   // Others
+            25 => 7,   // Total
+            26 => 7,   // Plan (TPT)
+            27 => 7,   // Actual (TPT)
+            28 => 7,   // Type (Break)
+            29 => 7,   // Time (Break)
+            30 => 9,   // Work Time
+            31 => 7,   // Pass%
+            32 => 7,   // Rep%
+            33 => 7,   // Rej%
+            34 => 8,   // OEE (%)
+            35 => 8,   // GSPH
         ];
 
         foreach ($widths as $col => $width) {

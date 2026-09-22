@@ -11,6 +11,7 @@ use App\Models\Downtime;
 use App\Models\QCheck;
 use App\Models\DailyProduction;
 use App\Models\LkhCorrection;
+use App\Services\ProductionMetricsService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Carbon\Carbon;
 
@@ -244,6 +245,118 @@ describe('Foreman LKH Edit — Down Time', function () {
             ->first();
         expect($dt)->not->toBeNull();
         expect($dt->duration_seconds)->toBe(300);
+    });
+
+    test('foreman can update dt_others and downtime record is created as Others', function () {
+        $t = lkhSetupTeam();
+
+        $this->actingAs($t['foreman'])
+            ->postJson(route('supervisor.reports.daily_production.update_cells'), [
+                'date'    => '2026-09-16',
+                'line'    => 'PRESS A',
+                'shift'   => 'Shift Pagi',
+                'updates' => [['plan_id' => $t['plan']->id, 'field' => 'dt_others', 'value' => '5']],
+            ])
+            ->assertOk();
+
+        $dt = Downtime::where('job_master_id', $t['job']->id)
+            ->where('problem', 'Koreksi LKH')
+            ->first();
+        expect($dt)->not->toBeNull();
+        expect($dt->jenis_downtime)->toBe('Others');
+        expect($dt->duration_seconds)->toBe(300);
+    });
+
+    test('dt_others scales existing Others records without inflating production', function () {
+        $t = lkhSetupTeam();
+
+        Downtime::create([
+            'job_master_id'    => $t['job']->id,
+            'jenis_downtime'   => 'Others',
+            'problem'          => 'Menunggu instruksi',
+            'start_time'       => '2026-09-16 09:00:00',
+            'finish_time'      => '2026-09-16 09:20:00',
+            'duration_seconds' => 1200,
+        ]);
+
+        $this->actingAs($t['foreman'])
+            ->postJson(route('supervisor.reports.daily_production.update_cells'), [
+                'date'    => '2026-09-16',
+                'line'    => 'PRESS A',
+                'shift'   => 'Shift Pagi',
+                'updates' => [['plan_id' => $t['plan']->id, 'field' => 'dt_others', 'value' => '10']],
+            ])
+            ->assertOk();
+
+        $dt = Downtime::where('job_master_id', $t['job']->id)->where('jenis_downtime', 'Others')->first();
+        expect($dt->duration_seconds)->toBe(600);
+
+        $breakdown = ProductionMetricsService::downtimeBreakdown(Downtime::all());
+        expect($breakdown['others'])->toBe(10.0);
+        expect($breakdown['production'])->toBe(0.0);
+        expect($breakdown['total'])->toBe(10.0);
+    });
+
+    test('others downtime is bucketed separately and added to total', function () {
+        $t = lkhSetupTeam();
+
+        Downtime::create([
+            'job_master_id'    => $t['job']->id,
+            'jenis_downtime'   => 'Others',
+            'problem'          => 'Menunggu instruksi',
+            'start_time'       => '2026-09-16 09:00:00',
+            'finish_time'      => '2026-09-16 09:10:00',
+            'duration_seconds' => 600,
+        ]);
+        Downtime::create([
+            'job_master_id'    => $t['job']->id,
+            'jenis_downtime'   => 'Machine',
+            'problem'          => 'Breakdown',
+            'start_time'       => '2026-09-16 10:00:00',
+            'finish_time'      => '2026-09-16 10:20:00',
+            'duration_seconds' => 1200,
+        ]);
+
+        $breakdown = ProductionMetricsService::downtimeBreakdown(Downtime::all());
+        expect($breakdown['others'])->toBe(10.0);
+        expect($breakdown['machine'])->toBe(20.0);
+        expect($breakdown['production'])->toBe(0.0);
+        expect($breakdown['total'])->toBe(30.0);
+    });
+
+    test('old LKH data without others stays unaffected (others_t = 0.00)', function () {
+        $t = lkhSetupTeam();
+
+        Downtime::create([
+            'job_master_id'    => $t['job']->id,
+            'jenis_downtime'   => 'Machine',
+            'problem'          => 'Breakdown',
+            'start_time'       => '2026-09-16 08:00:00',
+            'finish_time'      => '2026-09-16 08:20:00',
+            'duration_seconds' => 1200,
+        ]);
+
+        $breakdown = ProductionMetricsService::downtimeBreakdown(Downtime::all());
+        expect($breakdown['others'])->toBe(0.0);
+        expect($breakdown['machine'])->toBe(20.0);
+        expect($breakdown['total'])->toBe(20.0);
+    });
+
+    test('updated response fragment renders dt_others cell with new value', function () {
+        $t = lkhSetupTeam();
+
+        $res = $this->actingAs($t['foreman'])
+            ->postJson(route('supervisor.reports.daily_production.update_cells'), [
+                'date'    => '2026-09-16',
+                'line'    => 'PRESS A',
+                'shift'   => 'Shift Pagi',
+                'updates' => [['plan_id' => $t['plan']->id, 'field' => 'dt_others', 'value' => '4']],
+            ])
+            ->assertOk()
+            ->json();
+
+        expect($res['html'])->toContain('data-field="dt_others"');
+        expect($res['html'])->toContain('data-value="4"');
     });
 });
 

@@ -120,7 +120,7 @@ class ProductionMetricsService
     /**
      * Sum downtime minutes by category (excludes dandori, idle, break, quality).
      *
-     * @return array{machine: float, material: float, logistic: float, production: float, ubp: float, total: float}
+     * @return array{machine: float, material: float, logistic: float, production: float, others: float, ubp: float, total: float}
      */
     public static function downtimeBreakdown(Collection $downtimes): array
     {
@@ -129,6 +129,7 @@ class ProductionMetricsService
             'material' => 0.0,
             'logistic' => 0.0,
             'production' => 0.0,
+            'others' => 0.0,
             'dies' => 0.0,
             'ubp' => 0.0,
             'total' => 0.0,
@@ -155,6 +156,8 @@ class ProductionMetricsService
                 $breakdown['logistic'] += $dur;
             } elseif (str_contains($type, 'UBP')) {
                 $breakdown['ubp'] += $dur;
+            } elseif (str_contains($type, 'OTHERS')) {
+                $breakdown['others'] += $dur;
             } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
                 $breakdown['production'] += $dur;
             } else {
