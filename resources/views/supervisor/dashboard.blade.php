@@ -785,7 +785,6 @@ async function dashFetch(url) {
     throw new Error(`Jaringan gagal untuk ${url} (page ${location.origin}) :: ${e.message}`);
   }
 }
-}
 
 async function fetchDashboardData() {
     const date = document.getElementById('dateInput').value;
