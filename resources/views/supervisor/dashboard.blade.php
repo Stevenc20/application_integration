@@ -318,6 +318,19 @@ let LAST_DETAIL_HASH = '';
 let CARDS_CACHED = false;
 let CELL_CACHE = {};
 let LAST_DETAIL_RENDER_HASH = '';
+let LAST_KPI_RENDER_HASH = '';
+
+// Inisialisasi tanggal WAJIB sebelum request pertama agar query string tidak kosong
+(function initDateInput(){
+  const input = document.getElementById('dateInput');
+  if (!input) return;
+  if (input.value) return;
+  const now = new Date();
+  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  let saved = null;
+  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
+  input.value = saved || today;
+})();
 
 function setText(el, v) {
   if (el && el.textContent !== v) el.textContent = v;
@@ -330,21 +343,44 @@ function setText(el, v) {
  */
 let LINE_DETAIL = {};
 
+let DASH_ERROR_SHOWN = false;
+
+function showDashError(message) {
+  if (DASH_ERROR_SHOWN) return;
+  DASH_ERROR_SHOWN = true;
+  console.error('[SupervisorDashboard]', message);
+  const grid = document.getElementById('linesGrid');
+  if (grid && !grid.children.length) {
+    grid.innerHTML = `<div class="col-span-full rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">${message}</div>`;
+  }
+}
+
+async function readJson(response, url) {
+  const text = await response.text();
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status} ${url} :: ${text.slice(0, 300)}`);
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON from ${url} :: ${text.slice(0, 300)}`);
+  }
+}
+
 async function fetchDetailData() {
     const date = document.getElementById('dateInput').value;
     const shift = selectedShift;
     try {
         let url = `{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
-        const response = await fetch(url);
-        const data = await response.json();
-        const newDetailHash = JSON.stringify(data.detail);
+        const data = await readJson(await fetch(url), url);
+        LINE_DETAIL = data.detail || {};
+        const newDetailHash = JSON.stringify(LINE_DETAIL);
         if (newDetailHash === LAST_DETAIL_HASH) return;
         LAST_DETAIL_HASH = newDetailHash;
-        LINE_DETAIL = data.detail || {};
         renderLineCards();
     } catch (error) {
-        console.error("Error fetching detail data:", error);
+        showDashError('Gagal memuat rincian: ' + error.message);
     }
 }
 
@@ -356,24 +392,25 @@ async function fetchDashboardData() {
         let url = `{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
 
-        const response = await fetch(url);
-        const data = await response.json();
-        
-        const newHash = JSON.stringify(data.line_kpi);
-        const detailChanged = newHash !== LAST_KPI_HASH;
-        LAST_KPI_HASH = newHash;
-        
+        const data = await readJson(await fetch(url), url);
+        if (!data.line_kpi) throw new Error('Respons API tidak memuat line_kpi');
+
+        DASH_ERROR_SHOWN = false;
         LINE_KPI = data.line_kpi;
         LINE_META = data.line_meta || {};
-        DETAIL_DATA = data.detail_data;
-        
+        DETAIL_DATA = data.detail_data || {};
+
+        const newHash = JSON.stringify(LINE_KPI);
+        const detailChanged = newHash !== LAST_KPI_HASH;
+        LAST_KPI_HASH = newHash;
+
         if (detailChanged) {
             renderLineCards();
             if(selectedDays === 1 && typeof renderTodayCharts === 'function') renderTodayCharts();
         }
         fetchDetailData();
     } catch (error) {
-        console.error("Error fetching dashboard data:", error);
+        showDashError('Gagal memuat data dashboard: ' + error.message);
     }
 }
 
@@ -381,7 +418,6 @@ async function fetchDashboardData() {
 
 // Menjalankan penarikan data pertama kali saat halaman dibuka
 fetchDashboardData();
-setTimeout(fetchDetailData, 100);
 
 // Real-time via BroadcastChannel (instant from Input Harian saves)
 try {
@@ -404,14 +440,6 @@ function updateClock(){
 }
 setInterval(updateClock, 1000);
 updateClock();
-
-(function(){
-  const now = new Date();
-  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  let saved;
-  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
-  document.getElementById('dateInput').value = saved || today;
-})();
 
 function setShift(s){
   selectedShift = s;
@@ -616,20 +644,15 @@ function buildLineCard(line){
 }
 
 function renderLineCards(forceDetail){
-  const grid = document.getElementById('linesGrid');
-  if (!CARDS_CACHED) {
-    grid.innerHTML = LINES.map(buildLineCard).join('');
-    CARDS_CACHED = true;
-    cacheCards();
-    return;
-  }
   updateCards(forceDetail);
 }
 
 function cacheCards() {
   CELL_CACHE = {};
   document.querySelectorAll('#linesGrid .bg-white').forEach(card => {
-    const line = card.querySelector('.card-line-title').textContent.trim();
+    const titleEl = card.querySelector('.card-line-title');
+    if (!titleEl) return;
+    const line = titleEl.textContent.trim();
     CELL_CACHE[line] = { el: card };
     card.querySelectorAll('tbody tr').forEach(row => {
       const cells = row.querySelectorAll('td');
@@ -643,13 +666,19 @@ function cacheCards() {
 }
 
 function updateCards(forceDetail) {
-  // Detail changed: skip KPI update, rebuild everything
-  if (forceDetail || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH) {
-    LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
+  // Rebuild when detail changed, KPI changed, or the card DOM is missing/stale
+  const kpiRenderHash = JSON.stringify(LINE_KPI);
+  if (forceDetail
+      || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH
+      || kpiRenderHash !== LAST_KPI_RENDER_HASH
+      || !CARDS_CACHED
+      || !document.getElementById('linesGrid').children.length) {
     flushCardCache();
     document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
     CARDS_CACHED = true;
     cacheCards();
+    LAST_KPI_RENDER_HASH = kpiRenderHash;
+    LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
     return;
   }
 
@@ -715,6 +744,7 @@ function flushCardCache() {
   CARDS_CACHED = false;
   CELL_CACHE = {};
   LAST_DETAIL_RENDER_HASH = '';
+  LAST_KPI_RENDER_HASH = '';
 }
 
 function openKpiDetailModal(type, line){
