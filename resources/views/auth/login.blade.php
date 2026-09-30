@@ -454,6 +454,47 @@
         .btn-submit svg { transition: transform 0.2s; }
         .btn-submit:hover svg { transform: translateX(3px); }
 
+        .btn-qa {
+            width: 100%;
+            background: rgba(74, 158, 255, 0.06);
+            color: #2563EB;
+            border: 1.5px solid rgba(37, 99, 235, 0.25);
+            border-radius: 8px;
+            padding: 12px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            font-family: 'Inter', sans-serif;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s;
+            letter-spacing: 0.02em;
+            text-decoration: none;
+            box-sizing: border-box;
+        }
+
+        .btn-qa:hover {
+            background: rgba(37, 99, 235, 0.12);
+            border-color: rgba(37, 99, 235, 0.5);
+            color: #1D4ED8;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.15);
+        }
+
+        .btn-qa .qa-badge {
+            font-size: 0.65rem;
+            font-weight: 700;
+            letter-spacing: 0.1em;
+            text-transform: uppercase;
+            background: rgba(37, 99, 235, 0.12);
+            border: 1px solid rgba(37, 99, 235, 0.25);
+            padding: 2px 7px;
+            border-radius: 20px;
+            color: #2563EB;
+        }
+
         .form-divider {
             height: 1px;
             background: var(--border);
@@ -643,6 +684,20 @@
                         <path d="M3 7h8M8 4l3 3-3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
                     </svg>
                 </button>
+
+                <div style="text-align: center; margin: 1.25rem 0; color: var(--t3); font-size: 0.8rem; font-weight: 500; display: flex; align-items: center; gap: 10px;">
+                    <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                    <span>akses sistem lain</span>
+                    <div style="flex: 1; height: 1px; background: var(--border);"></div>
+                </div>
+
+                <a href="https://qa.tantechstev.com/login" target="_blank" class="btn-qa">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    Login ke QA System
+                    <span class="qa-badge">QA</span>
+                </a>
 
             </form>
 
