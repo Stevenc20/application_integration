@@ -39,6 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
+    <div id="dashError" class="hidden mb-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs sm:text-sm font-bold text-red-700 break-words"></div>
     <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
@@ -750,15 +751,20 @@ async function fetchDetailData() {
     }
 }
 
-let DASH_ERROR_SHOWN = false;
-
 function showDashError(message) {
   console.error('[SupervisorDashboard]', message);
-  if (DASH_ERROR_SHOWN) return;
-  DASH_ERROR_SHOWN = true;
-  const grid = document.getElementById('linesGrid');
-  if (grid && !grid.children.length) {
-    grid.innerHTML = `<div class="col-span-full rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">${message}</div>`;
+  const banner = document.getElementById('dashError');
+  if (banner) {
+    banner.textContent = message;
+    banner.classList.remove('hidden');
+  }
+}
+
+function clearDashError() {
+  const banner = document.getElementById('dashError');
+  if (banner) {
+    banner.textContent = '';
+    banner.classList.add('hidden');
   }
 }
 
@@ -784,7 +790,7 @@ async function fetchDashboardData() {
         const data = await readDashJson(response, url);
         if (!data.line_kpi) throw new Error('Respons API tidak memuat line_kpi');
 
-        DASH_ERROR_SHOWN = false;
+        clearDashError();
         const newHash = JSON.stringify(data.line_kpi);
         const detailChanged = newHash !== LAST_KPI_HASH;
         LAST_KPI_HASH = newHash;
