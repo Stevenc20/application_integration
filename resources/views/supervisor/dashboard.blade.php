@@ -318,6 +318,7 @@ let LAST_DETAIL_HASH = '';
 // Incremental render cache
 let CARDS_CACHED = false;
 let CELL_CACHE = {};
+let DETAIL_OPEN = {};
 let LAST_DETAIL_RENDER_HASH = '';
 let LAST_KPI_RENDER_HASH = '';
 
@@ -585,9 +586,10 @@ function buildLineCard(line){
     </tr>`;
   });
 
-  // Detail section: label badge + table/empty state
+  // Detail section: label badge + table/empty state (collapsible per line)
+  const detailOpen = DETAIL_OPEN[line] === true;
   const detSection = `
-    <div class="det-section-label">
+    <div class="det-section-label" ${hasDetail ? `onclick="toggleDetail('${line}')" style="cursor:pointer" role="button" title="Klik untuk buka/tutup detail"` : ''}>
       <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
         <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
         <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
@@ -595,9 +597,10 @@ function buildLineCard(line){
       </svg>
       <span class="label-text">Detail Produksi</span>
       <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
+      ${hasDetail ? `<svg class="det-caret ${detailOpen ? 'open' : ''}" width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="flex-shrink:0;margin-left:auto;transition:transform .15s ease;color:#94a3b8"><path d="M5.5 7.5L10 12l4.5-4.5z"/></svg>` : ''}
     </div>
     ${hasDetail ? `
-    <div class="det-scroll">
+    <div class="det-scroll ${detailOpen ? '' : 'hidden'}">
       <table class="det-table">
         <thead>
           <tr>
@@ -636,7 +639,7 @@ function buildLineCard(line){
     <div class="card-line-title bg-red-50 border-b border-red-100 px-4 py-2.5 text-center text-red-700 font-black tracking-[0.15em] text-sm sm:text-base uppercase">
       ${line}
     </div>
-    <div class="overflow-x-auto">
+    <div class="overflow-x-auto kpi-table-wrap">
       <table class="border-collapse w-full">
         <thead>
           <tr class="bg-gray-100 border-b border-gray-200 text-gray-500">
@@ -659,6 +662,11 @@ function renderLineCards(forceDetail){
   updateCards(forceDetail);
 }
 
+function toggleDetail(line) {
+  DETAIL_OPEN[line] = !DETAIL_OPEN[line];
+  renderLineCards(true);
+}
+
 function cacheCards() {
   CELL_CACHE = {};
   document.querySelectorAll('#linesGrid .bg-white').forEach(card => {
@@ -666,7 +674,7 @@ function cacheCards() {
     if (!titleEl) return;
     const line = titleEl.textContent.trim();
     CELL_CACHE[line] = { el: card };
-    card.querySelectorAll('tbody tr').forEach(row => {
+    card.querySelectorAll('.kpi-table-wrap tbody tr').forEach(row => {
       const cells = row.querySelectorAll('td');
       if (cells.length < 4) return;
       const desc = cells[0].textContent.trim();
