@@ -304,6 +304,7 @@
 <script>
 const LINES = @json($lines);
 const SELECTED_LINE = @json($selectedLine);
+const INITIAL = @json($initial);
 
 let selectedShift = 1;
 let selectedDays  = 1;
@@ -325,12 +326,22 @@ let LAST_KPI_RENDER_HASH = '';
   const input = document.getElementById('dateInput');
   if (!input) return;
   if (input.value) return;
+  if (INITIAL && INITIAL.date) { input.value = INITIAL.date; return; }
   const now = new Date();
   const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
   let saved = null;
   try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
   input.value = saved || today;
 })();
+
+// Paint from the server-rendered payload so the grid is never blank, then let
+// the poller take over. Both use the same controller payload builder.
+if (INITIAL && INITIAL.line_kpi) {
+  LINE_KPI = INITIAL.line_kpi || {};
+  LINE_META = INITIAL.line_meta || {};
+  DETAIL_DATA = INITIAL.detail_data || {};
+  LAST_KPI_HASH = JSON.stringify(LINE_KPI);
+}
 
 function setText(el, v) {
   if (el && el.textContent !== v) el.textContent = v;
@@ -416,7 +427,8 @@ async function fetchDashboardData() {
 
 
 
-// Menjalankan penarikan data pertama kali saat halaman dibuka
+// Render pertama dari payload server, lalu poller mengambil alih
+renderLineCards();
 fetchDashboardData();
 
 // Real-time via BroadcastChannel (instant from Input Harian saves)

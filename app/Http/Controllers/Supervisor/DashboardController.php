@@ -36,11 +36,22 @@ class DashboardController extends Controller
         }
         
         $lines = $linesQuery->pluck('line_name');
-        
+
         $view = 'supervisor.dashboard';
         if (request()->routeIs('supervisor.quality.dashboard') || request()->routeIs('quality.dashboard'))  $view = 'supervisor.quality.dashboard';
-        
-        return view($view, compact('selectedLine', 'lines'));
+
+        if ($view === 'supervisor.dashboard') {
+            $date  = request('date', $this->defaultDashboardDate());
+            $shift = (int) request('shift', 1);
+
+            $initial = $this->buildDashboardPayload($lines->toArray(), $date, $shift);
+            $initial['date']  = $date;
+            $initial['shift'] = $shift;
+        } else {
+            $initial = null;
+        }
+
+        return view($view, compact('selectedLine', 'lines', 'initial'));
     }
 
     public function monitor()
@@ -62,6 +73,17 @@ class DashboardController extends Controller
             $lines = [$selectedLine];
         }
 
+        $payload = $this->buildDashboardPayload($lines, $date, $shift);
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Build the dashboard payload shared by the initial page render and the
+     * polling API, so both always produce an identical shape.
+     */
+    private function buildDashboardPayload(array $lines, string $date, int $shift): array
+    {
         $lineKpi = [];
         $lineMeta = [];
         $detailData = [
@@ -87,11 +109,11 @@ class DashboardController extends Controller
             }
         }
 
-        return response()->json([
+        return [
             'line_kpi'    => $lineKpi,
             'line_meta'   => $lineMeta,
             'detail_data' => $detailData,
-        ]);
+        ];
     }
 
     public function getDetailData()
