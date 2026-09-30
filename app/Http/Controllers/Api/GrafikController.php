@@ -9,6 +9,7 @@ use App\Models\Machine;
 use App\Models\MachineLog;
 use App\Models\JobMaster;
 use App\Models\LineMaster;
+use App\Models\ProductionPlan;
 use App\Services\DashboardRealtimeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -206,8 +207,16 @@ class GrafikController extends Controller
 
     public function gsph(Request $request)
     {
-        $date = $request->input('date', Carbon::now()->toDateString());
+        $date = $request->input('date');
         $shift = (int) $request->input('shift', 1);
+
+        // Default: pakai tanggal schedule terakhir yang punya job, bukan hardcode hari ini
+        if (! $date) {
+            $latestPlanDate = ProductionPlan::where('row_type', 'job')->max('plan_date');
+            $date = $latestPlanDate
+                ? Carbon::parse($latestPlanDate)->toDateString()
+                : Carbon::now()->toDateString();
+        }
 
         $lines = LineMaster::where('status', 'active')
             ->select('line_name')->distinct()->pluck('line_name')->toArray();
@@ -227,6 +236,6 @@ class GrafikController extends Controller
             $actual[] = $gsphEntry ? (float) $gsphEntry['actual'] : 0;
         }
 
-        return response()->json(compact('labels', 'plan', 'actual'));
+        return response()->json(compact('labels', 'plan', 'actual') + ['date' => $date]);
     }
 }

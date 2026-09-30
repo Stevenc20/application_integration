@@ -14,28 +14,61 @@ class DashboardController extends Controller
     {
         $today = Carbon::today()->toDateString();
 
-        // 1. Total Rencana Produksi (Hanya tipe 'job')
-        $totalPlans = ProductionPlan::whereDate('plan_date', $today)
-            ->where('row_type', 'job')
-            ->count();
+        // Tanggal aktif: pakai tanggal request, jika tidak ada pakai tanggal terakhir
+        // yang punya schedule (supaya hasil upload PPC tetap terlihat).
+        $requestDate = request('date');
+        $hasScheduleOnRequestDate = false;
 
-        // 2. Sedang Berjalan (Sudah di-approve dan kemungkinan sudah ada di JobMaster)
-        $running = ProductionPlan::whereDate('plan_date', $today)
-            ->where('row_type', 'job')
-            ->where('status', 'approved')
-            ->count();
+        if ($requestDate && preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestDate)) {
+            $activeDate = $requestDate;
+            $hasScheduleOnRequestDate = ProductionPlan::whereDate('plan_date', $activeDate)
+                ->where('row_type', 'job')
+                ->exists();
+        } else {
+            $activeDate = $today;
+        }
+
+        if (! $hasScheduleOnRequestDate) {
+            $latestPlanDate = ProductionPlan::where('row_type', 'job')
+                ->max('plan_date');
+
+            if ($latestPlanDate) {
+                $latestPlanDate = Carbon::parse($latestPlanDate)->toDateString();
+                if (! $requestDate || $latestPlanDate !== Carbon::parse($requestDate)->toDateString()) {
+                    $activeDate = $latestPlanDate;
+                }
+            }
+        }
+
+        $baseQuery = fn () => ProductionPlan::whereDate('plan_date', $activeDate)
+            ->where('row_type', 'job');
+
+        // 1. Total Rencana Produksi (Hanya tipe 'job')
+        $totalPlans = $baseQuery()->count();
+
+        // 2. Sedang Berjalan (approved / sudah ada aktual ok)
+        $running = $baseQuery()->where(function ($q) {
+            $q->where('status', 'approved')
+              ->orWhere('ok', '>', 0);
+        })->count();
 
         // 3. Sudah Selesai
-        $completed = ProductionPlan::whereDate('plan_date', $today)
-            ->where('row_type', 'job')
-            ->where('status', 'completed')
-            ->count();
+        $completed = $baseQuery()->where('status', 'completed')->count();
 
         // 4. Menunggu Approval (Status masih pending)
-        $pending = ProductionPlan::whereDate('plan_date', $today)
-            ->where('row_type', 'job')
-            ->where('status', 'pending')
-            ->count();
+        $pending = $baseQuery()->where('status', 'pending')->count();
+
+        // 5. Ringkasan schedule per press
+        $pressSummary = $baseQuery()
+            ->selectRaw("COALESCE(press_name, '—') as press_name, COUNT(*) as jobs, COALESCE(SUM(plan), 0) as plan_qty, COALESCE(SUM(ok), 0) as ok_qty")
+            ->groupBy('press_name')
+            ->orderBy('press_name')
+            ->get()
+            ->keyBy('press_name');
+
+        $totalPlanQty = (float) $baseQuery()->sum('plan');
+        $totalOkQty   = (float) $baseQuery()->sum('ok');
+        $isTodayData  = ($activeDate === $today);
 
         // 5. Recovery Alert: item pending dari hari sebelumnya
         $recoveryAlert = null;
@@ -73,7 +106,12 @@ class DashboardController extends Controller
             'completed',
             'pending',
             'recoveryAlert',
-            'recoverySummary'
+            'recoverySummary',
+            'activeDate',
+            'isTodayData',
+            'pressSummary',
+            'totalPlanQty',
+            'totalOkQty'
         ));
     }
 }

@@ -38,6 +38,19 @@
         </div>
     </div>
 
+    @if(! $isTodayData)
+    <div class="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+        <p class="text-sm font-semibold text-amber-800">
+            Belum ada schedule untuk hari ini ({{ now()->translatedFormat('d M Y') }}). Menampilkan schedule tanggal
+            <strong>{{ \Carbon\Carbon::parse($activeDate)->translatedFormat('d M Y') }}</strong>.
+        </p>
+        <a href="{{ route('ppc.planning.production_plan', ['date' => $activeDate]) }}" class="sm:ml-auto text-xs font-black uppercase text-amber-700 hover:text-amber-900 whitespace-nowrap">
+            Buka Production Plan →
+        </a>
+    </div>
+    @endif
+
     {{-- Recovery Alert Banner --}}
     @if($recoveryAlert)
     <a href="{{ route('ppc.planning.production_plan') }}" class="block group">
@@ -80,11 +93,13 @@
                 <div class="w-11 h-11 bg-gradient-to-br from-rose-500 to-red-600 rounded-xl flex items-center justify-center shadow-lg shadow-rose-200/50">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
                 </div>
-                <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-50 px-2.5 py-1 rounded-full">Hari Ini</span>
-            </div>
-            <p class="text-3xl font-black text-slate-800 tracking-tight" id="statTotalPlans">{{ $totalPlans }}</p>
-            <p class="text-xs font-bold text-slate-400 mt-1">Total Rencana Produksi</p>
-        </div>
+                        <span class="text-[10px] font-black text-rose-400 uppercase tracking-widest bg-rose-50 px-2.5 py-1 rounded-full">
+                            {{ \Carbon\Carbon::parse($activeDate)->translatedFormat('d M Y') }}
+                        </span>
+                    </div>
+                    <p class="text-3xl font-black text-slate-800 tracking-tight" id="statTotalPlans">{{ $totalPlans }}</p>
+                    <p class="text-xs font-bold text-slate-400 mt-1">Total Rencana Produksi</p>
+                </div>
 
         {{-- Card 2: Running --}}
         <div class="group bg-white rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300">
@@ -279,7 +294,7 @@
                             </div>
                             <div>
                                 <h3 class="text-sm font-black text-slate-700 tracking-tight">Overview Produksi</h3>
-                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Per Press - Hari Ini</p>
+                                <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Per Press - {{ \Carbon\Carbon::parse($activeDate)->translatedFormat('d M Y') }}</p>
                             </div>
                         </div>
                         <a href="{{ route('ppc.planning.production_plan') }}" class="text-[11px] font-black text-rose-600 hover:text-rose-700 flex items-center gap-1 transition-colors">
@@ -290,6 +305,34 @@
                 </div>
 
                 <div class="p-6">
+                    {{-- Ringkasan total schedule --}}
+                    <div class="grid grid-cols-3 gap-3 mb-6">
+                        <div class="bg-rose-50 rounded-xl px-4 py-3 text-center border border-rose-100">
+                            <p class="text-lg font-black text-rose-700">{{ number_format($totalPlanQty, 0) }}</p>
+                            <p class="text-[10px] font-bold text-rose-400 uppercase tracking-wider">Total Plan (pcs)</p>
+                        </div>
+                        <div class="bg-emerald-50 rounded-xl px-4 py-3 text-center border border-emerald-100">
+                            <p class="text-lg font-black text-emerald-700">{{ number_format($totalOkQty, 0) }}</p>
+                            <p class="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">Total OK (pcs)</p>
+                        </div>
+                        <div class="bg-slate-50 rounded-xl px-4 py-3 text-center border border-slate-200">
+                            <p class="text-lg font-black text-slate-700">{{ $pressSummary->count() }}</p>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Press Terisi</p>
+                        </div>
+                    </div>
+
+                    @php
+                        $normalizePress = function ($value) {
+                            $v = strtoupper(trim((string) $value));
+                            $v = preg_replace('/^(PRESS|LINE)\s+/', '', $v);
+                            return preg_replace('/[^A-Z0-9]/', '', $v);
+                        };
+                        $pressLookup = [];
+                        foreach ($pressSummary as $pressRow) {
+                            $pressLookup[$normalizePress($pressRow->press_name)] = $pressRow;
+                        }
+                    @endphp
+
                     {{-- Press Cards Grid --}}
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
                         @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F'] as $idx => $press)
@@ -301,8 +344,9 @@
                                 ['from-red-600', 'to-rose-700', 'bg-red-50', 'text-red-800', 'border-red-200', 'shadow-red-100'],
                             ];
                             $c = $colors[$idx % count($colors)];
+                            $row = $pressLookup[$normalizePress($press)] ?? null;
                         @endphp
-                        <a href="{{ route('ppc.planning.production_plan', ['press' => $press]) }}" class="group block p-5 rounded-2xl border {{ $c[4] }} {{ $c[2] }} hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                        <a href="{{ route('ppc.planning.production_plan', ['date' => $activeDate, 'press' => $press]) }}" class="group block p-5 rounded-2xl border {{ $c[4] }} {{ $c[2] }} hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-9 h-9 bg-gradient-to-br {{ $c[0] }} {{ $c[1] }} rounded-xl flex items-center justify-center shadow-md {{ $c[5] }}">
                                     <span class="text-white text-[11px] font-black">{{ chr(65 + $idx) }}</span>
@@ -310,7 +354,12 @@
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-300 group-hover:text-rose-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
                             </div>
                             <h4 class="text-sm font-black {{ $c[3] }} tracking-tight">{{ $press }}</h4>
-                            <p class="text-[11px] text-slate-400 font-medium mt-0.5">Klik untuk lihat jadwal</p>
+                            @if($row)
+                                <p class="text-xl font-black text-slate-700 mt-1">{{ number_format((float) $row->plan_qty, 0) }} <span class="text-[10px] font-bold text-slate-400">pcs</span></p>
+                                <p class="text-[11px] text-slate-400 font-medium mt-0.5">{{ $row->jobs }} job &bull; {{ number_format((float) $row->ok_qty, 0) }} OK</p>
+                            @else
+                                <p class="text-[11px] text-slate-400 font-medium mt-0.5">Belum ada schedule</p>
+                            @endif
                         </a>
                         @endforeach
                     </div>
