@@ -61,16 +61,36 @@ class KaryawanController extends Controller
             'nama_karyawan' => 'required|string|max:100',
             'nrp_karyawan'  => 'required|digits:4|unique:karyawans,nrp_karyawan',
             'jabatan'       => 'required|in:admin,operator,leader,leader a,leader b,leader c,leader d,shearing,handwork,foreman,supervisor,ppc,quality,production,manager,kadiv,direktur,presdir,superadmin,dies_shop,plant_service,irm,logistik,produksi',
+            'password'      => 'nullable|string|min:6',
         ], [
             'nrp_karyawan.digits' => 'NRP harus 4 digit angka.',
             'nrp_karyawan.unique' => 'NRP sudah terdaftar, gunakan NRP yang lain.',
+            'password.min'        => 'Password minimal 6 karakter.',
         ]);
 
         $karyawan = Karyawan::create($request->only('nama_karyawan', 'nrp_karyawan', 'jabatan'));
 
-        User::where('nrp', $karyawan->nrp_karyawan)->update(['role' => $karyawan->jabatan]);
+        $user = User::where('nrp', $karyawan->nrp_karyawan)->first();
+        if ($user) {
+            $userUpdate = [
+                'name' => $karyawan->nama_karyawan,
+                'role' => $karyawan->jabatan,
+            ];
+            if ($request->filled('password')) {
+                $userUpdate['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+            }
+            $user->update($userUpdate);
+        } else {
+            User::create([
+                'name'      => $karyawan->nama_karyawan,
+                'nrp'       => $karyawan->nrp_karyawan,
+                'role'      => $karyawan->jabatan,
+                'password'  => \Illuminate\Support\Facades\Hash::make($request->filled('password') ? $request->password : 'password123'),
+                'is_active' => 1,
+            ]);
+        }
 
-        return redirect()->route('master.karyawan')->with('success', 'Karyawan berhasil ditambahkan.');
+        return redirect()->route('master.karyawan')->with('success', 'Karyawan dan akun user berhasil ditambahkan.');
     }
 
     /**
@@ -84,15 +104,38 @@ class KaryawanController extends Controller
             'nama_karyawan' => 'required|string|max:100',
             'nrp_karyawan'  => 'required|digits:4|unique:karyawans,nrp_karyawan,' . $id . ',id_karyawan',
             'jabatan'       => 'required|in:admin,operator,leader,leader a,leader b,leader c,leader d,shearing,handwork,foreman,supervisor,ppc,quality,production,manager,kadiv,direktur,presdir,superadmin,dies_shop,plant_service,irm,logistik,produksi',
+            'password'      => 'nullable|string|min:6',
         ], [
             'nrp_karyawan.unique' => 'NRP sudah digunakan karyawan lain.',
+            'password.min'        => 'Password minimal 6 karakter.',
         ]);
 
+        $oldNrp = $karyawan->nrp_karyawan;
         $karyawan->update($request->only('nama_karyawan', 'nrp_karyawan', 'jabatan'));
 
-        User::where('nrp', $karyawan->nrp_karyawan)->update(['role' => $karyawan->jabatan]);
+        // Sync to users table (by old NRP or new NRP)
+        $user = User::where('nrp', $oldNrp)->orWhere('nrp', $karyawan->nrp_karyawan)->first();
+        if ($user) {
+            $userUpdate = [
+                'name' => $karyawan->nama_karyawan,
+                'nrp'  => $karyawan->nrp_karyawan,
+                'role' => $karyawan->jabatan,
+            ];
+            if ($request->filled('password')) {
+                $userUpdate['password'] = \Illuminate\Support\Facades\Hash::make($request->password);
+            }
+            $user->update($userUpdate);
+        } else {
+            User::create([
+                'name'      => $karyawan->nama_karyawan,
+                'nrp'       => $karyawan->nrp_karyawan,
+                'role'      => $karyawan->jabatan,
+                'password'  => \Illuminate\Support\Facades\Hash::make($request->filled('password') ? $request->password : 'password123'),
+                'is_active' => 1,
+            ]);
+        }
 
-        return redirect()->route('master.karyawan')->with('success', 'Data karyawan berhasil diperbarui.');
+        return redirect()->route('master.karyawan')->with('success', 'Data karyawan dan user login berhasil diperbarui.');
     }
 
     /**

@@ -195,7 +195,7 @@ Route::middleware(['auth','role:admin,ppc,supervisor', 'feature:job_master'])->p
 });
 
 // master karyawan
-Route::middleware(['auth','role:admin,ppc,supervisor', 'feature:data_karyawan'])->prefix('master/karyawan')->group(function () {
+Route::middleware(['auth','role:admin,ppc,supervisor,foreman,leader,manager,kadiv,direktur', 'feature:data_karyawan'])->prefix('master/karyawan')->group(function () {
 
     Route::get('/', [KaryawanController::class, 'index'])->name('master.karyawan');
 

@@ -234,7 +234,12 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">NRP Karyawan</label>
-                    <input type="text" name="nrp_karyawan" required placeholder="Nomor Registrasi Pegawai..."
+                    <input type="text" name="nrp_karyawan" required placeholder="Nomor Registrasi Pegawai (4 digit)..."
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Password Login <span class="text-slate-400 font-normal lowercase">(default: password123)</span></label>
+                    <input type="password" name="password" placeholder="Minimal 6 karakter..."
                         class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all">
                 </div>
                 <div>
@@ -526,6 +531,11 @@
                 <div>
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">NRP Karyawan</label>
                     <input type="text" id="edit_nrp" name="nrp_karyawan" required
+                        class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all">
+                </div>
+                <div>
+                    <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Ganti Password <span class="text-slate-400 font-normal lowercase">(opsional - kosongkan jika tidak ingin diubah)</span></label>
+                    <input type="password" id="edit_password" name="password" placeholder="Masukkan password baru..."
                         class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all">
                 </div>
                 <div>
@@ -907,6 +917,8 @@ function closeAddModal() { hideModal('addModal'); }
 function openKaryawanEditModal(data) {
     document.getElementById('edit_nama').value    = data.nama;
     document.getElementById('edit_nrp').value     = data.nrp;
+    const pwd = document.getElementById('edit_password');
+    if (pwd) pwd.value = '';
     setEditJabatan(data.jabatan);
     document.getElementById('editForm').action    = '/master/karyawan/update/' + data.id;
     showModal('editModal');
