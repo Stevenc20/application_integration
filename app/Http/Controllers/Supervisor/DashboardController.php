@@ -40,18 +40,7 @@ class DashboardController extends Controller
         $view = 'supervisor.dashboard';
         if (request()->routeIs('supervisor.quality.dashboard') || request()->routeIs('quality.dashboard'))  $view = 'supervisor.quality.dashboard';
 
-        if ($view === 'supervisor.dashboard') {
-            $date  = request('date', $this->defaultDashboardDate());
-            $shift = (int) request('shift', 1);
-
-            $initial = $this->buildDashboardPayload($lines->toArray(), $date, $shift);
-            $initial['date']  = $date;
-            $initial['shift'] = $shift;
-        } else {
-            $initial = null;
-        }
-
-        return view($view, compact('selectedLine', 'lines', 'initial'));
+        return view($view, compact('selectedLine', 'lines'));
     }
 
     public function monitor()

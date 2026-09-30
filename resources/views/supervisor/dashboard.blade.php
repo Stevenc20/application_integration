@@ -39,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 {{ count($lines) === 1 ? 'w-full' : (count($lines) === 2 ? 'lg:grid-cols-2' : 'lg:grid-cols-3 is-multi-line') }} gap-4 sm:gap-5 min-h-[300px]" id="linesGrid"></div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -126,10 +126,16 @@
 </div>
 
 <!-- ===== MODAL ===== -->
-<div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 backdrop-blur-sm p-4" onclick="if(event.target===this) closeKpiDetailModal()">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-3xl border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0 transition-all duration-200" id="modalDialog">
+<div id="modalBackdrop" class="fixed inset-0 z-[9999] hidden items-center justify-center bg-black/60 p-4" onclick="if(event.target===this) closeKpiDetailModal()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-[90vw] border border-gray-100 flex flex-col max-h-[90vh] transform scale-95 opacity-0" id="modalDialog">
         <div class="px-5 py-4 border-b border-red-100 flex justify-between items-center bg-red-50 rounded-t-2xl">
-            <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
+            <div class="flex items-center">
+                <button id="modalBackBtn" onclick="modalGoBack()">
+                    <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M13 16l-6-6 6-6"/></svg>
+                    Kembali
+                </button>
+                <h3 class="font-black text-red-700 text-base sm:text-lg" id="modalTitle">Detail Data</h3>
+            </div>
             <button onclick="closeKpiDetailModal()" class="text-gray-400 hover:text-gray-600 transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
@@ -151,59 +157,219 @@
 <style>
 /* ── 1080p / Large Monitor ≥1920px ─────────────────────────── */
 @media (min-width: 1920px) {
-  .kpi-table-cell          { font-size: 0.88rem !important; padding: 8px 12px !important; }
-  .kpi-table-header        { font-size: 0.72rem !important; padding: 8px 12px !important; }
-  .card-line-title         { font-size: 1rem !important; padding: 10px 14px !important; }
   .chart-min-h             { min-height: 380px !important; }
   .filter-input            { font-size: 0.95rem !important; padding: 10px 16px !important; }
   .filter-btn              { font-size: 0.9rem !important; padding: 10px 20px !important; }
   #liveClock               { font-size: 3.5rem !important; }
   .dash-h1                 { font-size: 2rem !important; }
-  #linesGrid.is-multi-line { gap: 1.25rem !important; grid-template-columns: repeat(3, 1fr) !important; }
   .space-wrapper           { gap: 1.5rem !important; }
+  .press-card-header       { font-size: 1.2rem !important; padding: 14px 16px !important; }
+  .kpi-row                 { padding: 10px 16px !important; min-height: 44px !important; }
+  .kpi-row .kpi-label      { font-size: 1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.1rem !important; }
+  .per-press-view .press-card-header { font-size: 2rem !important; padding: 20px 28px !important; }
+  .per-press-view .kpi-row           { padding: 18px 24px !important; min-height: 56px !important; }
+  .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
+  .per-press-view .kpi-row .kpi-value { font-size: 1.5rem !important; }
+  .per-press-view .kpi-row .kpi-pct   { font-size: 1.1rem !important; }
+  .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
+  .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
+  .per-press-table thead th           { font-size: 1.1rem !important; padding: 16px 24px !important; }
+  .per-press-table tbody td           { font-size: 1.25rem !important; padding: 16px 24px !important; }
+  .per-press-table .pp-td-clickable   { font-size: 1.25rem !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
 @media (min-width: 2560px) {
-  .kpi-table-cell          { font-size: 1.05rem !important; padding: 11px 16px !important; }
-  .kpi-table-header        { font-size: 0.85rem !important; padding: 10px 16px !important; }
-  .card-line-title         { font-size: 1.2rem !important; padding: 13px 18px !important; letter-spacing: 0.15em !important; }
   .chart-min-h             { min-height: 500px !important; }
   .filter-input            { font-size: 1.1rem !important; padding: 12px 20px !important; }
   .filter-btn              { font-size: 1.05rem !important; padding: 12px 28px !important; }
   #liveClock               { font-size: 5rem !important; }
   .dash-h1                 { font-size: 2.6rem !important; }
-  #linesGrid.is-multi-line { gap: 1.5rem !important; grid-template-columns: repeat(3, 1fr) !important; }
   .space-wrapper           { gap: 2rem !important; }
   .chart-grid              { gap: 1.75rem !important; }
   .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
+  .press-card-header       { font-size: 1.3rem !important; padding: 16px 20px !important; }
+  .kpi-row                 { padding: 12px 18px !important; min-height: 48px !important; }
+  .kpi-row .kpi-label      { font-size: 1.1rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.2rem !important; }
+  .kpi-pct        { font-size: 1rem !important; }
+  .per-press-view .press-card-header { font-size: 2.2rem !important; padding: 22px 28px !important; }
+  .per-press-view .kpi-row           { padding: 16px 22px !important; min-height: 52px !important; }
+  .per-press-view .kpi-row .kpi-label { font-size: 1.3rem !important; }
+  .per-press-view .kpi-row .kpi-value { font-size: 1.5rem !important; }
+  .per-press-view .kpi-row .kpi-pct   { font-size: 1.1rem !important; }
+  .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 1.6rem !important; }
+  .per-press-view .kpi-col-header     { font-size: 1.1rem !important; }
+  .per-press-table thead th           { font-size: 1.2rem !important; padding: 18px 28px !important; }
+  .per-press-table tbody td           { font-size: 1.4rem !important; padding: 18px 28px !important; }
+  .per-press-table .pp-td-clickable   { font-size: 1.4rem !important; }
 }
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
 @media (min-width: 3840px) {
-  .kpi-table-cell          { font-size: 1.45rem !important; padding: 16px 24px !important; }
-  .kpi-table-header        { font-size: 1.15rem !important; padding: 14px 22px !important; }
-  .card-line-title         { font-size: 1.7rem !important; padding: 18px 24px !important; letter-spacing: 0.2em !important; }
   .chart-min-h             { min-height: 720px !important; }
   .filter-input            { font-size: 1.5rem !important; padding: 18px 28px !important; border-radius: 1rem !important; }
   .filter-btn              { font-size: 1.45rem !important; padding: 18px 40px !important; border-radius: 1rem !important; }
   #liveClock               { font-size: 7.5rem !important; }
   .dash-h1                 { font-size: 3.75rem !important; }
   .dash-subtitle           { font-size: 1.4rem !important; }
-  #linesGrid.is-multi-line { gap: 2rem !important; grid-template-columns: repeat(3, 1fr) !important; }
   .space-wrapper           { gap: 3rem !important; }
   .chart-grid              { gap: 2.5rem !important; }
   .section-card            { border-radius: 1.5rem !important; padding: 2rem !important; }
   .modal-dialog-inner      { max-width: 1400px !important; font-size: 1.6rem !important; }
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
+  #linesGrid               { grid-template-columns: repeat(4, 1fr) !important; gap: 2.5rem !important; }
+  .press-card-header       { font-size: 1.8rem !important; padding: 20px 28px !important; letter-spacing: 0.25em !important; }
+  .kpi-row                 { padding: 16px 22px !important; min-height: 54px !important; }
+  .kpi-row .kpi-label      { font-size: 1.4rem !important; }
+  .kpi-row .kpi-value      { font-size: 1.6rem !important; }
+  .kpi-row .kpi-pct        { font-size: 1.2rem !important; }
+  .per-press-view .press-card-header { font-size: 3rem !important; padding: 28px 36px !important; }
+  .per-press-view .kpi-row           { padding: 20px 30px !important; min-height: 64px !important; }
+  .per-press-view .kpi-row .kpi-label { font-size: 1.7rem !important; }
+  .per-press-view .kpi-row .kpi-value { font-size: 2rem !important; }
+  .per-press-view .kpi-row .kpi-pct   { font-size: 1.4rem !important; }
+  .per-press-view .kpi-row-clickable .kpi-val-main { font-size: 2.2rem !important; }
+  .per-press-view .kpi-col-header     { font-size: 1.4rem !important; padding: 14px 30px !important; }
+  .per-press-table thead th           { font-size: 1.5rem !important; padding: 22px 36px !important; }
+  .per-press-table tbody td           { font-size: 1.7rem !important; padding: 22px 36px !important; }
+  .per-press-table .pp-td-clickable   { font-size: 1.7rem !important; }
+}
+
+/* ── PER-PRESS VIEW (single press, full-width card + big fonts) ─── */
+#linesGrid.per-press-view {
+  grid-template-columns: 1fr !important;
+  gap: 1.5rem !important;
+}
+.per-press-view .press-card {
+  border-radius: 1.25rem;
+  border: 1px solid #e5e7eb;
+  max-width: none !important;
+}
+.per-press-view .press-card-header {
+  font-size: 1.8rem;
+  padding: 24px 32px;
+  letter-spacing: 0.3em;
+}
+.per-press-view .press-card-body {
+  display: block !important;
+  padding: 0;
+}
+.per-press-view .kpi-col-left,
+.per-press-view .kpi-col-right { display: none; }
+
+/* Per-press table */
+.pp-table-wrap { overflow-x: auto; }
+.per-press-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.per-press-table thead th {
+  padding: 14px 20px;
+  font-size: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6b7280;
+  background: #fafafa;
+  border-bottom: 2px solid #e5e7eb;
+  text-align: left;
+}
+.per-press-table thead th:not(:first-child) { text-align: right; }
+.per-press-table tbody td {
+  padding: 14px 20px;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #1f2937;
+  border-bottom: 1px solid #f3f4f6;
+}
+.per-press-table tbody td:first-child {
+  font-weight: 800;
+  color: #374151;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.per-press-table tbody td:not(:first-child) { text-align: right; }
+.per-press-table tbody tr:hover { background: #f9fafb; }
+.per-press-table tbody tr:last-child td { border-bottom: none; }
+.per-press-table .pp-td-actual { color: #dc2626; font-weight: 900; }
+.per-press-table .pp-td-curr { color: #2563eb; font-weight: 800; }
+.per-press-table .pp-row-job td { background: #eff6ff; border-bottom-color: #bfdbfe; }
+.per-press-table .pp-row-gsph td { background: #f0f9ff; border-bottom-color: #bae6fd; }
+.per-press-table .pp-row-stroke td { background: #f5f3ff; border-bottom-color: #ddd6fe; }
+.per-press-table .pp-td-clickable {
+  color: #dc2626;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #fca5a5;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.per-press-table .pp-td-clickable:hover { color: #b91c1c; }
+.per-press-table .pp-row-clickable { cursor: pointer; }
+.per-press-table .pp-row-clickable:hover { background: #fef2f2; }
+
+/* Per-press detail section (no toggle, shown directly) */
+.per-press-detail {
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+}
+.per-press-detail .det-section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.per-press-detail .det-section-label .label-text {
+  font-size: 0.85rem;
+  font-weight: 800;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.per-press-detail .det-section-label .label-badge {
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #e5e7eb;
+  color: #6b7280;
+}
+.per-press-detail .det-section-label .label-badge.zero {
+  background: #fef2f2;
+  color: #dc2626;
+}
+.per-press-detail .det-empty { padding: 20px 12px; }
+.per-press-view .kpi-col-left,
+.per-press-view .kpi-col-right { display: none; }
+.per-press-view .kpi-row {
+  padding: 16px 20px;
+  min-height: 52px;
+}
+.per-press-view .kpi-row .kpi-label {
+  font-size: 1.2rem;
+  font-weight: 800;
+}
+.per-press-view .kpi-row .kpi-value {
+  font-size: 1.4rem;
+  font-weight: 800;
+}
+.per-press-view .kpi-row .kpi-pct {
+  font-size: 1rem;
+}
+.per-press-view .kpi-row-clickable .kpi-val-main {
+  font-size: 1.5rem;
+}
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
 .det-scroll {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 240px;
+  max-height: 500px;
   scrollbar-width: thin;
   scrollbar-color: #e5e7eb #f9fafb;
 }
@@ -215,7 +381,7 @@
 .det-table {
   border-collapse: collapse;
   width: 100%;
-  min-width: 900px;
+  min-width: 1400px;
   font-size: 11px;
 }
 .det-table thead tr {
@@ -251,43 +417,6 @@
   vertical-align: middle;
   color: #6b7280;
 }
-
-.det-footer {
-  margin-top: auto;
-  border-top: 1px solid #e9ecef;
-  background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
-}
-.det-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-  padding: 9px 14px;
-  font-size: 11px;
-  font-weight: 900;
-  text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: #b91c1c;
-  background: transparent;
-  border: 0;
-  cursor: pointer;
-  transition: background .15s ease, color .15s ease;
-}
-.det-btn:hover:not(:disabled) { background: #fee2e2; color: #991b1b; }
-.det-btn:focus-visible { outline: 2px solid #ef4444; outline-offset: -2px; }
-.det-btn span.det-btn-count {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: none;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: #fee2e2;
-  color: #b91c1c;
-}
-.det-btn.zero { color: #b0b7c3; cursor: not-allowed; }
-.det-btn.zero span.det-btn-count { background: #f1f5f9; color: #b0b7c3; }
 
 .det-section-label {
   display: flex;
@@ -332,6 +461,239 @@
 }
 .det-empty svg  { width: 32px; height: 32px; opacity: 0.5; }
 .det-empty span { font-size: 11px; font-weight: 700; letter-spacing: 0.04em; color: #b0b7c3; }
+
+/* ── PRESS CARD NEW LAYOUT ──────────────────────────────────── */
+.press-card {
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 1rem;
+  border: 1px solid #e5e7eb;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+  transition: border-color 0.2s;
+}
+.press-card:hover { border-color: #fca5a5; }
+
+.press-card-header {
+  background: linear-gradient(135deg, #fef2f2 0%, #fff1f2 100%);
+  border-bottom: 2px solid #fecaca;
+  padding: 12px 16px;
+  text-align: center;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #dc2626;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+}
+
+.press-card-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.kpi-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 16px;
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.15s;
+  min-height: 42px;
+}
+.kpi-row:last-child { border-bottom: none; }
+.kpi-row:hover { background: #f9fafb; }
+
+.kpi-row .kpi-label {
+  font-size: 0.9rem;
+  font-weight: 800;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  flex-shrink: 0;
+}
+.kpi-row .kpi-value {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #1f2937;
+  text-align: right;
+  word-break: break-word;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.3em;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.kpi-row .kpi-pct {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #9ca3af;
+  margin-left: 0;
+}
+
+/* Clickable rows — red value + underline + pct below */
+.kpi-row-clickable { cursor: pointer; }
+.kpi-row-clickable .kpi-val-main {
+  color: #dc2626;
+  font-weight: 900;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: #fca5a5;
+  text-underline-offset: 3px;
+}
+.kpi-row-clickable .kpi-label {
+  color: #dc2626;
+  font-weight: 700;
+}
+.kpi-row-clickable .kpi-pct {
+  color: #9ca3af;
+  font-weight: 600;
+}
+.kpi-row-clickable:hover { background: #fef2f2; }
+
+/* Per-press: keep column layout for value + pct */
+.per-press-view .kpi-row .kpi-value {
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 1px;
+}
+
+/* Subtitle text (e.g. "curr" under JOB) */
+.kpi-subtitle {
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* GSPH row highlight */
+.kpi-row[data-desc="GSPH"] {
+  background: #f0f9ff;
+  border-bottom: 1px solid #bae6fd;
+}
+.kpi-row[data-desc="GSPH"] .kpi-label { color: #0369a1; }
+
+/* JOB row highlight */
+.kpi-row[data-desc="JOB"] {
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
+}
+.kpi-row[data-desc="JOB"] .kpi-label { color: #1d4ed8; }
+.kpi-row[data-desc="JOB"] .kpi-pct { color: #2563eb; }
+
+/* STROKE row highlight */
+.kpi-row[data-desc="STROKE"] {
+  background: #f5f3ff;
+  border-bottom: 1px solid #ddd6fe;
+}
+.kpi-row[data-desc="STROKE"] .kpi-label { color: #7c3aed; }
+
+/* Danger row (high repair/reject/downtime) */
+.kpi-row-danger {
+  background: #fef2f2 !important;
+  border-left: 3px solid #ef4444;
+}
+.kpi-row-danger .kpi-label { color: #dc2626 !important; font-weight: 900 !important; }
+.kpi-row-danger .kpi-value { color: #dc2626 !important; font-weight: 900 !important; }
+
+/* Detail toggle button */
+.detail-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 14px;
+  background: #f1f5f9;
+  border-top: 1px solid #e2e8f0;
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #475569;
+  letter-spacing: 0.04em;
+  transition: all 0.15s;
+  width: 100%;
+}
+.detail-toggle svg { opacity: 0.6; transition: opacity 0.15s; }
+.detail-toggle:hover { background: #eff6ff; color: #2563eb; }
+.detail-toggle:hover svg { opacity: 1; }
+
+/* ── MODAL KPI CLICKABLE ROWS (inside press detail modal) ──── */
+.kpi-modal-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: 1px solid transparent;
+}
+.kpi-modal-row:hover {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+}
+.kpi-modal-row .kpi-modal-label { font-size: 0.8rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em; }
+.kpi-modal-row .kpi-modal-value { font-size: 1.1rem; font-weight: 900; color: #1e293b; }
+.kpi-modal-row .kpi-modal-arrow { color: #94a3b8; transition: color 0.15s, transform 0.15s; }
+.kpi-modal-row:hover .kpi-modal-arrow { color: #2563eb; transform: translateX(2px); }
+.kpi-modal-row.is-zero .kpi-modal-value { color: #94a3b8; }
+
+/* Modal back button */
+#modalBackBtn {
+  display: none;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #64748b;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transition: all 0.15s;
+  margin-right: 8px;
+}
+#modalBackBtn:hover { background: #fee2e2; color: #dc2626; }
+#modalBackBtn.visible { display: inline-flex; }
+
+/* ── BLINK ANIMATIONS ──────────────────────────────────────── */
+@keyframes blink-red {
+  0%, 100% { background: #ef4444 !important; color: #fff !important; }
+  50% { background: #fff !important; color: #ef4444 !important; }
+}
+@keyframes blink-yellow {
+  0%, 100% { background: #eab308 !important; color: #000 !important; }
+  50% { background: #fff !important; color: #eab308 !important; }
+}
+@keyframes blink-green {
+  0%, 100% { background: #22c55e !important; color: #fff !important; }
+  50% { background: #fff !important; color: #22c55e !important; }
+}
+
+.kpi-row.blink-red {
+  animation: blink-red 0.8s ease-in-out infinite;
+  border-radius: 4px;
+  margin: 0 4px;
+  padding: 7px 8px;
+}
+.kpi-row.blink-yellow {
+  animation: blink-yellow 1.2s ease-in-out infinite;
+  border-radius: 4px;
+  margin: 0 4px;
+  padding: 7px 8px;
+}
+.kpi-row.blink-green {
+  animation: blink-green 0.6s ease-in-out 3;
+  border-radius: 4px;
+  margin: 0 4px;
+  padding: 7px 8px;
+}
 </style>
 
 @endsection
@@ -341,7 +703,7 @@
 <script>
 const LINES = @json($lines);
 const SELECTED_LINE = @json($selectedLine);
-const INITIAL = @json($initial);
+const IS_PER_PRESS = LINES.length === 1;
 
 let selectedShift = 1;
 let selectedDays  = 1;
@@ -349,6 +711,8 @@ let charts = {};
 let LINE_KPI = {};
 let LINE_META = {};
 let DETAIL_DATA = {};
+let PRESS_DETAIL_DATA = {};
+let MODAL_STACK = [];
 let LAST_KPI_HASH = '';
 let LAST_DETAIL_HASH = '';
 
@@ -356,29 +720,6 @@ let LAST_DETAIL_HASH = '';
 let CARDS_CACHED = false;
 let CELL_CACHE = {};
 let LAST_DETAIL_RENDER_HASH = '';
-let LAST_KPI_RENDER_HASH = '';
-
-// Inisialisasi tanggal WAJIB sebelum request pertama agar query string tidak kosong
-(function initDateInput(){
-  const input = document.getElementById('dateInput');
-  if (!input) return;
-  if (input.value) return;
-  if (INITIAL && INITIAL.date) { input.value = INITIAL.date; return; }
-  const now = new Date();
-  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  let saved = null;
-  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
-  input.value = saved || today;
-})();
-
-// Paint from the server-rendered payload so the grid is never blank, then let
-// the poller take over. Both use the same controller payload builder.
-if (INITIAL && INITIAL.line_kpi) {
-  LINE_KPI = INITIAL.line_kpi || {};
-  LINE_META = INITIAL.line_meta || {};
-  DETAIL_DATA = INITIAL.detail_data || {};
-  LAST_KPI_HASH = JSON.stringify(LINE_KPI);
-}
 
 function setText(el, v) {
   if (el && el.textContent !== v) el.textContent = v;
@@ -391,45 +732,44 @@ function setText(el, v) {
  */
 let LINE_DETAIL = {};
 
-let DASH_ERROR_SHOWN = false;
-
-function showDashError(message) {
-  if (DASH_ERROR_SHOWN) return;
-  DASH_ERROR_SHOWN = true;
-  console.error('[SupervisorDashboard]', message);
-  const grid = document.getElementById('linesGrid');
-  if (grid && !grid.children.length) {
-    grid.innerHTML = `<div class="col-span-full rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">${message}</div>`;
-  }
-}
-
-async function readJson(response, url) {
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`HTTP ${response.status} ${url} :: ${text.slice(0, 300)}`);
-  }
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`Invalid JSON from ${url} :: ${text.slice(0, 300)}`);
-  }
-}
-
 async function fetchDetailData() {
     const date = document.getElementById('dateInput').value;
     const shift = selectedShift;
     try {
         let url = `{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
-        const data = await readJson(await fetch(url), url);
-        LINE_DETAIL = data.detail || {};
-        const newDetailHash = JSON.stringify(LINE_DETAIL);
+        const response = await fetch(url);
+        const data = await readDashJson(response, url);
+        const newDetailHash = JSON.stringify(data.detail);
         if (newDetailHash === LAST_DETAIL_HASH) return;
         LAST_DETAIL_HASH = newDetailHash;
+        LINE_DETAIL = data.detail || {};
         renderLineCards();
     } catch (error) {
         showDashError('Gagal memuat rincian: ' + error.message);
     }
+}
+
+let DASH_ERROR_SHOWN = false;
+
+function showDashError(message) {
+  console.error('[SupervisorDashboard]', message);
+  if (DASH_ERROR_SHOWN) return;
+  DASH_ERROR_SHOWN = true;
+  const grid = document.getElementById('linesGrid');
+  if (grid && !grid.children.length) {
+    grid.innerHTML = `<div class="col-span-full rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-semibold text-red-700">${message}</div>`;
+  }
+}
+
+async function readDashJson(response, url) {
+  const text = await response.text();
+  if (!response.ok) throw new Error(`HTTP ${response.status} ${url} :: ${text.slice(0, 300)}`);
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`Invalid JSON from ${url} :: ${text.slice(0, 300)}`);
+  }
 }
 
 async function fetchDashboardData() {
@@ -440,18 +780,19 @@ async function fetchDashboardData() {
         let url = `{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
 
-        const data = await readJson(await fetch(url), url);
+        const response = await fetch(url);
+        const data = await readDashJson(response, url);
         if (!data.line_kpi) throw new Error('Respons API tidak memuat line_kpi');
 
         DASH_ERROR_SHOWN = false;
+        const newHash = JSON.stringify(data.line_kpi);
+        const detailChanged = newHash !== LAST_KPI_HASH;
+        LAST_KPI_HASH = newHash;
+        
         LINE_KPI = data.line_kpi;
         LINE_META = data.line_meta || {};
         DETAIL_DATA = data.detail_data || {};
-
-        const newHash = JSON.stringify(LINE_KPI);
-        const detailChanged = newHash !== LAST_KPI_HASH;
-        LAST_KPI_HASH = newHash;
-
+        
         if (detailChanged) {
             renderLineCards();
             if(selectedDays === 1 && typeof renderTodayCharts === 'function') renderTodayCharts();
@@ -464,9 +805,21 @@ async function fetchDashboardData() {
 
 
 
-// Render pertama dari payload server, lalu poller mengambil alih
-renderLineCards();
+// Isi tanggal sebelum request pertama agar query string tidak kosong
+(function initDateInput(){
+  const input = document.getElementById('dateInput');
+  if (!input || input.value) return;
+  const now = new Date();
+  const p = n => String(n).padStart(2, '0');
+  const today = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
+  let saved = null;
+  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
+  input.value = saved || today;
+})();
+
+// Menjalankan penarikan data pertama kali saat halaman dibuka
 fetchDashboardData();
+setTimeout(fetchDetailData, 100);
 
 // Real-time via BroadcastChannel (instant from Input Harian saves)
 try {
@@ -489,6 +842,13 @@ function updateClock(){
 }
 setInterval(updateClock, 1000);
 updateClock();
+
+(function(){
+  const now = new Date();
+  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
+  try { localStorage.removeItem('dash_filter_date'); } catch(e) {}
+  document.getElementById('dateInput').value = today;
+})();
 
 function setShift(s){
   selectedShift = s;
@@ -562,228 +922,372 @@ function detailCells(r){
     dCell(r.plan_finish) + dCell(r.actual_finish);
 }
 
+function cellClass(desc, actual, actPct){
+    if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'blink-green':p>=80?'blink-yellow':'blink-red';}
+    if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'blink-red':p>2?'blink-yellow':'';}
+    if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){const v=parseFloat(actual);return v>30?'blink-red':v>15?'blink-yellow':'';}
+    return '';
+}
+
+var prevBlinkClass = {};
+
+const MAIN_KPIS = ['QTY','GSPH','REPAIR','REJECT','TOTAL_DT'];
+const EXTRA_KPIS = ['PROD_T','MACH_T','DIES_T','MAT_T','LOG_T','OVERTIME'];
+const LEFT_KPIS  = ['QTY','GSPH','REPAIR','REJECT'];
+const RIGHT_KPIS = ['TOTAL_DT'];
+
+function buildKpiRow(kpi, line, safeLine){
+  const isClickable = kpi.popup || kpi.actualLink;
+  let valueHtml = '';
+  if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+  } else if (isClickable && kpi.desc === 'TOTAL_DT') {
+    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
+  } else if (isClickable) {
+    valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+  } else if(kpi.desc === 'GSPH'){
+    valueHtml = `<span>${kpi.actual}</span>`;
+  } else if(kpi.desc === 'REPAIR' || kpi.desc === 'REJECT'){
+    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+  } else if(kpi.desc === 'TOTAL_DT'){
+    valueHtml = `<span>${kpi.actual}</span>`;
+  } else {
+    valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+  }
+  const dangerCls = kpi.danger ? ' kpi-row-danger' : '';
+  const clickCls = isClickable ? ' kpi-row-clickable' : '';
+  const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+        const label = kpi.desc;
+  return `<div class="kpi-row${dangerCls}${clickCls}" data-line="${line}" data-desc="${kpi.desc}" id="kpi-${kpi.desc}-${safeLine}"${clickAttr}>
+    <span class="kpi-label">${label}</span>
+    <span class="kpi-value">${valueHtml}</span>
+  </div>`;
+}
+
 function buildLineCard(line){
   const rows = LINE_KPI[line] || [];
   const meta = LINE_META[line] || {};
   const jobLabel = meta.job || '-';
-  const jobPlan = meta.jobPlan || '0';  
   const jobActual = meta.jobActual || '0/0';
   const strokeVal = meta.stroke || '0';
   const currStrokeVal = meta.currStroke || '-';
   const detailRows = LINE_DETAIL[line] || [];
+  const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
 
-  // KPI table rows
-  let kpiRows = `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
-    <td class="kpi-table-cell px-3 py-2 text-left text-blue-700 font-extrabold text-xs">JOB</td>
-    <td class="kpi-table-cell px-3 py-2 text-center text-gray-500 text-xs">${jobPlan}</td>
-    <td class="kpi-table-cell px-3 py-2 text-center text-blue-700 font-bold text-xs">${jobActual}</td>
-    <td class="kpi-table-cell px-3 py-2 text-center text-gray-800 font-semibold text-xs">${jobLabel}</td>
-  </tr>`;
+  const jobRow = `<div class="kpi-row" data-line="${line}" data-desc="JOB">
+    <span class="kpi-label">JOB</span>
+    <span class="kpi-value">${jobActual} <span class="kpi-subtitle">curr</span> <span class="kpi-pct">${jobLabel !== '-' ? jobLabel : ''}</span></span>
+  </div>`;
 
-  rows.forEach((kpi) => {
-    const dangerRowCls = kpi.danger ? 'bg-red-50' : 'hover:bg-gray-50/70';
-    const textDescCls  = kpi.danger ? 'text-red-700 font-extrabold' : 'text-gray-700 font-bold';
-    let clickAttr = kpi.popup || kpi.actualLink ? `onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
-    let cursorCls = kpi.popup || kpi.actualLink ? 'cursor-pointer hover:bg-red-50 transition-colors' : '';
-    let underlineCls = kpi.popup || kpi.actualLink ? 'underline decoration-dotted decoration-red-300 underline-offset-4' : '';
+  const strokeDisplay = currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID') + ' / ' + Number(strokeVal).toLocaleString('id-ID');
+  const strokeRow = `<div class="kpi-row" data-line="${line}" data-desc="STROKE" id="kpi-STROKE-${safeLine}">
+    <span class="kpi-label">STROKE</span>
+    <span class="kpi-value">${strokeDisplay}</span>
+  </div>`;
 
-    let actualCell = '';
-    if(kpi.popup && (kpi.desc==='REPAIR' || kpi.desc==='REJECT')){
-      actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
-    } else {
-      actualCell = `<span class="text-red-600 font-extrabold ${underlineCls}">${kpi.actual}</span>`;
-    }
+  const mainRows = rows.filter(k => MAIN_KPIS.includes(k.desc));
+  const extraRows = rows.filter(k => EXTRA_KPIS.includes(k.desc));
 
-    kpiRows += `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
-      <td class="kpi-table-cell px-3 py-2 text-left ${textDescCls} border-l-[3px] border-transparent text-xs">${kpi.desc}</td>
-      <td class="kpi-table-cell px-3 py-2 text-center text-gray-500 text-xs">${kpi.plan}</td>
-      <td class="kpi-table-cell px-3 py-2 text-center text-xs ${cursorCls}" ${clickAttr}>${actualCell}</td>
-      <td class="kpi-table-cell px-3 py-2 text-center text-gray-600 font-semibold text-xs">${kpi.currentPct ? `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>` : kpi.current}</td>
+  let bodyHtml = '';
+  if (IS_PER_PRESS) {
+    let tableRows = '';
+    const jobPlan = meta.jobPlan || '0';
+    tableRows += `<tr class="pp-row-job">
+      <td>JOB</td>
+      <td>${jobPlan}</td>
+      <td class="pp-td-actual">${jobActual}</td>
+      <td class="pp-td-curr">${jobLabel !== '-' ? jobLabel : '-'}</td>
     </tr>`;
 
-    if(kpi.desc === 'GSPH'){
-      kpiRows += `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
-        <td class="kpi-table-cell px-3 py-2 text-left text-blue-700 font-extrabold text-xs">STROKE</td>
-        <td class="kpi-table-cell px-3 py-2 text-center text-gray-500 text-xs">-</td>
-        <td class="kpi-table-cell px-3 py-2 text-center text-blue-700 font-bold text-xs">${Number(strokeVal).toLocaleString('id-ID')}</td>
-        <td class="kpi-table-cell px-3 py-2 text-center text-gray-600 font-semibold text-xs">${currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID')}</td>
-      </tr>`;
+    const allKpis = [...mainRows, ...extraRows];
+    const order = ['QTY','GSPH','TOTAL_DT','MACH_T','DIES_T','MAT_T','LOG_T','PROD_T','OVERTIME','REPAIR','REJECT'];
+    const sorted = order.map(d => allKpis.find(k => k.desc === d)).filter(Boolean);
+    const remaining = allKpis.filter(k => !order.includes(k.desc));
+    sorted.push(...remaining);
+
+    sorted.forEach(kpi => {
+      const isClickable = kpi.popup || kpi.actualLink;
+      const clickAttr = isClickable ? ` onclick="openKpiDetailModal('${kpi.desc}','${line}')"` : '';
+      const actualClass = isClickable ? 'pp-td-actual pp-td-clickable' : 'pp-td-actual';
+
+      if (kpi.desc === 'QTY') {
+        const planNum = Number(kpi.plan || 0).toLocaleString('id-ID');
+        const actualNum = Number(kpi.actual || 0).toLocaleString('id-ID');
+        const rowCls = isClickable ? ' class="pp-row-clickable"' : '';
+        tableRows += `<tr${rowCls}>
+          <td>QTY</td>
+          <td>${planNum}</td>
+          <td${clickAttr} class="${actualClass}">${actualNum}</td>
+          <td class="pp-td-curr">${kpi.current || '-'}</td>
+        </tr>`;
+        tableRows += `<tr class="pp-row-stroke">
+          <td>STROKE</td>
+          <td>-</td>
+          <td class="pp-td-actual">${strokeDisplay}</td>
+          <td class="pp-td-curr">${currStrokeVal !== '-' ? currStrokeVal : '-'}</td>
+        </tr>`;
+      } else {
+        let rowClass = kpi.desc === 'GSPH' ? 'pp-row-gsph' : '';
+        if (isClickable) rowClass = 'pp-row-clickable';
+  const label = kpi.desc;
+        tableRows += `<tr class="${rowClass}">
+          <td>${label}</td>
+          <td>${kpi.plan || '-'}</td>
+          <td${clickAttr} class="${actualClass}">${kpi.actual}</td>
+          <td class="pp-td-curr">${kpi.current || '-'}</td>
+        </tr>`;
+      }
+    });
+
+    bodyHtml = `<div class="pp-table-wrap"><table class="per-press-table">
+      <thead><tr><th>DESC</th><th>PLAN</th><th>ACTUAL</th><th>CURR</th></tr></thead>
+      <tbody>${tableRows}</tbody>
+    </table></div>`;
+  } else {
+    let kpiHtml = jobRow;
+
+    const qtyKpi = mainRows.find(k => k.desc === 'QTY');
+    if (qtyKpi) {
+      const actualNum = Number(qtyKpi.actual || 0).toLocaleString('id-ID');
+      const planNum = Number(qtyKpi.plan || 0).toLocaleString('id-ID');
+      kpiHtml += `<div class="kpi-row kpi-row-clickable" data-line="${line}" data-desc="QTY" id="kpi-QTY-${safeLine}" onclick="openKpiDetailModal('QTY','${line}')">
+        <span class="kpi-label">QTY</span>
+        <span class="kpi-value"><span class="kpi-val-main">${actualNum} / ${planNum}</span></span>
+      </div>`;
     }
+
+    kpiHtml += strokeRow;
+
+    mainRows.filter(kpi => kpi.desc !== 'QTY').forEach((kpi) => {
+      kpiHtml += buildKpiRow(kpi, line, safeLine);
+    });
+
+    bodyHtml = kpiHtml;
+  }
+
+  const hasDetail = detailRows.length > 0;
+  const rowCount = detailRows.length;
+  let detRows = '';
+  detailRows.forEach((r) => {
+    detRows += `<tr>${detailCells(r)}</tr>`;
   });
 
-  // Detail: ringkas di card, rincian penuh lewat tombol -> modal
-  const hasDetail = detailRows.length > 0;
-  const rowCount  = detailRows.length;
+  let extraKpiHtml = '';
+  if (!IS_PER_PRESS && extraRows.length > 0) {
+    extraRows.forEach((kpi) => {
+      const isClickable = kpi.popup || kpi.actualLink;
+      let valueHtml = '';
+      if (isClickable) {
+        const zeroCls = (!kpi.actual || kpi.actual === '0 m' || kpi.actual === '0') ? ' is-zero' : '';
+        valueHtml = `<span class="kpi-modal-value${zeroCls}">${kpi.actual}</span>`;
+        extraKpiHtml += `<div class="kpi-modal-row" onclick="openKpiFromPressDetail('${kpi.desc}','${line}')">
+          <span class="kpi-modal-label">${kpi.desc}</span>
+          <span style="display:flex;align-items:center;gap:6px">
+            ${valueHtml}
+            <span class="kpi-modal-arrow"><svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 4l6 6-6 6"/></svg></span>
+          </span>
+        </div>`;
+      } else {
+        valueHtml = `<span class="kpi-modal-value">${kpi.actual}</span>`;
+        extraKpiHtml += `<div class="kpi-modal-row">
+          <span class="kpi-modal-label">${kpi.desc}</span>
+          <span>${valueHtml}</span>
+        </div>`;
+      }
+    });
+  }
 
-  const detFooter = `
-    <div class="det-footer">
-      <button type="button" class="det-btn${hasDetail ? '' : ' zero'}" onclick="openJobDetailModal('${line}')"${hasDetail ? '' : ' disabled'} title="Lihat detail produksi ${line}">
-        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
-          <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
-          <path d="M2 8h16" stroke="currentColor" stroke-width="1.5"/>
-          <path d="M7 4v12M13 4v12" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/>
-        </svg>
-        <span class="det-btn-text">Detail</span>
-        <span class="det-btn-count">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
-      </button>
-    </div>`;
-      
-  return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
-    <div class="card-line-title bg-red-50 border-b border-red-100 px-4 py-2.5 text-center text-red-700 font-black tracking-[0.15em] text-sm sm:text-base uppercase">
-      ${line}
-    </div>
-    <div class="overflow-x-auto kpi-table-wrap">
-      <table class="border-collapse w-full">
+  const detailTableHtml = hasDetail ? `
+    <div class="det-scroll">
+      <table class="det-table">
         <thead>
-          <tr class="bg-gray-100 border-b border-gray-200 text-gray-500">
-            <th class="kpi-table-header px-3 py-2 text-left text-[10px] sm:text-xs font-black uppercase tracking-wider">DESC</th>
-            <th class="kpi-table-header px-3 py-2 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider">PLAN</th>
-            <th class="kpi-table-header px-3 py-2 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider">ACTUAL</th>
-            <th class="kpi-table-header px-3 py-2 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider">CURR</th>
+          <tr>
+            <th style="text-align:center">No</th>
+            <th style="text-align:left">Job No</th>
+            <th style="text-align:center">P1</th>
+            <th style="text-align:center">P2</th>
+            <th style="text-align:center">P3</th>
+            <th style="text-align:center">P4</th>
+            <th style="text-align:center">Plan Qty</th>
+            <th style="text-align:center;color:#16a34a">Good</th>
+            <th style="text-align:center;color:#d97706">Rep</th>
+            <th style="text-align:center;color:#dc2626">Rej</th>
+            <th style="text-align:center">Press Time</th>
+            <th style="text-align:center">Dandori</th>
+            <th style="text-align:center">IQ Check</th>
+            <th style="text-align:center">Downtime</th>
+            <th style="text-align:center;color:#2563eb">TPT</th>
+            <th style="text-align:center">Plan Finish</th>
+            <th style="text-align:center">Act Finish</th>
           </tr>
         </thead>
-        <tbody>
-          ${kpiRows}
-        </tbody>
+        <tbody>${detRows}</tbody>
       </table>
-    </div>
-    ${detFooter}
+    </div>` : `
+    <div class="det-empty">
+      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db" style="width:28px;height:28px;opacity:0.5">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+      </svg>
+      <span>Belum ada data produksi</span>
+    </div>`;
+
+  if (IS_PER_PRESS) {
+    return `<div class="press-card" id="card-${safeLine}">
+      <div class="press-card-header">${line}</div>
+      <div class="press-card-body">${bodyHtml}</div>
+      <div class="per-press-detail">
+        <div class="det-section-label">
+          <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+            <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
+            <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
+            <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
+          </svg>
+          <span class="label-text">Detail Produksi</span>
+          <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
+        </div>
+        ${detailTableHtml}
+      </div>
+    </div>`;
+  }
+
+  if (!IS_PER_PRESS) {
+    PRESS_DETAIL_DATA[safeLine] = { extraKpiHtml, detailTableHtml, hasDetail, rowCount };
+  }
+
+  return `<div class="press-card" id="card-${safeLine}">
+    <div class="press-card-header">${line}</div>
+    <div class="press-card-body">${bodyHtml}</div>
+    <button class="detail-toggle" onclick="openPressDetailModal('${safeLine}','${line}')">
+      <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="9" cy="9" r="6"/><path d="M13.5 13.5L17 17"/></svg>
+      Detail
+    </button>
   </div>`;
 }
 
 function renderLineCards(forceDetail){
-  updateCards(forceDetail);
-}
-
-function showModal(title, wide) {
-  const backdrop = document.getElementById('modalBackdrop');
-  const dialog = document.getElementById('modalDialog');
-  document.getElementById('modalTitle').textContent = title;
-  dialog.classList.toggle('max-w-3xl', !wide);
-  dialog.classList.toggle('max-w-6xl', !!wide);
-  backdrop.classList.remove('hidden');
-  backdrop.classList.add('flex');
-  setTimeout(() => {
-    dialog.classList.add('scale-100', 'opacity-100');
-    dialog.classList.remove('scale-95', 'opacity-0');
-  }, 10);
-}
-
-function openJobDetailModal(line) {
-  const body = document.getElementById('modalBody');
-  showModal(`Detail Produksi — ${line}`, true);
-
-  const rows = LINE_DETAIL[line] || [];
-  if (!rows.length) {
-    body.innerHTML = `<div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
-      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db" class="w-10 h-10"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
-      <span class="text-sm font-semibold">Belum ada data produksi untuk ${line}</span></div>`;
+  const grid = document.getElementById('linesGrid');
+  if (IS_PER_PRESS) {
+    grid.classList.add('per-press-view');
+  } else {
+    grid.classList.remove('per-press-view');
+  }
+  if (!CARDS_CACHED) {
+    grid.innerHTML = LINES.map(buildLineCard).join('');
+    CARDS_CACHED = true;
+    cacheCards();
     return;
   }
-
-  const head = ['No','Job No','P1','P2','P3','P4','Plan Qty','Good','Rep','Rej','Press Time','Dandori','IQ Check','Downtime','TPT','Plan Finish','Act Finish'];
-  const th = (t, i) => `<th class="px-2 py-2 ${i === 1 ? 'text-left' : 'text-center'} bg-gray-50 text-gray-600 text-[10px] sm:text-xs font-black uppercase tracking-wider border-b border-gray-200 whitespace-nowrap">${t}</th>`;
-
-  body.innerHTML = `
-    <div class="overflow-x-auto rounded-xl border border-gray-200">
-      <table class="w-full text-xs sm:text-sm">
-        <thead><tr>${head.map(th).join('')}</tr></thead>
-        <tbody class="divide-y divide-gray-100">
-          ${rows.map((r, idx) => `<tr class="hover:bg-gray-50">${detailCells(Object.assign({}, r, { no: idx + 1 }))}</tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
+  updateCards(forceDetail);
 }
 
 function cacheCards() {
   CELL_CACHE = {};
-  document.querySelectorAll('#linesGrid .bg-white').forEach(card => {
-    const titleEl = card.querySelector('.card-line-title');
-    if (!titleEl) return;
-    const line = titleEl.textContent.trim();
+  LINES.forEach(line => {
+    const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
+    const card = document.getElementById('card-' + safeLine);
+    if (!card) return;
     CELL_CACHE[line] = { el: card };
-    card.querySelectorAll('.kpi-table-wrap tbody tr').forEach(row => {
-      const cells = row.querySelectorAll('td');
-      if (cells.length < 4) return;
-      const desc = cells[0].textContent.trim();
-      CELL_CACHE[`${line}-${desc}-plan`]   = cells[1];
-      CELL_CACHE[`${line}-${desc}-actual`] = cells[2];
-      CELL_CACHE[`${line}-${desc}-curr`]   = cells[3];
+
+    card.querySelectorAll('.kpi-row').forEach(row => {
+      const desc = row.getAttribute('data-desc');
+      if (!desc) return;
+      CELL_CACHE[`${line}-${desc}-row`] = row;
+      CELL_CACHE[`${line}-${desc}-value`] = row.querySelector('.kpi-value');
     });
   });
 }
 
 function updateCards(forceDetail) {
-  // Rebuild when detail changed, KPI changed, or the card DOM is missing/stale
-  const kpiRenderHash = JSON.stringify(LINE_KPI);
-  if (forceDetail
-      || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH
-      || kpiRenderHash !== LAST_KPI_RENDER_HASH
-      || !CARDS_CACHED
-      || !document.getElementById('linesGrid').children.length) {
+  if (IS_PER_PRESS) {
     flushCardCache();
     document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
     CARDS_CACHED = true;
     cacheCards();
-    LAST_KPI_RENDER_HASH = kpiRenderHash;
-    LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
     return;
   }
 
-  // Only KPI data changed — incremental cell update
+  if (forceDetail || LAST_DETAIL_HASH !== LAST_DETAIL_RENDER_HASH) {
+    LAST_DETAIL_RENDER_HASH = LAST_DETAIL_HASH;
+    flushCardCache();
+    document.getElementById('linesGrid').innerHTML = LINES.map(buildLineCard).join('');
+    CARDS_CACHED = true;
+    cacheCards();
+    return;
+  }
+
   LINES.forEach(line => {
     const rows = LINE_KPI[line] || [];
     const meta = LINE_META[line] || {};
+    const safeLine = line.replace(/[^a-zA-Z0-9]/g,'_');
 
-    setText(CELL_CACHE[`${line}-JOB-plan`],   meta.jobPlan || '0');
-    setText(CELL_CACHE[`${line}-JOB-actual`],  meta.jobActual || '0/0');
-    setText(CELL_CACHE[`${line}-JOB-curr`],    meta.job || '-');
+    const jobValEl = CELL_CACHE[`${line}-JOB-value`];
+    if (jobValEl) {
+      const h = `${meta.jobActual || '0/0'} <span class="kpi-subtitle">curr</span> <span class="kpi-pct">${meta.job && meta.job !== '-' ? meta.job : ''}</span>`;
+      if (jobValEl.innerHTML !== h) jobValEl.innerHTML = h;
+    }
 
-    const st = meta.stroke || '0';
-    const cs = meta.currStroke || '-';
-    setText(CELL_CACHE[`${line}-STROKE-plan`], '-');
-    setText(CELL_CACHE[`${line}-STROKE-actual`], Number(st).toLocaleString('id-ID'));
-    setText(CELL_CACHE[`${line}-STROKE-curr`], cs==='-'?'-':Number(cs||0).toLocaleString('id-ID'));
+    const strokeValEl = CELL_CACHE[`${line}-STROKE-value`];
+    if (strokeValEl) {
+      const st = meta.stroke || '0';
+      const cs = meta.currStroke || '-';
+      const h = cs === '-' ? '-' : Number(cs || 0).toLocaleString('id-ID') + ' / ' + Number(st).toLocaleString('id-ID');
+      if (strokeValEl.textContent !== h) strokeValEl.textContent = h;
+    }
 
     rows.forEach(kpi => {
-      const planCell   = CELL_CACHE[`${line}-${kpi.desc}-plan`];
-      const actualCell = CELL_CACHE[`${line}-${kpi.desc}-actual`];
-      const currCell   = CELL_CACHE[`${line}-${kpi.desc}-curr`];
+      const rowEl = CELL_CACHE[`${line}-${kpi.desc}-row`];
+      const valEl = CELL_CACHE[`${line}-${kpi.desc}-value`];
+      if (!rowEl || !valEl) return;
 
-      if (planCell) setText(planCell, kpi.plan || '-');
+      const isClickable = kpi.popup || kpi.actualLink;
+      let valueHtml = '';
+      if (kpi.desc === 'QTY' && !IS_PER_PRESS) {
+        const actualNum = Number(kpi.actual || 0).toLocaleString('id-ID');
+        const planNum = Number(kpi.plan || 0).toLocaleString('id-ID');
+        valueHtml = `<span class="kpi-val-main">${actualNum} / ${planNum}</span>`;
+      } else if (isClickable && (kpi.desc === 'REPAIR' || kpi.desc === 'REJECT')) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">(${kpi.actualPct || ''})</span>`;
+  } else if (isClickable && kpi.desc === 'TOTAL_DT') {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span>`;
+      } else if (isClickable) {
+        valueHtml = `<span class="kpi-val-main">${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      } else if(kpi.desc === 'GSPH'){
+        valueHtml = `<span>${kpi.actual}</span>`;
+  } else if(kpi.desc === 'TOTAL_DT'){
+        valueHtml = `<span>${kpi.actual}</span>`;
+      } else {
+        valueHtml = `<span>${kpi.actual}</span><span class="kpi-pct">${kpi.currentPct ? '(' + kpi.currentPct + ')' : ''}</span>`;
+      }
+      if (valEl.innerHTML !== valueHtml) valEl.innerHTML = valueHtml;
 
-      if (actualCell) {
-        if (kpi.popup && (kpi.desc==='REPAIR'||kpi.desc==='REJECT')) {
-          const h = `<span class="text-red-600 font-extrabold underline decoration-dotted decoration-red-300 underline-offset-4">${kpi.actual}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.actualPct}</span>`;
-          if (actualCell.innerHTML !== h) actualCell.innerHTML = h;
-        } else {
-          setText(actualCell, kpi.actual);
+      if (isClickable) {
+        rowEl.classList.add('kpi-row-clickable');
+        if (!rowEl.getAttribute('onclick')) {
+          rowEl.setAttribute('onclick', `openKpiDetailModal('${kpi.desc}','${line}')`);
         }
       }
 
-      if (currCell) {
-        if (kpi.currentPct) {
-          const h = `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>`;
-          if (currCell.innerHTML !== h) currCell.innerHTML = h;
-        } else {
-          setText(currCell, kpi.current);
-        }
+      if (kpi.danger) {
+        rowEl.classList.add('kpi-row-danger');
+      } else {
+        rowEl.classList.remove('kpi-row-danger');
       }
 
-      if (planCell) {
-        const row  = planCell.closest('tr');
-        const dsc  = row ? row.cells[0] : null;
-        if (row && dsc) {
-          const dangerCls = 'border-b border-gray-100 transition-colors bg-red-50';
-          const safeCls   = 'border-b border-gray-100 transition-colors hover:bg-gray-50/70';
-          const wantDanger = kpi.danger ? dangerCls : safeCls;
-          if (row.className !== wantDanger) row.className = wantDanger;
-          const txtCls = kpi.danger
-            ? 'kpi-table-cell px-4 py-3 text-left text-red-700 font-extrabold border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base'
-            : 'kpi-table-cell px-4 py-3 text-left text-gray-700 font-bold border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base';
-          if (dsc.className !== txtCls) dsc.className = txtCls;
-        }
+      const newBlink = cellClass(kpi.desc, kpi.actual, kpi.actualPct);
+      const prevBlink = prevBlinkClass[`${line}-${kpi.desc}`] || '';
+
+      if (prevBlink && prevBlink.includes('blink') && !newBlink.includes('blink')) {
+        rowEl.classList.remove('blink-red', 'blink-yellow', 'blink-green');
+        rowEl.classList.add('blink-green');
+        setTimeout(() => {
+          rowEl.classList.remove('blink-green');
+        }, 1800);
+      } else {
+        rowEl.classList.remove('blink-red', 'blink-yellow', 'blink-green');
+        if (newBlink) rowEl.classList.add(newBlink);
       }
+      prevBlinkClass[`${line}-${kpi.desc}`] = newBlink;
     });
   });
 }
@@ -792,17 +1296,223 @@ function flushCardCache() {
   CARDS_CACHED = false;
   CELL_CACHE = {};
   LAST_DETAIL_RENDER_HASH = '';
-  LAST_KPI_RENDER_HASH = '';
+  prevBlinkClass = {};
+}
+
+function openPressDetailModal(safeLine, line){
+  const data = PRESS_DETAIL_DATA[safeLine];
+  if (!data) return;
+
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  const body = document.getElementById('modalBody');
+  const backBtn = document.getElementById('modalBackBtn');
+
+  MODAL_STACK = [];
+  backBtn.classList.remove('visible');
+
+  document.getElementById('modalTitle').textContent = `${line} DETAIL`;
+
+  let html = '';
+  if (data.extraKpiHtml) {
+    html += `<div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><circle cx="10" cy="10" r="8" stroke="#94a3b8" stroke-width="2"/><path d="M10 6v4l3 2" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round"/></svg>
+        <span style="font-size:0.85rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Downtime Detail</span>
+        <span style="font-size:0.65rem;color:#94a3b8;font-weight:600">— klik untuk rincian</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:4px">
+        ${data.extraKpiHtml}
+      </div>
+    </div>`;
+  }
+  html += `<div>
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">
+      <svg width="13" height="13" viewBox="0 0 20 20" fill="none"><rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/><path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/><path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/></svg>
+      <span style="font-size:0.85rem;font-weight:800;color:#6b7280;text-transform:uppercase;letter-spacing:0.08em">Detail Produksi</span>
+      <span style="font-size:0.7rem;font-weight:700;padding:2px 8px;border-radius:99px;background:${data.hasDetail ? '#e5e7eb' : '#fef2f2'};color:${data.hasDetail ? '#6b7280' : '#dc2626'}">${data.hasDetail ? data.rowCount + ' Job' : 'Belum Ada Data'}</span>
+    </div>
+    ${data.detailTableHtml}
+  </div>`;
+
+  body.innerHTML = html;
+  backdrop.classList.remove('hidden');
+  backdrop.classList.add('flex');
+  setTimeout(() => { dialog.classList.add('scale-100', 'opacity-100'); dialog.classList.remove('scale-95', 'opacity-0'); }, 10);
+}
+
+function openKpiFromPressDetail(type, line){
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  const body = document.getElementById('modalBody');
+  const title = document.getElementById('modalTitle');
+  const backBtn = document.getElementById('modalBackBtn');
+
+  MODAL_STACK.push({ html: body.innerHTML, title: title.textContent });
+  backBtn.classList.add('visible');
+
+  title.textContent = `Rincian ${type} — ${line}`;
+  body.innerHTML = `
+    <div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
+      <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+      <span class="text-sm font-semibold">Memuat rincian...</span>
+    </div>`;
+  body.scrollTop = 0;
+
+  try {
+    const typeData = DETAIL_DATA[type];
+    if(!typeData) { showKpiModalEmpty(); return; }
+
+    let html = '';
+
+    if(typeData.type === 'production'){
+      const lineData = typeData[line];
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
+      html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+        <thead class="bg-gray-50 text-gray-600"><tr>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+          <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+          <th class="px-4 py-3 text-center border-b border-gray-200 w-24">OK Qty</th>
+        </tr></thead>
+        <tbody class="divide-y divide-gray-100">
+        ${lineData.rows.map((r, i) => `<tr class="hover:bg-gray-50">
+          <td class="px-4 py-3 text-center text-gray-500">${i + 1}</td>
+          <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+          <td class="px-4 py-3 text-center text-green-600 font-black">${r.ok}</td>
+        </tr>`).join('')}
+        <tr class="bg-gray-50"><td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
+        </tbody></table></div>`;
+    } else {
+      const lineData = typeData[line];
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
+
+      if(typeData.type === 'quality'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-20">Qty</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="3" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
+          </tbody></table></div>`;
+      } else if(typeData.type === 'dt_summary'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Jenis</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem (Alasan)</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.jenis}</td>
+            <td class="px-4 py-3 font-semibold text-blue-700">${r.job || '-'}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+            <td class="px-4 py-3 text-gray-600">${r.action || '-'}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50 font-black">
+            <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
+            <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
+          </tr>
+          </tbody></table></div>`;
+      } else if(typeData.type === 'idle_detail'){
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item / Job</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200">Idle Start</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200">Idle End</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-center text-gray-600">${r.start}</td>
+            <td class="px-4 py-3 text-center text-gray-600">${r.end}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="4" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL IDLE</td>
+            <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td></tr>
+          </tbody></table></div>`;
+      } else {
+        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
+          <thead class="bg-gray-50 text-gray-600"><tr>
+            <th class="px-4 py-3 text-center border-b border-gray-200">No</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Penyebab</th>
+            <th class="px-4 py-3 text-left border-b border-gray-200">Action</th>
+            <th class="px-4 py-3 text-right border-b border-gray-200">Durasi</th>
+          </tr></thead>
+          <tbody class="divide-y divide-gray-100">
+          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
+            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
+            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
+            <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-gray-600">${r.penyebab}</td>
+            <td class="px-4 py-3 text-gray-600">${r.action}</td>
+            <td class="px-4 py-3 text-right font-bold text-gray-700">${r.durasi} m</td>
+          </tr>`).join('')}
+          <tr class="bg-gray-50"><td colspan="5" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td class="px-4 py-3 text-right font-black text-red-600">${lineData.total} m</td></tr>
+          </tbody></table></div>`;
+      }
+    }
+
+    body.innerHTML = html;
+  } catch (e) {
+    console.error("Error in openKpiFromPressDetail:", e);
+    body.innerHTML = `<div class="text-center py-10 text-red-500 font-medium">Error: ${e.message}</div>`;
+  }
+}
+
+function modalGoBack(){
+  if (MODAL_STACK.length === 0) return;
+  const prev = MODAL_STACK.pop();
+  const body = document.getElementById('modalBody');
+  const title = document.getElementById('modalTitle');
+  const backBtn = document.getElementById('modalBackBtn');
+
+  body.innerHTML = prev.html;
+  title.textContent = prev.title;
+  body.scrollTop = 0;
+
+  if (MODAL_STACK.length === 0) backBtn.classList.remove('visible');
 }
 
 function openKpiDetailModal(type, line){
+  console.log(`Attempting to open modal: Type=${type}, Line=${line}`);
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
   const body = document.getElementById('modalBody');
-  showModal(`Rincian ${type} — ${line}`, false);
+  
+  document.getElementById('modalTitle').textContent = `Rincian ${type} — ${line}`;
   body.innerHTML = `
     <div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
         <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
         <span class="text-sm font-semibold">Memuat rincian...</span>
     </div>`;
+  
+  backdrop.classList.remove('hidden');
+  backdrop.classList.add('flex');
+  setTimeout(() => { dialog.classList.add('scale-100', 'opacity-100'); dialog.classList.remove('scale-95', 'opacity-0'); }, 10);
 
   try {
     const typeData = DETAIL_DATA[type];
@@ -837,7 +1547,7 @@ function openKpiDetailModal(type, line){
 
     } else {
       const lineData = typeData[line];
-      if(!lineData || !lineData.rows || (lineData.rows.length === 0 && type !== 'PROD_T')) { 
+      if(!lineData || !lineData.rows || lineData.rows.length === 0) { 
           console.warn(`No rows found for line: ${line} in type: ${type}`);
           showKpiModalEmpty(); return; 
       }
@@ -887,25 +1597,6 @@ function openKpiDetailModal(type, line){
           <tr class="bg-gray-50 font-black">
             <td colspan="6" class="px-4 py-3 text-right text-gray-700">TOTAL DOWNTIME</td>
             <td class="px-4 py-3 text-right text-red-600">${lineData.total} m</td>
-          </tr>
-          </tbody></table></div>`;
-
-      } else if(typeData.type === 'runtime'){
-        html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
-          <thead class="bg-gray-50 text-gray-600"><tr>
-            <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
-            <th class="px-4 py-3 text-left border-b border-gray-200">Job</th>
-            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Runtime</th>
-          </tr></thead>
-          <tbody class="divide-y divide-gray-100">
-          ${lineData.rows.map(r=>`<tr class="hover:bg-gray-50">
-            <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
-            <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
-            <td class="px-4 py-3 text-center text-blue-600 font-black">${r.durasi}</td>
-          </tr>`).join('')}
-          <tr class="bg-gray-50">
-            <td colspan="2" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
-            <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
           </tr>
           </tbody></table></div>`;
 
@@ -978,14 +1669,13 @@ function showKpiModalEmpty(){
 function closeKpiDetailModal(){
   const backdrop = document.getElementById('modalBackdrop');
   const dialog = document.getElementById('modalDialog');
-  
-  dialog.classList.remove('scale-100', 'opacity-100');
-  dialog.classList.add('scale-95', 'opacity-0');
-  
-  setTimeout(() => {
-      backdrop.classList.add('hidden');
-      backdrop.classList.remove('flex');
-  }, 200);
+  const backBtn = document.getElementById('modalBackBtn');
+
+  MODAL_STACK = [];
+  backBtn.classList.remove('visible');
+
+  backdrop.classList.add('hidden');
+  backdrop.classList.remove('flex');
 }
 function onBackdropClick(e){
   if(e.target === document.getElementById('modalBackdrop')) closeModal();
