@@ -160,6 +160,23 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         // Toggle Sub-Menu
+        function submenuOf(toggleElement) {
+            const parent = toggleElement.closest('li.menu-item') || toggleElement.closest('li');
+            if (!parent) return null;
+            // Hanya submenu milik parent ini, bukan submenu anak di dalamnya.
+            for (const child of parent.children) {
+                if (child.classList.contains('menu-sub')) return child;
+            }
+            return null;
+        }
+
+        function syncAria(toggleElement) {
+            const submenu = submenuOf(toggleElement);
+            toggleElement.setAttribute('aria-expanded', submenu && !submenu.classList.contains('hidden') ? 'true' : 'false');
+        }
+
+        document.querySelectorAll('.menu-toggle').forEach(syncAria);
+
         document.body.addEventListener('click', function(e) {
             const toggleElement = e.target.closest('.menu-toggle');
             
@@ -168,10 +185,10 @@
                     e.preventDefault();
                 }
 
-                const parent = toggleElement.closest('li') || toggleElement.closest('.menu-item');
+                const parent = toggleElement.closest('li.menu-item') || toggleElement.closest('li');
                 if (!parent) return;
 
-                const submenu = parent.querySelector('.menu-sub');
+                const submenu = submenuOf(toggleElement);
                 const arrow = toggleElement.querySelector('.arrow');
 
                 if (submenu) {
@@ -182,6 +199,7 @@
                 }
                 
                 parent.classList.toggle('active');
+                syncAria(toggleElement);
             }
         });
 
