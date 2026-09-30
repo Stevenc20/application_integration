@@ -252,6 +252,43 @@
   color: #6b7280;
 }
 
+.det-footer {
+  margin-top: auto;
+  border-top: 1px solid #e9ecef;
+  background: linear-gradient(90deg, #f8fafc 0%, #f1f5f9 100%);
+}
+.det-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 14px;
+  font-size: 11px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #b91c1c;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  transition: background .15s ease, color .15s ease;
+}
+.det-btn:hover:not(:disabled) { background: #fee2e2; color: #991b1b; }
+.det-btn:focus-visible { outline: 2px solid #ef4444; outline-offset: -2px; }
+.det-btn span.det-btn-count {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fee2e2;
+  color: #b91c1c;
+}
+.det-btn.zero { color: #b0b7c3; cursor: not-allowed; }
+.det-btn.zero span.det-btn-count { background: #f1f5f9; color: #b0b7c3; }
+
 .det-section-label {
   display: flex;
   align-items: center;
@@ -318,7 +355,6 @@ let LAST_DETAIL_HASH = '';
 // Incremental render cache
 let CARDS_CACHED = false;
 let CELL_CACHE = {};
-let DETAIL_OPEN = {};
 let LAST_DETAIL_RENDER_HASH = '';
 let LAST_KPI_RENDER_HASH = '';
 
@@ -575,65 +611,22 @@ function buildLineCard(line){
     }
   });
 
-  // Detail rows
+  // Detail: ringkas di card, rincian penuh lewat tombol -> modal
   const hasDetail = detailRows.length > 0;
   const rowCount  = detailRows.length;
 
-  let detRows = '';
-  detailRows.forEach((r, idx) => {
-    detRows += `<tr>
-      ${detailCells(r)}
-    </tr>`;
-  });
-
-  // Detail section: label badge + table/empty state (collapsible per line)
-  const detailOpen = DETAIL_OPEN[line] === true;
-  const detSection = `
-    <div class="det-section-label" ${hasDetail ? `onclick="toggleDetail('${line}')" style="cursor:pointer" role="button" title="Klik untuk buka/tutup detail"` : ''}>
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
-        <rect x="2" y="4" width="16" height="12" rx="2" stroke="#94a3b8" stroke-width="2"/>
-        <path d="M2 8h16" stroke="#94a3b8" stroke-width="1.5"/>
-        <path d="M7 4v12M13 4v12" stroke="#94a3b8" stroke-width="1" stroke-dasharray="2 2"/>
-      </svg>
-      <span class="label-text">Detail Produksi</span>
-      <span class="label-badge ${hasDetail ? '' : 'zero'}">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
-      ${hasDetail ? `<svg class="det-caret ${detailOpen ? 'open' : ''}" width="12" height="12" viewBox="0 0 20 20" fill="currentColor" style="flex-shrink:0;margin-left:auto;transition:transform .15s ease;color:#94a3b8"><path d="M5.5 7.5L10 12l4.5-4.5z"/></svg>` : ''}
-    </div>
-    ${hasDetail ? `
-    <div class="det-scroll ${detailOpen ? '' : 'hidden'}">
-      <table class="det-table">
-        <thead>
-          <tr>
-            <th style="text-align:center">No</th>
-            <th style="text-align:left">Job No</th>
-            <th style="text-align:center">P1</th>
-            <th style="text-align:center">P2</th>
-            <th style="text-align:center">P3</th>
-            <th style="text-align:center">P4</th>
-            <th style="text-align:center">Plan Qty</th>
-            <th style="text-align:center;color:#16a34a">Good</th>
-            <th style="text-align:center;color:#d97706">Rep</th>
-            <th style="text-align:center;color:#dc2626">Rej</th>
-            <th style="text-align:center">Press Time</th>
-            <th style="text-align:center">Dandori</th>
-            <th style="text-align:center">IQ Check</th>
-            <th style="text-align:center">Downtime</th>
-            <th style="text-align:center;color:#2563eb">TPT</th>
-            <th style="text-align:center">Plan Finish</th>
-            <th style="text-align:center">Act Finish</th>
-          </tr>
-        </thead>
-        <tbody>${detRows}</tbody>
-      </table>
-    </div>` : `
-    <div class="det-empty">
-      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
-          d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
-      </svg>
-      <span>Belum ada data produksi</span>
-    </div>`}
-  `;
+  const detFooter = `
+    <div class="det-footer">
+      <button type="button" class="det-btn${hasDetail ? '' : ' zero'}" onclick="openJobDetailModal('${line}')"${hasDetail ? '' : ' disabled'} title="Lihat detail produksi ${line}">
+        <svg width="13" height="13" viewBox="0 0 20 20" fill="none" style="flex-shrink:0">
+          <rect x="2" y="4" width="16" height="12" rx="2" stroke="currentColor" stroke-width="2"/>
+          <path d="M2 8h16" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M7 4v12M13 4v12" stroke="currentColor" stroke-width="1" stroke-dasharray="2 2"/>
+        </svg>
+        <span class="det-btn-text">Detail</span>
+        <span class="det-btn-count">${hasDetail ? rowCount + ' Job' : 'Belum Ada Data'}</span>
+      </button>
+    </div>`;
       
   return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
     <div class="card-line-title bg-red-50 border-b border-red-100 px-4 py-2.5 text-center text-red-700 font-black tracking-[0.15em] text-sm sm:text-base uppercase">
@@ -654,7 +647,7 @@ function buildLineCard(line){
         </tbody>
       </table>
     </div>
-    ${detSection}
+    ${detFooter}
   </div>`;
 }
 
@@ -662,9 +655,44 @@ function renderLineCards(forceDetail){
   updateCards(forceDetail);
 }
 
-function toggleDetail(line) {
-  DETAIL_OPEN[line] = !DETAIL_OPEN[line];
-  renderLineCards(true);
+function showModal(title, wide) {
+  const backdrop = document.getElementById('modalBackdrop');
+  const dialog = document.getElementById('modalDialog');
+  document.getElementById('modalTitle').textContent = title;
+  dialog.classList.toggle('max-w-3xl', !wide);
+  dialog.classList.toggle('max-w-6xl', !!wide);
+  backdrop.classList.remove('hidden');
+  backdrop.classList.add('flex');
+  setTimeout(() => {
+    dialog.classList.add('scale-100', 'opacity-100');
+    dialog.classList.remove('scale-95', 'opacity-0');
+  }, 10);
+}
+
+function openJobDetailModal(line) {
+  const body = document.getElementById('modalBody');
+  showModal(`Detail Produksi — ${line}`, true);
+
+  const rows = LINE_DETAIL[line] || [];
+  if (!rows.length) {
+    body.innerHTML = `<div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-400">
+      <svg fill="none" viewBox="0 0 24 24" stroke="#d1d5db" class="w-10 h-10"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+      <span class="text-sm font-semibold">Belum ada data produksi untuk ${line}</span></div>`;
+    return;
+  }
+
+  const head = ['No','Job No','P1','P2','P3','P4','Plan Qty','Good','Rep','Rej','Press Time','Dandori','IQ Check','Downtime','TPT','Plan Finish','Act Finish'];
+  const th = (t, i) => `<th class="px-2 py-2 ${i === 1 ? 'text-left' : 'text-center'} bg-gray-50 text-gray-600 text-[10px] sm:text-xs font-black uppercase tracking-wider border-b border-gray-200 whitespace-nowrap">${t}</th>`;
+
+  body.innerHTML = `
+    <div class="overflow-x-auto rounded-xl border border-gray-200">
+      <table class="w-full text-xs sm:text-sm">
+        <thead><tr>${head.map(th).join('')}</tr></thead>
+        <tbody class="divide-y divide-gray-100">
+          ${rows.map((r, idx) => `<tr class="hover:bg-gray-50">${detailCells(Object.assign({}, r, { no: idx + 1 }))}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
 }
 
 function cacheCards() {
@@ -768,21 +796,13 @@ function flushCardCache() {
 }
 
 function openKpiDetailModal(type, line){
-  console.log(`Attempting to open modal: Type=${type}, Line=${line}`);
-  const backdrop = document.getElementById('modalBackdrop');
-  const dialog = document.getElementById('modalDialog');
   const body = document.getElementById('modalBody');
-  
-  document.getElementById('modalTitle').textContent = `Rincian ${type} — ${line}`;
+  showModal(`Rincian ${type} — ${line}`, false);
   body.innerHTML = `
     <div class="flex flex-col items-center justify-center py-10 gap-3 text-gray-500">
         <svg class="animate-spin h-8 w-8 text-red-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
         <span class="text-sm font-semibold">Memuat rincian...</span>
     </div>`;
-  
-  backdrop.classList.remove('hidden');
-  backdrop.classList.add('flex');
-  setTimeout(() => { dialog.classList.add('scale-100', 'opacity-100'); dialog.classList.remove('scale-95', 'opacity-0'); }, 10);
 
   try {
     const typeData = DETAIL_DATA[type];
