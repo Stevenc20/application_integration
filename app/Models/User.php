@@ -69,5 +69,24 @@ class User extends Authenticatable
             ->where('enabled', true)
             ->exists();
     }
+
+    /**
+     * Cek apakah user punya salah satu dari role yang diberikan (case-insensitive).
+     *
+     * @param  string|array<int, string>  $roles
+     */
+    public function isRole($roles): bool
+    {
+        $roles = is_array($roles) ? $roles : [$roles];
+        $current = strtolower(trim((string) $this->role));
+
+        foreach ($roles as $role) {
+            if ($current !== '' && $current === strtolower(trim((string) $role))) {
+                return true;
+            }
+        }
+
+        return false;
+    }
 }
     
