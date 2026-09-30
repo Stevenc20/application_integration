@@ -188,13 +188,22 @@
 @endsection
 
 @section('scripts')
+@php
+    // Path relatif, bukan route() absolut, supaya tidak diblokir browser sebagai
+    // mixed content ketika APP_URL masih http:// sementara situs diakses https.
+    try {
+        $lineApiPath = parse_url(route('monitoring.line.api'), PHP_URL_PATH) ?: '/monitoring/line/api-data';
+    } catch (\Throwable $e) {
+        $lineApiPath = '/monitoring/line/api-data';
+    }
+@endphp
 <script src="https://cdn.jsdelivr.net/npm/chart.js" defer></script>
 <script>
 (function() {
     'use strict';
 
     const LINES = @json($lines);
-    const API_URL = '{{ route("monitoring.line.api") }}';
+    const API_URL = '{{ $lineApiPath }}';
     const INIT_DATA = @json($lineKpi);
     let selectedShift = {{ $selectedShift }};
     let LINE_KPI = INIT_DATA || {};
@@ -242,16 +251,38 @@
         return null;
     }
 
+    function showLineError(message) {
+        var box = document.getElementById('lineFetchError');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'lineFetchError';
+            box.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:1300;max-width:90vw;padding:10px 16px;border-radius:10px;font-size:13px;font-weight:700;background:#7f1d1d;color:#fff;box-shadow:0 8px 24px rgba(0,0,0,.25)';
+            document.body.appendChild(box);
+        }
+        box.textContent = message;
+    }
+
+    function clearLineError() {
+        var box = document.getElementById('lineFetchError');
+        if (box) box.remove();
+    }
+
     async function fetchLineData() {
         var date = document.getElementById('dateInput').value;
-        var url = API_URL + '?date=' + date + '&shift=' + selectedShift;
+        var url = API_URL + '?date=' + encodeURIComponent(date) + '&shift=' + selectedShift;
         try {
             var res = await fetch(url, { credentials: 'same-origin' });
             if (!res.ok) {
+                var why = 'Gagal memuat data (' + res.status + ' ' + res.statusText + '). '
+                    + (res.status === 403 ? 'Akses ditolak / fitur line_monitoring tidak aktif.' :
+                       res.status === 404 ? 'Endpoint tidak ditemukan.' :
+                       res.status >= 500 ? 'Error server.' : '');
                 console.error('HTTP ' + res.status + ': ' + url);
+                showLineError(why);
                 return;
             }
             var data = await res.json();
+            clearLineError();
             if (data.line_kpi) {
                 LINE_KPI = data.line_kpi;
             } else {
@@ -262,6 +293,7 @@
             renderComparisonChart();
         } catch (e) {
             console.error('Fetch error:', url, e);
+            showLineError('Tidak bisa menghubungi server. Cek koneksi atau mixed content.');
         }
     }
 

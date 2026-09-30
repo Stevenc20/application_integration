@@ -19,7 +19,7 @@ class MonitoringController extends Controller
             ->select('line_name')->distinct()->pluck('line_name')->toArray();
         $selectedDate = request('date', now()->toDateString());
         $selectedShift = (int) request('shift', 1);
-        $lineKpi = collect([]);
+        $lineKpi = $this->buildLineKpi($selectedDate, $selectedShift);
         return view('monitoring.line', compact('lines', 'selectedDate', 'selectedShift', 'lineKpi'));
     }
 
@@ -28,6 +28,11 @@ class MonitoringController extends Controller
         $date  = request('date', now()->toDateString());
         $shift = (int) request('shift', 1);
 
+        return response()->json(['line_kpi' => $this->buildLineKpi($date, $shift)]);
+    }
+
+    private function buildLineKpi(string $date, int $shift): array
+    {
         $lines = LineMaster::where('status', 'active')
             ->select('line_name')->distinct()->pluck('line_name')->toArray();
 
@@ -81,7 +86,7 @@ class MonitoringController extends Controller
             ];
         }
 
-        return response()->json(['line_kpi' => $lineKpi]);
+        return $lineKpi;
     }
 
     public function tv()
