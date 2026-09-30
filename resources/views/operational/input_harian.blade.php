@@ -32,6 +32,16 @@
                 </svg>
                 <span>Lihat Laporan LKH</span>
             </a>
+
+            @if(Route::has('ppc.planning.recovery.index'))
+            <a href="{{ route('ppc.planning.recovery.index') }}" 
+               class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-md shadow-amber-500/10 transition-all border border-amber-600/20">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>Recovery</span>
+            </a>
+            @endif
             
             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary-red" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -59,7 +69,7 @@
                         <span>Batalkan</span>
                     </button>
                 </div>
-                @elseif($allJobsDone ?? false)
+                @else
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                     <input id="shiftCommentInput" type="text" maxlength="255"
                         placeholder="Catatan untuk shift berikutnya (opsional)"
@@ -190,6 +200,42 @@
         </div>
     @else
         @include('operational.components.active-job-board')
+    @endif
+
+    {{-- SHIFT SUBMISSION BANNER --}}
+    @if(!isset($isHistorical) || !$isHistorical)
+    @if(!($isLocked ?? false))
+    <div id="shiftSubmissionBanner" class="mb-6">
+        <div class="bg-white rounded-2xl border border-orange-200 bg-orange-50/50 shadow-sm overflow-hidden">
+            <div class="px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-orange-100 flex items-center justify-center shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-sm font-black text-orange-800 uppercase tracking-widest">Akhiri Shift</h3>
+                        <p class="text-[10px] font-bold text-orange-600 mt-0.5">
+                            @php
+                                $completedCount = $jobs->filter(fn($p) => optional($p->job_data)->status === 'complete')->count();
+                                $totalJobs = $jobs->count();
+                            @endphp
+                            {{ $completedCount }}/{{ $totalJobs }} item selesai. Item yang belum mencapai target akan otomatis masuk recovery. Lengkapi downtime terlebih dahulu bila ada.
+                        </p>
+                    </div>
+                </div>
+                <button onclick="submitShift()" 
+                    class="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-red-600 hover:from-orange-600 hover:to-red-700 shadow-md shadow-orange-500/10 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition-all border border-orange-600/20 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    <span>Akhiri Shift</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    @endif
     @endif
 
     {{-- MAIN TABLE CARD --}}
@@ -536,11 +582,13 @@ window._breakSchedule = {!! $breakScheduleData->toJson() !!};
 })();
 
 function submitShift() {
-    showConfirm('Akhiri Shift?', 'Semua data akan difinalisasi.', function () {
+    showConfirm('Akhiri Shift?', 'Semua data akan difinalisasi. Item yang belum mencapai target akan masuk antrean recovery.', function () {
         closeConfirmModal();
-        const btn = document.getElementById('submitShiftBtn');
-        btn.disabled = true;
-        btn.innerHTML = '<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Memvalidasi...';
+        const btns = document.querySelectorAll('#submitShiftBtn, [onclick="submitShift()"]');
+        btns.forEach(b => {
+            b.disabled = true;
+            b.innerHTML = '<svg class="animate-spin w-4 h-4 inline-block mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Memvalidasi...';
+        });
 
         const params = new URLSearchParams(window.location.search);
         const commentInput = document.getElementById('shiftCommentInput');
@@ -560,26 +608,35 @@ function submitShift() {
         .then(r => r.json().then(data => ({ status: r.status, data })))
         .then(({ status, data }) => {
             if (status === 200 && data.success) {
-                showToast(data.message || 'Shift berhasil disubmit!', 'success');
-                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Shift Disubmit';
-                btn.classList.remove('from-orange-500', 'to-red-600', 'hover:from-orange-600', 'hover:to-red-700');
-                btn.classList.add('from-emerald-500', 'to-teal-600', 'cursor-default');
-                btn.onclick = null;
+                const recovered = parseInt(data.recovered || 0, 10);
+                showToast(recovered > 0 ? 'Shift berhasil disubmit! ' + recovered + ' item tidak tercapai masuk recovery.' : (data.message || 'Shift berhasil disubmit!'), 'success');
+                btns.forEach(b => {
+                    b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Shift Disubmit';
+                    b.classList.remove('from-orange-500', 'to-red-600', 'hover:from-orange-600', 'hover:to-red-700');
+                    b.classList.add('from-emerald-500', 'to-teal-600', 'cursor-default');
+                    b.onclick = null;
+                });
                 setTimeout(() => window.location.reload(), 1200);
             } else if (data.has_issues) {
                 openShiftValidationModal(data.issues);
-                btn.disabled = false;
-                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+                btns.forEach(b => {
+                    b.disabled = false;
+                    b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+                });
             } else {
                 alert('Gagal: ' + (data.message || 'Unknown error'));
-                btn.disabled = false;
-                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+                btns.forEach(b => {
+                    b.disabled = false;
+                    b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+                });
             }
         })
         .catch(err => {
             alert('Error: ' + err.message);
-            btn.disabled = false;
-            btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+            btns.forEach(b => {
+                b.disabled = false;
+                b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+            });
         });
     });
 }

@@ -50,6 +50,16 @@
                     TAMBAH MANUAL
                 </button>
 
+                <a href="{{ route('ppc.planning.recovery.index') }}" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm ring-1 ring-amber-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    RECOVERY
+                    @if(isset($pendingRecoveryItems) && $pendingRecoveryItems->count() > 0)
+                        <span class="px-1.5 py-0.5 text-[10px] font-black bg-white text-amber-700 rounded-full leading-none">{{ $pendingRecoveryItems->count() }}</span>
+                    @endif
+                </a>
+
                 <div class="w-px h-6 bg-white/20"></div>
 
                 <form id="filterForm" class="flex items-center gap-2">
@@ -184,6 +194,11 @@
                 <button onclick="showOverrideModal(this)"
                         class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-sm">
                     ⚡ OVERRIDE
+                </button>
+                @else
+                <button onclick="prosesCutOff('{{ $press }}')"
+                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-sm">
+                    🔄 PROSES CUT OFF
                 </button>
                 @endif
                 <button onclick="this.closest('[style]')?.remove() ?? this.parentElement.parentElement.remove()"
