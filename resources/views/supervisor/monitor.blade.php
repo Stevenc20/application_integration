@@ -66,6 +66,35 @@
         #shiftBar button:hover{background:#f1f5f9;border-color:#94a3b8}
         #shiftBar button.active{background:#059669;color:#fff;border-color:#059669}
         #shiftBar button.active:hover{background:#047857}
+
+        /* ── NO PLAN badge / notice ── */
+        .plan-badge{
+            display:inline-block;margin-left:6px;padding:1px 7px;border-radius:99px;
+            background:#fef3c7;color:#92400e;border:1px solid #fcd34d;
+            font-size:9px;font-weight:900;letter-spacing:0.06em;vertical-align:middle;
+            white-space:nowrap;
+        }
+        .plan-notice{
+            background:#fffbeb!important;color:#92400e!important;
+            font-size:10px;font-weight:800;letter-spacing:0.04em;
+        }
+        .plan-notice.alert{background:#fef3c7!important;border-top:2px solid #fcd34d}
+
+        /* ── Shift change toast ── */
+        .shift-toast{
+            position:fixed;top:76px;left:50%;transform:translateX(-50%);
+            z-index:1000;display:flex;align-items:center;gap:10px;
+            padding:10px 22px;border-radius:10px;
+            background:#1e40af;color:#fff;font-size:14px;font-weight:900;
+            letter-spacing:0.05em;box-shadow:0 10px 30px rgba(0,0,0,0.25);
+            opacity:0;pointer-events:none;
+            transition:opacity .25s ease, transform .25s ease;
+        }
+        .shift-toast.show{opacity:1;transform:translateX(-50%)}
+        .shift-toast svg{width:20px;height:20px;flex-shrink:0;animation:pulse-dot 1.2s ease-in-out infinite}
+        .shift-toast.night{background:#6d28d9}
+        @media(max-width:480px){.shift-toast{font-size:11px;padding:8px 14px;top:52px}.shift-toast svg{width:16px;height:16px}}
+        @media(min-width:3840px){.shift-toast{font-size:30px;padding:22px 48px;top:150px;border-radius:16px}.shift-toast svg{width:44px;height:44px}}
         .live-dot{
             width:7px;height:7px;border-radius:50%;
             background:#22c55e;display:inline-block;
@@ -91,6 +120,7 @@
             overflow:hidden;
             text-overflow:ellipsis;
             max-width:0; /* forces table-layout:fixed to clip content, not overflow */
+            color: #1e293b;
         }
         thead th{
             background:#f8fafc;font-size:8px;font-weight:800;
@@ -107,8 +137,8 @@
         }
         td.desc-cell{
             background:#f8fafc;font-weight:700;text-align:left;
-            padding-left:4px;
-            color:#334155;font-size:9px;
+            padding-left:6px;
+            color:#334155;font-size:12px;
             position:sticky;left:0;z-index:1;
             overflow:hidden;text-overflow:ellipsis;
             max-width:none; /* sticky cells must NOT use max-width:0 trick */
@@ -121,7 +151,7 @@
         tbody tr.row-detail td{font-size:11px;padding:3px 4px}
         .val-plan{color:#64748b;font-weight:600}
         .val-curr{color:#334155;font-weight:700}
-        .val-actual{font-weight:800}
+        .val-actual{font-weight:800; color:#1e293b;}
         .bg-green{background:#22c55e!important;color:#fff!important}
         .bg-yellow{background:#eab308!important;color:#000!important}
         .bg-red{background:#ef4444!important;color:#fff!important}
@@ -133,34 +163,71 @@
         .status-tryout{background:#3b82f6!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-1stcheck{background:#a855f7!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
 
-        @keyframes blink-red{0%,100%{background:#ef4444!important;color:#fff!important}50%{background:#fff!important;color:#ef4444!important}}
-        @keyframes blink-yellow{0%,100%{background:#eab308!important;color:#000!important}50%{background:#fff!important;color:#eab308!important}}
-        @keyframes blink-green{0%,100%{background:#22c55e!important;color:#fff!important}50%{background:#fff!important;color:#22c55e!important}}
-        .bg-red-blink{animation:blink-red .8s ease-in-out infinite!important}
-        .bg-yellow-blink{animation:blink-yellow 1.2s ease-in-out infinite!important}
-        .bg-green-blink{animation:blink-green .6s ease-in-out 3!important}
+        @keyframes blink-red{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes blink-yellow{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes blink-green{0%,100%{opacity:1}50%{opacity:0.3}}
+        .bg-red-blink{background:#ef4444!important;color:#fff!important;animation:blink-red .8s ease-in-out infinite!important}
+        .bg-yellow-blink{background:#eab308!important;color:#000!important;animation:blink-yellow .8s ease-in-out infinite!important}
+        .bg-green-blink{background:#22c55e!important;color:#fff!important;animation:blink-green .8s ease-in-out infinite!important}
 
         .large-table th,.large-table td{
-            padding:6px 4px!important;
-            font-size:11px!important;
+            padding:0.4vw 0.3vw!important;
+            font-size:1.1vw!important;
             overflow:hidden!important;text-overflow:ellipsis!important;max-width:0!important;
+            color: #1e293b;
         }
-        .large-table thead th{font-size:10px!important;padding:8px 4px!important}
-        .large-table thead th.line-header{font-size:12px!important;padding:10px 4px!important}
-        .large-table td.desc-cell{font-size:11px!important;padding-left:8px!important}
+        body:not(.dark) .large-table td, body:not(.dark) .right-detail-table td { font-weight: 800 !important; }
+        body:not(.dark) .large-table td:not([class*="status-"]):not([class*="bg-"]), 
+        body:not(.dark) .right-detail-table td:not([class*="status-"]):not([class*="bg-"]) { 
+            color: #0f172a !important; 
+        }
+        
+        body .large-table td.val-curr, 
+        body .large-table td.val-actual, 
+        body .large-table td.val-plan {
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            white-space: nowrap !important;
+        }
+
+        .right-detail-table th, .right-detail-table td {
+            max-width: none !important;
+            overflow: visible !important;
+            text-overflow: clip !important;
+            padding: 0.3vw 0.2vw !important;
+            font-size: 0.75vw !important;
+        }
+        .right-detail-table thead th {
+            font-size: 0.7vw !important;
+            padding: 0.4vw 0.2vw !important;
+        }
+        .large-table thead th{font-size:0.9vw!important;padding:0.5vw 0.3vw!important}
+        .large-table thead th.line-header{font-size:1.2vw!important;padding:0.6vw 0.3vw!important}
+        .large-table td.desc-cell{font-size:1.2vw!important;padding-left:0.5vw!important}
+        .large-table .val-plan, .large-table .val-curr, .large-table .val-actual { font-size: 1.3vw!important; }
+
+        #row-REPAIR .val-plan, #row-REPAIR .val-curr, #row-REPAIR .val-actual,
+        #row-REJECT .val-plan, #row-REJECT .val-curr, #row-REJECT .val-actual {
+            font-size: 0.8vw !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.1 !important;
+        }
+        
         .large-table .status-running,.large-table .status-break,
         .large-table .status-downtime,.large-table .status-idle,
         .large-table .status-not-running,.large-table .status-tryout,
-        .large-table .status-1stcheck{font-size:12px!important;padding:10px!important}
+        .large-table .status-1stcheck{font-size:1.2vw!important;padding:0.6vw!important}
         .sep-row td{background:#e2e8f0!important;height:3px;padding:0!important;border:0!important}
         .sep-row .desc-cell{background:#e2e8f0!important}
-        .detail-header td{background:#dbeafe!important;font-size:10px;font-weight:800;color:#1e40af!important;padding:4px 6px!important}
+        .detail-header td{background:#dbeafe!important;font-size:0.8vw;font-weight:800;color:#1e40af!important;padding:0.3vw 0.4vw!important}
         .detail-header .desc-cell{background:#dbeafe!important}
 
         /* opaque background for sticky left table */
-        .left-kpi-table td{background:#fff!important}
-        .left-kpi-table tr:nth-child(even) td{background:#fafafa!important}
-        .left-kpi-table td.desc-cell{background:#f1f5f9!important}
+        .left-kpi-table td{background:#fff}
+        .left-kpi-table tr:nth-child(even) td{background:#fafafa}
+        .left-kpi-table td.desc-cell{background:#f1f5f9}
 
         /* detail section */
         .det-scroll{overflow-x:auto;overflow-y:auto;max-height:320px;scrollbar-width:thin;scrollbar-color:#e5e7eb #f9fafb}
@@ -193,6 +260,78 @@
         /* Fill vertical space — stretch table to container, allow .table-scroll to scroll */
         .table-scroll{position:relative}
         .table-scroll table{border-collapse:collapse}
+
+        /* ── THEME TOGGLE BTN ── */
+        .theme-btn{
+            display:inline-flex;align-items:center;justify-content:center;
+            width:32px;height:32px;border-radius:6px;
+            background:#f1f5f9;border:1px solid #e2e8f0;
+            color:#475569;cursor:pointer;transition:all 0.12s;
+        }
+        .theme-btn:hover{background:#e2e8f0;color:#1e293b;}
+
+        /* ── DARK MODE ── */
+        body.dark{background:#0f172a;color:#f8fafc}
+        body.dark .header{background:#1e293b;border-color:#334155}
+        body.dark .header-left .title{color:#f8fafc}
+        body.dark .header-left .subtitle{color:#94a3b8}
+        body.dark .header-right{color:#cbd5e1}
+        body.dark .header-right .clock{color:#60a5fa}
+        body.dark .header-right .exit-btn{background:#334155;color:#94a3b8;border-color:#475569}
+        body.dark .header-right .exit-btn:hover{background:#7f1d1d;color:#fca5a5;border-color:#991b1b}
+        body.dark .filter-bar button{background:#334155;color:#cbd5e1;border-color:#475569}
+        body.dark .filter-bar button:hover{background:#475569}
+        body.dark .filter-bar button.active{background:#3b82f6;color:#fff;border-color:#3b82f6}
+        
+        /* PLAN Column Highlighting */
+        .left-kpi-table .th-plan, .left-kpi-table .val-plan { background-color: #e2e8f0 !important; }
+        body.dark .left-kpi-table .th-plan, body.dark .left-kpi-table .val-plan { background-color: #334155 !important; color: #cbd5e1 !important; border-color: #475569 !important; }
+        body.dark #shiftBar button{background:#334155;color:#cbd5e1;border-color:#475569}
+        body.dark #shiftBar button:hover{background:#475569}
+        body.dark #shiftBar button.active{background:#10b981;color:#fff;border-color:#10b981}
+        body.dark th, body.dark td{border-color:#334155;color:#f8fafc}
+        body.dark thead th{background:#0f172a;color:#94a3b8}
+        body.dark thead th.line-header{background:#1e3a8a;color:#f8fafc}
+        body.dark td.desc-cell{background:#0f172a;color:#cbd5e1}
+        body.dark tbody tr:nth-child(even) td{background:#1e293b}
+        body.dark tbody tr:nth-child(even) td.desc-cell{background:#1e293b}
+        body.dark .table-scroll::-webkit-scrollbar-track{background:#0f172a}
+        body.dark .table-scroll::-webkit-scrollbar-thumb{background:#475569}
+        body.dark .table-scroll::-webkit-scrollbar-thumb:hover{background:#64748b}
+        body.dark .val-plan{color:#94a3b8}
+        body.dark .val-curr{color:#cbd5e1}
+        body.dark .val-actual{color:#f8fafc}
+        body.dark .theme-btn{background:#334155;color:#fbbf24;border-color:#475569;}
+        body.dark .theme-btn:hover{background:#475569;}
+        body.dark .sep-row td{background:#334155!important}
+        body.dark .sep-row .desc-cell{background:#334155!important}
+        body.dark .detail-header td{background:#1e3a8a!important;color:#93c5fd!important}
+        body.dark .detail-header .desc-cell{background:#1e3a8a!important}
+
+        /* ── DETAIL TABLE COLORS ── */
+        .det-job{color:#1e293b}
+        .det-qty{color:#374151}
+        .det-good{color:#16a34a}
+        .det-repair{color:#d97706}
+        .det-reject{color:#dc2626}
+        .det-tpt{color:#2563eb}
+        body.dark .det-job{color:#f8fafc}
+        body.dark .det-qty{color:#cbd5e1}
+        body.dark .det-good{color:#4ade80}
+        body.dark .det-repair{color:#fbbf24}
+        body.dark .det-reject{color:#f87171}
+        body.dark .det-tpt{color:#60a5fa}
+        
+        .card-bg{background:#fff}
+        body.dark .card-bg{background:#0f172a}
+        .border-divider{border-color:#e2e8f0}
+        body.dark .border-divider{border-color:#334155}
+        .progress-pct{color:#1e293b}
+        body.dark .progress-pct{color:#f8fafc}
+
+        body.dark .left-kpi-table td{background:#0f172a}
+        body.dark .left-kpi-table tr:nth-child(even) td{background:#1e293b}
+        body.dark .left-kpi-table td.desc-cell{background:#1e293b}
 
         /* ── SMALL MOBILE (<480px) ── */
         @media(max-width:480px){
@@ -332,9 +471,44 @@
             .large-table .status-1stcheck{font-size:27px!important;padding:24px!important}
             .single-top-header th{font-size:28px!important;padding:24px 32px!important}
         }
+
+        /* P1.1.1 TYPOGRAPHY PATCH REFINEMENT */
+        .right-detail-table th,
+        .right-detail-table td {
+            font-size: clamp(12px, 0.85vw, 28px) !important;
+            padding: clamp(4px, 0.4vw, 14px) clamp(4px, 0.4vw, 12px) !important;
+        }
+        .right-detail-table thead th {
+            font-size: clamp(10px, 0.65vw, 22px) !important;
+        }
+        .right-detail-table td.det-job {
+            font-size: clamp(11px, 0.7vw, 24px) !important;
+        }
+        .right-detail-table td.det-process {
+            padding: clamp(2px, 0.2vw, 8px) !important;
+        }
+        
+        /* PROCESS column specific */
+        .process-cell {
+            display: flex; gap: clamp(2px, 0.2vw, 6px); justify-content: center; align-items: center;
+        }
+        .process-item {
+            display: flex; flex-direction: column; align-items: center; gap: 2px;
+        }
+        .process-lbl {
+            font-size: clamp(8px, 0.5vw, 16px); color: #64748b; line-height: 1; font-weight: 800;
+        }
+        .process-box {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: clamp(14px, 1.2vw, 36px); height: clamp(14px, 1.2vw, 36px);
+            border-radius: 2px; font-size: clamp(9px, 0.7vw, 20px); font-weight: 900; line-height: 1;
+        }
+        .process-box.ok { border: 1px solid #22c55e; background: #f0fdf4; color: #16a34a; }
+        .process-box.ng { background: #f3f4f6; color: #9ca3af; font-weight: 700; }
     </style>
 </head>
 <body>
+<div id="monError" style="display:none;position:fixed;left:0;right:0;bottom:0;z-index:9999;background:#b91c1c;color:#fff;font:700 13px/1.4 system-ui,sans-serif;padding:8px 14px;word-break:break-word;"></div>
 <div class="monitor-container">
     <div class="header">
         <div class="header-left">
@@ -344,21 +518,26 @@
         <div class="header-right">
             <div class="filter-bar" id="filterBar">
                 <button class="active" data-line="all">Semua</button>
-                @foreach($lines as $l)
-                    @php $shortLine = strtoupper(trim(preg_replace('/^(PRESS|LINE)\s*/i', '', $l))); @endphp
-                    <button data-line="{{ $shortLine }}">{{ $shortLine }}</button>
-                @endforeach
+                <button data-line="A">A</button>
+                <button data-line="B">B</button>
+                <button data-line="C">C</button>
+                <button data-line="D">D</button>
             </div>
             <div class="filter-bar" id="shiftBar">
-                <button onclick="setShift(1)" class="active">Shift Pagi</button>
-                <button onclick="setShift(2)" class="">Shift Malam</button>
+                <button onclick="setShift(1,true)" data-shift="1" class="active">Shift Pagi</button>
+                <button onclick="setShift(2,true)" data-shift="2" class="">Shift Malam</button>
             </div>
-            <div>
+            <button class="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode" id="themeBtn" style="margin-left: 4px; margin-right: 8px;">
+                <svg id="themeIcon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                </svg>
+            </button>
+            <div class="clock" id="liveClock" style="margin-right: 12px;">--:--:--</div>
+            <div style="text-align: right; padding-right: 6px;">
                 <div id="shiftLabel">Shift A</div>
                 <div id="dateLabel">--</div>
             </div>
-            <div class="clock" id="liveClock">--:--:--</div>
-            <a href="{{ route('supervisor.dashboard') }}" class="exit-btn">
+            <a href="{{ parse_url(route('supervisor.dashboard'), PHP_URL_PATH) }}" class="exit-btn">
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
                 Exit
             </a>
@@ -374,7 +553,39 @@
     </div>
 </div>
 
+<div id="shiftToast" class="shift-toast" role="alert">
+    <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+    <span id="shiftToastMsg"></span>
+</div>
+
 <script>
+// Init theme early to prevent flash
+(function(){
+    if(localStorage.getItem('monitor-theme')==='dark'){
+        document.body.classList.add('dark');
+    }
+})();
+
+function toggleTheme() {
+    const body = document.body;
+    body.classList.toggle('dark');
+    const isDark = body.classList.contains('dark');
+    localStorage.setItem('monitor-theme', isDark ? 'dark' : 'light');
+    updateThemeIcon(isDark);
+}
+function updateThemeIcon(isDark) {
+    const icon = document.getElementById('themeIcon');
+    if(!icon) return;
+    if(isDark) {
+        icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />';
+    } else {
+        icon.innerHTML = '<path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>';
+    }
+}
+document.addEventListener('DOMContentLoaded', () => {
+    updateThemeIcon(document.body.classList.contains('dark'));
+});
+
 const LINES = @json($lines);
 let LINE_KPI = {};
 let LINE_META = {};
@@ -382,19 +593,47 @@ let LINE_DETAIL = {};
 let LINE_STATUSES = {};
 let LAST_HASH = '';
 let selectedLine = null;
-let selectedShift = 1;
+const _initTime = new Date();
+const _h = _initTime.getHours();
+const _m = _initTime.getMinutes();
+const _isShift2 = (_h >= 21 || _h < 7 || (_h === 7 && _m < 30));
+let selectedShift = _isShift2 ? 2 : 1;
 let prevCellClasses = {};
+let lastManualShiftAt = 0;
+let shiftToastTimer = null;
 
-function setShift(s) {
+function currentShiftFromClock(){
+    const n = new Date(), h = n.getHours(), m = n.getMinutes();
+    return (h >= 21 || h < 7 || (h === 7 && m < 30)) ? 2 : 1;
+}
+
+function showShiftToast(s) {
+    const el = document.getElementById('shiftToast');
+    const msg = document.getElementById('shiftToastMsg');
+    if (!el || !msg) return;
+    msg.textContent = s === 1 ? '⏰ SHIFT BERUBAH → SHIFT PAGI' : '⏰ SHIFT BERUBAH → SHIFT MALAM';
+    el.classList.toggle('night', s === 2);
+    el.classList.add('show');
+    clearTimeout(shiftToastTimer);
+    shiftToastTimer = setTimeout(() => el.classList.remove('show'), 8000);
+}
+
+function setShift(s, fromButton) {
+    const prev = selectedShift;
     selectedShift = s;
+    if (fromButton) lastManualShiftAt = Date.now();
+    detailPage = 0;
+    detailPages = 1;
+    stopRotate();
     document.querySelectorAll('#shiftBar button').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('#shiftBar button')[s === 1 ? 0 : 1].classList.add('active');
+    document.querySelector(`#shiftBar button[data-shift="${s}"]`)?.classList.add('active');
     allCells = null;
     LAST_HASH = '';
     fetchData();
+    if (s !== prev) showShiftToast(s);
 }
 
-const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DT','MACH_T','MAT_T','LOG_T'];
+const KPI_ROWS = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
 
 function pad(n){ return String(n).padStart(2,'0') }
 
@@ -402,7 +641,14 @@ function updateClock(){
     const n=new Date();
     document.getElementById('liveClock').textContent=`${pad(n.getHours())}:${pad(n.getMinutes())}:${pad(n.getSeconds())}`;
     document.getElementById('dateLabel').textContent=n.toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'numeric'});
-    document.getElementById('shiftLabel').textContent=selectedShift===1?'Shift Pagi':'Shift Malam';
+    document.getElementById('shiftLabel').textContent = selectedShift === 1 ? 'Shift Pagi' : 'Shift Malam';
+    document.querySelectorAll('#shiftBar button').forEach(b => b.classList.remove('active'));
+    document.querySelector(`#shiftBar button[data-shift="${selectedShift}"]`)?.classList.add('active');
+
+    const auto = currentShiftFromClock();
+    if (auto !== selectedShift && (Date.now() - lastManualShiftAt) > 5*60*1000) {
+        setShift(auto, false);
+    }
 }
 setInterval(updateClock,1000);
 updateClock();
@@ -414,30 +660,45 @@ document.getElementById('filterBar').addEventListener('click',function(e){
     const newSel=btn.dataset.line==='all'?null:btn.dataset.line;
     if((selectedLine===null)!==(newSel===null)) allCells=null; // flush cache when switching mode
     selectedLine=newSel;
+    detailPage = 0;
+    detailPages = 1;
+    stopRotate();
     renderTable();
 });
 
+// Path relatif, bukan URL absolut dari route(). Kalau APP_URL di server http://
+// sementara halaman diakses lewat https, browser memblokirnya sebagai mixed content.
+const MON_API_DATA   = @json(parse_url(route('supervisor.dashboard.api'), PHP_URL_PATH));
+const MON_API_DETAIL = @json(parse_url(route('supervisor.dashboard.detail'), PHP_URL_PATH));
+const MON_API_STATUS = @json(parse_url(route('supervisor.overview.lineStatus'), PHP_URL_PATH));
+
 function fetchData(){
     const n=new Date();
+    if (n.getHours() < 7 || (n.getHours() === 7 && n.getMinutes() < 30)) {
+        n.setDate(n.getDate() - 1);
+    }
     const date=`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
     const shift=selectedShift;
 
     Promise.all([
-        fetch(`{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`).then(r=>r.ok ? r.json() : {}),
-        fetch(`{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`).then(r=>r.ok ? r.json() : {}),
-        fetch(`{{ route('supervisor.overview.lineStatus') }}`).then(r=>r.ok ? r.json() : {}),
+        fetch(`${MON_API_DATA}?date=${date}&shift=${shift}`).then(r=>r.json()),
+        fetch(`${MON_API_DETAIL}?date=${date}&shift=${shift}`).then(r=>r.json()),
+        fetch(`${MON_API_STATUS}`).then(r=>r.json()),
     ]).then(([kpi,det,sts])=>{
-        const h=JSON.stringify(kpi?.line_kpi||{})+JSON.stringify(det?.detail||{})+JSON.stringify(sts?.line_statuses||{});
+        const h=JSON.stringify(kpi.line_kpi)+JSON.stringify(kpi.line_meta)+JSON.stringify(det.detail)+JSON.stringify(sts.line_statuses);
         if(h===LAST_HASH) return;
         LAST_HASH=h;
-        LINE_KPI=kpi?.line_kpi||{};
-        LINE_META=kpi?.line_meta||{};
-        LINE_DETAIL=det?.detail||{};
-        LINE_STATUSES=sts?.line_statuses||{};
+        LINE_KPI=kpi.line_kpi||{};
+        LINE_META=kpi.line_meta||{};
+        LINE_DETAIL=det.detail||{};
+        LINE_STATUSES=sts.line_statuses||{};
         renderTable();
+        const eb=document.getElementById('monError');
+        if(eb){eb.style.display='none';eb.textContent='';}
     }).catch(e=>{
         console.error('fetch err',e);
-        renderTable();
+        const eb=document.getElementById('monError');
+        if(eb){eb.textContent='Gagal memuat data monitor: '+e.message;eb.style.display='block';}
     });
 }
 
@@ -448,15 +709,170 @@ function kv(line,desc){
 
 function meta(line,k){ return (LINE_META[line]||{})[k]||'-' }
 
-function cellClass(desc,actual,actPct){
-    if(desc==='GSPH'){const p=parseFloat(actPct||actual);return p>=100?'bg-green':p>=80?'bg-yellow':'bg-red'}
-    if(desc==='REPAIR'||desc==='REJECT'){const p=parseFloat(actPct||actual);return p>5?'bg-red-blink':p>2?'bg-yellow-blink':''}
-    if(['DT','TOTAL_DT','MACH_T','MAT_T','LOG_T'].includes(desc)){const v=parseFloat(actual);return v>30?'bg-red-blink':v>15?'bg-yellow-blink':''}
-    return '';
+function noPlan(line){
+    const jp = meta(line,'jobPlan');
+    if (jp === '0' || jp === '-') return true;
+    const k = kv(line,'QTY');
+    return !k || (parseFloat(k.plan) || 0) <= 0;
 }
 
-function dtCell(v,st){ return `<td style="${st||''}">${v}</td>`; }
-function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:16px;height:16px;border-radius:3px;border:2px solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:10px;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 4px;border-radius:3px;background:#f3f4f6;color:#9ca3af;font-size:10px;font-weight:700">-</span>'; }
+function getClasses(desc, k){
+    if(!k) return {act:'', curr:'', style:''};
+    let act='', curr='', style='';
+    if(desc==='GSPH'){
+        const planVal = parseFloat(k.plan);
+        const actVal = parseFloat(k.actual);
+        if(!isNaN(actVal) && !isNaN(planVal) && planVal>0){
+            const pct = (actVal/planVal)*100;
+            act = pct>=100?'bg-green':'bg-red';
+        } else if(actVal>0) act = 'bg-green';
+        
+        if(k.current && k.current!=='-'){
+            const currVal = parseFloat(k.current);
+            if(!isNaN(currVal) && !isNaN(planVal) && planVal>0){
+                const currPct = (currVal/planVal)*100;
+                curr = currPct>=100?'bg-green':'bg-red';
+            } else if(currVal>0) curr = 'bg-green';
+        }
+    }else if(desc==='REPAIR'||desc==='REJECT'){
+        const p=parseFloat(k.actualPct||k.actual);
+        if(p>5) act='bg-red';
+        else if(p>2) act='bg-yellow';
+        
+        if(k.current && k.current!=='-' && k.current!=='0 pcs' && parseFloat(k.current)>0) curr = act;
+    }else if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){
+        const v=parseFloat(k.actual);
+        if(!isNaN(v) && v>0) act='bg-red';
+        
+        if(k.current && k.current!=='-' && k.current!=='0 m' && parseFloat(k.current)>0) curr='bg-red-blink';
+    }
+    
+    if(act==='bg-yellow') style='color:#000!important;';
+    else if(act!=='') style='color:#fff!important;';
+    
+    return {act, curr, style};
+}
+
+function dtCell(v,st,cls){ return `<td class="${cls||''}" style="${st||''}">${v}</td>`; }
+function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:1vw;height:1vw;border-radius:0.2vw;border:0.1vw solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:0.7vw;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 0.3vw;border-radius:0.2vw;background:#f3f4f6;color:#9ca3af;font-size:0.7vw;font-weight:700">-</span>'; }
+function chkP(c, lbl){
+    return `<div class="process-item"><span class="process-lbl">${lbl}</span><span class="process-box ${c?'ok':'ng'}">${c?'&#10003;':'-'}</span></div>`;
+}
+
+// ── Fit-to-screen + auto-rotate helpers ──
+const MIN_FIT = 0.6;
+const ROTATE_MS = 15000;
+let detailPage = 0;
+let detailPages = 1;
+let rotateTimer = null;
+
+function buildRightBody(rows, maxRows, overallPlan){
+    maxRows = maxRows || rows.length;
+    let h = '';
+    let renderedRightRowspan = false;
+    for (let i = 0; i < maxRows; i++) {
+        const isDataRow = i < rows.length;
+        h += `<tr style="${isDataRow ? 'height:1px;' : ''}">`;
+        if (isDataRow) {
+            const j = rows[i];
+            const pt = j.press_time > 0 ? j.press_time + ' m' : '-';
+            const dn = j.dandori > 0 ? j.dandori + ' m' : '-';
+            const iq = j.iq_check > 0 ? j.iq_check + ' m' : '-';
+            const dw = j.downtime > 0 ? j.downtime + ' m' : '-';
+            const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
+            
+            let gsphSt = 'font-weight:700;';
+            let gsphTxt = (j.gsph_plan > 0 || j.gsph_actual > 0) ? j.gsph_actual : '-';
+            
+            const planToUse = j.gsph_plan > 0 ? j.gsph_plan : (overallPlan || 0);
+            
+            if (planToUse > 0) {
+                const pct = (j.gsph_actual / planToUse) * 100;
+                if (pct >= 100) {
+                    gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
+                } else {
+                    const blinkClass = j.is_running ? 'animation:blink-red .8s ease-in-out infinite;' : '';
+                    gsphSt = `background-color:#ef4444!important; color:#fff!important; font-weight:900; ${blinkClass}`;
+                    gsphTxt = `${j.gsph_actual} <span style="font-size:0.6vw;">⚠️</span>`;
+                }
+            } else if (j.gsph_actual > 0) {
+                gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
+            }
+
+            const dtSt = j.downtime > 0 ? 'background-color:#ef4444!important; color:#fff!important; font-weight:900;' : '';
+
+            h += `
+                ${dtCell(j.no, 'border-left:none;')}
+                ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
+                ${dtCell(`<div class="process-cell">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`, '', 'det-process')}
+                ${dtCell(j.plan_qty, '', 'det-qty')}
+                ${dtCell(j.good, 'font-weight:600;', 'det-good')}
+                ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
+                ${dtCell(j.reject, 'font-weight:600;', 'det-reject')}
+                ${dtCell(pt)}
+                ${dtCell(dn)}
+                ${dtCell(iq)}
+                ${dtCell(dw, dtSt)}
+                ${dtCell(tp, 'font-weight:700;', 'det-tpt')}
+                ${dtCell(j.plan_finish)}
+                ${dtCell(j.actual_finish)}
+                ${dtCell(gsphTxt, gsphSt)}
+            `;
+        } else {
+            if (!renderedRightRowspan) {
+                const remainingRight = maxRows - rows.length;
+                h += `<td rowspan="${remainingRight}" colspan="15" class="card-bg" style="border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600; height:100%;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                renderedRightRowspan = true;
+            }
+        }
+        h += '</tr>';
+    }
+    return h;
+}
+
+function computeFit(root){
+    const scrollEl = document.querySelector('.table-scroll');
+    if(!root || !scrollEl) return 1;
+    root.style.zoom = '';
+    const availW = scrollEl.clientWidth || window.innerWidth;
+    const availH = scrollEl.clientHeight || window.innerHeight;
+    const natW = root.offsetWidth || availW;
+    const natH = root.offsetHeight || availH;
+    let s = Math.min(1, availW / natW, availH / natH);
+    return (isFinite(s) && s > 0) ? s : 1;
+}
+
+function applyFit(root){
+    const scrollEl = document.querySelector('.table-scroll');
+    if(!root || !scrollEl) return;
+    
+    // Disable auto-zoom / scaling because VW units handle responsiveness natively
+    scrollEl.style.overflow = 'hidden';
+    root.style.transform = '';
+    root.style.width = '100%';
+    root.style.height = '100%';
+    root.style.zoom = '';
+}
+
+function stopRotate(){
+    if(rotateTimer){ clearInterval(rotateTimer); rotateTimer = null; }
+}
+
+function startRotate(){
+    stopRotate();
+    if(detailPages > 1){
+        rotateTimer = setInterval(()=>{
+            detailPage = (detailPage + 1) % detailPages;
+            renderTable();
+        }, ROTATE_MS);
+    }
+}
+
+function refitRoot(){
+    const scrollEl = document.querySelector('.table-scroll');
+    const root = scrollEl && scrollEl.firstElementChild;
+    if(root) requestAnimationFrame(()=>applyFit(root));
+}
 
 // ── Cell cache for incremental rendering (Semua view) ──
 let allCells = null;
@@ -478,10 +894,10 @@ function renderAllLines(){
             </table>
         `;
         const thead=document.getElementById('monitorThead');
-        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis">DESC</th>';
-        LINES.forEach(l=>{hh+=`<th colspan="3" class="line-header">${l}</th>`});
+        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:16px;text-align:left;padding-left:4px;">DESC</th>';
+        LINES.forEach((l,li)=>{hh+=`<th colspan="3" class="line-header">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`});
         hh+='</tr><tr>';
-        LINES.forEach(()=>{hh+='<th>PLAN</th><th>CURR</th><th>ACTUAL</th>'});
+        LINES.forEach(()=>{hh+='<th class="th-plan" style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th style="font-size:16px;">ACTUAL</th>'});
         hh+='</tr>';
         thead.innerHTML=hh;
 
@@ -489,7 +905,8 @@ function renderAllLines(){
         let b='';
         const cellMap={};
         KPI_ROWS.forEach(desc=>{
-            b+=`<tr id="row-${desc}"><td class="desc-cell">${desc}</td>`;
+            let descHtml = desc;
+            b+=`<tr id="row-${desc}"><td class="desc-cell">${descHtml}</td>`;
             LINES.forEach((line,li)=>{
                 ['plan','curr','actual'].forEach((col,ci)=>{
                     const id=`cell-${desc}-${li}-${col}`;
@@ -524,6 +941,7 @@ function renderAllLines(){
 
         // Fill initial data
         updateAllCells();
+        requestAnimationFrame(()=>applyFit(document.querySelector('.table-scroll')?.firstElementChild));
         return;
     }
     updateAllCells();
@@ -539,7 +957,7 @@ function updateAllCells(){
                 setText(getCell('actual'),meta(line,'jobActual'));
             }else if(desc==='STROKE'){
                 const s=meta(line,'stroke'),cs=meta(line,'currStroke');
-                setText(getCell('plan'),'-');
+                setText(getCell('plan'),meta(line,'strokePlan')||'-');
                 setText(getCell('curr'),cs==='-'?'-':Number(cs||0).toLocaleString('id-ID'));
                 setText(getCell('actual'),s==='-'?'-':Number(s).toLocaleString('id-ID'));
             }else{
@@ -547,20 +965,18 @@ function updateAllCells(){
                 if(k){
                     setText(getCell('plan'),k.plan||'-');
                     setText(getCell('curr'),k.current||'-');
-                    const cls=cellClass(desc,k.actual,k.actualPct);
+                    const cl = getClasses(desc, k);
                     const pct=k.actualPct?` ${k.actualPct}`:'';
                     const ac=getCell('actual');
-                    setText(ac,(k.actual||'-')+pct);
-                    const cellKey=`${desc}-${li}`;
-                    const prevCls=prevCellClasses[cellKey]||'';
-                    if(prevCls && prevCls.includes('blink') && !cls.includes('blink')){
-                        ac.className='val-actual bg-green-blink';
-                        setTimeout(()=>{const c=document.getElementById(`cell-${desc}-${li}-actual`);if(c)c.className='val-actual';},1800);
-                    }else{
-                        ac.className='val-actual'+(cls?' '+cls:'');
+                    const cu=getCell('curr');
+                    let actValTxt = (k.actual||'-')+pct;
+                    if (desc === 'GSPH' && cl.act === 'bg-red') {
+                        actValTxt += ` <span style="font-size:0.6vw;">⚠️</span>`;
                     }
-                    if(cls) prevCellClasses[cellKey]=cls;
-                    else delete prevCellClasses[cellKey];
+                    setText(ac, actValTxt, desc === 'GSPH');
+                    cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
+                    ac.className = 'val-actual'+(cl.act?' '+cl.act:'');
+                    ac.style.cssText = cl.style || '';
                 }else{
                     setText(getCell('plan'),'-');
                     setText(getCell('curr'),'-');
@@ -584,11 +1000,18 @@ function updateAllCells(){
             if(cell.className!=='status-not-running') cell.className='status-not-running';
         }
     });
+    // NO PLAN badge + notice
+    LINES.forEach((line,li)=>{
+        const np=noPlan(line);
+        const badge=document.getElementById(`planBadge-${li}`);
+        if(badge) badge.style.display=np?'inline-block':'none';
+    });
 }
 
-function setText(el,v){
+function setText(el,v,isHtml=false){
     if(!el)return;
-    if(el.textContent!==v) el.textContent=v;
+    if(isHtml) { if(el.innerHTML!==v) el.innerHTML=v; }
+    else { if(el.textContent!==v) el.textContent=v; }
 }
 
 function renderTable(){
@@ -617,7 +1040,7 @@ function renderTable(){
     const actVal = qtyKpi ? parseFloat(qtyKpi.actual) : 0;
     const pct = planVal > 0 ? ((actVal / planVal) * 100).toFixed(2) : '0.00';
 
-    const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','DT','MACH_T','MAT_T','LOG_T'];
+    const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
     const rightRows = LINE_DETAIL[lineKey] || [];
 
     // CASE A: No detail jobs scheduled -> Make KPI table take 100% full width to prevent empty columns on the right
@@ -643,17 +1066,21 @@ function renderTable(){
                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px;">PRESS ${line}</th>
             </tr>
             <tr>
-                <th style="width:25%">DESC</th>
-                <th style="width:25%">PLAN</th>
-                <th style="width:25%">CURR</th>
-                <th style="width:25%">ACTUAL</th>
+                <th style="width:25%;font-size:18px;text-align:left;padding-left:6px;">DESC</th>
+                <th style="width:25%;font-size:18px;">PLAN</th>
+                <th style="width:25%;font-size:18px;">CURR</th>
+                <th style="width:25%;font-size:18px;">ACTUAL</th>
             </tr>
         `;
 
         let b = '';
         leftRows.forEach(desc => {
-            b += '<tr>';
-            b += `<td class="desc-cell" style="width:25%; max-width:none;">${desc}</td>`;
+            b += `<tr id="row-${desc}">`;
+            let descHtml = desc;
+            if(desc === 'GSPH') {
+                descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
+            }
+            b += `<td class="desc-cell" style="width:25%; max-width:none;">${descHtml}</td>`;
 
             if (desc === 'JOB') {
                 b += `<td class="val-plan">${meta(lineKey,'jobPlan')}</td>`;
@@ -661,17 +1088,17 @@ function renderTable(){
                 b += `<td class="val-actual">${meta(lineKey,'jobActual')}</td>`;
             } else if (desc === 'STROKE') {
                 const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
-                b += `<td class="val-plan">-</td>`;
+                b += `<td class="val-plan">${meta(lineKey,'strokePlan')||'-'}</td>`;
                 b += `<td class="val-curr">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
                 b += `<td class="val-actual">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
             } else {
                 const k = kv(lineKey, desc);
                 if (k) {
-                    const cls = cellClass(desc, k.actual, k.actualPct);
+                    const cl = getClasses(desc, k);
                     const pct = k.actualPct ? ` ${k.actualPct}` : '';
                     b += `<td class="val-plan">${k.plan||'-'}</td>`;
-                    b += `<td class="val-curr">${k.current||'-'}</td>`;
-                    b += `<td class="val-actual ${cls}">${k.actual||'-'}${pct}</td>`;
+                    b += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
+                    b += `<td class="val-actual ${cl.act}" style="${cl.style}">${k.actual||'-'}${pct}</td>`;
                 } else {
                     b += `<td>-</td><td>-</td><td>-</td>`;
                 }
@@ -701,116 +1128,64 @@ function renderTable(){
         const barColor = progressPct >= 100 ? '#22c55e' : progressPct >= 80 ? '#eab308' : '#ef4444';
         b += `
             <tr class="progress-row">
-                <td colspan="4" style="background:#fff; padding:8px 12px; text-align:left; border-top:2px solid #e2e8f0;">
+                <td colspan="4" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:2px; border-top-style:solid;">
                     <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
-                    <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                        <div style="flex:1; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
+                    <div style="display:flex; align-items:center; gap:8px; width:100%; min-width:0;">
+                        <div style="flex:1; min-width:0; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                             <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
                         </div>
-                        <div style="font-size:12px; font-weight:900; color:#1e293b; min-width:50px; text-align:right;">${pct}%</div>
+                        <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; flex-shrink:0; text-align:right;">${pct}%</div>
                     </div>
                 </td>
             </tr>
         `;
 
         tbody.innerHTML = b;
+        requestAnimationFrame(()=>applyFit(tbl));
         return;
     }
 
     // CASE B: Split screen but seamlessly touching (gap: 0px) with matched rowspans
-    const maxRows = Math.max(leftRows.length, rightRows.length);
-    const leftRowSpans = [];
-    const baseSpan = Math.floor(maxRows / leftRows.length);
-    const remainder = maxRows % leftRows.length;
-    for (let i = 0; i < leftRows.length; i++) {
-        leftRowSpans.push(baseSpan + (i < remainder ? 1 : 0));
-    }
-
-    const leftRowStarts = [];
-    let currentStart = 0;
-    for (let i = 0; i < leftRows.length; i++) {
-        leftRowStarts.push(currentStart);
-        currentStart += leftRowSpans[i];
-    }
-
     // Build left side HTML
     let leftBodyHtml = '';
-    for (let i = 0; i < maxRows; i++) {
-        leftBodyHtml += '<tr>';
-        const leftIdx = leftRowStarts.indexOf(i);
-        if (leftIdx !== -1) {
-            const desc = leftRows[leftIdx];
-            const span = leftRowSpans[leftIdx];
-            
-            leftBodyHtml += `<td class="desc-cell" rowspan="${span}">${desc}</td>`;
+    for (let i = 0; i < leftRows.length; i++) {
+        const desc = leftRows[i];
+        leftBodyHtml += `<tr id="row-${desc}">`;
+        
+        let descHtml = desc;
+        leftBodyHtml += `<td class="desc-cell">${descHtml}</td>`;
 
-            if (desc === 'JOB') {
-                leftBodyHtml += `<td class="val-plan" rowspan="${span}">${meta(lineKey,'jobPlan')}</td>`;
-                leftBodyHtml += `<td class="val-curr" rowspan="${span}">${meta(lineKey,'job')}</td>`;
-                leftBodyHtml += `<td class="val-actual" rowspan="${span}" style="border-right:none;">${meta(lineKey,'jobActual')}</td>`;
-            } else if (desc === 'STROKE') {
-                const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
-                leftBodyHtml += `<td class="val-plan" rowspan="${span}">-</td>`;
-                leftBodyHtml += `<td class="val-curr" rowspan="${span}">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
-                leftBodyHtml += `<td class="val-actual" rowspan="${span}" style="border-right:none;">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
-            } else {
-                const k = kv(lineKey, desc);
-                if (k) {
-                    const cls = cellClass(desc, k.actual, k.actualPct);
-                    const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
-                    leftBodyHtml += `<td class="val-plan" rowspan="${span}">${k.plan||'-'}</td>`;
-                    leftBodyHtml += `<td class="val-curr" rowspan="${span}">${k.current||'-'}</td>`;
-                    leftBodyHtml += `<td class="val-actual ${cls}" rowspan="${span}" style="border-right:none;">${k.actual||'-'}${pctVal}</td>`;
-                } else {
-                    leftBodyHtml += `<td rowspan="${span}">-</td><td rowspan="${span}">-</td><td rowspan="${span}" style="border-right:none;">-</td>`;
+        if (desc === 'JOB') {
+            leftBodyHtml += `<td class="val-plan">${meta(lineKey,'jobPlan')}</td>`;
+            leftBodyHtml += `<td class="val-curr">${meta(lineKey,'job')}</td>`;
+            leftBodyHtml += `<td class="val-actual" style="border-right:none;">${meta(lineKey,'jobActual')}</td>`;
+        } else if (desc === 'STROKE') {
+            const s=meta(lineKey,'stroke'), cs=meta(lineKey,'currStroke');
+            leftBodyHtml += `<td class="val-plan">${meta(lineKey,'strokePlan')||'-'}</td>`;
+            leftBodyHtml += `<td class="val-curr">${cs==='-'?'-':Number(cs||0).toLocaleString('id-ID')}</td>`;
+            leftBodyHtml += `<td class="val-actual" style="border-right:none;">${s==='-'?'-':Number(s).toLocaleString('id-ID')}</td>`;
+        } else {
+            const k = kv(lineKey, desc);
+            if (k) {
+                const cl = getClasses(desc, k);
+                const pctVal = k.actualPct ? ` ${k.actualPct}` : '';
+                let actValTxt = (k.actual||'-') + pctVal;
+                if (desc === 'GSPH' && cl.act === 'bg-red') {
+                    actValTxt += ` <span style="font-size:0.8vw;">⚠️</span>`;
                 }
+                leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
+                leftBodyHtml += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
+                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style}">${actValTxt}</td>`;
+            } else {
+                leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
         }
         leftBodyHtml += '</tr>';
     }
 
-    // Build right side HTML
-    let rightBodyHtml = '';
-    let renderedRightRowspan = false;
-    for (let i = 0; i < maxRows; i++) {
-        rightBodyHtml += '<tr>';
-        if (i < rightRows.length) {
-            const j = rightRows[i];
-            const pt = j.press_time > 0 ? j.press_time + ' m' : '-';
-            const dn = j.dandori > 0 ? j.dandori + ' m' : '-';
-            const iq = j.iq_check > 0 ? j.iq_check + ' m' : '-';
-            const dw = j.downtime > 0 ? j.downtime + ' m' : '-';
-            const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
 
-            rightBodyHtml += `
-                ${dtCell(j.no, 'border-left:none;')}
-                ${dtCell(j.job_number, 'text-align:left;font-weight:600;color:#1e293b')}
-                ${dtCell(chk(j.p1))}
-                ${dtCell(chk(j.p2))}
-                ${dtCell(chk(j.p3))}
-                ${dtCell(chk(j.p4))}
-                ${dtCell(j.plan_qty, 'color:#374151')}
-                ${dtCell(j.good, 'color:#16a34a;font-weight:600')}
-                ${dtCell(j.repair, 'color:#d97706;font-weight:600')}
-                ${dtCell(j.reject, 'color:#dc2626;font-weight:600')}
-                ${dtCell(pt)}
-                ${dtCell(dn)}
-                ${dtCell(iq)}
-                ${dtCell(dw)}
-                ${dtCell(tp, 'color:#2563eb;font-weight:700')}
-                ${dtCell(j.plan_finish)}
-                ${dtCell(j.actual_finish)}
-            `;
-        } else {
-            if (!renderedRightRowspan) {
-                const remainingRight = maxRows - rightRows.length;
-                rightBodyHtml += `<td rowspan="${remainingRight}" colspan="17" style="background:#fff; border:1px solid #e2e8f0; border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
-                renderedRightRowspan = true;
-            }
-        }
-        rightBodyHtml += '</tr>';
-    }
 
+    // Build right side HTML (handled inside renderCaseB with fit/pagination)
     const st = LINE_STATUSES[lineKey];
     let statusVal = '—';
     let statusClass = 'status-not-running';
@@ -821,24 +1196,30 @@ function renderTable(){
     }
 
     const progressPct = parseFloat(pct);
-    const barColor = progressPct >= 100 ? '#22c55e' : progressPct >= 80 ? '#eab308' : '#ef4444';
+    const barColor = progressPct >= 100 ? '#22c55e' : '#ef4444';
 
-    // Insert split container layout
-    scrollEl.innerHTML = `
+    const kpiGsph = kv(lineKey, 'GSPH');
+    const overallPlan = kpiGsph ? (parseFloat(kpiGsph.plan) || 0) : 0;
+
+    // Insert split container layout (reusable for full or per-page render)
+    const renderCaseB = (rows, pageInfo, matchLeft) => {
+        const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length, overallPlan);
+        const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
+        scrollEl.innerHTML = `
         <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
             <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
                 <!-- Left KPI Table -->
-                <div style="width:30%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; background:#fff; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05);">
+                <div class="card-bg" style="width:28%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink: 0;">
                     <table class="large-table left-kpi-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
                             <tr class="single-top-header">
                                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:28%">DESC</th>
-                                <th style="width:24%">PLAN</th>
-                                <th style="width:24%">CURR</th>
-                                <th style="width:24%; border-right:none;">ACTUAL</th>
+                                <th style="width:28%;font-size:1.1vw;text-align:left;padding-left:6px;">DESC</th>
+                                <th class="th-plan" style="width:24%;font-size:1.1vw;">PLAN</th>
+                                <th style="width:24%;font-size:1.1vw;">CURR</th>
+                                <th style="width:24%; border-right:none;font-size:1.1vw;">ACTUAL</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -847,40 +1228,38 @@ function renderTable(){
                     </table>
                 </div>
                 <!-- Right Detail Table -->
-                <div style="width:70%; display:flex; flex-direction:column; min-width:950px;">
-                    <table class="large-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
+                <div style="width:72%; display:flex; flex-direction:column; overflow:hidden;">
+                    <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
-                                <th colspan="17" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%</th>
+                                <th colspan="15" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="width:4%; border-left:none;">NO</th>
-                                <th style="width:13%">JOB NO</th>
-                                <th style="width:4%">P1</th>
-                                <th style="width:4%">P2</th>
-                                <th style="width:4%">P3</th>
-                                <th style="width:4%">P4</th>
-                                <th style="width:8%">PLAN QTY</th>
-                                <th style="width:8%;color:#16a34a">GOOD</th>
-                                <th style="width:6%;color:#d97706">REP</th>
-                                <th style="width:6%;color:#dc2626">REJ</th>
-                                <th style="width:8%">PRESS TIME</th>
-                                <th style="width:8%">DANDORI</th>
-                                <th style="width:8%">10 CHECK</th>
-                                <th style="width:8%">DOWNTIME</th>
-                                <th style="width:6%;color:#2563eb">TPT</th>
-                                <th style="width:7%">PLAN FIN</th>
-                                <th style="width:7%">ACT FIN</th>
+                                <th style="border-left:none; white-space:nowrap;">NO</th>
+                                <th style="white-space:nowrap;">JOB NO</th>
+                                <th style="white-space:nowrap;">PROCESS</th>
+                                <th style="white-space:nowrap;">PLAN QTY</th>
+                                <th class="det-good" style="white-space:nowrap;">GOOD</th>
+                                <th class="det-repair" style="white-space:nowrap;">REP</th>
+                                <th class="det-reject" style="white-space:nowrap;">REJ</th>
+                                <th style="white-space:nowrap;">PRESS TIME</th>
+                                <th style="white-space:nowrap;">DANDORI</th>
+                                <th style="white-space:nowrap;">1ST CHECK</th>
+                                <th style="white-space:nowrap;">DOWNTIME</th>
+                                <th class="det-tpt" style="white-space:nowrap;">TPT</th>
+                                <th style="white-space:nowrap;">PLAN FIN</th>
+                                <th style="white-space:nowrap;">ACT FIN</th>
+                                <th style="white-space:nowrap; border-right:none;">GSPH</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${rightBodyHtml}
+                            ${body}
                         </tbody>
                     </table>
                 </div>
             </div>
             <!-- Shared Footer Status & Progress -->
-            <div style="width:100%; background:#fff; border-top:2px solid #e2e8f0; margin-top:8px; position:sticky; left:0; z-index:11;">
+            <div class="card-bg border-divider" style="width:100%; border-top-width:2px; border-top-style:solid; margin-top:8px; position:sticky; left:0; z-index:11;">
                 <table class="large-table" style="width:100%; border-collapse:collapse; table-layout:fixed;">
                     <tbody>
                         <tr>
@@ -888,13 +1267,13 @@ function renderTable(){
                             <td class="${statusClass}" style="text-align:left; padding-left:20px; font-weight:900; border-bottom:none;">${statusVal}</td>
                         </tr>
                         <tr class="progress-row">
-                            <td colspan="2" style="background:#fff; padding:8px 12px; text-align:left; border-top:1px solid #e2e8f0; border-bottom:none;">
+                            <td colspan="2" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:1px; border-top-style:solid; border-bottom:none;">
                                 <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
-                                <div style="display:flex; align-items:center; gap:8px; width:100%;">
-                                    <div style="flex:1; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
+                                <div style="display:flex; align-items:center; gap:8px; width:100%; min-width:0;">
+                                    <div style="flex:1; min-width:0; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                                         <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
                                     </div>
-                                    <div style="font-size:12px; font-weight:900; color:#1e293b; min-width:50px; text-align:right;">${pct}%</div>
+                                    <div class="progress-pct" style="font-size:12px; font-weight:900; min-width:50px; flex-shrink:0; text-align:right;">${pct}%</div>
                                 </div>
                             </td>
                         </tr>
@@ -903,11 +1282,37 @@ function renderTable(){
             </div>
         </div>
     `;
+        return scrollEl.firstElementChild;
+    };
+
+    // Full render + shrink-to-fit; fall back to auto-rotate pages only when rows are too many
+    let root = renderCaseB(rightRows, null, true);
+    const s = computeFit(root);
+    if (s < 0.99 && rightRows.length > 1) {
+        const pageSize = Math.max(1, Math.floor(rightRows.length * s * 0.95)); // 5% safety margin
+        detailPages = Math.ceil(rightRows.length / pageSize);
+        detailPage = Math.min(detailPage, detailPages - 1);
+        const pageRows = rightRows.slice(detailPage * pageSize, (detailPage + 1) * pageSize);
+        root = renderCaseB(pageRows, { page: detailPage + 1, pages: detailPages }, true);
+        startRotate();
+    } else {
+        detailPages = 1;
+        detailPage = 0;
+        stopRotate();
+    }
+    applyFit(root);
 }
 
-renderTable();
 fetchData();
-setInterval(fetchData,5000);
+setInterval(fetchData, 1500);
+document.addEventListener('visibilitychange',function(){
+    if(!document.hidden){LAST_HASH='';fetchData();}
+});
+let resizeTimer = null;
+window.addEventListener('resize', function(){
+    clearTimeout(resizeTimer);
+    resizeTimer = setTimeout(refitRoot, 150);
+});
 </script>
 </body>
 </html>
