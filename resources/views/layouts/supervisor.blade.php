@@ -212,6 +212,7 @@
             setInterval(window.fetchGlobalTimer, 30000); // sync every 30s
         });
     </script>
+    @include('components.pull_ahead_alert')
     @stack('modals')
     @yield('scripts')
     @stack('scripts')

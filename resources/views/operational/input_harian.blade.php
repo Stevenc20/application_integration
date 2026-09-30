@@ -33,15 +33,13 @@
                 <span>Lihat Laporan LKH</span>
             </a>
 
-            @if(Route::has('ppc.planning.recovery.index'))
-            <a href="{{ route('ppc.planning.recovery.index') }}" 
-               class="flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-md shadow-amber-500/10 transition-all border border-amber-600/20">
+            <button type="button" onclick="openTarikShiftModal()" 
+               class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-4 py-2.5 rounded-xl shadow-md shadow-blue-500/10 transition-all border border-blue-700/20">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
                 </svg>
-                <span>Recovery</span>
-            </a>
-            @endif
+                <span>Tarik Shift</span>
+            </button>
             
             <div class="flex items-center gap-2 bg-white border border-gray-200 rounded-xl px-4 py-2.5 shadow-sm">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-primary-red" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -334,6 +332,76 @@
 
 @push('modals')
     @include('operational.components.modals')
+
+    {{-- MODAL TARIK SHIFT (PULL AHEAD) --}}
+    <div id="tarikShiftModal" class="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm hidden transition-opacity duration-300">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-xl overflow-hidden transform transition-all duration-300 flex flex-col max-h-[90vh] mx-4">
+            <!-- Header -->
+            <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white shrink-0">
+                <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                        <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-lg font-bold">Tarik Shift (Pull Ahead)</h3>
+                        <p class="text-xs text-blue-100" id="tarikShiftSubtitle">Ambil item produksi dari shift berikutnya</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeTarikShiftModal()" class="text-white/80 hover:text-white hover:bg-white/20 p-2 rounded-full transition-colors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+
+            <!-- Body -->
+            <div class="p-6 overflow-y-auto space-y-4">
+                <div id="tarikShiftLoading" class="py-8 text-center text-gray-500 hidden">
+                    <svg class="animate-spin w-8 h-8 mx-auto mb-2 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                    <p class="text-xs font-bold uppercase tracking-wider">Memuat data shift berikutnya...</p>
+                </div>
+
+                <div id="tarikShiftEmpty" class="py-8 text-center text-gray-500 hidden">
+                    <svg class="w-12 h-12 mx-auto mb-2 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"/></svg>
+                    <p class="text-sm font-bold text-gray-600">Tidak ada item yang dapat ditarik.</p>
+                    <p class="text-xs text-gray-400 mt-1">Pastikan jadwal PPC shift selanjutnya sudah dibuat.</p>
+                </div>
+
+                <form id="tarikShiftForm" onsubmit="submitTarikShift(event)" class="space-y-4 hidden">
+                    <div>
+                        <label class="block text-xs font-black text-gray-600 uppercase mb-1.5">Pilih Item dari Shift Berikutnya <span class="text-red-500">*</span></label>
+                        <select id="tarikShiftPlanSelect" onchange="onTarikShiftPlanChanged()" required class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-200 outline-none transition bg-white">
+                            <option value="">-- Pilih Item Produksi --</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-xs font-black text-gray-600 uppercase mb-1.5">Qty yang Ditarik (PCS) <span class="text-red-500">*</span></label>
+                            <input type="number" id="tarikShiftQty" required min="1" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-200 outline-none font-bold text-gray-800">
+                            <div class="text-[10px] text-gray-500 mt-1">Maksimal: <span id="tarikShiftMaxQty" class="font-bold text-blue-600">0</span> PCS</div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-black text-gray-600 uppercase mb-1.5">Urutan Setelah (Sequence)</label>
+                            <select id="tarikShiftSequence" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-200 outline-none transition bg-white">
+                                <option value="">Antrean Paling Akhir</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+                        <button type="button" onclick="closeTarikShiftModal()" class="px-5 py-2.5 rounded-xl border border-gray-200 text-gray-600 hover:bg-gray-100 text-sm font-bold transition-all">
+                            Batal
+                        </button>
+                        <button type="submit" id="tarikShiftSubmitBtn" class="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-md shadow-blue-500/20 transition-all flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span>Ajukan Tarik Shift</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endpush
 
 @endsection
@@ -743,6 +811,140 @@ function goToIssue(type, planId, jobMasterId, dtId) {
             window.openRRInputModal ? window.openRRInputModal(jobMasterId, 'reject', 0) : null;
         }
     }, 500);
+}
+
+// ── Tarik Shift (Pull Ahead) Functions ──
+let nextShiftPlansData = [];
+
+function openTarikShiftModal() {
+    const modal = document.getElementById('tarikShiftModal');
+    if (!modal) return;
+    modal.classList.remove('hidden');
+
+    const loading = document.getElementById('tarikShiftLoading');
+    const empty = document.getElementById('tarikShiftEmpty');
+    const form = document.getElementById('tarikShiftForm');
+    loading.classList.remove('hidden');
+    empty.classList.add('hidden');
+    form.classList.add('hidden');
+
+    const params = new URLSearchParams(window.location.search);
+    const line = params.get('line') || 'Line A';
+    const shift = params.get('shift') || 'Shift Pagi';
+    const date = params.get('date') || '{{ $date }}';
+
+    fetch(`{{ route('operational.pull_ahead.next_shift') }}?line=${encodeURIComponent(line)}&shift=${encodeURIComponent(shift)}&date=${encodeURIComponent(date)}`, {
+        headers: {
+            'Accept': 'application/json'
+        }
+    })
+    .then(r => r.json())
+    .then(res => {
+        loading.classList.add('hidden');
+        if (res.success && res.next_shift_plans && res.next_shift_plans.length > 0) {
+            nextShiftPlansData = res.next_shift_plans;
+            document.getElementById('tarikShiftSubtitle').innerText = `Menarik dari ${res.next_shift_name || 'Shift Selanjutnya'}`;
+
+            const planSelect = document.getElementById('tarikShiftPlanSelect');
+            planSelect.innerHTML = '<option value="">-- Pilih Item Produksi --</option>';
+            res.next_shift_plans.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.id;
+                opt.textContent = `${p.job_master || p.job_no} (Tersedia: ${p.available_qty || p.remaining_plan || p.plan} PCS)`;
+                planSelect.appendChild(opt);
+            });
+
+            const seqSelect = document.getElementById('tarikShiftSequence');
+            seqSelect.innerHTML = '<option value="">Antrean Paling Akhir</option>';
+            if (res.current_shift_plans) {
+                res.current_shift_plans.forEach(cp => {
+                    const opt = document.createElement('option');
+                    opt.value = cp.id;
+                    opt.textContent = `Setelah: ${cp.job_master || cp.job_no} (Seq ${cp.row_no})`;
+                    seqSelect.appendChild(opt);
+                });
+            }
+
+            form.classList.remove('hidden');
+        } else {
+            empty.classList.remove('hidden');
+        }
+    })
+    .catch(err => {
+        loading.classList.add('hidden');
+        empty.classList.remove('hidden');
+        console.error('Error fetching next shift data:', err);
+    });
+}
+
+function closeTarikShiftModal() {
+    const modal = document.getElementById('tarikShiftModal');
+    if (modal) modal.classList.add('hidden');
+}
+
+function onTarikShiftPlanChanged() {
+    const planId = document.getElementById('tarikShiftPlanSelect').value;
+    const plan = nextShiftPlansData.find(p => p.id == planId);
+    const qtyInput = document.getElementById('tarikShiftQty');
+    const maxQtyLabel = document.getElementById('tarikShiftMaxQty');
+
+    if (plan) {
+        const max = plan.available_qty || plan.remaining_plan || plan.plan || 0;
+        qtyInput.max = max;
+        qtyInput.value = max;
+        maxQtyLabel.innerText = max;
+    } else {
+        qtyInput.max = 0;
+        qtyInput.value = 0;
+        maxQtyLabel.innerText = 0;
+    }
+}
+
+function submitTarikShift(e) {
+    e.preventDefault();
+    const btn = document.getElementById('tarikShiftSubmitBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<svg class="animate-spin w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Mengajukan...';
+
+    const params = new URLSearchParams(window.location.search);
+    const planId = document.getElementById('tarikShiftPlanSelect').value;
+    const qty = document.getElementById('tarikShiftQty').value;
+    const seq = document.getElementById('tarikShiftSequence').value;
+    const currentShift = params.get('shift') || 'Shift Pagi';
+    const nextShiftName = document.getElementById('tarikShiftSubtitle').innerText.replace('Menarik dari ', '').trim();
+
+    fetch('{{ route('operational.pull_ahead.request') }}', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'Accept': 'application/json'
+        },
+        body: JSON.stringify({
+            original_plan_id: planId,
+            qty_requested: qty,
+            proposed_sequence_after: seq || null,
+            target_shift: currentShift,
+            source_shift: nextShiftName || 'Shift Berikutnya'
+        })
+    })
+    .then(r => r.json())
+    .then(res => {
+        if (res.success) {
+            closeTarikShiftModal();
+            showToast(res.message || 'Pull Ahead Request berhasil diajukan dan menunggu Approval PPC.', 'success');
+            setTimeout(() => window.location.reload(), 1500);
+        } else {
+            alert('Gagal: ' + (res.message || 'Terjadi kesalahan'));
+            btn.disabled = false;
+            btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Ajukan Tarik Shift';
+        }
+    })
+    .catch(err => {
+        alert('Error: ' + err.message);
+        btn.disabled = false;
+        btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Ajukan Tarik Shift';
+    });
 }
 </script>
 

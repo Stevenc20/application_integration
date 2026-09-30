@@ -146,7 +146,7 @@
                             <span id="dtBtnText">Simpan Laporan</span>
                         </button>
                         <button onclick="closeDowntimeModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 font-bold text-sm transition-all">
-                            Isi Nanti
+                            Tutup
                         </button>
                     </div>
                 </div>
@@ -264,18 +264,18 @@
             </div>
 
             <div>
-                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Area Problem</label>
-                <input type="text" id="rrArea" name="area_problem" placeholder="Contoh: Pressing, Welding, dll." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-red-500 focus:ring focus:ring-red-200/50 outline-none transition duration-200">
+                <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Area Problem <span class="text-red-500">*</span></label>
+                <input type="text" id="rrArea" name="area_problem" required placeholder="Contoh: Pressing, Welding, dll." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-red-500 focus:ring focus:ring-red-200/50 outline-none transition duration-200">
             </div>
 
             <div class="grid grid-cols-2 gap-4">
                 <div>
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Penyebab Utama (Root Cause)</label>
-                    <textarea id="rrRootCause" name="root_cause" rows="2" placeholder="Mengapa defect terjadi..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-red-500 focus:ring focus:ring-red-200/50 outline-none resize-none transition duration-200"></textarea>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Penyebab Utama (Root Cause) <span class="text-red-500">*</span></label>
+                    <textarea id="rrRootCause" name="root_cause" required rows="2" placeholder="Mengapa defect terjadi..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-red-500 focus:ring focus:ring-red-200/50 outline-none resize-none transition duration-200"></textarea>
                 </div>
                 <div>
-                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tindakan Pencegahan (Countermeasure)</label>
-                    <textarea id="rrCountermeasure" name="countermeasure" rows="2" placeholder="Langkah perbaikan..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-red-500 focus:ring focus:ring-red-200/50 outline-none resize-none transition duration-200"></textarea>
+                    <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 ml-1">Tindakan Pencegahan (Countermeasure) <span class="text-red-500">*</span></label>
+                    <textarea id="rrCountermeasure" name="countermeasure" required rows="2" placeholder="Langkah perbaikan..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:border-red-500 focus:ring focus:ring-red-200/50 outline-none resize-none transition duration-200"></textarea>
                 </div>
             </div>
 

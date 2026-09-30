@@ -178,6 +178,7 @@
             setInterval(window.fetchGlobalTimer, 30000);
         });
     </script>
+    @include('components.pull_ahead_alert')
     @stack('modals')
     @yield('scripts')
     @stack('scripts')

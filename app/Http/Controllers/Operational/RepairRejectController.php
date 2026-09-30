@@ -97,14 +97,14 @@ class RepairRejectController extends Controller
             'job_master_id'  => 'required|exists:job_masters,id',
             'type'           => 'required|in:repair,reject',
             'defect_name'    => 'required|string|max:255',
-            'qty_a'          => 'required|numeric|min:0',
+            'qty_a'          => 'required|numeric|min:1',
             'qty_b'         => 'nullable|numeric|min:0',
             'pcs_number'     => 'nullable|string|max:255',
             'sketch_no'      => 'nullable|string|max:100',
             'repair_category'=> 'nullable|string|max:100',
-            'area_problem'   => 'nullable|string|max:255',
-            'root_cause'     => 'nullable|string',
-            'countermeasure' => 'nullable|string',
+            'area_problem'   => 'required|string|max:255',
+            'root_cause'     => 'required|string',
+            'countermeasure' => 'required|string',
             'images.*'       => 'nullable|file|max:5120',
         ]);
 
@@ -217,14 +217,14 @@ class RepairRejectController extends Controller
 
         $validated = $request->validate([
             'defect_name'    => 'required|string|max:255',
-            'qty_a'          => 'required|numeric|min:0',
+            'qty_a'          => 'required|numeric|min:1',
             'qty_b'         => 'nullable|numeric|min:0',
             'pcs_number'     => 'nullable|string|max:255',
             'sketch_no'      => 'nullable|string|max:100',
             'repair_category'=> 'nullable|string|max:100',
-            'area_problem'   => 'nullable|string|max:255',
-            'root_cause'     => 'nullable|string',
-            'countermeasure' => 'nullable|string',
+            'area_problem'   => 'required|string|max:255',
+            'root_cause'     => 'required|string',
+            'countermeasure' => 'required|string',
             'images.*'       => 'nullable|file|max:5120',
         ]);
 

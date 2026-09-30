@@ -988,6 +988,143 @@ class InputHarianController extends Controller
                 ]);
             }
 
+            // ── VALIDATION: Pastikan semua downtime, repair, dan reject terisi lengkap sebelum shift berakhir ──
+            $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->where('row_type', 'job')
+                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
+
+            if ($shiftName) {
+                $planQuery->where('shift_name', 'like', "{$shiftName}%");
+            }
+
+            $normalizedPress = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineMaster->line_name)));
+            $planQuery->whereRaw("
+                REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
+            ", ["%{$normalizedPress}%"]);
+
+            $plans = $planQuery->get();
+
+            $issues = [
+                'dt'     => [],
+                'repair' => [],
+                'reject' => [],
+                'remain' => [],
+            ];
+
+            if ($plans->isNotEmpty()) {
+                $parentPlans = $plans->filter(fn($p) => !$p->parent_job_id);
+                $parentIdentifiers = $parentPlans->map(function($p) {
+                    $jn = trim($p->job_no ?? '');
+                    $jm = trim($p->job_master ?? '');
+                    if (blank($jn) && blank($jm)) return null;
+                    return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+                })->filter()->values()->toArray();
+
+                $parentJobMasters = \App\Models\JobMaster::whereIn('job_number', $parentIdentifiers)
+                    ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                    ->get()
+                    ->keyBy('job_number');
+
+                $parentIds = $parentPlans->pluck('id')->filter()->values()->toArray();
+                $childPlansMap = \App\Models\ProductionPlan::whereIn('parent_job_id', $parentIds)
+                    ->get()
+                    ->groupBy('parent_job_id');
+
+                $childIdentifiers = $childPlansMap->flatten()->map(function($c) {
+                    $cjn = trim($c->job_no ?? '');
+                    return $cjn ? ($cjn . '-' . $c->id) : null;
+                })->filter()->values()->toArray();
+
+                $childJobMasters = \App\Models\JobMaster::whereIn('job_number', $childIdentifiers)
+                    ->with(['downtimes', 'repairRejects'])
+                    ->get()
+                    ->keyBy('job_number');
+
+                // ── VALIDATION LOOP: Periksa downtime, repair, reject ──
+                foreach ($plans as $plan) {
+                    if ($plan->parent_job_id) continue;
+
+                    $jn = trim($plan->job_no ?? '');
+                    $jm = trim($plan->job_master ?? '');
+                    if (blank($jn) && blank($jm)) continue;
+                    $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+
+                    $jobMaster = $parentJobMasters->get($identifier);
+                    if (!$jobMaster) continue;
+
+                    $allJms = collect([$jobMaster]);
+                    $children = $childPlansMap->get($plan->id, collect());
+                    foreach ($children as $child) {
+                        $childKey = trim($child->job_no ?? '') . '-' . $child->id;
+                        $childJm = $childJobMasters->get($childKey);
+                        if ($childJm) $allJms->push($childJm);
+                    }
+
+                    $itemName = $plan->job_no ?: $plan->job_master;
+
+                    foreach ($allJms as $jm) {
+                        foreach ($jm->downtimes ?? [] as $dt) {
+                            if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
+                                continue;
+                            }
+                            if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
+                                $issues['dt'][] = [
+                                    'item'          => $itemName,
+                                    'issue'         => 'problem/penyebab/action belum lengkap',
+                                    'dt_id'         => $dt->id,
+                                    'job_master_id' => $jm->id,
+                                    'plan_id'       => $plan->id,
+                                ];
+                            }
+                        }
+
+                        foreach ($jm->repairRejects ?? [] as $rr) {
+                            if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
+                                $key = $rr->type === 'reject' ? 'reject' : 'repair';
+                                $issues[$key][] = [
+                                    'item'          => $itemName,
+                                    'issue'         => 'area_problem/root_cause/countermeasure belum lengkap',
+                                    'job_master_id' => $jm->id,
+                                    'plan_id'       => $plan->id,
+                                ];
+                            }
+                        }
+
+                        if ($jm->dailyProduction && $jm->dailyProduction->actual_repair > 0) {
+                            $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'repair');
+                            if (!$hasRR) {
+                                $issues['repair'][] = [
+                                    'item'          => $itemName,
+                                    'issue'         => (int)$jm->dailyProduction->actual_repair . ' pcs Repair tanpa catatan form',
+                                    'job_master_id' => $jm->id,
+                                    'plan_id'       => $plan->id,
+                                ];
+                            }
+                        }
+
+                        if ($jm->dailyProduction && $jm->dailyProduction->actual_reject > 0) {
+                            $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'reject');
+                            if (!$hasRR) {
+                                $issues['reject'][] = [
+                                    'item'          => $itemName,
+                                    'issue'         => (int)$jm->dailyProduction->actual_reject . ' pcs Reject tanpa catatan form',
+                                    'job_master_id' => $jm->id,
+                                    'plan_id'       => $plan->id,
+                                ];
+                            }
+                        }
+                    }
+                }
+
+                if (!empty($issues['dt']) || !empty($issues['repair']) || !empty($issues['reject'])) {
+                    return response()->json([
+                        'success'    => false,
+                        'has_issues' => true,
+                        'issues'     => $issues,
+                    ], 422);
+                }
+            }
+
             $cutoffAt = now();
 
             // All writes in one transaction; if cut-off fails, everything rolls back.

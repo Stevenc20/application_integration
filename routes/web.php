@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\JobController;
 use App\Http\Controllers\Admin\KaryawanController;
 Use App\Http\Controllers\Operational\InputHarianController;
 use App\Http\Controllers\Operational\DandoriController;
+use App\Http\Controllers\PullAheadController;
 use App\Http\Controllers\Ppc\ProductionPlanController;
 use App\Http\Controllers\Planning\ProductionLineController;
 use App\Http\Controllers\Ppc\RundownController;
@@ -617,8 +618,17 @@ Route::middleware(['auth'])
     Route::post('/repair-reject/{id}/update', [\App\Http\Controllers\Operational\RepairRejectController::class, 'update'])->middleware('feature:repair_reject')->name('repair_reject.update');
     Route::delete('/repair-reject/{id}',   [\App\Http\Controllers\Operational\RepairRejectController::class, 'destroy'])->middleware('feature:repair_reject')->name('repair_reject.destroy');
     Route::get('/job/{jobId}/repair-reject', [\App\Http\Controllers\Operational\RepairRejectController::class, 'getByJob'])->middleware('feature:repair_reject')->name('repair_reject.by_job');
+    /*
+    ====================================================
+    PULL AHEAD (TARIK SHIFT)
+    ====================================================
+    */
+    Route::get('/pull-ahead/next-shift',   [PullAheadController::class, 'nextShiftData'])->name('pull_ahead.next_shift');
+    Route::post('/pull-ahead/request',      [PullAheadController::class, 'submitRequest'])->name('pull_ahead.request');
 
 });
+
+Route::middleware(['auth'])->post('/pull-ahead/mark-read', [PullAheadController::class, 'markAsRead'])->name('pull_ahead.mark_read');
 
 
 /*
@@ -716,6 +726,11 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(func
         Route::post('/recovery/run-scheduler',         [\App\Http\Controllers\Ppc\RecoveryController::class, 'runScheduler'])->name('recovery.run_scheduler');
         Route::get('/recovery/alert-data',             [\App\Http\Controllers\Ppc\RecoveryController::class, 'alertData'])->name('recovery.alert_data');
     });
+
+    // Pull Ahead Approvals
+    Route::get('/pull-ahead',              [PullAheadController::class, 'indexPpc'])->name('pull_ahead.index');
+    Route::post('/pull-ahead/{id}/approve',[PullAheadController::class, 'approve'])->name('pull_ahead.approve');
+    Route::post('/pull-ahead/{id}/reject', [PullAheadController::class, 'reject'])->name('pull_ahead.reject');
 });
 
 // ======================
