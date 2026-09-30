@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DailyProduction;
 use App\Models\Downtime;
 use App\Models\JobMaster;
+use App\Models\LineMaster;
 use App\Models\ProductionPlan;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Cache;
@@ -36,28 +37,26 @@ class DashboardRealtimeService
 
         $workDate = $shift === 2 ? Carbon::parse($date)->subDay()->toDateString() : $date;
 
-        $normalizedPress = strtoupper(preg_replace('/^(PRESS|LINE)\s*/i', '', $lineName));
-
+        $isMorning = ($shift === 1);
         $plans = ProductionPlan::where('plan_date', $date)
-            ->whereRaw("
-                REPLACE(
-                    REPLACE(
-                        UPPER(TRIM(press_name)),
-                        'PRESS ',
-                        ''
-                    ),
-                    'LINE ',
-                    ''
-                ) = ?
-            ", [$normalizedPress])
-            ->where('shift_name', 'like', $planShiftText . '%')
+            ->where(function ($q) use ($isMorning) {
+                if ($isMorning) {
+                    $q->where('shift_name', 'like', '%Pagi%')
+                      ->orWhere('shift_name', 'like', '%1%');
+                } else {
+                    $q->where('shift_name', 'like', '%Malam%')
+                      ->orWhere('shift_name', 'like', '%2%');
+                }
+            })
             ->where('row_type', 'job')
             ->where(function ($q) {
                 $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                   ->orWhereNull('job_no');
             })
             ->orderBy('row_no')
-            ->get();
+            ->get()
+            ->filter(fn ($p) => $this->pressMatches($p, $lineName))
+            ->values();
 
         if ($plans->isEmpty()) {
             return $this->emptyMetrics($lineName);
@@ -486,6 +485,37 @@ class DashboardRealtimeService
             return (float) abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
         }
         return 0.0;
+    }
+
+    private function normalizePressName(?string $value): string
+    {
+        $normalized = strtoupper(trim((string) $value));
+        $normalized = preg_replace('/^(PRESS|LINE)\s+/', '', $normalized);
+
+        return preg_replace('/[\s\-_.]+/', '', $normalized);
+    }
+
+    private function pressMatches($plan, string $lineName): bool
+    {
+        $target = $this->normalizePressName($lineName);
+        if ($target === '') {
+            return false;
+        }
+
+        if (trim((string) ($plan->press_name ?? '')) !== ''
+            && $this->normalizePressName($plan->press_name) === $target) {
+            return true;
+        }
+
+        $lineMasterId = $plan->line_master_id ?? null;
+        if ($lineMasterId) {
+            $masterId = LineMaster::where('line_name', $lineName)->value('id');
+            if ($masterId && (string) $lineMasterId === (string) $masterId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function emptyMetrics(string $lineName): array

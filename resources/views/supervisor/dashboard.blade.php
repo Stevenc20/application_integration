@@ -39,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 {{ count($lines) === 1 ? 'max-w-2xl mx-auto' : (count($lines) === 2 ? 'lg:grid-cols-2' : 'lg:grid-cols-3 is-multi-line') }} gap-4 sm:gap-5 min-h-[300px]" id="linesGrid"></div>
+    <div class="grid grid-cols-1 {{ count($lines) === 1 ? 'w-full' : (count($lines) === 2 ? 'lg:grid-cols-2' : 'lg:grid-cols-3 is-multi-line') }} gap-4 sm:gap-5 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">

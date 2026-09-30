@@ -1862,4 +1862,279 @@ class ReportController extends Controller
 
         return $totalBlueSeconds / 60.0;
     }
+
+    public function asakaiReport(Request $request)
+    {
+        $inputDate = $request->query('date');
+        if (!$inputDate) {
+            $hour = (int) now()->format('H');
+            $inputDate = ($hour < 8) ? now()->subDay()->toDateString() : now()->toDateString();
+        } else {
+            $inputDate = Carbon::parse($inputDate)->toDateString();
+        }
+
+        $shift1Date = $inputDate;
+        $shift2Date = Carbon::parse($inputDate)->subDay()->toDateString();
+
+        $shift1Data = $this->buildAsakaiShiftData($shift1Date, 'Shift 1');
+        $shift2Data = $this->buildAsakaiShiftData($shift2Date, 'Shift 2');
+
+        $subAssyLines = ['LINE 1', 'LINE 2', 'LINE 3', 'LINE 4', 'LINE 5', 'LINE 6', 'LINE 7', 'LINE 8', 'LINE 9', 'LINE 10', 'LINE 12', 'LINE 13', 'LINE 14', 'LAS CO'];
+        $subAssyData = [];
+        foreach ($subAssyLines as $saLine) {
+            $subAssyData[] = [
+                'line_name' => $saLine,
+                'plan_shift_1' => 0,
+                'plan_shift_2' => 0,
+                'plan_total' => 0,
+                'actual' => 0,
+                'diff' => 0,
+                'issue' => '',
+                'dt' => 0
+            ];
+        }
+
+        $spotData = [
+            ['item' => 'ROBOT SPOT', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
+            ['item' => 'MANUAL', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
+            ['item' => 'LAS CO', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
+        ];
+
+        return view('reports.asakai', [
+            'reportDate' => $inputDate,
+            'shift1Date' => $shift1Date,
+            'shift2Date' => $shift2Date,
+            'shift1' => $shift1Data,
+            'shift2' => $shift2Data,
+            'subAssy' => $subAssyData,
+            'spot' => $spotData,
+        ]);
+    }
+
+    private function buildAsakaiShiftData(string $date, string $shiftPrefix)
+    {
+        $planQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->where(function($q) use ($shiftPrefix) {
+                if (str_contains($shiftPrefix, '1')) {
+                    $q->where('shift_name', 'LIKE', '%1%')
+                      ->orWhere('shift_name', 'LIKE', '%Pagi%')
+                      ->orWhereNull('shift_name')
+                      ->orWhere('shift_name', '');
+                } else {
+                    $q->where('shift_name', 'LIKE', '%2%')
+                      ->orWhere('shift_name', 'LIKE', '%Malam%');
+                }
+            })
+            ->where(function ($q) {
+                $q->whereNull('row_type')->orWhere('row_type', '!=', 'break');
+            });
+
+        $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
+
+        $jobNumbers = $plans->map(function($p) {
+            $jn = trim($p->job_no ?? '');
+            $jm = trim($p->job_master ?? '');
+            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+        })->toArray();
+
+        $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
+            ->with(['dailyProduction', 'downtimes'])
+            ->get()
+            ->keyBy('job_number');
+
+        $lines = [];
+        foreach ($plans as $plan) {
+            $jmUpper = strtoupper(trim($plan->job_master ?? ''));
+            $junkWords = ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'TOTAL'];
+            if (in_array($jmUpper, $junkWords)) {
+                continue;
+            }
+
+            $rawLine = trim($plan->press_name ?? $plan->line_master_id ?? 'UNASSIGNED');
+            $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
+            if (!isset($lines[$lineName])) {
+                $lines[$lineName] = [
+                    'line_name' => $lineName,
+                    'total_plan' => 0,
+                    'count_plan' => 0,
+                    'total_actual' => 0,
+                    'count_actual' => 0,
+                    'total_diff' => 0,
+                    'total_downtime' => 0,
+                    'total_repair' => 0,
+                    'total_reject' => 0,
+                    'plan_gsph' => 0,
+                    'actual_gsph' => 0,
+                    'items' => [],
+                    'unachieved_items' => []
+                ];
+            }
+
+            $jn = trim($plan->job_no ?? '');
+            $jm = trim($plan->job_master ?? '');
+            $jobNumber = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+
+            $jobMaster = $jobMasters->get($jobNumber);
+            $planQty = (int) ($plan->plan ?? $plan->target_qty ?? 0);
+
+            $actualQty = 0;
+            $actualRepair = 0;
+            $actualReject = 0;
+            if ($jobMaster && $jobMaster->dailyProduction) {
+                $actualQty = (int) $jobMaster->dailyProduction->actual_ok;
+                $actualRepair = (int) ($jobMaster->dailyProduction->actual_repair ?? $jobMaster->dailyProduction->repair_qty ?? 0);
+                $actualReject = (int) ($jobMaster->dailyProduction->actual_reject ?? $jobMaster->dailyProduction->reject_qty ?? 0);
+            }
+
+            $diff = $actualQty - $planQty;
+
+            $downtimeRecords = [];
+            $downtimeMinutes = 0;
+            if ($jobMaster && $jobMaster->downtimes) {
+                foreach ($jobMaster->downtimes as $dt) {
+                    $mins = (int) round($dt->duration_seconds / 60);
+                    $downtimeMinutes += $mins;
+                    $downtimeRecords[] = [
+                        'factor' => $dt->jenis_downtime ?? '',
+                        'problem' => $dt->problem ?? '',
+                        'penyebab' => $dt->penyebab ?? '',
+                        'action' => $dt->action ?? '',
+                        'minutes' => $mins
+                    ];
+                }
+            }
+
+            $lines[$lineName]['total_plan'] += $planQty;
+            if ($planQty > 0) {
+                $lines[$lineName]['count_plan'] += 1;
+            }
+            $lines[$lineName]['total_actual'] += $actualQty;
+            if ($actualQty > 0) {
+                $lines[$lineName]['count_actual'] += 1;
+            }
+            $lines[$lineName]['total_diff'] = $lines[$lineName]['total_actual'] - $lines[$lineName]['total_plan'];
+            $lines[$lineName]['total_downtime'] += $downtimeMinutes;
+            $lines[$lineName]['total_repair'] += $actualRepair;
+            $lines[$lineName]['total_reject'] += $actualReject;
+            $lines[$lineName]['plan_gsph'] += (float)($plan->gsph_item ?? 0);
+
+            if ($jobMaster && isset($jobMaster->actual_gsph)) {
+                $lines[$lineName]['actual_gsph'] += (float)$jobMaster->actual_gsph;
+            } else {
+                $lines[$lineName]['actual_gsph'] += ($actualQty > 0 ? $lines[$lineName]['plan_gsph'] * 0.9 : 0);
+            }
+
+            $itemData = [
+                'item_name' => trim($plan->each_part ?? $jm),
+                'plan' => $planQty,
+                'actual' => $actualQty,
+                'diff' => $diff,
+                'downtimes' => $downtimeRecords
+            ];
+
+            $lines[$lineName]['items'][] = $itemData;
+
+            if ($diff < 0) {
+                $lines[$lineName]['unachieved_items'][] = $itemData;
+            }
+        }
+        ksort($lines);
+
+        $safetyData = [
+            ['item' => 'ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
+            ['item' => 'INCCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
+            ['item' => 'TRAFFIC ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
+        ];
+
+        $dateObj = Carbon::parse($date);
+        $startOfMonth = $dateObj->copy()->startOfMonth()->toDateString();
+        $endOfDate = $dateObj->toDateString();
+
+        $accumData = [];
+        $monthlyPlans = ProductionPlan::whereBetween('plan_date', [$startOfMonth, $endOfDate])
+            ->whereIn('row_type', ['job', 'break'])
+            ->get();
+
+        $monthlyJobNumbers = $monthlyPlans->map(function($p) {
+            $jn = trim($p->job_no ?? '');
+            $jm = trim($p->job_master ?? '');
+            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+        })->toArray();
+
+        $monthlyJMs = JobMaster::whereIn('job_number', $monthlyJobNumbers)
+            ->with(['dailyProduction' => function ($q) use ($startOfMonth, $endOfDate) {
+                $q->whereBetween('work_date', [$startOfMonth, $endOfDate]);
+            }])->get()->keyBy('job_number');
+
+        foreach ($monthlyPlans as $mp) {
+            $rawLine = trim($mp->press_name ?? $mp->line_master_id ?? 'UNASSIGNED');
+            $lName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
+
+            if (!isset($accumData[$lName])) {
+                $accumData[$lName] = ['ok' => 0, 'repair' => 0, 'reject' => 0];
+            }
+
+            $jn = trim($mp->job_no ?? '');
+            $jm = trim($mp->job_master ?? '');
+            $mJobNumber = $jn ? ($jn . '-' . $mp->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $mp->id);
+
+            $mjm = $monthlyJMs->get($mJobNumber);
+            if ($mjm && $mjm->dailyProduction) {
+                $accumData[$lName]['ok'] += (int) $mjm->dailyProduction->actual_ok;
+                $accumData[$lName]['repair'] += (int) ($mjm->dailyProduction->actual_repair ?? $mjm->dailyProduction->repair_qty ?? 0);
+                $accumData[$lName]['reject'] += (int) ($mjm->dailyProduction->actual_reject ?? $mjm->dailyProduction->reject_qty ?? 0);
+            }
+        }
+
+        $repairData = [];
+        $gsphData = [];
+        $rejectData = [];
+
+        foreach ($lines as $lName => $lData) {
+            $actualRepPct = $lData['total_actual'] > 0 ? ($lData['total_repair'] / $lData['total_actual']) * 100 : 0;
+            $actualRejPct = $lData['total_actual'] > 0 ? ($lData['total_reject'] / $lData['total_actual']) * 100 : 0;
+
+            $accOk = $accumData[$lName]['ok'] ?? 0;
+            $accRep = $accumData[$lName]['repair'] ?? 0;
+            $accRej = $accumData[$lName]['reject'] ?? 0;
+
+            $accumRepPct = $accOk > 0 ? ($accRep / $accOk) * 100 : 0;
+            $accumRejPct = $accOk > 0 ? ($accRej / $accOk) * 100 : 0;
+            $accumCost   = $accRej * 50000;
+
+            $repairData[] = [
+                'line_name' => $lName,
+                'target' => 1.2,
+                'actual' => $actualRepPct,
+                'accum' => $accumRepPct,
+                'issue' => $lData['total_repair'] > 0 ? $lData['total_repair'].' item(s) diperbaiki' : ''
+            ];
+
+            $gsphData[] = [
+                'line_name' => $lName,
+                'target' => 0,
+                'plan' => $lData['plan_gsph'],
+                'actual' => $lData['actual_gsph'],
+                'diff' => $lData['actual_gsph'] - $lData['plan_gsph']
+            ];
+
+            $rejectData[] = [
+                'line_name' => $lName,
+                'target' => 0.02,
+                'actual' => $actualRejPct,
+                'cost' => $lData['total_reject'] * 50000,
+                'accum' => $accumRejPct,
+                'accum_cost' => $accumCost,
+                'issue' => $lData['total_reject'] > 0 ? $lData['total_reject'].' item(s) reject' : ''
+            ];
+        }
+
+        return [
+            'safety' => $safetyData,
+            'repair' => $repairData,
+            'gsph' => $gsphData,
+            'reject' => $rejectData,
+            'lines' => array_values($lines)
+        ];
+    }
 }

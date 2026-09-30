@@ -649,6 +649,51 @@ window._breakSchedule = {!! $breakScheduleData->toJson() !!};
     };
 })();
 
+// Fallback for confirm modal in case production-engine.js loads after or encounters an issue
+window.showConfirm = window.showConfirm || function(title, text, callback) {
+    const titleEl = document.getElementById('confirmTitle');
+    const textEl = document.getElementById('confirmText');
+    const btnEl = document.getElementById('confirmBtn');
+    const modalEl = document.getElementById('confirmModal');
+    const contentEl = document.getElementById('confirmContent');
+
+    if (!modalEl || !btnEl) {
+        if (confirm(`${title}\n\n${text}`)) {
+            callback();
+        }
+        return;
+    }
+
+    if (titleEl) titleEl.innerText = title;
+    if (textEl) textEl.innerText = text;
+    modalEl.classList.remove('hidden');
+    modalEl.classList.add('flex');
+
+    setTimeout(() => {
+        if (contentEl) {
+            contentEl.classList.remove('scale-95', 'opacity-0');
+            contentEl.classList.add('scale-100', 'opacity-100');
+        }
+    }, 10);
+
+    btnEl.onclick = callback;
+};
+
+window.closeConfirmModal = window.closeConfirmModal || function() {
+    const contentEl = document.getElementById('confirmContent');
+    const modalEl = document.getElementById('confirmModal');
+    if (contentEl) {
+        contentEl.classList.add('scale-95', 'opacity-0');
+        contentEl.classList.remove('scale-100', 'opacity-100');
+    }
+    setTimeout(() => {
+        if (modalEl) {
+            modalEl.classList.add('hidden');
+            modalEl.classList.remove('flex');
+        }
+    }, 150);
+};
+
 function submitShift() {
     showConfirm('Akhiri Shift?', 'Semua data akan difinalisasi. Item yang belum mencapai target akan masuk antrean recovery.', function () {
         closeConfirmModal();

@@ -344,10 +344,10 @@
         <div class="header-right">
             <div class="filter-bar" id="filterBar">
                 <button class="active" data-line="all">Semua</button>
-                <button data-line="A">A</button>
-                <button data-line="B">B</button>
-                <button data-line="C">C</button>
-                <button data-line="D">D</button>
+                @foreach($lines as $l)
+                    @php $shortLine = strtoupper(trim(preg_replace('/^(PRESS|LINE)\s*/i', '', $l))); @endphp
+                    <button data-line="{{ $shortLine }}">{{ $shortLine }}</button>
+                @endforeach
             </div>
             <div class="filter-bar" id="shiftBar">
                 <button onclick="setShift(1)" class="active">Shift Pagi</button>
@@ -423,19 +423,22 @@ function fetchData(){
     const shift=selectedShift;
 
     Promise.all([
-        fetch(`{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`).then(r=>r.json()),
-        fetch(`{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`).then(r=>r.json()),
-        fetch(`{{ route('supervisor.overview.lineStatus') }}`).then(r=>r.json()),
+        fetch(`{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`).then(r=>r.ok ? r.json() : {}),
+        fetch(`{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`).then(r=>r.ok ? r.json() : {}),
+        fetch(`{{ route('supervisor.overview.lineStatus') }}`).then(r=>r.ok ? r.json() : {}),
     ]).then(([kpi,det,sts])=>{
-        const h=JSON.stringify(kpi.line_kpi)+JSON.stringify(det.detail)+JSON.stringify(sts.line_statuses);
+        const h=JSON.stringify(kpi?.line_kpi||{})+JSON.stringify(det?.detail||{})+JSON.stringify(sts?.line_statuses||{});
         if(h===LAST_HASH) return;
         LAST_HASH=h;
-        LINE_KPI=kpi.line_kpi||{};
-        LINE_META=kpi.line_meta||{};
-        LINE_DETAIL=det.detail||{};
-        LINE_STATUSES=sts.line_statuses||{};
+        LINE_KPI=kpi?.line_kpi||{};
+        LINE_META=kpi?.line_meta||{};
+        LINE_DETAIL=det?.detail||{};
+        LINE_STATUSES=sts?.line_statuses||{};
         renderTable();
-    }).catch(e=>console.error('fetch err',e));
+    }).catch(e=>{
+        console.error('fetch err',e);
+        renderTable();
+    });
 }
 
 function kv(line,desc){
@@ -902,6 +905,7 @@ function renderTable(){
     `;
 }
 
+renderTable();
 fetchData();
 setInterval(fetchData,5000);
 </script>

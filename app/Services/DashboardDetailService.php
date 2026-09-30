@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\DailyProduction;
 use App\Models\Downtime;
 use App\Models\JobMaster;
+use App\Models\LineMaster;
 use App\Models\ProductionPlan;
 use App\Models\Dandori;
 use App\Models\QCheck;
@@ -23,20 +24,28 @@ class DashboardDetailService
         $planShiftText = self::SHIFT_MAP[$shift] ?? 'Shift Pagi';
         $workDate = $shift === 2 ? Carbon::parse($date)->subDay()->toDateString() : $date;
 
-        $normalizedPress = strtoupper(preg_replace('/^(PRESS|LINE)\s*/i', '', $lineName));
-
+        $isMorning = ($shift === 1);
         $plans = ProductionPlan::where(function ($q) use ($date, $workDate) {
                 $q->where('plan_date', $date)->orWhere('plan_date', $workDate);
             })
-            ->whereRaw("REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') = ?", [$normalizedPress])
-            ->where('shift_name', 'like', $planShiftText . '%')
+            ->where(function ($q) use ($isMorning) {
+                if ($isMorning) {
+                    $q->where('shift_name', 'like', '%Pagi%')
+                      ->orWhere('shift_name', 'like', '%1%');
+                } else {
+                    $q->where('shift_name', 'like', '%Malam%')
+                      ->orWhere('shift_name', 'like', '%2%');
+                }
+            })
             ->where('row_type', 'job')
             ->where(function ($q) {
                 $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                   ->orWhereNull('job_no');
             })
             ->orderBy('row_no')
-            ->get();
+            ->get()
+            ->filter(fn ($p) => $this->pressMatches($p, $lineName))
+            ->values();
 
         if ($plans->isEmpty()) {
             return [];
@@ -140,5 +149,36 @@ class DashboardDetailService
         }
 
         return $rows;
+    }
+
+    private function normalizePressName(?string $value): string
+    {
+        $normalized = strtoupper(trim((string) $value));
+        $normalized = preg_replace('/^(PRESS|LINE)\s+/', '', $normalized);
+
+        return preg_replace('/[\s\-_.]+/', '', $normalized);
+    }
+
+    private function pressMatches($plan, string $lineName): bool
+    {
+        $target = $this->normalizePressName($lineName);
+        if ($target === '') {
+            return false;
+        }
+
+        if (trim((string) ($plan->press_name ?? '')) !== ''
+            && $this->normalizePressName($plan->press_name) === $target) {
+            return true;
+        }
+
+        $lineMasterId = $plan->line_master_id ?? null;
+        if ($lineMasterId) {
+            $masterId = LineMaster::where('line_name', $lineName)->value('id');
+            if ($masterId && (string) $lineMasterId === (string) $masterId) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

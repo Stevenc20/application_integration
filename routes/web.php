@@ -228,6 +228,7 @@ Route::middleware(['auth','role:supervisor,ppc,leader,foreman,manager,kadiv,dire
     Route::prefix('reports')->name('reports.')->group(function() {
         Route::get('/daily-production', [\App\Http\Controllers\Supervisor\ReportController::class, 'dailyProduction'])->middleware('feature:daily_report')->name('daily_production');
         Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
+        Route::get('/asakai', [\App\Http\Controllers\Supervisor\ReportController::class, 'asakaiReport'])->middleware('feature:daily_report')->name('asakai');
         Route::get('/performance', [\App\Http\Controllers\Supervisor\ReportController::class, 'performance'])->middleware('feature:performance_report')->name('performance');
         Route::get('/downtime-recap/{planId}', [\App\Http\Controllers\Supervisor\ReportController::class, 'downtimeRecap'])->middleware('feature:daily_report')->name('downtime_recap');
         Route::get('/downtime-recap-json/{planId}', [\App\Http\Controllers\Supervisor\ReportController::class, 'downtimeRecapJson'])->middleware('feature:daily_report')->name('downtime_recap_json');
@@ -1015,3 +1016,41 @@ Route::middleware(['auth', 'role:production'])->prefix('production')->name('prod
 Route::middleware(['auth'])->prefix('api')->name('api.')->group(function () {
     Route::get('/gsph', [\App\Http\Controllers\Api\GrafikController::class, 'gsph']);
 });
+
+// ======================
+// NETWORK MONITOR (ADMIN & SUPERADMIN ONLY)
+// ======================
+Route::middleware(['auth', 'role:admin,superadmin', 'feature:network_monitor'])
+    ->prefix('network-monitor')
+    ->name('network_monitor.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\NetworkMonitorController::class, 'index'])->name('index');
+        Route::get('/containers', [\App\Http\Controllers\NetworkMonitorController::class, 'containers'])->name('containers');
+        Route::get('/logs', [\App\Http\Controllers\NetworkMonitorController::class, 'logs'])->name('logs');
+        Route::get('/latency', [\App\Http\Controllers\NetworkMonitorController::class, 'latency'])->name('latency');
+    });
+
+// ======================
+// DATA MINING
+// ======================
+Route::middleware(['auth', 'feature:data_mining'])
+    ->prefix('data-mining')
+    ->name('data_mining.')
+    ->group(function () {
+        Route::get('/', [\App\Http\Controllers\DataMiningController::class, 'index'])->name('index');
+        Route::get('/trend/{metric}', [\App\Http\Controllers\DataMiningController::class, 'getTrend'])->name('trend');
+        Route::get('/anomaly', [\App\Http\Controllers\DataMiningController::class, 'getAnomaly'])->name('anomaly');
+        Route::get('/pareto/{type}', [\App\Http\Controllers\DataMiningController::class, 'getPareto'])->name('pareto');
+        Route::get('/summary', [\App\Http\Controllers\DataMiningController::class, 'getSummary'])->name('summary');
+    });
+
+// ======================
+// SECURITY DASHBOARD (ADMIN & SUPERADMIN ONLY)
+// ======================
+Route::middleware(['auth', 'role:admin,superadmin', 'feature:security'])
+    ->prefix('security')
+    ->name('security.')
+    ->group(function () {
+        Route::get('/dashboard', [\App\Http\Controllers\SecurityController::class, 'index'])->name('dashboard');
+        Route::get('/logs', [\App\Http\Controllers\SecurityController::class, 'logs'])->name('logs');
+    });

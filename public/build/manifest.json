@@ -1,0 +1,42 @@
+{
+  "_polyfills-legacy-CRaAXCnN.js": {
+    "file": "assets/polyfills-legacy-CRaAXCnN.js",
+    "name": "assets/polyfills-legacy-CRaAXCnN.js"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-CSsh82qs.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/css/supervisor.css": {
+    "file": "assets/supervisor-BPImwEJC.css",
+    "src": "resources/css/supervisor.css",
+    "isEntry": true,
+    "name": "supervisor",
+    "names": [
+      "supervisor.css"
+    ]
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-D4MFKzzM.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true
+  },
+  "resources/js/operational/production-engine.js": {
+    "file": "assets/production-engine-BxQKH7IQ.js",
+    "name": "production-engine",
+    "src": "resources/js/operational/production-engine.js",
+    "isEntry": true
+  },
+  "resources/js/ppc/planning.js": {
+    "file": "assets/planning-Cf5-V4Ci.js",
+    "name": "planning",
+    "src": "resources/js/ppc/planning.js",
+    "isEntry": true
+  }
+}
