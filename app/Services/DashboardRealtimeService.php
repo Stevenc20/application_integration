@@ -28,6 +28,10 @@ class DashboardRealtimeService
         $shortJob = fn($name) => strtoupper(trim(explode(' ', $name ?? '-')[0])) ?: '-';
         $planShiftText = self::SHIFT_PLAN_MAP[$shift] ?? 'Shift Pagi';
 
+        // Fallback tanggal: kalau tanggal yang diminta tidak punya schedule,
+        // pakai tanggal schedule terakhir yang punya job (bukan dashboard kosong).
+        $date = $this->resolvePlanDate($date);
+
         $shiftStartDt = $shift === 1
             ? Carbon::parse($date)->setTime(7, 30)
             : Carbon::parse($date)->subDay()->setTime(21, 0);
@@ -35,26 +39,10 @@ class DashboardRealtimeService
             ? Carbon::parse($date)->setTime(21, 0)
             : Carbon::parse($date)->addDay()->setTime(7, 30);
 
-        $workDate = $shift === 2 ? Carbon::parse($date)->subDay()->toDateString() : $date;
+        $workDate = $date;
 
         $isMorning = ($shift === 1);
-        $plans = ProductionPlan::where('plan_date', $date)
-            ->where(function ($q) use ($isMorning) {
-                if ($isMorning) {
-                    $q->where('shift_name', 'like', '%Pagi%')
-                      ->orWhere('shift_name', 'like', '%1%');
-                } else {
-                    $q->where('shift_name', 'like', '%Malam%')
-                      ->orWhere('shift_name', 'like', '%2%');
-                }
-            })
-            ->where('row_type', 'job')
-            ->where(function ($q) {
-                $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                  ->orWhereNull('job_no');
-            })
-            ->orderBy('row_no')
-            ->get()
+        $plans = $this->getPlansForDateAndShift($date, $isMorning)
             ->filter(fn ($p) => $this->pressMatches($p, $lineName))
             ->values();
 
@@ -100,6 +88,14 @@ class DashboardRealtimeService
             ->where('work_date', $workDate)
             ->whereIn('job_master_id', $jobIds)
             ->get();
+
+        if ($dailyRecords->isEmpty()) {
+            $fallbackDate = Carbon::parse($workDate)->subDay()->toDateString();
+            $dailyRecords = DailyProduction::with('jobMaster')
+                ->where('work_date', $fallbackDate)
+                ->whereIn('job_master_id', $jobIds)
+                ->get();
+        }
 
         $activeJobIds = $dailyRecords->pluck('job_master_id')->toArray();
         $missingJobs = $jobMasters->whereNotIn('id', $activeJobIds);
@@ -495,6 +491,49 @@ class DashboardRealtimeService
         return preg_replace('/[\s\-_.]+/', '', $normalized);
     }
 
+    /**
+     * Tanggal schedule yang benar-benar punya data. Kalau tanggal yang diminta kosong,
+     * mundur ke tanggal schedule terakhir yang punya job supaya dashboard tidak blank.
+     */
+    private function resolvePlanDate(string $date): string
+    {
+        $hasJobs = ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'job')
+            ->exists();
+
+        if ($hasJobs) {
+            return $date;
+        }
+
+        $latest = ProductionPlan::where('row_type', 'job')->max('plan_date');
+
+        return $latest ? Carbon::parse($latest)->toDateString() : $date;
+    }
+
+    /**
+     * Baris job untuk tanggal + shift tertentu.
+     */
+    private function getPlansForDateAndShift(string $date, bool $isMorning)
+    {
+        return ProductionPlan::where('plan_date', $date)
+            ->where(function ($q) use ($isMorning) {
+                if ($isMorning) {
+                    $q->where('shift_name', 'like', '%Pagi%')
+                      ->orWhere('shift_name', 'like', '%1%');
+                } else {
+                    $q->where('shift_name', 'like', '%Malam%')
+                      ->orWhere('shift_name', 'like', '%2%');
+                }
+            })
+            ->where('row_type', 'job')
+            ->where(function ($q) {
+                $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                  ->orWhereNull('job_no');
+            })
+            ->orderBy('row_no')
+            ->get();
+    }
+
     private function pressMatches($plan, string $lineName): bool
     {
         $target = $this->normalizePressName($lineName);
@@ -502,9 +541,17 @@ class DashboardRealtimeService
             return false;
         }
 
-        if (trim((string) ($plan->press_name ?? '')) !== ''
-            && $this->normalizePressName($plan->press_name) === $target) {
+        $pressRaw = trim((string) ($plan->press_name ?? ''));
+        if ($pressRaw !== '' && $this->normalizePressName($pressRaw) === $target) {
             return true;
+        }
+
+        // press_name kadang tersimpan sebagai line_code (mis. "PA"), bukan "PRESS A"
+        if ($pressRaw !== '') {
+            $master = LineMaster::where('line_name', $lineName)->first();
+            if ($master && $this->normalizePressName($master->line_code ?? '') === $this->normalizePressName($pressRaw)) {
+                return true;
+            }
         }
 
         $lineMasterId = $plan->line_master_id ?? null;

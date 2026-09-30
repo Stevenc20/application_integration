@@ -22,12 +22,13 @@ class DashboardDetailService
     public function getLineDetail(string $lineName, string $date, int $shift): array
     {
         $planShiftText = self::SHIFT_MAP[$shift] ?? 'Shift Pagi';
-        $workDate = $shift === 2 ? Carbon::parse($date)->subDay()->toDateString() : $date;
+
+        // Fallback tanggal: pakai tanggal schedule terakhir yang punya job
+        $date = $this->resolvePlanDate($date);
+        $workDate = $date;
 
         $isMorning = ($shift === 1);
-        $plans = ProductionPlan::where(function ($q) use ($date, $workDate) {
-                $q->where('plan_date', $date)->orWhere('plan_date', $workDate);
-            })
+        $plans = ProductionPlan::where('plan_date', $date)
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')
@@ -61,12 +62,43 @@ class DashboardDetailService
             ->get()
             ->keyBy('job_number');
 
+        // Auto-create JobMaster yang belum ada, sama seperti DashboardRealtimeService,
+        // supaya detail tidak selalu 0 walau JobMaster belum pernah di-sync.
+        foreach ($plans as $p) {
+            $jn = trim($p->job_no ?? '');
+            $jm = trim($p->job_master ?? '');
+            $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            if (! $jobMasters->has($identifier)) {
+                $newJob = JobMaster::create([
+                    'job_number' => $identifier,
+                    'job_name'   => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
+                    'line'       => $p->press_name ?? $lineName,
+                    'target_qty' => (int) ($p->plan ?? 0),
+                    'sequence_no' => $p->row_no ?? 1,
+                    'status'     => 'pending',
+                    'plan_start' => $p->start_time ? Carbon::parse($date . ' ' . $p->start_time)->startOfMinute() : null,
+                    'plan_end'   => $p->finish_time ? Carbon::parse($date . ' ' . $p->finish_time)->startOfMinute() : null,
+                    'capacity'   => (int) ($p->qty_plt ?? 0),
+                ]);
+                $jobMasters->put($identifier, $newJob);
+            }
+        }
+
         $jobIds = $jobMasters->pluck('id');
 
         $dailyRecords = DailyProduction::where('work_date', $workDate)
             ->whereIn('job_master_id', $jobIds)
             ->get()
             ->keyBy('job_master_id');
+
+        if ($dailyRecords->isEmpty()) {
+            $fallbackDate = Carbon::parse($workDate)->subDay()->toDateString();
+            $dailyRecords = DailyProduction::where('work_date', $fallbackDate)
+                ->whereIn('job_master_id', $jobIds)
+                ->get()
+                ->keyBy('job_master_id');
+        }
 
         $dandoriMinutes = Dandori::whereIn('next_job_id', $jobIds)
             ->whereNotNull('finish_time')
@@ -171,6 +203,14 @@ class DashboardDetailService
             return true;
         }
 
+        // press_name kadang tersimpan sebagai line_code (mis. "PA"), bukan "PRESS A"
+        if (trim((string) ($plan->press_name ?? '')) !== '') {
+            $master = LineMaster::where('line_name', $lineName)->first();
+            if ($master && $this->normalizePressName($master->line_code ?? '') === $this->normalizePressName($plan->press_name)) {
+                return true;
+            }
+        }
+
         $lineMasterId = $plan->line_master_id ?? null;
         if ($lineMasterId) {
             $masterId = LineMaster::where('line_name', $lineName)->value('id');
@@ -180,5 +220,20 @@ class DashboardDetailService
         }
 
         return false;
+    }
+
+    private function resolvePlanDate(string $date): string
+    {
+        $hasJobs = ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'job')
+            ->exists();
+
+        if ($hasJobs) {
+            return $date;
+        }
+
+        $latest = ProductionPlan::where('row_type', 'job')->max('plan_date');
+
+        return $latest ? Carbon::parse($latest)->toDateString() : $date;
     }
 }

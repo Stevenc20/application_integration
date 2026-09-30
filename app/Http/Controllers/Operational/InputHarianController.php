@@ -13,6 +13,7 @@ use App\Models\LineMaster;
 use App\Models\ProductionLog;
 use App\Models\ShiftSubmission;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use App\Services\ProductionService;
 use App\Services\DashboardRealtimeService;
 

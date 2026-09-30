@@ -51,7 +51,7 @@ class DashboardController extends Controller
 
     public function getApiData()
     {
-        $date  = request('date', now()->toDateString());
+        $date  = request('date', $this->defaultDashboardDate());
         $shift = (int) request('shift', 1);
         $selectedLine = request('line');
 
@@ -96,7 +96,7 @@ class DashboardController extends Controller
 
     public function getDetailData()
     {
-        $date  = request('date', now()->toDateString());
+        $date  = request('date', $this->defaultDashboardDate());
         $shift = (int) request('shift', 1);
         $selectedLine = request('line');
 
@@ -119,7 +119,7 @@ class DashboardController extends Controller
 
     public function stream(): StreamedResponse
     {
-        $date  = request('date', now()->toDateString());
+        $date  = request('date', $this->defaultDashboardDate());
         $shift = (int) request('shift', 1);
         $selectedLine = request('line');
 
@@ -198,6 +198,17 @@ class DashboardController extends Controller
         $response->headers->set('X-Accel-Buffering', 'no');
 
         return $response;
+    }
+
+    /**
+     * Tanggal default dashboard. Sebelum jam 07:00 masih berjalan Shift Malam,
+     * jadi pakai tanggal kemarin supaya sinkron dengan Input Harian.
+     */
+    private function defaultDashboardDate(): string
+    {
+        return (int) now()->format('H') < 7
+            ? now()->subDay()->toDateString()
+            : now()->toDateString();
     }
 
     private function computeOverviewData(string $dateFrom, string $dateTo, string $selectedLine, int $shift): array
@@ -571,7 +582,7 @@ class DashboardController extends Controller
 
     public function troubleHistory()
     {
-        $date = request('date', now()->toDateString());
+        $date = request('date', $this->defaultDashboardDate());
         $search = request('search');
 
         $query = \App\Models\Downtime::with('jobMaster')
