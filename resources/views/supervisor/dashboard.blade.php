@@ -28,7 +28,7 @@
             <button id="s2btn" onclick="setShift(2)" class="filter-btn px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">Shift 2</button>
         </div>
         <div class="flex items-center gap-2 ml-auto">
-            <a href="{{ route('supervisor.monitor') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors">
+            <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors">
                 <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                 Monitor
             </a>
@@ -706,6 +706,11 @@ const LINES = @json($lines);
 const SELECTED_LINE = @json($selectedLine);
 const IS_PER_PRESS = LINES.length === 1;
 
+// Path relatif, bukan URL absolut dari route(). Kalau APP_URL di server http://
+// sementara halaman diakses lewat https, browser memblokirnya sebagai mixed content.
+const DASH_API_DATA   = @json(parse_url(route('supervisor.dashboard.api'), PHP_URL_PATH));
+const DASH_API_DETAIL = @json(parse_url(route('supervisor.dashboard.detail'), PHP_URL_PATH));
+
 let selectedShift = 1;
 let selectedDays  = 1;
 let charts = {};
@@ -737,7 +742,7 @@ async function fetchDetailData() {
     const date = document.getElementById('dateInput').value;
     const shift = selectedShift;
     try {
-        let url = `{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`;
+        let url = `${DASH_API_DETAIL}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
         const response = await dashFetch(url);
         const data = await readDashJson(response, url);
@@ -791,7 +796,7 @@ async function fetchDashboardData() {
     const shift = selectedShift;
     
     try {
-        let url = `{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`;
+        let url = `${DASH_API_DATA}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
 
         const response = await dashFetch(url);
