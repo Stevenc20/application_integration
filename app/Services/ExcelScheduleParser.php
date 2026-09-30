@@ -145,7 +145,7 @@ class ExcelScheduleParser
 
         if (empty($pressStarts)) {
             $pressName = 'PRESS A';
-            foreach (['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D'] as $p) {
+            foreach (['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F'] as $p) {
                 if (stripos($sheetName, $p) !== false) { $pressName = $p; break; }
             }
             $pressStarts[] = ['idx' => 0, 'name' => $pressName];

@@ -59,6 +59,10 @@ class InputHarianController extends Controller
                 $lineFilter = 'Line C';
             } elseif ($userRole === 'leader d') {
                 $lineFilter = 'Line D';
+            } elseif ($userRole === 'leader e') {
+                $lineFilter = 'Line E';
+            } elseif ($userRole === 'leader f') {
+                $lineFilter = 'Line F';
             } elseif ($userRole === 'shearing') {
                 $lineFilter = 'Shearing';
             } elseif ($userRole === 'handwork') {
@@ -405,7 +409,7 @@ class InputHarianController extends Controller
             'jobs'            => $plans, 
             'pendingJobs'     => $pendingJobs,
             'lines'           => collect([
-                                    'Line A', 'Line B', 'Line C', 'Line D', 'Shearing', 'Handwork'
+                                    'Line A', 'Line B', 'Line C', 'Line D', 'Line E', 'Line F', 'Shearing', 'Handwork'
                                  ]),
             'activeJob'       => $activeJob,
             'productionLogs'  => $productionLogs,
@@ -805,6 +809,10 @@ class InputHarianController extends Controller
                 $lineParam = 'Line C';
             } elseif ($upperLine === 'PRESS D' || $upperLine === 'D' || $upperLine === 'LINE D') {
                 $lineParam = 'Line D';
+            } elseif ($upperLine === 'PRESS E' || $upperLine === 'E' || $upperLine === 'LINE E') {
+                $lineParam = 'Line E';
+            } elseif ($upperLine === 'PRESS F' || $upperLine === 'F' || $upperLine === 'LINE F') {
+                $lineParam = 'Line F';
             } elseif ($upperLine === 'SHEARING') {
                 $lineParam = 'Shearing';
             } elseif ($upperLine === 'HANDWORK') {

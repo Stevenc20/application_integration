@@ -291,8 +291,8 @@
 
                 <div class="p-6">
                     {{-- Press Cards Grid --}}
-                    <div class="grid grid-cols-2 gap-4 mb-6">
-                        @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D'] as $idx => $press)
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                        @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F'] as $idx => $press)
                         @php
                             $colors = [
                                 ['from-rose-500', 'to-red-600', 'bg-rose-50', 'text-rose-700', 'border-rose-200', 'shadow-rose-100'],
@@ -300,7 +300,7 @@
                                 ['from-rose-600', 'to-red-700', 'bg-rose-50', 'text-rose-800', 'border-rose-200', 'shadow-rose-100'],
                                 ['from-red-600', 'to-rose-700', 'bg-red-50', 'text-red-800', 'border-red-200', 'shadow-red-100'],
                             ];
-                            $c = $colors[$idx];
+                            $c = $colors[$idx % count($colors)];
                         @endphp
                         <a href="{{ route('ppc.planning.production_plan', ['press' => $press]) }}" class="group block p-5 rounded-2xl border {{ $c[4] }} {{ $c[2] }} hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                             <div class="flex items-center justify-between mb-3">
