@@ -308,15 +308,26 @@ class InputHarianController extends Controller
 
             $activeJob = $activeJobQuery->first();
         } else {
-            // Today mode: cari job running realtime
-            $activeJob = JobMaster::where(DB::raw('LOWER(status)'), 'running');
+            // Today mode: cari job running realtime yang sesuai dengan jadwal aktif hari ini
+            $scheduledJobNumbers = $plans->map(function($p) {
+                $jn = trim($p->job_no ?? '');
+                $jm = trim($p->job_master ?? '');
+                return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            })->toArray();
+
+            $activeJobQuery = JobMaster::where(DB::raw('LOWER(status)'), 'running');
 
             if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
                 $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
-                $activeJob->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
+                $activeJobQuery->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
             }
 
-            $activeJob = $activeJob->with([
+            // Only pick a running job if it belongs to current schedule plans
+            if (!empty($scheduledJobNumbers)) {
+                $activeJobQuery->whereIn('job_number', $scheduledJobNumbers);
+            }
+
+            $activeJob = $activeJobQuery->with([
                     'dailyProduction' => function ($q) use ($date) {
                         $q->where('work_date', $date);
                     },
@@ -482,6 +493,45 @@ class InputHarianController extends Controller
                     'job_number' => $identifier,
                     'status'     => 'pending',
                 ]));
+            }
+        }
+
+        // Cleanup orphaned running/paused jobs for this shift/date whose plan was removed/overwritten
+        $activeIdentifiers = $plans->map(function ($plan) {
+            $jn = trim($plan->job_no ?? '');
+            $jm = trim($plan->job_master ?? '');
+            return $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
+        })->toArray();
+
+        if (!empty($activeIdentifiers)) {
+            $orphanedJobs = \App\Models\JobMaster::whereIn('status', ['running', 'paused'])
+                ->where(function ($q) {
+                    $q->where('job_number', 'LIKE', '%-%');
+                })
+                ->whereNotIn('job_number', $activeIdentifiers)
+                ->whereHas('dailyProduction', function ($dq) use ($date) {
+                    $dq->where('work_date', $date);
+                })
+                ->get();
+
+            if ($orphanedJobs->isNotEmpty()) {
+                $orphanedIds = $orphanedJobs->pluck('id')->toArray();
+                $nowTs = now();
+
+                \App\Models\Downtime::whereIn('job_master_id', $orphanedIds)
+                    ->whereNull('finish_time')
+                    ->update(['finish_time' => $nowTs]);
+
+                \App\Models\Dandori::whereIn('next_job_id', $orphanedIds)
+                    ->whereNull('finish_time')
+                    ->update(['finish_time' => $nowTs]);
+
+                \App\Models\ProductionSession::whereIn('job_master_id', $orphanedIds)
+                    ->where('status', 'running')
+                    ->update(['status' => 'finished', 'finish_time' => $nowTs]);
+
+                \App\Models\JobMaster::whereIn('id', $orphanedIds)
+                    ->update(['status' => 'closed', 'finished_at' => $nowTs]);
             }
         }
     }

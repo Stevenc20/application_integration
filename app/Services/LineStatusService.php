@@ -22,12 +22,29 @@ class LineStatusService
         }
 
         // 1. All running/paused jobs grouped by line
+        // Only consider jobs that belong to active plans on the current work date
         $allRunningJobs = JobMaster::whereIn('line', $activeLines)
             ->whereIn('status', ['running', 'paused'])
-            ->get()
-            ->groupBy('line');
+            ->get();
 
-        $allJobIds = $allRunningJobs->flatten()->pluck('id');
+        // Verify and filter out any orphaned running jobs that no longer exist in ProductionPlan for today
+        $validRunningJobs = collect();
+        foreach ($allRunningJobs as $job) {
+            $plan = $job->production_plan;
+            if (!$plan || $plan->plan_date !== $today) {
+                // Dangling/orphaned job from previous plan upload - auto close
+                $nowTs = now();
+                Downtime::where('job_master_id', $job->id)->whereNull('finish_time')->update(['finish_time' => $nowTs]);
+                Dandori::where('next_job_id', $job->id)->whereNull('finish_time')->update(['finish_time' => $nowTs]);
+                ProductionSession::where('job_master_id', $job->id)->where('status', 'running')->update(['status' => 'finished', 'finish_time' => $nowTs]);
+                $job->update(['status' => 'closed', 'finished_at' => $nowTs]);
+                continue;
+            }
+            $validRunningJobs->push($job);
+        }
+
+        $allRunningJobs = $validRunningJobs->groupBy('line');
+        $allJobIds = $validRunningJobs->pluck('id');
 
         // 2. Active downtimes (machine/process issues) across all jobs
         $activeDowntimeJobIds = [];

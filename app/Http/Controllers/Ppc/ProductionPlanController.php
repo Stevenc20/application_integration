@@ -429,6 +429,42 @@ class ProductionPlanController extends Controller
                         // Disassociate recovery queue items — DON'T delete them
                         \App\Models\RecoveryItem::whereIn('production_plan_id', $ppcPlanIds)
                             ->update(['production_plan_id' => null]);
+
+                        // Auto-stop and close any JobMaster, Downtime, and ProductionSession linked to these old plans
+                        $jobIdentifiers = [];
+                        foreach ($ppcPlanIds as $pid) {
+                            $jobIdentifiers[] = "%-{$pid}";
+                        }
+                        $oldJobs = \App\Models\JobMaster::where(function($q) use ($ppcPlanIds, $jobIdentifiers) {
+                            foreach ($ppcPlanIds as $pid) {
+                                $q->orWhere('job_number', 'LIKE', "%-{$pid}");
+                            }
+                        })->get();
+
+                        if ($oldJobs->isNotEmpty()) {
+                            $oldJobIds = $oldJobs->pluck('id')->toArray();
+                            $nowTs = now();
+
+                            // Close open downtimes (including break time, trouble, etc.)
+                            \App\Models\Downtime::whereIn('job_master_id', $oldJobIds)
+                                ->whereNull('finish_time')
+                                ->update(['finish_time' => $nowTs]);
+
+                            // Close open dandoris
+                            \App\Models\Dandori::whereIn('next_job_id', $oldJobIds)
+                                ->whereNull('finish_time')
+                                ->update(['finish_time' => $nowTs]);
+
+                            // Close open production sessions
+                            \App\Models\ProductionSession::whereIn('job_master_id', $oldJobIds)
+                                ->where('status', 'running')
+                                ->update(['status' => 'finished', 'finish_time' => $nowTs]);
+
+                            // Mark running or paused jobs as closed
+                            \App\Models\JobMaster::whereIn('id', $oldJobIds)
+                                ->whereIn('status', ['running', 'paused'])
+                                ->update(['status' => 'closed', 'finished_at' => $nowTs]);
+                        }
                     }
 
                     ProductionPlan::whereDate('plan_date', $parsedDate)
