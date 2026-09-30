@@ -39,7 +39,7 @@
     </div>
 
     <!-- ===== LINE CARDS ===== -->
-    <div class="grid grid-cols-1 {{ count($lines) > 1 ? 'lg:grid-cols-2' : '' }} gap-6 min-h-[300px]" id="linesGrid"></div>
+    <div class="grid grid-cols-1 {{ count($lines) === 1 ? 'max-w-2xl mx-auto' : (count($lines) === 2 ? 'lg:grid-cols-2' : 'lg:grid-cols-3 is-multi-line') }} gap-4 sm:gap-5 min-h-[300px]" id="linesGrid"></div>
 
     <!-- ===== DAY RANGE ===== -->
     <div class="flex flex-col sm:flex-row items-center justify-between gap-3 pt-2 border-t border-gray-200">
@@ -151,29 +151,29 @@
 <style>
 /* ── 1080p / Large Monitor ≥1920px ─────────────────────────── */
 @media (min-width: 1920px) {
-  .kpi-table-cell          { font-size: 0.95rem !important; padding: 10px 14px !important; }
-  .kpi-table-header        { font-size: 0.75rem !important; padding: 9px 14px !important; }
-  .card-line-title         { font-size: 1.05rem !important; padding: 12px 16px !important; }
+  .kpi-table-cell          { font-size: 0.88rem !important; padding: 8px 12px !important; }
+  .kpi-table-header        { font-size: 0.72rem !important; padding: 8px 12px !important; }
+  .card-line-title         { font-size: 1rem !important; padding: 10px 14px !important; }
   .chart-min-h             { min-height: 380px !important; }
   .filter-input            { font-size: 0.95rem !important; padding: 10px 16px !important; }
   .filter-btn              { font-size: 0.9rem !important; padding: 10px 20px !important; }
   #liveClock               { font-size: 3.5rem !important; }
   .dash-h1                 { font-size: 2rem !important; }
-  .linesGrid               { gap: 1.25rem !important; }
+  #linesGrid.is-multi-line { gap: 1.25rem !important; grid-template-columns: repeat(3, 1fr) !important; }
   .space-wrapper           { gap: 1.5rem !important; }
 }
 
 /* ── QHD / 2K ≥2560px ──────────────────────────────────────── */
 @media (min-width: 2560px) {
-  .kpi-table-cell          { font-size: 1.15rem !important; padding: 13px 18px !important; }
-  .kpi-table-header        { font-size: 0.9rem !important; padding: 12px 18px !important; }
-  .card-line-title         { font-size: 1.3rem !important; padding: 15px 20px !important; letter-spacing: 0.15em !important; }
+  .kpi-table-cell          { font-size: 1.05rem !important; padding: 11px 16px !important; }
+  .kpi-table-header        { font-size: 0.85rem !important; padding: 10px 16px !important; }
+  .card-line-title         { font-size: 1.2rem !important; padding: 13px 18px !important; letter-spacing: 0.15em !important; }
   .chart-min-h             { min-height: 500px !important; }
   .filter-input            { font-size: 1.1rem !important; padding: 12px 20px !important; }
   .filter-btn              { font-size: 1.05rem !important; padding: 12px 28px !important; }
   #liveClock               { font-size: 5rem !important; }
   .dash-h1                 { font-size: 2.6rem !important; }
-  .linesGrid               { gap: 1.75rem !important; grid-template-columns: repeat(4, 1fr) !important; }
+  #linesGrid.is-multi-line { gap: 1.5rem !important; grid-template-columns: repeat(3, 1fr) !important; }
   .space-wrapper           { gap: 2rem !important; }
   .chart-grid              { gap: 1.75rem !important; }
   .modal-dialog-inner      { max-width: 900px !important; font-size: 1.1rem !important; }
@@ -181,30 +181,29 @@
 
 /* ── 4K ≥3840px ─────────────────────────────────────────────── */
 @media (min-width: 3840px) {
-  .kpi-table-cell          { font-size: 1.65rem !important; padding: 20px 28px !important; }
-  .kpi-table-header        { font-size: 1.25rem !important; padding: 18px 28px !important; }
-  .card-line-title         { font-size: 1.9rem !important; padding: 22px 28px !important; letter-spacing: 0.2em !important; }
+  .kpi-table-cell          { font-size: 1.45rem !important; padding: 16px 24px !important; }
+  .kpi-table-header        { font-size: 1.15rem !important; padding: 14px 22px !important; }
+  .card-line-title         { font-size: 1.7rem !important; padding: 18px 24px !important; letter-spacing: 0.2em !important; }
   .chart-min-h             { min-height: 720px !important; }
   .filter-input            { font-size: 1.5rem !important; padding: 18px 28px !important; border-radius: 1rem !important; }
   .filter-btn              { font-size: 1.45rem !important; padding: 18px 40px !important; border-radius: 1rem !important; }
   #liveClock               { font-size: 7.5rem !important; }
   .dash-h1                 { font-size: 3.75rem !important; }
   .dash-subtitle           { font-size: 1.4rem !important; }
-  .linesGrid               { gap: 2.5rem !important; grid-template-columns: repeat(4, 1fr) !important; }
+  #linesGrid.is-multi-line { gap: 2rem !important; grid-template-columns: repeat(3, 1fr) !important; }
   .space-wrapper           { gap: 3rem !important; }
   .chart-grid              { gap: 2.5rem !important; }
   .section-card            { border-radius: 1.5rem !important; padding: 2rem !important; }
   .modal-dialog-inner      { max-width: 1400px !important; font-size: 1.6rem !important; }
   .live-badge              { font-size: 1.2rem !important; padding: 10px 20px !important; }
   .day-label               { font-size: 1.2rem !important; }
-  #linesGrid               { grid-template-columns: repeat(2, 1fr) !important; gap: 2.5rem !important; }
 }
 
 /* ── DETAIL PRODUKSI TABLE ───────────────────────────────────── */
 .det-scroll {
   overflow-x: auto;
   overflow-y: auto;
-  max-height: 320px;
+  max-height: 240px;
   scrollbar-width: thin;
   scrollbar-color: #e5e7eb #f9fafb;
 }
@@ -498,10 +497,10 @@ function buildLineCard(line){
 
   // KPI table rows
   let kpiRows = `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
-    <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">JOB</td>
-    <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">${jobPlan}</td>
-    <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${jobActual}</td>
-    <td class="px-4 py-3 text-center text-gray-800 font-semibold text-xs sm:text-sm">${jobLabel}</td>
+    <td class="kpi-table-cell px-3 py-2 text-left text-blue-700 font-extrabold text-xs">JOB</td>
+    <td class="kpi-table-cell px-3 py-2 text-center text-gray-500 text-xs">${jobPlan}</td>
+    <td class="kpi-table-cell px-3 py-2 text-center text-blue-700 font-bold text-xs">${jobActual}</td>
+    <td class="kpi-table-cell px-3 py-2 text-center text-gray-800 font-semibold text-xs">${jobLabel}</td>
   </tr>`;
 
   rows.forEach((kpi) => {
@@ -519,18 +518,18 @@ function buildLineCard(line){
     }
 
     kpiRows += `<tr class="border-b border-gray-100 transition-colors ${dangerRowCls}">
-      <td class="kpi-table-cell px-4 py-3 text-left ${textDescCls} border-l-[4px] border-transparent text-xs sm:text-sm lg:text-base">${kpi.desc}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-gray-500 text-xs sm:text-sm lg:text-base">${kpi.plan}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-xs sm:text-sm lg:text-base ${cursorCls}" ${clickAttr}>${actualCell}</td>
-      <td class="kpi-table-cell px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm lg:text-base">${kpi.currentPct ? `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>` : kpi.current}</td>
+      <td class="kpi-table-cell px-3 py-2 text-left ${textDescCls} border-l-[3px] border-transparent text-xs">${kpi.desc}</td>
+      <td class="kpi-table-cell px-3 py-2 text-center text-gray-500 text-xs">${kpi.plan}</td>
+      <td class="kpi-table-cell px-3 py-2 text-center text-xs ${cursorCls}" ${clickAttr}>${actualCell}</td>
+      <td class="kpi-table-cell px-3 py-2 text-center text-gray-600 font-semibold text-xs">${kpi.currentPct ? `<span>${kpi.current}</span><span class="text-gray-400 text-[10px] ml-1">| ${kpi.currentPct}</span>` : kpi.current}</td>
     </tr>`;
 
     if(kpi.desc === 'GSPH'){
       kpiRows += `<tr class="border-b border-gray-100 bg-blue-50/50 hover:bg-blue-50/70">
-        <td class="px-4 py-3 text-left text-blue-700 font-extrabold text-xs sm:text-sm">STROKE</td>
-        <td class="px-4 py-3 text-center text-gray-500 text-xs sm:text-sm">-</td>
-        <td class="px-4 py-3 text-center text-blue-700 font-bold text-xs sm:text-sm">${Number(strokeVal).toLocaleString('id-ID')}</td>
-        <td class="px-4 py-3 text-center text-gray-600 font-semibold text-xs sm:text-sm">${currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID')}</td>
+        <td class="kpi-table-cell px-3 py-2 text-left text-blue-700 font-extrabold text-xs">STROKE</td>
+        <td class="kpi-table-cell px-3 py-2 text-center text-gray-500 text-xs">-</td>
+        <td class="kpi-table-cell px-3 py-2 text-center text-blue-700 font-bold text-xs">${Number(strokeVal).toLocaleString('id-ID')}</td>
+        <td class="kpi-table-cell px-3 py-2 text-center text-gray-600 font-semibold text-xs">${currStrokeVal === '-' ? '-' : Number(currStrokeVal || 0).toLocaleString('id-ID')}</td>
       </tr>`;
     }
   });
@@ -594,17 +593,17 @@ function buildLineCard(line){
   `;
       
   return `<div class="bg-white rounded-2xl border border-gray-200 shadow-xl overflow-hidden flex flex-col group hover:border-red-300 transition-all">
-    <div class="card-line-title bg-red-50 border-b border-red-100 px-5 py-4 text-center text-red-700 font-black tracking-[0.2em] text-sm sm:text-base lg:text-lg uppercase">
+    <div class="card-line-title bg-red-50 border-b border-red-100 px-4 py-2.5 text-center text-red-700 font-black tracking-[0.15em] text-sm sm:text-base uppercase">
       ${line}
     </div>
     <div class="overflow-x-auto">
       <table class="border-collapse w-full">
         <thead>
-          <tr class="bg-gray-100 border-b-2 border-gray-200 text-gray-500">
-            <th class="kpi-table-header px-4 py-3 text-left text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">DESC</th>
-            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">PLAN</th>
-            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">ACTUAL</th>
-            <th class="kpi-table-header px-4 py-3 text-center text-[10px] sm:text-xs lg:text-sm font-black uppercase tracking-widest">CURR</th>
+          <tr class="bg-gray-100 border-b border-gray-200 text-gray-500">
+            <th class="kpi-table-header px-3 py-2 text-left text-[10px] sm:text-xs font-black uppercase tracking-wider">DESC</th>
+            <th class="kpi-table-header px-3 py-2 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider">PLAN</th>
+            <th class="kpi-table-header px-3 py-2 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider">ACTUAL</th>
+            <th class="kpi-table-header px-3 py-2 text-center text-[10px] sm:text-xs font-black uppercase tracking-wider">CURR</th>
           </tr>
         </thead>
         <tbody>
