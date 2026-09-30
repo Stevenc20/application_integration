@@ -56,6 +56,15 @@
     .section-header .sub { font-size: 10px; font-weight: 700; color: #9CA3AF; text-transform: uppercase; letter-spacing: 0.5px; }
     .cell-time { font-family: 'Courier New', monospace; font-weight: 700; font-size: 11px; }
     .cell-qty { font-variant-numeric: tabular-nums; text-align: center; }
+    .lkh-editable-cell { position: relative; cursor: pointer; }
+    .lkh-editable-cell .lkh-edit-icon { display: none; position: absolute; top: 1px; right: 2px; font-size: 9px; color: #DC2626; background: #FEE2E2; border-radius: 4px; padding: 0 3px; line-height: 1.3; z-index: 2; }
+    .lkh-editable-cell:hover .lkh-edit-icon { display: block; }
+    body.lkh-edit-mode .lkh-editable-cell { outline: 1px dashed #F59E0B; outline-offset: -1px; background: #FFFBEB; }
+    body.lkh-edit-mode .lkh-editable-cell:hover { background: #FEF3C7; }
+    .lkh-editable-cell.lkh-cell-edited { background: #FDE68A !important; }
+    .lkh-editable-cell.lkh-cell-edited .lkh-edit-display { color: #92400E; }
+    .lkh-cell-input { width: 100%; min-width: 45px; padding: 2px 4px; border: 1.5px solid #F59E0B; border-radius: 6px; background: #fff; font-size: 11px; font-weight: 700; text-align: center; color: #1F2937; }
+    .lkh-cell-input:focus { outline: none; border-color: #DC2626; box-shadow: 0 0 0 2px rgba(220,38,38,0.15); }
 </style>
 @endsection
 
@@ -75,6 +84,35 @@
                 <span class="font-bold text-gray-800 tracking-wide text-sm uppercase">Filter Laporan Kerja Harian (LKH)</span>
             </div>
             <div class="flex items-center gap-2">
+                @php
+                    $canEdit = $canEdit ?? false;
+                    $ttdLocked = $ttdLocked ?? false;
+                    $leaderSigned = $signatureStatus['teamleader']['signed'] ?? false;
+                    $editLockMsg = $leaderSigned ? 'Edit Terkunci (TTD)' : 'Menunggu TTD Team Leader';
+                @endphp
+                @if ($canEdit)
+                    @if ($ttdLocked)
+                        <span class="inline-flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed" title="Edit terkunci karena TTD sudah diisi">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                            <span>{{ $editLockMsg }}</span>
+                        </span>
+                    @else
+                        <button type="button" id="btn-edit-lkh" onclick="toggleLkhEdit(true)"
+                                class="flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            <span>Edit Actual</span>
+                        </button>
+                        <button type="button" id="btn-save-lkh" onclick="saveLkhEdits()" style="display:none;background-color:#DC2626 !important;"
+                                class="flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm border border-red-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            <span>Simpan</span>
+                        </button>
+                        <button type="button" id="btn-cancel-lkh" onclick="toggleLkhEdit(false)" style="display:none"
+                                class="flex items-center gap-2 text-xs font-bold px-4 py-2.5 rounded-xl transition-all border border-gray-300 bg-white text-gray-500 hover:bg-gray-50">
+                            <span>Batal</span>
+                        </button>
+                    @endif
+                @endif
                 <a href="{{ route('supervisor.reports.daily_production', ['line' => $selectedLineName, 'shift' => $selectedShift, 'date' => $date, 'format' => 'excel']) }}"
                    class="flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm no-underline"
                    style="background-color:#15803d !important;"
@@ -86,6 +124,12 @@
                 </a>
             </div>
         </div>
+        @if ($canEdit && !$ttdLocked)
+        <div id="lkh-edit-banner" class="no-print px-6 py-2.5 bg-amber-50 border-b border-amber-200 text-amber-800 text-xs font-semibold flex items-center gap-2" style="display:none">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            <span>Mode edit aktif — klik sel <b>Good / Repair / Reject / Act Start / Act Fin / Uchi Dandori / Down Time</b> untuk mengubah data actual, lalu tekan <b>Simpan</b>.</span>
+        </div>
+        @endif
         <div class="p-6">
             <form id="filter-form" method="GET" action="{{ route('supervisor.reports.daily_production') }}" class="flex flex-col lg:flex-row lg:items-end justify-between gap-6">
                 <input type="hidden" id="active-line" name="line" value="{{ $selectedLineName }}">
@@ -175,32 +219,36 @@
                         @php
                             $roleKey = strtolower(str_replace(' ', '', $role));
                             $sigState = $signatureStatus[$roleKey] ?? ['signed' => false, 'available' => false];
-                            $isLocked = !$sigState['signed'] && !$sigState['available'];
                             $isSigned = $sigState['signed'];
+
+                            $authorizedScope = $authorizedScope ?? false;
+                            $canInteract = $authorizedScope;
+                            $clickable = $canInteract && $sigState['available'] && !$isSigned;
+                            $showLock = !$isSigned && !$clickable;
                         @endphp
-                        <div id="card_ttd_{{ $roleKey }}" class="flex flex-col items-center justify-between p-3 rounded-2xl bg-slate-50/50 border border-slate-200/60 relative group shadow-sm transition-all hover:shadow-md hover:border-slate-300{{ $isLocked ? ' opacity-50' : '' }}">
-                            <div id="lock_ttd_{{ $roleKey }}" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-2xl flex flex-col items-center justify-center z-10 cursor-not-allowed{{ $isLocked ? '' : ' hidden' }}">
+                        <div id="card_ttd_{{ $roleKey }}" class="flex flex-col items-center justify-between p-3 rounded-2xl bg-slate-50/50 border border-slate-200/60 relative group shadow-sm transition-all hover:shadow-md hover:border-slate-300{{ $showLock ? ' opacity-50' : '' }}">
+                            <div id="lock_ttd_{{ $roleKey }}" class="absolute inset-0 bg-white/70 backdrop-blur-[1px] rounded-2xl flex flex-col items-center justify-center z-10 cursor-not-allowed{{ $showLock ? '' : ' hidden' }}">
                                 <svg class="w-5 h-5 text-slate-400 mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                                 <span class="text-[9px] font-black text-slate-400 uppercase tracking-wider">LOCKED</span>
                             </div>
                             <span class="block text-xs tracking-wider font-black text-gray-500 mb-2">{{ $role }}</span>
-                            <div id="badge_ttd_{{ $roleKey }}" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black transition-all select-none mb-2{{ $isSigned ? ' bg-emerald-50 text-emerald-700 border-emerald-200' : ($isLocked ? ' bg-gray-100 text-gray-400 border-gray-200' : ' bg-gray-100 text-gray-400 border-gray-200') }}">
+                            <div id="badge_ttd_{{ $roleKey }}" class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-black transition-all select-none mb-2{{ $isSigned ? ' bg-emerald-50 text-emerald-700 border-emerald-200' : ' bg-gray-100 text-gray-400 border-gray-200' }}">
                                 @if ($isSigned)
                                 <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>
-                                @elseif ($isLocked)
+                                @elseif ($showLock)
                                 <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span><span>LOCKED</span>
                                 @else
                                 <span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span><span>UNSIGNED</span>
                                 @endif
                             </div>
-                            <div id="clickarea_ttd_{{ $roleKey }}" class="h-20 w-full flex items-center justify-center border border-dashed border-gray-300 rounded-xl transition-all relative overflow-hidden group mb-2{{ $isLocked ? ' opacity-50 cursor-not-allowed' : ' cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/20' }}"
-                                 @if(!$isLocked) onclick="openSignatureModal('{{ $roleKey }}')" title="Klik untuk menggambar tanda tangan {{ $role }}" @endif>
+                            <div id="clickarea_ttd_{{ $roleKey }}" class="h-20 w-full flex items-center justify-center border border-dashed border-gray-300 rounded-xl transition-all relative overflow-hidden group mb-2{{ $clickable ? ' cursor-pointer hover:border-emerald-500 hover:bg-emerald-50/20' : ' opacity-50 cursor-not-allowed' }}"
+                                 @if($clickable) onclick="openSignatureModal('{{ $roleKey }}')" title="Klik untuk menggambar tanda tangan {{ $role }}" @endif>
                                 <img id="img_ttd_{{ $roleKey }}" class="max-h-18 max-w-[95%] object-contain{{ $isSigned ? '' : ' hidden' }} transition-all duration-300" />
                                 <div id="placeholder_ttd_{{ $roleKey }}" class="text-[10px] font-black text-gray-400 uppercase tracking-wider flex flex-col items-center gap-1.5{{ $isSigned ? ' hidden' : '' }} group-hover:text-emerald-600 transition-colors">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
-                                    <span>@if($isLocked) LOCKED @else Klik TTD @endif</span>
+                                    <span>@if($showLock) LOCKED @else Klik TTD @endif</span>
                                 </div>
-                                <button type="button" id="btn_delete_ttd_{{ $roleKey }}" class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center{{ $isSigned ? '' : ' hidden' }} transition-all no-print hover:scale-110 shadow-sm"
+                                <button type="button" id="btn_delete_ttd_{{ $roleKey }}" class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center{{ $isSigned && $canInteract ? '' : ' hidden' }} transition-all no-print hover:scale-110 shadow-sm"
                                         onclick="event.stopPropagation();deleteSignature('{{ $roleKey }}')" title="Hapus tanda tangan">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -226,39 +274,7 @@
                         <span class="inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 animate-pulse"><span class="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1"></span>LIVE</span>
                     </h2>
                 </div>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                    @php
-                        $oeeVal = $totals['weighted_oee'] ?? 0;
-                        $oeeClass = 'from-red-50 to-red-100/50 border-red-200 text-red-700 bg-red-50 text-red-600';
-                        if ($oeeVal >= 85) $oeeClass = 'from-emerald-50 to-emerald-100/50 border-emerald-200 text-emerald-700 bg-emerald-50 text-emerald-600';
-                        elseif ($oeeVal >= 65) $oeeClass = 'from-amber-50 to-amber-100/50 border-amber-200 text-amber-700 bg-amber-50 text-amber-600';
-                    @endphp
-                    @foreach ([
-                        ['TOTAL STROKE', number_format($totals['total_stroke'] ?? 0), 'good+repair+reject'],
-                        ['SHIFT CYCLE TIME', number_format($totals['weighted_ct'] ?? 0,1).' <span class="text-xs font-semibold">sec</span>', 'Standard: '.number_format($totals['avg_plan_ct'] ?? 0,1).' s'],
-                        ['SHIFT GSPH', number_format($totals['weighted_gsph'] ?? 0,0), 'Target: '.number_format($summary['gsph_plan'] ?? 0,0)],
-                        ['AVAILABILITY', number_format($summary['availability'] ?? 0,1).'%', 'operating vs loading'],
-                        ['PERFORMANCE', number_format($summary['performance'] ?? 0,1).'%', 'ideal vs operating'],
-                    ] as $card)
-                    <div class="bg-gradient-to-br from-slate-50 to-slate-100/50 rounded-2xl border border-slate-200 p-4 shadow-sm relative overflow-hidden transition-all hover:shadow-md hover:border-slate-350">
-                        <div class="flex justify-between items-start">
-                            <div><span class="block text-[10px] font-black text-slate-500 uppercase tracking-wider">{{ $card[0] }}</span><span class="block text-xl font-black text-slate-900 mt-2">{!! $card[1] !!}</span></div>
-                        </div>
-                        <div class="mt-2 text-[10px] text-slate-400 font-bold uppercase tracking-wide">{{ $card[2] }}</div>
-                    </div>
-                    @endforeach
-                    <div class="bg-gradient-to-br {{ $oeeClass }} rounded-2xl border p-4 shadow-sm relative overflow-hidden transition-all hover:shadow-md">
-                        <div class="flex justify-between items-start">
-                            <div><span class="block text-[10px] font-black uppercase tracking-wider">SHIFT OEE RATING</span><span class="block text-xl font-black mt-2">{{ number_format($oeeVal,1) }}%</span></div>
-                        </div>
-                        <div class="mt-2 text-[10px] font-bold uppercase tracking-wide">
-                            @if ($oeeVal >= 85) WORLD CLASS OEE
-                            @elseif ($oeeVal >= 65) OK PERFORMANCE
-                            @else LOW EFFICIENCY
-                            @endif
-                        </div>
-                    </div>
-                </div>
+                @include('reports.partials.lkh_oee_cards')
             </div>
 
             {{-- HELPER --}}
@@ -425,7 +441,7 @@
                                 <th colspan="2" class="group-border">CT Actual</th>
                                 <th class="group-border">Press Time</th>
                                 <th colspan="3" class="group-border">Uchi Dandori</th>
-                                <th colspan="7" class="group-border">Down Time</th>
+                                <th colspan="6" class="group-border">Down Time</th>
                                 <th colspan="2" class="group-border">TPT</th>
                                 <th colspan="2" class="group-border">Break</th>
                                 <th class="group-border">Work Time</th>
@@ -457,7 +473,6 @@
                                 <th style="width:55px">Material</th>
                                 <th style="width:55px">Log</th>
                                 <th style="width:60px">Production</th>
-                                <th style="width:55px">Others</th>
                                 <th style="width:55px" class="group-border">Total</th>
                                 <th style="width:50px">Plan</th>
                                 <th style="width:50px" class="group-border">Actual</th>
@@ -470,7 +485,7 @@
                                 <th style="width:55px">OEE (%)</th>
                                 <th style="width:55px">GSPH (Pcs/Hour)</th>
                             </tr>
-</thead>
+                        </thead>
                         @include('reports.partials.lkh_actual_rows')
                     </table>
                 </div>
@@ -493,81 +508,7 @@
                                 <th style="width:20%">%</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            @php
-                                $sumItemPlan = $summary['item_plan'] ?? 0;
-                                $sumItemAct = $summary['item_act'] ?? 0;
-                                $sumQtyPlan = $summary['qty_plan'] ?? 0;
-                                $sumQtyAct = $summary['qty_act'] ?? 0;
-                                $sumTptPlan = $summary['tpt_plan'] ?? 0;
-                                $sumTptAct = $summary['tpt_act'] ?? 0;
-                                $sumGsphPlan = $summary['gsph_plan'] ?? 0;
-                                $sumGsphAct = $summary['gsph_act'] ?? 0;
-                                $sumPassPlan = $summary['pass_rate_plan'] ?? 100;
-                                $sumPassAct = $summary['pass_rate_act'] ?? 0;
-                                $sumRejPlan = $summary['reject_rate_plan'] ?? 2;
-                                $sumRejAct = $summary['reject_rate_act'] ?? 0;
-                                $sumRepPlan = $summary['repair_rate_plan'] ?? 1;
-                                $sumRepAct = $summary['repair_rate_act'] ?? 0;
-                                $sumOee = $totals['weighted_oee'] ?? 0;
-                                $achievementPct = $sumQtyPlan > 0 ? ($sumQtyAct / $sumQtyPlan * 100) : 0;
-
-                                $pctClass = fn($v) => $v >= 100 ? 'good' : ($v >= 80 ? 'warn' : 'bad');
-                            @endphp
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">ITEM PROCESS</td>
-                                <td class="val-plan">{{ number_format($sumItemPlan) }} Items</td>
-                                <td class="val-actual">{{ number_format($sumItemAct) }} Items</td>
-                                @php $pct = $sumItemPlan > 0 ? ($sumItemAct / $sumItemPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">QTY PROCESS (PCS)</td>
-                                <td class="val-plan">{{ number_format($sumQtyPlan) }} Pcs</td>
-                                <td class="val-actual">{{ number_format($sumQtyAct) }} Pcs</td>
-                                @php $pct = $sumQtyPlan > 0 ? ($sumQtyAct / $sumQtyPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">TPT PROCESS (MIN)</td>
-                                <td class="val-plan">{{ number_format($sumTptPlan,1) }} Min</td>
-                                <td class="val-actual">{{ number_format($sumTptAct,1) }} Min</td>
-                                @php $pct = $sumTptPlan > 0 ? ($sumTptAct / $sumTptPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">GSPH</td>
-                                <td class="val-plan">{{ number_format($sumGsphPlan,0) }} Pcs/Hour</td>
-                                <td class="val-actual">{{ number_format($sumGsphAct,0) }} Pcs/Hour</td>
-                                @php $pct = $sumGsphPlan > 0 ? ($sumGsphAct / $sumGsphPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">PASS RATE (%)</td>
-                                <td class="val-plan">{{ number_format($sumPassPlan,1) }}%</td>
-                                <td class="val-actual">{{ number_format($sumPassAct,1) }}%</td>
-                                @php $pct = $sumPassPlan > 0 ? ($sumPassAct / $sumPassPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">REJECT RATE (%)</td>
-                                <td class="val-plan">{{ number_format($sumRejPlan,2) }}%</td>
-                                <td class="val-actual">{{ number_format($sumRejAct,2) }}%</td>
-                                @php $pct = $sumRejPlan > 0 ? ($sumRejAct / $sumRejPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pct <= 80 ? 'good' : ($pct <= 100 ? 'warn' : 'bad') }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">REPAIR RATE (%)</td>
-                                <td class="val-plan">{{ number_format($sumRepPlan,2) }}%</td>
-                                <td class="val-actual">{{ number_format($sumRepAct,2) }}%</td>
-                                @php $pct = $sumRepPlan > 0 ? ($sumRepAct / $sumRepPlan * 100) : 0; @endphp
-                                <td class="val-pct {{ $pct <= 80 ? 'good' : ($pct <= 100 ? 'warn' : 'bad') }}">{{ number_format($pct,1) }}%</td>
-                            </tr>
-                            <tr><td class="bg-gray-50 font-bold text-gray-700">OEE (%)</td>
-                                <td class="val-plan">100.0%</td>
-                                <td class="val-actual">{{ number_format($sumOee,1) }}%</td>
-                                <td class="val-pct {{ $sumOee >= 85 ? 'good' : ($sumOee >= 65 ? 'warn' : 'bad') }}">{{ number_format($sumOee,1) }}%</td>
-                            </tr>
-                            <tr class="bg-gray-100 font-black text-lg">
-                                <td class="bg-gray-100 font-black text-gray-800">ACHIEVEMENT</td>
-                                <td class="bg-gray-100 text-gray-600">{{ number_format($sumQtyPlan,0) }}</td>
-                                <td class="bg-gray-100 val-actual">{{ number_format($sumQtyAct,0) }}</td>
-                                <td class="bg-gray-100 val-pct {{ $pctClass($achievementPct) }}">{{ number_format($achievementPct,1) }}%</td>
-                            </tr>
-                        </tbody>
+                        @include('reports.partials.lkh_summary_rows')
                     </table>
                 </div>
             </div>
@@ -620,24 +561,38 @@
 </div>
 
 @php
-    $sigSaveUrl = '';
-    $sigDeleteUrl = '';
-    $sigGetUrl = '';
-    $sigStatusUrl = '';
-    try { $sigSaveUrl = route('signature.save'); } catch (\Exception $e) { $sigSaveUrl = url('/signature/save'); }
-    try { $sigDeleteUrl = route('signature.delete'); } catch (\Exception $e) { $sigDeleteUrl = url('/signature/delete'); }
-    try { $sigGetUrl = route('signature.get'); } catch (\Exception $e) { $sigGetUrl = url('/signature/get'); }
-    try { $sigStatusUrl = route('signature.status'); } catch (\Exception $e) { $sigStatusUrl = url('/signature/status'); }
+    // Path relatif, bukan URL absolut dari route(). Kalau APP_URL di server http://
+    // sementara halaman diakses lewat https, browser memblokirnya sebagai mixed content.
+    $relativeRoute = function (string $name, string $fallback) {
+        try { return parse_url(route($name), PHP_URL_PATH) ?: $fallback; }
+        catch (\Throwable $e) { return $fallback; }
+    };
+    $sigSaveUrl   = $relativeRoute('signature.save', '/signature/save');
+    $sigDeleteUrl = $relativeRoute('signature.delete', '/signature/delete');
+    $sigGetUrl    = $relativeRoute('signature.get', '/signature/get');
+    $sigStatusUrl = $relativeRoute('signature.status', '/signature/status');
 @endphp
 
 @push('scripts')
 <script>
 let activeSignatureRole = null;
 const sigWorkDate = '{{ $date }}';
-const sigLineName = '{{ $selectedLineName }}';
-const sigShiftName = '{{ $latestShiftName }}';
+const sigLineName = @json($selectedLineName);
+const sigShiftName = @json($selectedShift);
+const SIG_USER_ROLE = @json(strtolower(auth()->user()?->role ?? ''));
+const SIG_IS_SUPERADMIN = SIG_USER_ROLE === 'superadmin';
+const SIG_AUTHORIZED = @json($authorizedScope ?? false);
+
+function sigRoleOwned(role) {
+    if (SIG_IS_SUPERADMIN) return true;
+    if (role === 'teamleader') return SIG_USER_ROLE.startsWith('leader') || SIG_USER_ROLE === 'teamleader' || SIG_USER_ROLE === 'group leader';
+    if (role === 'foreman') return SIG_USER_ROLE === 'foreman';
+    if (role === 'supervisor') return SIG_USER_ROLE === 'supervisor';
+    return false;
+}
 
 function openSignatureModal(role) {
+    if (!sigRoleOwned(role)) { alert('Anda tidak berhak menandatangani TTD ini'); return; }
     activeSignatureRole = role;
     document.getElementById('signature-role-label').textContent = 'Tanda Tangan: ' + role.charAt(0).toUpperCase() + role.slice(1);
     const m = document.getElementById('signature-modal');
@@ -738,7 +693,7 @@ function saveSignature() {
         badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>';
         badge.classList.remove('bg-gray-100','text-gray-400','border-gray-200');
         badge.classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
-        delBtn.classList.remove('hidden');
+        if (sigRoleOwned(activeSignatureRole)) delBtn.classList.remove('hidden');
         closeSignatureModal();
         refreshSignatureStatus();
     })
@@ -763,6 +718,7 @@ function closeConfirmModal(result) {
 }
 
 function deleteSignature(role) {
+    if (!sigRoleOwned(role)) { alert('Anda tidak berhak menghapus TTD ini'); return; }
     showConfirm('Hapus tanda tangan ' + role + '?').then(confirmed => {
         if (!confirmed) return;
         const img = document.getElementById('img_ttd_' + role);
@@ -797,116 +753,30 @@ function refreshSignatureStatus() {
                 const clickArea = document.getElementById('clickarea_ttd_' + role);
                 const card = document.getElementById('card_ttd_' + role);
                 if (!s) return;
-                if (s.signed) {
-                    if (lock) { lock.classList.add('hidden'); lock.style.display = ''; }
-                    if (clickArea) {
+                const canClick = SIG_AUTHORIZED && sigRoleOwned(role) && s.available && !s.signed;
+                const showLock = !s.signed && !canClick;
+                if (lock) {
+                    if (showLock) { lock.classList.remove('hidden'); lock.style.display = ''; }
+                    else { lock.classList.add('hidden'); lock.style.display = ''; }
+                }
+                if (clickArea) {
+                    if (canClick) {
                         clickArea.onclick = function() { openSignatureModal(role); };
                         clickArea.classList.remove('opacity-50');
                         clickArea.classList.add('cursor-pointer');
-                    }
-                    if (card) card.classList.remove('opacity-50');
-                } else if (s.available) {
-                    if (lock) { lock.classList.add('hidden'); lock.style.display = ''; }
-                    if (clickArea) {
-                        clickArea.onclick = function() { openSignatureModal(role); };
-                        clickArea.classList.remove('opacity-50');
-                        clickArea.classList.add('cursor-pointer');
-                    }
-                    if (card) card.classList.remove('opacity-50');
-                } else {
-                    if (lock) lock.classList.remove('hidden');
-                    if (clickArea) {
+                    } else {
                         clickArea.onclick = null;
                         clickArea.classList.add('opacity-50');
                         clickArea.classList.remove('cursor-pointer');
                     }
-                    if (card) card.classList.add('opacity-50');
+                }
+                if (card) {
+                    if (showLock) card.classList.add('opacity-50');
+                    else card.classList.remove('opacity-50');
                 }
             });
         })
         .catch(() => {});
-}
-
-const canEdit = {{ ($canEdit ?? false) ? 'true' : 'false' }};
-const updatesUrl = '{{ $updatesUrl ?? '' }}';
-const lkhCellFilterLine = document.getElementById('active-line') ? document.getElementById('active-line').value : '';
-const lkhCellDate = sigWorkDate;
-const lkhCellShift = document.getElementById('active-shift') ? document.getElementById('active-shift').value : '';
-
-function initLkhCellEditing() {
-    if (!canEdit || !updatesUrl) return;
-    document.querySelectorAll('.lkh-editable-cell').forEach(cell => {
-        cell.classList.add('cursor-pointer', 'hover:bg-amber-50', 'relative');
-        cell.addEventListener('click', function() {
-            if (this.dataset.editing === '1') return;
-            this.dataset.editing = '1';
-            const field = this.dataset.field;
-            const type = this.dataset.type;
-            const current = this.dataset.value || '';
-            const display = this.querySelector('.lkh-edit-display');
-            const input = document.createElement('input');
-            input.type = 'text';
-            input.value = current;
-            input.className = 'w-full min-w-[70px] border border-amber-400 rounded text-center font-bold text-xs px-1 py-0.5 focus:outline-none focus:ring-2 focus:ring-amber-300';
-            input.setAttribute('data-plan-id', this.dataset.planId);
-            display.style.display = 'none';
-            this.appendChild(input);
-            input.focus();
-            input.select();
-
-            const commit = (save) => {
-                this.dataset.editing = '0';
-                const newVal = input.value.trim();
-                input.remove();
-                display.style.display = '';
-                if (!save) return;
-                if (newVal === current) return;
-                submitLkhCellUpdate(this, newVal);
-            };
-
-            input.addEventListener('keydown', e => {
-                if (e.key === 'Enter') { e.preventDefault(); commit(true); }
-                if (e.key === 'Escape') { e.preventDefault(); commit(false); }
-            });
-            input.addEventListener('blur', () => commit(true));
-        });
-    });
-}
-
-function submitLkhCellUpdate(cell, newValue) {
-    cell.classList.add('opacity-50', 'pointer-events-none');
-    const updates = [{
-        plan_id: parseInt(cell.dataset.planId, 10),
-        field: cell.dataset.field,
-        value: newValue,
-    }];
-    fetch(updatesUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-        body: JSON.stringify({
-            date: lkhCellDate,
-            line: lkhCellFilterLine,
-            shift: lkhCellShift,
-            updates: updates,
-        }),
-    })
-    .then(r => r.json().then(d => ({ ok: r.ok, d })))
-    .then(({ ok, d }) => {
-        if (!ok) { throw new Error(d.error || 'Gagal menyimpan'); }
-        if (d.html) {
-            const holder = document.createElement('div');
-            holder.innerHTML = d.html;
-            const newTbody = holder.querySelector('#lkh-actual-tbody');
-            const newTfoot = holder.querySelector('#lkh-actual-tfoot');
-            if (newTbody) document.getElementById('lkh-actual-tbody').replaceWith(newTbody);
-            if (newTfoot) document.getElementById('lkh-actual-tfoot').replaceWith(newTfoot);
-            initLkhCellEditing();
-        }
-    })
-    .catch(err => {
-        alert(err.message);
-        cell.classList.remove('opacity-50', 'pointer-events-none');
-    });
 }
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -921,14 +791,159 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('badge_ttd_{{ $role }}').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>';
                 document.getElementById('badge_ttd_{{ $role }}').classList.remove('bg-gray-100','text-gray-400','border-gray-200');
                 document.getElementById('badge_ttd_{{ $role }}').classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
-                document.getElementById('btn_delete_ttd_{{ $role }}').classList.remove('hidden');
+                if (sigRoleOwned('{{ $role }}')) document.getElementById('btn_delete_ttd_{{ $role }}').classList.remove('hidden');
             }
         })
         .catch(() => {});
     @endforeach
     refreshSignatureStatus();
-    initLkhCellEditing();
 });
+
+// ── LKH Edit Actual mode ─────────────────────────────────────────────
+const LKH_UPDATE_URL = '{{ $relativeRoute('supervisor.reports.daily_production.update_cells', '/supervisor/reports/daily-production/update-cells') }}';
+const LKH_LINE = @json($selectedLineName);
+const LKH_DATE = @json($date);
+const LKH_SHIFT = @json($selectedShift);
+const LKH_CSRF = '{{ csrf_token() }}';
+
+let lkhEditMode = false;
+let lkhUpdates = {};
+
+function lkhSetEditMode(on) {
+    lkhEditMode = on;
+    document.body.classList.toggle('lkh-edit-mode', on);
+    const btnEdit = document.getElementById('btn-edit-lkh');
+    const btnSave = document.getElementById('btn-save-lkh');
+    const btnCancel = document.getElementById('btn-cancel-lkh');
+    const banner = document.getElementById('lkh-edit-banner');
+    if (btnEdit) btnEdit.style.display = on ? 'none' : '';
+    if (btnSave) btnSave.style.display = on ? '' : 'none';
+    if (btnCancel) btnCancel.style.display = on ? '' : 'none';
+    if (banner) banner.style.display = on ? '' : 'none';
+}
+
+function toggleLkhEdit(on) {
+    if (!on && lkhEditMode) {
+        // revert unsaved edits
+        Object.values(lkhUpdates).forEach(u => {
+            const cell = document.querySelector('#lkh-actual-tbody .lkh-editable-cell[data-plan-id="' + u.plan_id + '"][data-field="' + u.field + '"]');
+            if (cell && u.orig !== undefined) {
+                cell.dataset.value = u.orig;
+                cell.classList.remove('lkh-cell-edited');
+                lkhRestoreCellDisplay(cell);
+            }
+        });
+        lkhUpdates = {};
+    }
+    lkhSetEditMode(on);
+}
+
+function lkhRestoreCellDisplay(cell) {
+    cell.dataset.editing = '';
+    cell.textContent = '';
+    const span = document.createElement('span');
+    span.className = 'lkh-edit-display';
+    span.textContent = cell.dataset.value;
+    cell.appendChild(span);
+    const icon = document.createElement('span');
+    icon.className = 'lkh-edit-icon';
+    icon.textContent = '✎';
+    cell.appendChild(icon);
+}
+
+function lkhCellToInput(cell) {
+    if (cell.dataset.editing === '1') return;
+    cell.dataset.editing = '1';
+    const type = cell.dataset.type === 'time' ? 'time' : 'number';
+    const input = document.createElement('input');
+    input.type = type;
+    if (cell.dataset.type === 'mins') { input.step = 'any'; input.min = '0'; }
+    else if (type === 'number') { input.step = '1'; input.min = '0'; }
+    input.className = 'lkh-cell-input';
+    input.value = cell.dataset.value;
+    cell.textContent = '';
+    cell.appendChild(input);
+    input.focus();
+    input.select();
+
+    const commit = () => {
+        const val = input.value.trim();
+        if (val === '') { lkhRestoreCellDisplay(cell); return; }
+        if (val === cell.dataset.value) { lkhRestoreCellDisplay(cell); return; }
+        const key = cell.dataset.planId + ':' + cell.dataset.field;
+        if (!lkhUpdates[key]) lkhUpdates[key] = { plan_id: cell.dataset.planId, field: cell.dataset.field, value: val, orig: cell.dataset.value };
+        else lkhUpdates[key].value = val;
+        cell.dataset.value = val;
+        cell.classList.add('lkh-cell-edited');
+        lkhRestoreCellDisplay(cell);
+    };
+    const cancel = () => { lkhRestoreCellDisplay(cell); };
+    input.addEventListener('change', commit);
+    input.addEventListener('blur', commit);
+    input.addEventListener('keydown', e => {
+        if (e.key === 'Enter') { e.preventDefault(); commit(); input.blur(); }
+        if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+    });
+}
+
+document.addEventListener('click', function(e) {
+    if (!lkhEditMode) return;
+    const cell = e.target.closest('#lkh-actual-tbody .lkh-editable-cell');
+    if (!cell) return;
+    if (e.target.tagName === 'INPUT') return;
+    lkhCellToInput(cell);
+});
+
+function lkhShowToast(msg, isError) {
+    let toast = document.getElementById('lkh-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'lkh-toast';
+        toast.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;padding:12px 18px;border-radius:12px;color:#fff;font-size:13px;font-weight:700;box-shadow:0 6px 20px rgba(0,0,0,0.2);transition:opacity .3s;';
+        document.body.appendChild(toast);
+    }
+    toast.textContent = msg;
+    toast.style.background = isError ? '#DC2626' : '#15803D';
+    toast.style.opacity = '1';
+    clearTimeout(lkhShowToast._t);
+    lkhShowToast._t = setTimeout(() => { toast.style.opacity = '0'; }, 4000);
+}
+
+async function saveLkhEdits() {
+    const updates = Object.values(lkhUpdates);
+    if (!updates.length) { toggleLkhEdit(false); return; }
+    const ok = await showConfirm('Apakah Anda yakin ingin mengedit data actual?');
+    if (!ok) return;
+    try {
+        const res = await fetch(LKH_UPDATE_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': LKH_CSRF },
+            body: JSON.stringify({ line: LKH_LINE, date: LKH_DATE, shift: LKH_SHIFT, updates })
+        });
+        const data = await res.json();
+        if (!res.ok) { lkhShowToast(data.error || 'Gagal menyimpan data', true); return; }
+        lkhApplyFragments(data.html);
+        lkhUpdates = {};
+        lkhSetEditMode(false);
+        lkhShowToast(data.message || 'Data actual berhasil diperbarui');
+    } catch (err) {
+        lkhShowToast('Terjadi kesalahan jaringan', true);
+    }
+}
+
+function lkhApplyFragments(html) {
+    const tpl = document.createElement('template');
+    tpl.innerHTML = html;
+    const frag = tpl.content;
+    const tbody = document.getElementById('lkh-actual-tbody');
+    const tfoot = document.getElementById('lkh-actual-tfoot');
+    const summary = document.getElementById('lkh-summary-tbody');
+    const cards = document.getElementById('lkh-oee-cards');
+    if (tbody) tbody.innerHTML = frag.getElementById('lkh-actual-tbody').innerHTML;
+    if (tfoot) tfoot.innerHTML = frag.getElementById('lkh-actual-tfoot').innerHTML;
+    if (summary) summary.innerHTML = frag.getElementById('lkh-summary-tbody').innerHTML;
+    if (cards) cards.innerHTML = frag.getElementById('lkh-oee-cards').innerHTML;
+}
 </script>
 @endpush
 @endsection

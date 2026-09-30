@@ -227,7 +227,7 @@ Route::middleware(['auth','role:supervisor,ppc,leader,foreman,manager,kadiv,dire
     // Reports
     Route::prefix('reports')->name('reports.')->group(function() {
         Route::get('/daily-production', [\App\Http\Controllers\Supervisor\ReportController::class, 'dailyProduction'])->middleware('feature:daily_report')->name('daily_production');
-        Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
+        Route::post('/daily-production/update-cells', [\App\Http\Controllers\Supervisor\ReportController::class, 'updateLkhCells'])->middleware('feature:daily_report')->name('daily_production.update_cells');
         Route::get('/asakai', [\App\Http\Controllers\Supervisor\ReportController::class, 'asakaiReport'])->middleware('feature:daily_report')->name('asakai');
         Route::get('/performance', [\App\Http\Controllers\Supervisor\ReportController::class, 'performance'])->middleware('feature:performance_report')->name('performance');
         Route::get('/downtime-recap/{planId}', [\App\Http\Controllers\Supervisor\ReportController::class, 'downtimeRecap'])->middleware('feature:daily_report')->name('downtime_recap');
