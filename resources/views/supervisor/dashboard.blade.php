@@ -739,7 +739,7 @@ async function fetchDetailData() {
     try {
         let url = `{{ route('supervisor.dashboard.detail') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
-        const response = await fetch(url);
+        const response = await dashFetch(url);
         const data = await readDashJson(response, url);
         const newDetailHash = JSON.stringify(data.detail);
         if (newDetailHash === LAST_DETAIL_HASH) return;
@@ -774,8 +774,17 @@ async function readDashJson(response, url) {
   try {
     return JSON.parse(text);
   } catch (e) {
-    throw new Error(`Invalid JSON from ${url} :: ${text.slice(0, 300)}`);
+    throw new Error(`Invalid JSON dari ${url} :: ${text.slice(0, 300)}`);
   }
+}
+
+async function dashFetch(url) {
+  try {
+    return await fetch(url, { credentials: 'same-origin', headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' } });
+  } catch (e) {
+    throw new Error(`Jaringan gagal untuk ${url} (page ${location.origin}) :: ${e.message}`);
+  }
+}
 }
 
 async function fetchDashboardData() {
@@ -786,7 +795,7 @@ async function fetchDashboardData() {
         let url = `{{ route('supervisor.dashboard.api') }}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
 
-        const response = await fetch(url);
+        const response = await dashFetch(url);
         const data = await readDashJson(response, url);
         if (!data.line_kpi) throw new Error('Respons API tidak memuat line_kpi');
 
