@@ -203,35 +203,40 @@
 
         /* ─── LEFT PANEL ─── */
         .panel-left {
-            background: var(--red);
+            background: #1a1a2e;
+            background-image: url('{{ asset('images/building.png') }}');
+            background-size: cover;
+            background-position: center;
             padding: 3.5rem 3rem;
             display: flex;
             flex-direction: column;
             justify-content: space-between;
             position: relative;
             overflow: hidden;
+            min-height: 500px;
         }
 
-        /* Subtle pattern overlay */
+        /* Dark gradient overlay */
         .panel-left::before {
             content: '';
             position: absolute;
             inset: 0;
-            background-image:
-                linear-gradient(rgba(255,255,255,0.04) 1px, transparent 1px),
-                linear-gradient(90deg, rgba(255,255,255,0.04) 1px, transparent 1px);
-            background-size: 40px 40px;
+            background: linear-gradient(
+                160deg,
+                rgba(15, 15, 25, 0.80) 0%,
+                rgba(150, 35, 25, 0.55) 50%,
+                rgba(15, 15, 25, 0.88) 100%
+            );
         }
 
+        /* Subtle noise texture */
         .panel-left::after {
             content: '';
             position: absolute;
-            bottom: -60px;
-            right: -60px;
-            width: 220px;
-            height: 220px;
-            border-radius: 50%;
-            background: rgba(255,255,255,0.05);
+            inset: 0;
+            background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+            background-size: 200px;
+            pointer-events: none;
         }
 
         .panel-top { position: relative; z-index: 1; }
@@ -691,7 +696,7 @@
                     <div style="flex: 1; height: 1px; background: var(--border);"></div>
                 </div>
 
-                <a href="https://qa.tantechstev.com/login" target="_blank" class="btn-qa">
+                <a href="https://qa.tantechstev.com/login" class="btn-qa">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                         <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/>
                     </svg>
