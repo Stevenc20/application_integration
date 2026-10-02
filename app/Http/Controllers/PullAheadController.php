@@ -72,10 +72,12 @@ class PullAheadController extends Controller
         $date = $request->get('date', now()->toDateString());
 
         // 1. Cek apakah tanggal saat ini punya data untuk line ini, jika tidak mundur ke tanggal terakhir yang punya data
-        $checkDateExists = ProductionPlan::query();
-        $applyLineFilter($checkDateExists);
-        if (!$checkDateExists->whereDate('plan_date', $date)->exists()) {
-            $latestLineDate = (clone $checkDateExists)->max('plan_date');
+        $baseLineQuery = ProductionPlan::query();
+        $applyLineFilter($baseLineQuery);
+        $hasDateData = (clone $baseLineQuery)->whereDate('plan_date', $date)->exists();
+        if (!$hasDateData) {
+            // PENTING: pakai query TANPA whereDate, kalau tidak max() selalu NULL
+            $latestLineDate = (clone $baseLineQuery)->max('plan_date');
             if ($latestLineDate) {
                 $date = Carbon::parse($latestLineDate)->toDateString();
             }
@@ -116,6 +118,9 @@ class PullAheadController extends Controller
                           $q->where('row_type', 'job')
                             ->orWhereNull('row_type');
                       })
+                      // JANGAN pernah menawarkan item dari shift yang sedang dikerjakan
+                      ->where('shift_name', '!=', $currentShift)
+                      ->where('shift_name', 'not like', "{$currentShift}%")
                       ->where(function($q) use ($kws) {
                           foreach ($kws as $kw) {
                               $q->orWhere('shift_name', 'like', "%{$kw}%");
@@ -185,7 +190,12 @@ class PullAheadController extends Controller
         // Hitung Available Qty secara real-time dan jamin item tetap muncul
         $validPlans = [];
         foreach ($rawPlans as $plan) {
-            $avail = $this->pullAheadService->calculateAvailableQty($plan);
+            try {
+                $avail = $this->pullAheadService->calculateAvailableQty($plan);
+            } catch (\Throwable $e) {
+                \Log::warning('[PullAhead] calculateAvailableQty gagal: ' . $e->getMessage());
+                $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
+            }
             if ($avail <= 0) {
                 $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
             }
