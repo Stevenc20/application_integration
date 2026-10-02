@@ -52,16 +52,18 @@ class PullAheadController extends Controller
     public function nextShiftData(Request $request)
     {
         $line = $request->get('line', 'PRESS A');
-        $cleanLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $line)));
+        $cleanLine = strtoupper(trim(preg_replace('/^(PRESS|LINE)\s*/i', '', (string)$line)));
 
         // Helper filter Line yang fleksibel & konsisten dengan InputHarianController
         $applyLineFilter = function($query) use ($cleanLine, $line) {
             if (!empty($cleanLine) && $cleanLine !== 'ALL') {
                 $query->where(function($q) use ($cleanLine, $line) {
-                    $q->whereRaw("REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$cleanLine}%"])
+                    $q->whereRaw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS', ''), 'LINE', ''), ' ', '') LIKE ?", ["%{$cleanLine}%"])
                       ->orWhere('press_name', $line)
                       ->orWhere('press_name', 'PRESS ' . $cleanLine)
-                      ->orWhere('press_name', 'Line ' . $cleanLine);
+                      ->orWhere('press_name', 'Line ' . $cleanLine)
+                      ->orWhere('press_name', 'PRESS' . $cleanLine)
+                      ->orWhere('press_name', 'Line' . $cleanLine);
                 });
             }
         };
@@ -69,54 +71,73 @@ class PullAheadController extends Controller
         $currentShift = $request->get('shift', 'Shift Pagi');
         $date = $request->get('date', now()->toDateString());
 
+        // 1. Cek apakah tanggal saat ini punya data untuk line ini, jika tidak mundur ke tanggal terakhir yang punya data
+        $checkDateExists = ProductionPlan::query();
+        $applyLineFilter($checkDateExists);
+        if (!$checkDateExists->whereDate('plan_date', $date)->exists()) {
+            $latestLineDate = (clone $checkDateExists)->max('plan_date');
+            if ($latestLineDate) {
+                $date = Carbon::parse($latestLineDate)->toDateString();
+            }
+        }
+
         // Cek apakah shift saat ini adalah Pagi / Shift 1
         $isCurrentPagi = (stripos($currentShift, 'Pagi') !== false || stripos($currentShift, '1') !== false);
+        $tomorrow = Carbon::parse($date)->addDay()->toDateString();
 
+        // 2. Daftar prioritas kandidat shift berikutnya
+        $candidates = [];
         if ($isCurrentPagi) {
-            // Shift Pagi -> berikutnya Shift Malam / Shift 2
-            // Cek di hari yang sama terlebih dahulu, baru fallback ke besok
-            $targetDates = [$date, Carbon::parse($date)->addDay()->toDateString()];
-            $shiftKeywords = ['Malam', '2'];
+            // Sedang di Pagi -> cari Shift Malam hari ini, lalu Shift Malam besok, lalu Shift Pagi besok
+            $candidates[] = ['date' => $date, 'keywords' => ['Malam', '2']];
+            $candidates[] = ['date' => $tomorrow, 'keywords' => ['Malam', '2']];
+            $candidates[] = ['date' => $tomorrow, 'keywords' => ['Pagi', '1']];
         } else {
-            // Shift Malam -> berikutnya Shift Pagi / Shift 1
-            // Cek di besok hari terlebih dahulu, fallback ke hari yang sama
-            $targetDates = [Carbon::parse($date)->addDay()->toDateString(), $date];
-            $shiftKeywords = ['Pagi', '1'];
+            // Sedang di Malam -> cari Shift Pagi besok, lalu Shift Malam hari ini (jika user tarik item shift 2), lalu Shift Malam besok
+            $candidates[] = ['date' => $tomorrow, 'keywords' => ['Pagi', '1']];
+            $candidates[] = ['date' => $date, 'keywords' => ['Malam', '2']];
+            $candidates[] = ['date' => $tomorrow, 'keywords' => ['Malam', '2']];
+            $candidates[] = ['date' => $date, 'keywords' => ['Pagi', '1']];
         }
 
         $matchedDate = null;
         $nextShift = null;
+        $rawPlans = collect();
 
-        foreach ($targetDates as $targetDate) {
-            $baseQuery = ProductionPlan::query();
-            $applyLineFilter($baseQuery);
-            $baseQuery->whereDate('plan_date', $targetDate)
+        foreach ($candidates as $cand) {
+            $cDate = $cand['date'];
+            $kws = $cand['keywords'];
+
+            $planQuery = ProductionPlan::query();
+            $applyLineFilter($planQuery);
+            $planQuery->whereDate('plan_date', $cDate)
                       ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                       ->where(function($q) {
                           $q->where('row_type', 'job')
                             ->orWhereNull('row_type');
-                      });
+                      })
+                      ->where(function($q) use ($kws) {
+                          foreach ($kws as $kw) {
+                              $q->orWhere('shift_name', 'like', "%{$kw}%");
+                          }
+                      })
+                      ->orderBy('row_no', 'asc');
 
-            // Cari nama shift aktual yang cocok dengan kata kunci
-            $foundShift = (clone $baseQuery)->where(function($q) use ($shiftKeywords) {
-                foreach ($shiftKeywords as $kw) {
-                    $q->orWhere('shift_name', 'like', "%{$kw}%");
-                }
-            })->orderByDesc('updated_at')->value('shift_name');
-
-            if ($foundShift) {
-                $matchedDate = $targetDate;
-                $nextShift = $foundShift;
+            $items = $planQuery->get();
+            if ($items->isNotEmpty()) {
+                $matchedDate = $cDate;
+                $nextShift = $items->first()->shift_name;
+                $rawPlans = $items;
                 break;
             }
         }
 
-        // Fallback jika tidak menemukan keyword spesifik: cari shift apapun yang berbeda dari shift sekarang
-        if (!$nextShift) {
-            foreach ($targetDates as $targetDate) {
-                $baseQuery = ProductionPlan::query();
-                $applyLineFilter($baseQuery);
-                $foundShift = $baseQuery->whereDate('plan_date', $targetDate)
+        // Fallback jika belum menemukan: cari shift apapun yang berbeda dari shift sekarang
+        if ($rawPlans->isEmpty()) {
+            foreach ([$date, $tomorrow] as $fDate) {
+                $fallbackQuery = ProductionPlan::query();
+                $applyLineFilter($fallbackQuery);
+                $items = $fallbackQuery->whereDate('plan_date', $fDate)
                     ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                     ->where(function($q) {
                         $q->where('row_type', 'job')
@@ -124,43 +145,52 @@ class PullAheadController extends Controller
                     })
                     ->where('shift_name', '!=', $currentShift)
                     ->where('shift_name', 'not like', "{$currentShift}%")
-                    ->orderByDesc('updated_at')
-                    ->value('shift_name');
+                    ->orderBy('row_no', 'asc')
+                    ->get();
 
-                if ($foundShift) {
-                    $matchedDate = $targetDate;
-                    $nextShift = $foundShift;
+                if ($items->isNotEmpty()) {
+                    $matchedDate = $fDate;
+                    $nextShift = $items->first()->shift_name;
+                    $rawPlans = $items;
                     break;
                 }
             }
         }
 
-        if (!$nextShift) {
-            $nextShift = $isCurrentPagi ? 'Shift Malam' : 'Shift Pagi';
-            $matchedDate = $isCurrentPagi ? $date : Carbon::parse($date)->addDay()->toDateString();
+        // Terakhir: jika tetap kosong, ambil semua item job di $date untuk line tersebut
+        if ($rawPlans->isEmpty()) {
+            $allQuery = ProductionPlan::query();
+            $applyLineFilter($allQuery);
+            $items = $allQuery->whereDate('plan_date', $date)
+                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                ->where(function($q) {
+                    $q->where('row_type', 'job')
+                      ->orWhereNull('row_type');
+                })
+                ->orderBy('row_no', 'asc')
+                ->get();
+
+            if ($items->isNotEmpty()) {
+                $matchedDate = $date;
+                $nextShift = $items->first()->shift_name ?: 'Shift Berikutnya';
+                $rawPlans = $items;
+            }
         }
 
-        // Ambil plan shift berikutnya
-        $planQuery = ProductionPlan::query();
-        $applyLineFilter($planQuery);
-        $planQuery->whereDate('plan_date', $matchedDate)
-                  ->where('shift_name', $nextShift)
-                  ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                  ->where(function($q) {
-                      $q->where('row_type', 'job')
-                        ->orWhereNull('row_type');
-                  })
-                  ->orderBy('row_no', 'asc');
+        if (!$nextShift) {
+            $nextShift = $isCurrentPagi ? 'Shift Malam' : 'Shift Pagi';
+            $matchedDate = $matchedDate ?: ($isCurrentPagi ? $date : $tomorrow);
+        }
 
-        $rawPlans = $planQuery->get();
-
-        // Hitung Available Qty secara real-time dan saring yang habis
+        // Hitung Available Qty secara real-time dan jamin item tetap muncul
         $validPlans = [];
         foreach ($rawPlans as $plan) {
-            $plan->available_qty = $this->pullAheadService->calculateAvailableQty($plan);
-            if ($plan->available_qty > 0) {
-                $validPlans[] = $plan;
+            $avail = $this->pullAheadService->calculateAvailableQty($plan);
+            if ($avail <= 0) {
+                $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
             }
+            $plan->available_qty = $avail;
+            $validPlans[] = $plan;
         }
         $nextShiftPlans = array_values($validPlans);
 
@@ -177,6 +207,19 @@ class PullAheadController extends Controller
                       ->orderBy('row_no', 'asc');
 
         $currentShiftPlans = $currPlanQuery->get(['id', 'row_no', 'job_no', 'job_master']);
+
+        if ($currentShiftPlans->isEmpty()) {
+            $currFallback = ProductionPlan::query();
+            $applyLineFilter($currFallback);
+            $currentShiftPlans = $currFallback->whereDate('plan_date', $date)
+                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                ->where(function($q) {
+                    $q->where('row_type', 'job')
+                      ->orWhereNull('row_type');
+                })
+                ->orderBy('row_no', 'asc')
+                ->get(['id', 'row_no', 'job_no', 'job_master']);
+        }
 
         return response()->json([
             'success' => true,

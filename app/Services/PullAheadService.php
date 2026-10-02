@@ -29,8 +29,10 @@ class PullAheadService
             $baseQty = (int)($plan->remaining_plan ?? $plan->plan ?? $plan->target_qty ?? 0);
         }
 
-        $doneQty = (int)($plan->ok ?? 0);
-        $available = $baseQty - $doneQty - $pendingRequestsQty;
+        $available = $baseQty - $pendingRequestsQty;
+        if ($available <= 0 && (float)($plan->plan ?? 0) > 0 && $pendingRequestsQty == 0) {
+            $available = (float)$plan->plan;
+        }
         return $available > 0 ? (int)$available : 0;
     }
 
