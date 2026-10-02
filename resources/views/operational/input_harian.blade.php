@@ -523,7 +523,7 @@ window.jobMasterData = {
         actual_reject: {{ $jd->dailyProduction?->actual_reject ?? 0 }},
         dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
-        tpt: {{ (float)($job->tpt ?? 0) }},
+        tpt: {{ (float)(($job->tpt ?? 0) > 0 ? $job->tpt : (($job->start_time && $job->finish_time) ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time)) : 0)) }},
         line: "{{ $job->press_name ?? '' }}"
     },
     @endif
@@ -555,7 +555,7 @@ window.jobMasterData = {
         actual_reject: {{ $activeJob->dailyProduction?->actual_reject ?? 0 }},
         dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
-        tpt: {{ (float)(($activeProdPlan?->tpt) ?? 0) }},
+        tpt: {{ (float)(($activeProdPlan?->tpt ?? 0) > 0 ? $activeProdPlan->tpt : (($activeProdPlan?->start_time && $activeProdPlan?->finish_time) ? \Carbon\Carbon::parse($activeProdPlan->start_time)->diffInMinutes(\Carbon\Carbon::parse($activeProdPlan->finish_time)) : 0)) }},
         line: "{{ $activeJob->line ?? '' }}"
     },
     @endif

@@ -136,11 +136,11 @@
 
                     <!-- ACTUAL TIMES MARKERS ABOVE ACTUAL PROGRESS BAR -->
                     <div class="flex items-center justify-between text-[11px] sm:text-xs font-black uppercase tracking-wider mt-1 mb-1">
-                        <span id="execution-started-at" class="text-red-500">
+                        <span id="execution-started-at" class="text-slate-700 font-mono">
                             Started: {{ $actStartVal ?: '--:--' }}
                         </span>
-                        <span id="timeline-current-time" class="text-slate-400 font-mono">
-                            End: {{ $actFinishVal ?: '--:--' }}
+                        <span id="timeline-current-time" class="text-slate-700 font-mono">
+                            End: {{ $actFinishVal ?: ($actEndEstimate ?: '--:--') }}
                         </span>
                     </div>
 

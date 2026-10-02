@@ -1083,8 +1083,8 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         }
 
         const pD = Number(plannedDurationArg) || 0;
-        const planEndTime = Number(planEndTimeArg) || 0;
-        const relativeDeadline = planEndTime || (effectiveProductionStart + pD);
+        // RELATIVE DEADLINE: Must be based on actual start + TPT (planned duration), NOT PPC morning calendar end time!
+        const relativeDeadline = (effectiveProductionStart && pD > 0) ? (effectiveProductionStart + pD) : (Number(planEndTimeArg) || 0);
 
         const appendProduction = (start, end) => {
             if (end <= start) return;
