@@ -878,7 +878,7 @@ function openTarikShiftModal() {
     const shift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
     const date = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
 
-    fetch(`{{ route('operational.pull_ahead.next_shift') }}?line=${encodeURIComponent(line)}&shift=${encodeURIComponent(shift)}&date=${encodeURIComponent(date)}`, {
+    fetch(`/operational/pull-ahead/next-shift?line=${encodeURIComponent(line)}&shift=${encodeURIComponent(shift)}&date=${encodeURIComponent(date)}`, {
         headers: {
             'Accept': 'application/json'
         }
@@ -967,7 +967,7 @@ function submitTarikShift(e) {
     const nextShiftSubtitle = document.getElementById('tarikShiftSubtitle').innerText;
     const nextShiftName = nextShiftSubtitle.replace(/^Menarik dari\s+/i, '').replace(/\s*\([^)]*\)$/, '').trim();
 
-    fetch('{{ route('operational.pull_ahead.request') }}', {
+    fetch('/operational/pull-ahead/request', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
