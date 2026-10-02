@@ -630,6 +630,7 @@ Route::middleware(['auth'])
 });
 
 Route::middleware(['auth'])->post('/pull-ahead/mark-read', [PullAheadController::class, 'markAsRead'])->name('pull_ahead.mark_read');
+Route::middleware(['auth'])->get('/pull-ahead/pending-count', [PullAheadController::class, 'pendingCount'])->name('pull_ahead.pending_count');
 
 
 /*

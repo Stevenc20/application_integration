@@ -5,6 +5,8 @@
     $planActive = request()->routeIs('ppc.planning.*') || request()->routeIs('production_orders.*') || request()->routeIs('mrp.*') || request()->routeIs('master.job');
     $masterActive = request()->routeIs('boms.*') || request()->routeIs('master_stamping.*');
     $reportActive = request()->routeIs('supervisor.reports.*');
+    $pullAheadActive = request()->routeIs('ppc.pull_ahead.*');
+    $pendingPullAhead = \App\Models\PullAheadRequest::where('status', 'PENDING')->count();
 
     $arrow = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 transition-transform duration-300 arrow %s" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>';
 @endphp
@@ -74,6 +76,15 @@
                 <a href="{{ route('ppc.planning.production_plan') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ request()->routeIs('ppc.planning.production_plan') ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/></svg>
                     <span>Production Plan</span>
+                </a>
+            </li>
+            <li>
+                <a href="{{ route('ppc.pull_ahead.index') }}" class="flex items-center gap-2 px-3 py-2 text-sm rounded-lg transition {{ $pullAheadActive ? 'bg-red-600 text-white font-medium shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-red-600' }}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16V4m0 0L3 8m4-4l4 4m6 0v12m0 0l4-4m-4 4l-4-4"/></svg>
+                    <span class="flex-1">Tarik Shift</span>
+                    @if($pendingPullAhead > 0)
+                        <span class="px-2 py-0.5 rounded-full text-[10px] font-black bg-red-600 text-white">{{ $pendingPullAhead }}</span>
+                    @endif
                 </a>
             </li>
             <li>

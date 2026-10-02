@@ -42,6 +42,40 @@ class PullAheadController extends Controller
         return response()->json(['success' => true]);
     }
 
+    /**
+     * Hitung jumlah request baru yang belum dibaca (untuk polling notifikasi)
+     */
+    public function pendingCount(Request $request)
+    {
+        $user = auth()->user();
+        if (!$user) return response()->json(['success' => false, 'count' => 0], 403);
+
+if ($user->isRole(['ppc', 'manager'])) {
+            $count = PullAheadRequest::where('status', 'PENDING')
+                ->where('is_read_by_ppc', false)
+                ->count();
+            $url    = route('ppc.pull_ahead.index');
+            $label  = 'Tinjau Request';
+            $message = "Ada $count Request Pull Ahead baru dari Leader yang menunggu Approval.";
+        } else {
+            $count = PullAheadRequest::whereIn('status', ['APPROVED', 'REJECTED', 'APPLIED'])
+                ->where('requested_by', $user->id)
+                ->where('is_read_by_leader', false)
+                ->count();
+            $url    = route('operational.input_harian');
+            $label  = 'Buka Jadwal';
+            $message = "Ada $count update status pada Request Pull Ahead Anda.";
+        }
+
+        return response()->json([
+            'success' => true,
+            'count'   => $count,
+            'url'     => $url,
+            'label'   => $label,
+            'message' => $message,
+        ]);
+    }
+
     // ==========================================
     // LEADER / OPERATIONAL METHODS
     // ==========================================
@@ -284,6 +318,11 @@ class PullAheadController extends Controller
             ->where('status', 'PENDING')
             ->orderBy('created_at', 'desc')
             ->get();
+
+        // PPC yang sudah membuka dashboard dianggap sudah membaca request ini
+        PullAheadRequest::where('status', 'PENDING')
+            ->where('is_read_by_ppc', false)
+            ->update(['is_read_by_ppc' => true]);
             
         // Ambil list item shift berjalan untuk modal PPC (biar PPC bisa atur ulang row_no)
         // Kita butuh list per-request, jadi lebih baik di load via AJAX per request
