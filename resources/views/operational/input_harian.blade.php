@@ -535,7 +535,7 @@ window.jobMasterData = {
         id: {{ $activeJob->id }},
         status: "{{ $activeJob->status }}",
         @php $activeDate = request('date', now()->toDateString()); @endphp
-        @php $activeProdPlan = $activeJob->productionPlans->first(); @endphp
+        @php $activeProdPlan = $activeJob->production_plan ?: $activeJob->productionPlans->first(); @endphp
         plan_start: {{ $activeProdPlan?->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $activeProdPlan->start_time)->timestamp * 1000 : (\Carbon\Carbon::parse($activeJob->plan_start ?: $activeDate . ' 07:40')->timestamp * 1000) }},
         plan_end: {{ $activeProdPlan?->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $activeProdPlan->finish_time)->timestamp * 1000 : (\Carbon\Carbon::parse($activeJob->plan_end ?: $activeDate . ' 10:40')->timestamp * 1000) }},
         started_at: {{ 
@@ -555,7 +555,7 @@ window.jobMasterData = {
         actual_reject: {{ $activeJob->dailyProduction?->actual_reject ?? 0 }},
         dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
-        tpt: {{ (float)($activeJob->productionPlans->first()?->tpt ?? 0) }},
+        tpt: {{ (float)(($activeProdPlan?->tpt) ?? 0) }},
         line: "{{ $activeJob->line ?? '' }}"
     },
     @endif

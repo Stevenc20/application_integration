@@ -458,18 +458,29 @@ class InputHarianController extends Controller
         
         $plans = $planQuery->orderBy('row_no')->get();
 
+        // Batch fetch existing JobMasters to eliminate N+1 query overhead
+        $identifiers = [];
+        $validPlans = [];
         foreach ($plans as $seq => $plan) {
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
-            
             if (blank($jn) && blank($jm)) continue;
             if ($plan->row_type === 'break') continue;
             if (in_array($jn, ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) continue;
 
-            // Pastikan identifier UNIK per baris rencana (untuk support split production)
             $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
+            $identifiers[] = $identifier;
+            $validPlans[] = ['plan' => $plan, 'seq' => $seq, 'identifier' => $identifier];
+        }
 
-            $existing = \App\Models\JobMaster::where('job_number', $identifier)->first();
+        $existingJobMasters = \App\Models\JobMaster::whereIn('job_number', $identifiers)->get()->keyBy('job_number');
+
+        foreach ($validPlans as $item) {
+            $plan = $item['plan'];
+            $seq = $item['seq'];
+            $identifier = $item['identifier'];
+
+            $existing = $existingJobMasters->get($identifier);
 
             $data = [
                 'job_name'    => $plan->job_master ?: ($plan->job_no ?: 'UNKNOWN JOB'),
@@ -482,11 +493,21 @@ class InputHarianController extends Controller
             ];
 
             if ($existing) {
-                // Jangan paksa update status jika sudah jalan/selesai (Preserve state)
-                if (!in_array($existing->status, ['running', 'paused', 'complete', 'finished', 'closed'])) {
-                    $existing->update($data);
-                } else {
-                    $existing->update(array_diff_key($data, ['status' => '']));
+                // Check if any attributes changed before updating DB
+                $needsUpdate = false;
+                foreach ($data as $k => $v) {
+                    if ($existing->{$k} != $v) {
+                        $needsUpdate = true;
+                        break;
+                    }
+                }
+                if ($needsUpdate) {
+                    // Jangan paksa update status jika sudah jalan/selesai (Preserve state)
+                    if (!in_array($existing->status, ['running', 'paused', 'complete', 'finished', 'closed'])) {
+                        $existing->update($data);
+                    } else {
+                        $existing->update(array_diff_key($data, ['status' => '']));
+                    }
                 }
             } else {
                 \App\Models\JobMaster::create(array_merge($data, [

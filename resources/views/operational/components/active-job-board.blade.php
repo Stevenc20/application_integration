@@ -67,7 +67,9 @@
             if ($actStartVal && $schedStart && $schedFinish) {
                 $ppcStartCalc = \Carbon\Carbon::parse($date . ' ' . $schedStart);
                 $ppcEndCalc = \Carbon\Carbon::parse($date . ' ' . $schedFinish);
-                $tptMinutes = $ppcStartCalc->diffInMinutes($ppcEndCalc);
+                $tptMinutes = ($prodPlan && (float)($prodPlan->tpt ?? 0) > 0)
+                    ? (float)$prodPlan->tpt
+                    : $ppcStartCalc->diffInMinutes($ppcEndCalc);
                 $actualStartCalc = \Carbon\Carbon::parse($date . ' ' . $actStartVal);
                 $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
             }

@@ -552,7 +552,9 @@ function updateTimeline(forceAll = false) {
 
             const pS_time = Number(job.plan_start);
             const pE_time = Number(job.plan_end);
-            const plannedDurationMs = Math.max(pE_time - pS_time, 1000); // Guard: min 1s
+            const schedDurationMs = Math.max(pE_time - pS_time, 1000);
+            const tptMs = (Number(job.tpt) > 0) ? (Number(job.tpt) * 60 * 1000) : schedDurationMs;
+            const plannedDurationMs = Math.max(tptMs, 1000); // Guard: min 1s
 
             const pS = new Date(pS_time);
             const pE = new Date(pE_time);
@@ -585,8 +587,16 @@ function updateTimeline(forceAll = false) {
 
             const finalEndTime = jF ? new Date(jF) : effectiveNow;
 
-            // INDUSTRIAL CALIBRATION: Scale must cover (Actual Start + Quota)
-            const expectedFinishTime = anchorTime + plannedDurationMs;
+            let activeStart = anchorTime;
+            if (jS || firstDandori) {
+                activeStart = Math.min(
+                    jS ? jS.getTime() : Infinity,
+                    firstDandori ? firstDandori.getTime() : Infinity
+                );
+            }
+
+            // INDUSTRIAL CALIBRATION: Scale must cover (Actual Start / Dandori Start + TPT Quota)
+            const expectedFinishTime = activeStart + plannedDurationMs;
 
             const tD = Math.max(
                 plannedDurationMs / 1000,
@@ -600,10 +610,6 @@ function updateTimeline(forceAll = false) {
 
             let elapsed = 0;
             if (jS || firstDandori) {
-                const activeStart = Math.min(
-                    jS ? jS.getTime() : Infinity,
-                    firstDandori ? firstDandori.getTime() : Infinity
-                );
                 elapsed = (finalEndTime.getTime() - activeStart) / 1000;
             }
             const realPct = (elapsed / (plannedDurationMs / 1000)) * 100;
@@ -744,8 +750,11 @@ function updateTimeline(forceAll = false) {
                 const clock = document.getElementById('timeline-current-time');
                 if (clock) {
                     let endTimeDate = effectiveNow;
-                    if (jS && job.tpt > 0) {
-                        endTimeDate = new Date(jS.getTime() + (job.tpt * 60 * 1000));
+                    const startAnchor = jS || firstDandori;
+                    if (startAnchor && Number(job.tpt) > 0) {
+                        endTimeDate = new Date(startAnchor.getTime() + (Number(job.tpt) * 60 * 1000));
+                    } else if (startAnchor && plannedDurationMs > 0) {
+                        endTimeDate = new Date(startAnchor.getTime() + plannedDurationMs);
                     } else if (job.plan_end) {
                         endTimeDate = new Date(job.plan_end);
                     }
@@ -2321,10 +2330,13 @@ window.selectCustomItem = function selectCustomItem(id, label) {
 }
 
 function checkSyncStatus() {
+    if (window._isReloading || (window.ActionRunner && window.ActionRunner.locked)) return;
     const config = window.ProductionConfig;
     const line = config.currentLine || '';
     fetch(`/operational/active-job?line=${encodeURIComponent(line)}`, { headers: { 'Accept': 'application/json' } }).then(res => res.json()).then(data => {
+        if (window._isReloading) return;
         if ((data.running && data.id !== config.currentActiveId) || (!data.running && config.currentActiveId !== null)) {
+            window._isReloading = true;
             location.reload();
         }
     }).catch(() => { });
