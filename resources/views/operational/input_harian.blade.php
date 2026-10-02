@@ -883,7 +883,10 @@ function openTarikShiftModal() {
             'Accept': 'application/json'
         }
     })
-    .then(r => r.json())
+    .then(r => {
+        if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+        return r.json();
+    })
     .then(res => {
         loading.classList.add('hidden');
         if (res.success && res.next_shift_plans && res.next_shift_plans.length > 0) {
@@ -914,11 +917,15 @@ function openTarikShiftModal() {
             form.classList.remove('hidden');
         } else {
             empty.classList.remove('hidden');
+            const msg = empty.querySelector('p');
+            if (msg) msg.textContent = 'Tidak ada item yang dapat ditarik.';
         }
     })
     .catch(err => {
         loading.classList.add('hidden');
         empty.classList.remove('hidden');
+        const msg = empty.querySelector('p');
+        if (msg) msg.textContent = 'Gagal memuat data: ' + err.message;
         console.error('Error fetching next shift data:', err);
     });
 }
