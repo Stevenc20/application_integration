@@ -821,6 +821,48 @@ class ProductionPlanController extends Controller
                 'imported' => $imported,
             ]);
 
+            // Bulk pre-create JobMasters for the imported date so Dashboard and Input Harian load instantly without N+1 insert lag
+            try {
+                $newPlans = ProductionPlan::whereDate('plan_date', $parsedDate)
+                    ->where('row_type', 'job')
+                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                    ->get(['id', 'job_no', 'job_master', 'press_name', 'plan', 'row_no', 'start_time', 'finish_time', 'qty_plt']);
+
+                if ($newPlans->isNotEmpty()) {
+                    $identifiers = $newPlans->map(fn($p) => (trim($p->job_no ?? '') ?: 'AUTO-' . \Illuminate\Support\Str::slug($p->job_master ?? '')) . '-' . $p->id)->toArray();
+                    $existingJn = JobMaster::whereIn('job_number', $identifiers)->pluck('job_number')->flip()->toArray();
+
+                    $batchJobs = [];
+                    foreach ($newPlans as $p) {
+                        $jn = trim($p->job_no ?? '');
+                        $jm = trim($p->job_master ?? '');
+                        $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+                        if (!isset($existingJn[$identifier])) {
+                            $batchJobs[] = [
+                                'job_number'   => $identifier,
+                                'job_name'     => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
+                                'line'         => $p->press_name ?? 'Line A',
+                                'target_qty'   => (int) ($p->plan ?? 0),
+                                'sequence_no'  => $p->row_no ?? 1,
+                                'status'       => 'pending',
+                                'plan_start'   => $p->start_time ? Carbon::parse($parsedDate . ' ' . $p->start_time)->startOfMinute() : null,
+                                'plan_end'     => $p->finish_time ? Carbon::parse($parsedDate . ' ' . $p->finish_time)->startOfMinute() : null,
+                                'capacity'     => (int) ($p->qty_plt ?? 0),
+                                'created_at'   => now(),
+                                'updated_at'   => now(),
+                            ];
+                        }
+                    }
+                    if (!empty($batchJobs)) {
+                        foreach (array_chunk($batchJobs, 100) as $chunk) {
+                            JobMaster::insertOrIgnore($chunk);
+                        }
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("Pre-creating JobMasters post-import warning: " . $e->getMessage());
+            }
+
             // Auto-redirect to the first parsed sheet for convenience
             if (!empty($result['sheets'])) {
                 $firstKey = array_key_first($result['sheets']);

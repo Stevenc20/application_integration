@@ -28,23 +28,7 @@ class DashboardDetailService
         $workDate = $date;
 
         $isMorning = ($shift === 1);
-        $plans = ProductionPlan::where('plan_date', $date)
-            ->where(function ($q) use ($isMorning) {
-                if ($isMorning) {
-                    $q->where('shift_name', 'like', '%Pagi%')
-                      ->orWhere('shift_name', 'like', '%1%');
-                } else {
-                    $q->where('shift_name', 'like', '%Malam%')
-                      ->orWhere('shift_name', 'like', '%2%');
-                }
-            })
-            ->where('row_type', 'job')
-            ->where(function ($q) {
-                $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                  ->orWhereNull('job_no');
-            })
-            ->orderBy('row_no')
-            ->get()
+        $plans = $this->getPlansForDateAndShift($date, $isMorning)
             ->filter(fn ($p) => $this->pressMatches($p, $lineName))
             ->values();
 
@@ -62,27 +46,34 @@ class DashboardDetailService
             ->get()
             ->keyBy('job_number');
 
-        // Auto-create JobMaster yang belum ada, sama seperti DashboardRealtimeService,
-        // supaya detail tidak selalu 0 walau JobMaster belum pernah di-sync.
+        $insertJobs = [];
         foreach ($plans as $p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
             $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
 
             if (! $jobMasters->has($identifier)) {
-                $newJob = JobMaster::create([
-                    'job_number' => $identifier,
-                    'job_name'   => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
-                    'line'       => $p->press_name ?? $lineName,
-                    'target_qty' => (int) ($p->plan ?? 0),
+                $insertJobs[] = [
+                    'job_number'  => $identifier,
+                    'job_name'    => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
+                    'line'        => $p->press_name ?? $lineName,
+                    'target_qty'  => (int) ($p->plan ?? 0),
                     'sequence_no' => $p->row_no ?? 1,
-                    'status'     => 'pending',
-                    'plan_start' => $p->start_time ? Carbon::parse($date . ' ' . $p->start_time)->startOfMinute() : null,
-                    'plan_end'   => $p->finish_time ? Carbon::parse($date . ' ' . $p->finish_time)->startOfMinute() : null,
-                    'capacity'   => (int) ($p->qty_plt ?? 0),
-                ]);
-                $jobMasters->put($identifier, $newJob);
+                    'status'      => 'pending',
+                    'plan_start'  => $p->start_time ? Carbon::parse($date . ' ' . $p->start_time)->startOfMinute() : null,
+                    'plan_end'    => $p->finish_time ? Carbon::parse($date . ' ' . $p->finish_time)->startOfMinute() : null,
+                    'capacity'    => (int) ($p->qty_plt ?? 0),
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ];
             }
+        }
+
+        if (!empty($insertJobs)) {
+            JobMaster::insertOrIgnore($insertJobs);
+            $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
+                ->get()
+                ->keyBy('job_number');
         }
 
         $jobIds = $jobMasters->pluck('id');
@@ -191,6 +182,42 @@ class DashboardDetailService
         return preg_replace('/[\s\-_.]+/', '', $normalized);
     }
 
+    protected static array $plansCache = [];
+    protected static ?Collection $allLineMasters = null;
+    protected static array $resolvedDates = [];
+
+    /**
+     * Baris job untuk tanggal + shift tertentu (dimemoize agar tidak query berulang per line).
+     */
+    private function getPlansForDateAndShift(string $date, bool $isMorning)
+    {
+        $cacheKey = $date . '_' . ($isMorning ? '1' : '2');
+        if (isset(self::$plansCache[$cacheKey])) {
+            return self::$plansCache[$cacheKey];
+        }
+
+        $plans = ProductionPlan::whereDate('plan_date', $date)
+            ->where(function ($q) use ($isMorning) {
+                if ($isMorning) {
+                    $q->where('shift_name', 'like', '%Pagi%')
+                      ->orWhere('shift_name', 'like', '%1%');
+                } else {
+                    $q->where('shift_name', 'like', '%Malam%')
+                      ->orWhere('shift_name', 'like', '%2%');
+                }
+            })
+            ->where('row_type', 'job')
+            ->where(function ($q) {
+                $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                  ->orWhereNull('job_no');
+            })
+            ->orderBy('row_no')
+            ->get();
+
+        self::$plansCache[$cacheKey] = $plans;
+        return $plans;
+    }
+
     private function pressMatches($plan, string $lineName): bool
     {
         $target = $this->normalizePressName($lineName);
@@ -203,9 +230,13 @@ class DashboardDetailService
             return true;
         }
 
+        if (self::$allLineMasters === null) {
+            self::$allLineMasters = LineMaster::all();
+        }
+
         // press_name kadang tersimpan sebagai line_code (mis. "PA"), bukan "PRESS A"
         if (trim((string) ($plan->press_name ?? '')) !== '') {
-            $master = LineMaster::where('line_name', $lineName)->first();
+            $master = self::$allLineMasters->firstWhere('line_name', $lineName);
             if ($master && $this->normalizePressName($master->line_code ?? '') === $this->normalizePressName($plan->press_name)) {
                 return true;
             }
@@ -213,8 +244,8 @@ class DashboardDetailService
 
         $lineMasterId = $plan->line_master_id ?? null;
         if ($lineMasterId) {
-            $masterId = LineMaster::where('line_name', $lineName)->value('id');
-            if ($masterId && (string) $lineMasterId === (string) $masterId) {
+            $master = self::$allLineMasters->firstWhere('line_name', $lineName);
+            if ($master && (string) $lineMasterId === (string) $master->id) {
                 return true;
             }
         }
@@ -224,16 +255,23 @@ class DashboardDetailService
 
     private function resolvePlanDate(string $date): string
     {
+        if (isset(self::$resolvedDates[$date])) {
+            return self::$resolvedDates[$date];
+        }
+
         $hasJobs = ProductionPlan::whereDate('plan_date', $date)
             ->where('row_type', 'job')
             ->exists();
 
         if ($hasJobs) {
+            self::$resolvedDates[$date] = $date;
             return $date;
         }
 
         $latest = ProductionPlan::where('row_type', 'job')->max('plan_date');
+        $resolved = $latest ? Carbon::parse($latest)->toDateString() : $date;
+        self::$resolvedDates[$date] = $resolved;
 
-        return $latest ? Carbon::parse($latest)->toDateString() : $date;
+        return $resolved;
     }
 }

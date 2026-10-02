@@ -60,6 +60,7 @@ class DashboardRealtimeService
             ->get()
             ->keyBy('job_number');
 
+        $insertJobs = [];
         foreach ($plans as $p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
@@ -67,7 +68,7 @@ class DashboardRealtimeService
 
             if (!$jobMasters->has($identifier)) {
                 $jobName = $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB');
-                $newJob = JobMaster::create([
+                $insertJobs[] = [
                     'job_number'   => $identifier,
                     'job_name'     => $jobName,
                     'line'         => $p->press_name ?? $lineName,
@@ -77,9 +78,17 @@ class DashboardRealtimeService
                     'plan_start'   => $p->start_time ? Carbon::parse($date . ' ' . $p->start_time)->startOfMinute() : null,
                     'plan_end'     => $p->finish_time ? Carbon::parse($date . ' ' . $p->finish_time)->startOfMinute() : null,
                     'capacity'     => (int) ($p->qty_plt ?? 0),
-                ]);
-                $jobMasters->put($identifier, $newJob);
+                    'created_at'   => now(),
+                    'updated_at'   => now(),
+                ];
             }
+        }
+
+        if (!empty($insertJobs)) {
+            JobMaster::insertOrIgnore($insertJobs);
+            $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
+                ->get()
+                ->keyBy('job_number');
         }
 
         $jobIds = $jobMasters->pluck('id');
@@ -100,38 +109,64 @@ class DashboardRealtimeService
         $activeJobIds = $dailyRecords->pluck('job_master_id')->toArray();
         $missingJobs = $jobMasters->whereNotIn('id', $activeJobIds);
 
-        foreach ($missingJobs as $mj) {
-            $existingDaily = DailyProduction::where('job_master_id', $mj->id)->first();
+        if ($missingJobs->isNotEmpty()) {
+            $missingJobIds = $missingJobs->pluck('id')->toArray();
 
-            if ($existingDaily) {
-                $existingDaily->work_date = $workDate;
-                $existingDaily->setRelation('jobMaster', $mj);
-                $dailyRecords->push($existingDaily);
-            } else {
-                $logAgg = \App\Models\ProductionLog::where('job_master_id', $mj->id)
-                    ->selectRaw('COALESCE(SUM(ok_qty),0) as total_ok, COALESCE(SUM(repair_qty),0) as total_repair, COALESCE(SUM(reject_qty),0) as total_reject')
-                    ->first();
+            // 1 query to get all existing dailies
+            $existingDailiesMap = DailyProduction::whereIn('job_master_id', $missingJobIds)
+                ->get()
+                ->keyBy('job_master_id');
 
-                $downtimeSecs = (int) Downtime::where('job_master_id', $mj->id)
+            // Find which jobs actually have no daily at all
+            $stillMissingIds = array_diff($missingJobIds, $existingDailiesMap->keys()->toArray());
+
+            $logAggMap = collect();
+            $downtimeSecsMap = collect();
+
+            if (!empty($stillMissingIds)) {
+                // 1 query to aggregate production logs for all missing jobs
+                $logAggMap = \App\Models\ProductionLog::whereIn('job_master_id', $stillMissingIds)
+                    ->groupBy('job_master_id')
+                    ->selectRaw('job_master_id, COALESCE(SUM(ok_qty),0) as total_ok, COALESCE(SUM(repair_qty),0) as total_repair, COALESCE(SUM(reject_qty),0) as total_reject')
+                    ->get()
+                    ->keyBy('job_master_id');
+
+                // 1 query to aggregate downtimes for all missing jobs
+                $downtimeSecsMap = Downtime::whereIn('job_master_id', $stillMissingIds)
                     ->where('start_time', '>=', $shiftStartDt)
                     ->where('start_time', '<', $shiftEndDt)
                     ->where('jenis_downtime', '!=', 'dandori')
-                    ->sum('duration_seconds');
+                    ->groupBy('job_master_id')
+                    ->selectRaw('job_master_id, COALESCE(SUM(duration_seconds),0) as total_dt')
+                    ->pluck('total_dt', 'job_master_id');
+            }
 
-                $virtual = new DailyProduction([
-                    'job_master_id'    => $mj->id,
-                    'work_date'        => $workDate,
-                    'actual_ok'        => (int) $logAgg->total_ok,
-                    'actual_qty'       => (int) $logAgg->total_ok,
-                    'actual_repair'    => (int) $logAgg->total_repair,
-                    'actual_reject'    => (int) $logAgg->total_reject,
-                    'runtime_seconds'  => 0,
-                    'downtime_seconds' => $downtimeSecs,
-                    'line'             => $lineName,
-                    'shift'            => self::SHIFT_MAP[$shift] ?? 'Shift Pagi',
-                ]);
-                $virtual->setRelation('jobMaster', $mj);
-                $dailyRecords->push($virtual);
+            foreach ($missingJobs as $mj) {
+                $existingDaily = $existingDailiesMap->get($mj->id);
+
+                if ($existingDaily) {
+                    $existingDaily->work_date = $workDate;
+                    $existingDaily->setRelation('jobMaster', $mj);
+                    $dailyRecords->push($existingDaily);
+                } else {
+                    $logAgg = $logAggMap->get($mj->id);
+                    $dtSecs = (int) ($downtimeSecsMap->get($mj->id) ?? 0);
+
+                    $virtual = new DailyProduction([
+                        'job_master_id'    => $mj->id,
+                        'work_date'        => $workDate,
+                        'actual_ok'        => (int) ($logAgg?->total_ok ?? 0),
+                        'actual_qty'       => (int) ($logAgg?->total_ok ?? 0),
+                        'actual_repair'    => (int) ($logAgg?->total_repair ?? 0),
+                        'actual_reject'    => (int) ($logAgg?->total_reject ?? 0),
+                        'runtime_seconds'  => 0,
+                        'downtime_seconds' => $dtSecs,
+                        'line'             => $lineName,
+                        'shift'            => self::SHIFT_MAP[$shift] ?? 'Shift Pagi',
+                    ]);
+                    $virtual->setRelation('jobMaster', $mj);
+                    $dailyRecords->push($virtual);
+                }
             }
         }
 
@@ -166,15 +201,18 @@ class DashboardRealtimeService
         $currRepair = $hasRunning ? (int) $runningRecord->actual_repair : 0;
         $currReject = $hasRunning ? (int) $runningRecord->actual_reject : 0;
 
+        $sessionsMap = \App\Models\ProductionSession::whereIn('job_master_id', $jobIds)
+            ->where('work_date', $workDate)
+            ->get()
+            ->keyBy('job_master_id');
+
         $runtime = 0;
         $currRuntime = 0;
         foreach ($dailyRecords as $dp) {
             $dpRuntime = (float) $dp->runtime_seconds;
             if ($dpRuntime <= 0 && $dp->jobMaster) {
                 if ($dp->jobMaster->status === 'running') {
-                    $session = \App\Models\ProductionSession::where('job_master_id', $dp->job_master_id)
-                        ->where('work_date', $workDate)
-                        ->first();
+                    $session = $sessionsMap->get($dp->job_master_id);
                     if ($session && $session->start_time) {
                         $dpRuntime = (float) $session->total_seconds;
                         if ($session->status === 'running') {
@@ -184,9 +222,7 @@ class DashboardRealtimeService
                         $dpRuntime = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
                     }
                 } elseif ($dp->jobMaster->status === 'paused') {
-                    $session = \App\Models\ProductionSession::where('job_master_id', $dp->job_master_id)
-                        ->where('work_date', $workDate)
-                        ->first();
+                    $session = $sessionsMap->get($dp->job_master_id);
                     $dpRuntime = (float) ($session->total_seconds ?? 0);
                 } elseif ($dp->jobMaster->started_at) {
                     $endAt = $dp->jobMaster->finished_at ?: \Carbon\Carbon::now();
@@ -491,23 +527,34 @@ class DashboardRealtimeService
         return preg_replace('/[\s\-_.]+/', '', $normalized);
     }
 
+    protected static array $plansCache = [];
+    protected static ?Collection $allLineMasters = null;
+    protected static array $resolvedDates = [];
+
     /**
      * Tanggal schedule yang benar-benar punya data. Kalau tanggal yang diminta kosong,
      * mundur ke tanggal schedule terakhir yang punya job supaya dashboard tidak blank.
      */
     private function resolvePlanDate(string $date): string
     {
+        if (isset(self::$resolvedDates[$date])) {
+            return self::$resolvedDates[$date];
+        }
+
         $hasJobs = ProductionPlan::whereDate('plan_date', $date)
             ->where('row_type', 'job')
             ->exists();
 
         if ($hasJobs) {
+            self::$resolvedDates[$date] = $date;
             return $date;
         }
 
         $latest = ProductionPlan::where('row_type', 'job')->max('plan_date');
+        $resolved = $latest ? Carbon::parse($latest)->toDateString() : $date;
+        self::$resolvedDates[$date] = $resolved;
 
-        return $latest ? Carbon::parse($latest)->toDateString() : $date;
+        return $resolved;
     }
 
     /**
@@ -515,7 +562,12 @@ class DashboardRealtimeService
      */
     private function getPlansForDateAndShift(string $date, bool $isMorning)
     {
-        return ProductionPlan::where('plan_date', $date)
+        $cacheKey = $date . '_' . ($isMorning ? '1' : '2');
+        if (isset(self::$plansCache[$cacheKey])) {
+            return self::$plansCache[$cacheKey];
+        }
+
+        $plans = ProductionPlan::whereDate('plan_date', $date)
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')
@@ -532,6 +584,9 @@ class DashboardRealtimeService
             })
             ->orderBy('row_no')
             ->get();
+
+        self::$plansCache[$cacheKey] = $plans;
+        return $plans;
     }
 
     private function pressMatches($plan, string $lineName): bool
@@ -546,9 +601,13 @@ class DashboardRealtimeService
             return true;
         }
 
+        if (self::$allLineMasters === null) {
+            self::$allLineMasters = LineMaster::all();
+        }
+
         // press_name kadang tersimpan sebagai line_code (mis. "PA"), bukan "PRESS A"
         if ($pressRaw !== '') {
-            $master = LineMaster::where('line_name', $lineName)->first();
+            $master = self::$allLineMasters->firstWhere('line_name', $lineName);
             if ($master && $this->normalizePressName($master->line_code ?? '') === $this->normalizePressName($pressRaw)) {
                 return true;
             }
@@ -556,8 +615,8 @@ class DashboardRealtimeService
 
         $lineMasterId = $plan->line_master_id ?? null;
         if ($lineMasterId) {
-            $masterId = LineMaster::where('line_name', $lineName)->value('id');
-            if ($masterId && (string) $lineMasterId === (string) $masterId) {
+            $master = self::$allLineMasters->firstWhere('line_name', $lineName);
+            if ($master && (string) $lineMasterId === (string) $master->id) {
                 return true;
             }
         }

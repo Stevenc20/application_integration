@@ -838,7 +838,6 @@ async function fetchDashboardData() {
 
 // Menjalankan penarikan data pertama kali saat halaman dibuka
 fetchDashboardData();
-setTimeout(fetchDetailData, 100);
 
 // Real-time via BroadcastChannel (instant from Input Harian saves)
 try {
