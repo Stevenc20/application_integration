@@ -434,6 +434,7 @@ class InputHarianController extends Controller
             'sessionMap'      => $sessionMap,
             'scheduleContext' => $scheduleContext,
             'prevShiftComment' => $prevShiftComment,
+            'lineFilter'      => $lineFilter,
         ]);
     }
 

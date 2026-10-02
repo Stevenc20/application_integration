@@ -413,7 +413,7 @@
  */
 window.ProductionConfig = {
     csrfToken: '{{ csrf_token() }}',
-    currentLine: '{{ request('line') }}',
+    currentLine: '{{ request('line', $lineFilter ?? 'Line A') }}',
     currentDate: '{{ $date }}',
     currentShift: '{{ request('shift', $currentShift) }}',
     isLocked: {{ ($isLocked ?? false) ? 'true' : 'false' }},
@@ -874,9 +874,9 @@ function openTarikShiftModal() {
     form.classList.add('hidden');
 
     const params = new URLSearchParams(window.location.search);
-    const line = params.get('line') || 'Line A';
-    const shift = params.get('shift') || 'Shift Pagi';
-    const date = params.get('date') || '{{ $date }}';
+    const line = params.get('line') || (window.ProductionConfig && window.ProductionConfig.currentLine) || '{{ $lineFilter ?? "Line A" }}';
+    const shift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
+    const date = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
 
     fetch(`{{ route('operational.pull_ahead.next_shift') }}?line=${encodeURIComponent(line)}&shift=${encodeURIComponent(shift)}&date=${encodeURIComponent(date)}`, {
         headers: {
@@ -888,7 +888,8 @@ function openTarikShiftModal() {
         loading.classList.add('hidden');
         if (res.success && res.next_shift_plans && res.next_shift_plans.length > 0) {
             nextShiftPlansData = res.next_shift_plans;
-            document.getElementById('tarikShiftSubtitle').innerText = `Menarik dari ${res.next_shift_name || 'Shift Selanjutnya'}`;
+            const dateLabel = res.next_shift_date ? ` (${res.next_shift_date})` : '';
+            document.getElementById('tarikShiftSubtitle').innerText = `Menarik dari ${res.next_shift_name || 'Shift Selanjutnya'}${dateLabel}`;
 
             const planSelect = document.getElementById('tarikShiftPlanSelect');
             planSelect.innerHTML = '<option value="">-- Pilih Item Produksi --</option>';
@@ -955,8 +956,9 @@ function submitTarikShift(e) {
     const planId = document.getElementById('tarikShiftPlanSelect').value;
     const qty = document.getElementById('tarikShiftQty').value;
     const seq = document.getElementById('tarikShiftSequence').value;
-    const currentShift = params.get('shift') || 'Shift Pagi';
-    const nextShiftName = document.getElementById('tarikShiftSubtitle').innerText.replace('Menarik dari ', '').trim();
+    const currentShift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
+    const nextShiftSubtitle = document.getElementById('tarikShiftSubtitle').innerText;
+    const nextShiftName = nextShiftSubtitle.replace(/^Menarik dari\s+/i, '').replace(/\s*\([^)]*\)$/, '').trim();
 
     fetch('{{ route('operational.pull_ahead.request') }}', {
         method: 'POST',

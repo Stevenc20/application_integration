@@ -18,11 +18,20 @@ class PullAheadService
             ->where('status', 'PENDING')
             ->sum('qty_requested');
 
-        // Gunakan remaining_plan, jika null maka fallback ke kolom 'plan' (kuantitas rencana)
-        $baseQty = $plan->remaining_plan !== null ? $plan->remaining_plan : $plan->plan;
+        // Gunakan remaining_plan jika ada dan positif, jika tidak fallback ke plan atau target_qty
+        if ($plan->remaining_plan !== null && (int)$plan->remaining_plan > 0) {
+            $baseQty = (int)$plan->remaining_plan;
+        } elseif ($plan->plan !== null && (int)$plan->plan > 0) {
+            $baseQty = (int)$plan->plan;
+        } elseif ($plan->target_qty !== null && (int)$plan->target_qty > 0) {
+            $baseQty = (int)$plan->target_qty;
+        } else {
+            $baseQty = (int)($plan->remaining_plan ?? $plan->plan ?? $plan->target_qty ?? 0);
+        }
 
-        $available = $baseQty - $pendingRequestsQty;
-        return $available > 0 ? $available : 0;
+        $doneQty = (int)($plan->ok ?? 0);
+        $available = $baseQty - $doneQty - $pendingRequestsQty;
+        return $available > 0 ? (int)$available : 0;
     }
 
     /**
@@ -47,9 +56,6 @@ class PullAheadService
             'status'                  => 'PENDING'
         ]);
 
-        // TODO: Kirim notifikasi ke PPC
-        // misal: Notification::send($ppcUsers, new PullAheadRequested($request));
-
         return $request;
     }
 
@@ -61,36 +67,46 @@ class PullAheadService
         DB::beginTransaction();
         try {
             $originalPlan = $request->originalPlan;
-            $baseQty = $originalPlan->remaining_plan !== null ? $originalPlan->remaining_plan : $originalPlan->plan;
+            $baseQty = $originalPlan->remaining_plan !== null ? $originalPlan->remaining_plan : ($originalPlan->plan ?: $originalPlan->target_qty);
 
             if ($qtyApproved > $baseQty) {
                 throw new Exception("Qty Approved melebihi Sisa Plan asli.");
             }
 
-            // 1. Kurangi remaining plan di shift asal (atau set value baru jika tadinya null)
-            $originalPlan->remaining_plan = $baseQty - $qtyApproved;
+            // 1. Kurangi remaining plan di shift asal
+            $originalPlan->remaining_plan = max(0, $baseQty - $qtyApproved);
             $originalPlan->save();
 
-            // 2. Tentukan row_no untuk di shift 1 (berdasarkan final_sequence_after)
+            // 2. Tentukan row_no untuk di shift target (berdasarkan final_sequence_after)
             $targetRowNo = 1;
             if ($finalSequenceAfterId) {
                 $afterPlan = ProductionPlan::find($finalSequenceAfterId);
                 if ($afterPlan) {
                     $targetRowNo = $afterPlan->row_no + 1;
                     
-                    // Shift ke bawah semua plan di shift 1 (hari, line, shift yg sama) yg >= targetRowNo
-                    ProductionPlan::where('line_master_id', $afterPlan->line_master_id)
-                        ->where('plan_date', $afterPlan->plan_date) // asumsi kolom plan_date merepresentasikan tanggal produksi
+                    // Shift ke bawah semua plan di shift target (hari, line, shift yg sama) yg >= targetRowNo
+                    $shiftQuery = ProductionPlan::whereDate('plan_date', $afterPlan->plan_date)
                         ->where('shift_name', $request->target_shift)
-                        ->where('row_no', '>=', $targetRowNo)
-                        ->increment('row_no');
+                        ->where('row_no', '>=', $targetRowNo);
+
+                    if (!empty($afterPlan->line_master_id)) {
+                        $shiftQuery->where('line_master_id', $afterPlan->line_master_id);
+                    } elseif (!empty($afterPlan->press_name)) {
+                        $shiftQuery->where('press_name', $afterPlan->press_name);
+                    }
+                    $shiftQuery->increment('row_no');
                 }
             } else {
                 // Jika tidak ada usulan/keputusan, taruh di paling bawah
-                $maxRow = ProductionPlan::where('line_master_id', $originalPlan->line_master_id)
-                    ->where('plan_date', $originalPlan->plan_date)
-                    ->where('shift_name', $request->target_shift)
-                    ->max('row_no');
+                $maxRowQuery = ProductionPlan::whereDate('plan_date', $originalPlan->plan_date)
+                    ->where('shift_name', $request->target_shift);
+
+                if (!empty($originalPlan->line_master_id)) {
+                    $maxRowQuery->where('line_master_id', $originalPlan->line_master_id);
+                } elseif (!empty($originalPlan->press_name)) {
+                    $maxRowQuery->where('press_name', $originalPlan->press_name);
+                }
+                $maxRow = $maxRowQuery->max('row_no');
                 $targetRowNo = $maxRow ? $maxRow + 1 : 1;
             }
 
