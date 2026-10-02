@@ -2,7 +2,7 @@
     $dashboardActive = request()->routeIs('ppc.dashboard');
     $rundownActive = request()->routeIs('rundown.*') || request()->routeIs('rundown_press.*');
     $monitoringActive = request()->routeIs('monitoring.*') || request()->routeIs('supervisor.downtime.monitoring');
-    $planActive = request()->routeIs('ppc.planning.*') || request()->routeIs('production_orders.*') || request()->routeIs('mrp.*') || request()->routeIs('master.job');
+    $planActive = request()->routeIs('ppc.planning.*') || request()->routeIs('production_orders.*') || request()->routeIs('mrp.*') || request()->routeIs('master.job') || request()->routeIs('ppc.pull_ahead.*');
     $masterActive = request()->routeIs('boms.*') || request()->routeIs('master_stamping.*');
     $reportActive = request()->routeIs('supervisor.reports.*');
     $pullAheadActive = request()->routeIs('ppc.pull_ahead.*');
