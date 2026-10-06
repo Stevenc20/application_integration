@@ -335,7 +335,7 @@
 
                     {{-- Press Cards Grid --}}
                     <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                        @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F'] as $idx => $press)
+                        @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F', 'PRESS K'] as $idx => $press)
                         @php
                             $colors = [
                                 ['from-rose-500', 'to-red-600', 'bg-rose-50', 'text-rose-700', 'border-rose-200', 'shadow-rose-100'],
@@ -349,7 +349,7 @@
                         <a href="{{ route('ppc.planning.production_plan', ['date' => $activeDate, 'press' => $press]) }}" class="group block p-5 rounded-2xl border {{ $c[4] }} {{ $c[2] }} hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-9 h-9 bg-gradient-to-br {{ $c[0] }} {{ $c[1] }} rounded-xl flex items-center justify-center shadow-md {{ $c[5] }}">
-                                    <span class="text-white text-[11px] font-black">{{ chr(65 + $idx) }}</span>
+                                    <span class="text-white text-[11px] font-black">{{ substr($press, -1) }}</span>
                                 </div>
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-slate-300 group-hover:text-rose-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" /></svg>
                             </div>

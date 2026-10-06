@@ -276,6 +276,7 @@
                                 <option value="Line D">Line D</option>
                                 <option value="Line E">Line E</option>
                                 <option value="Line F">Line F</option>
+                                <option value="Line K">Line K</option>
                                 <option value="Shearing">Shearing</option>
                                 <option value="Handwork">Handwork</option>
                             </select>

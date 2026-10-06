@@ -115,7 +115,7 @@
             $suffix = trim(substr($role, 6));
             if ($suffix !== '') {
                 $suffix = strtoupper($suffix);
-                if (in_array($suffix, ['A', 'B', 'C', 'D', 'E', 'F'])) {
+                if (in_array($suffix, ['A', 'B', 'C', 'D', 'E', 'F', 'K'])) {
                     $popoutLine = 'Line ' . $suffix;
                 }
             }

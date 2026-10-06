@@ -267,6 +267,8 @@
                                 $userLine = 'Line E';
                             } elseif ($userRole === 'leader f') {
                                 $userLine = 'Line F';
+                            } elseif ($userRole === 'leader k') {
+                                $userLine = 'Line K';
                             } elseif ($userRole === 'shearing') {
                                 $userLine = 'Shearing';
                             } elseif ($userRole === 'handwork') {

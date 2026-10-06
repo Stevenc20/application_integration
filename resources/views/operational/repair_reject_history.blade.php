@@ -83,7 +83,7 @@
                class="px-4 py-2 rounded-xl text-xs font-black transition-all border-2 {{ !$normalizedActive ? 'bg-primary-red border-primary-red text-white shadow-lg shadow-red-200' : 'bg-white border-slate-100 text-slate-500 hover:border-red-200 hover:text-red-600' }} uppercase">
                 SEMUA LINE
             </a>
-            @foreach(['Line A', 'Line B', 'Line C', 'Line D', 'Line E', 'Line F', 'Shearing', 'Handwork'] as $ln)
+            @foreach(['Line A', 'Line B', 'Line C', 'Line D', 'Line E', 'Line F', 'Line K', 'Shearing', 'Handwork'] as $ln)
                 @php
                     $cleanName = str_replace('Line ', '', $ln);
                 @endphp

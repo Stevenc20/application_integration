@@ -56,8 +56,8 @@ class ScheduleStampingController extends Controller
                 ->orderBy('press_name')
                 ->pluck('press_name');
         }
-        // Always offer PRESS A-F
-        $defaultPress = collect(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F']);
+        // Always offer PRESS A-F, PRESS K
+        $defaultPress = collect(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F', 'PRESS K']);
         $allPress = $allPress->merge($defaultPress)->unique()->sort()->values();
 
         $selectedPress = $request->get('press');
@@ -246,8 +246,8 @@ class ScheduleStampingController extends Controller
         $anyRow = ScheduleStamping::where('upload_date', $date)->whereNotNull('hari')->first();
         $hariText = $anyRow ? $anyRow->hari : '';
 
-        $pagiInserted = ['PRESS A' => 0, 'PRESS B' => 0, 'PRESS C' => 0, 'PRESS D' => 0, 'PRESS E' => 0, 'PRESS F' => 0];
-        $malamInserted = ['PRESS A' => 0, 'PRESS B' => 0, 'PRESS C' => 0, 'PRESS D' => 0, 'PRESS E' => 0, 'PRESS F' => 0];
+        $pagiInserted = ['PRESS A' => 0, 'PRESS B' => 0, 'PRESS C' => 0, 'PRESS D' => 0, 'PRESS E' => 0, 'PRESS F' => 0, 'PRESS K' => 0];
+        $malamInserted = ['PRESS A' => 0, 'PRESS B' => 0, 'PRESS C' => 0, 'PRESS D' => 0, 'PRESS E' => 0, 'PRESS F' => 0, 'PRESS K' => 0];
 
         // Process Shift Pagi & Shift Malam sheets
         foreach (['Shift Pagi', 'Shift Malam'] as $shName) {
@@ -288,7 +288,8 @@ class ScheduleStampingController extends Controller
                 'PRESS C' => 0,
                 'PRESS D' => 0,
                 'PRESS E' => 0,
-                'PRESS F' => 0
+                'PRESS F' => 0,
+                'PRESS K' => 0
             ];
 
             for ($i = 0; $i < count($pressRows); $i++) {

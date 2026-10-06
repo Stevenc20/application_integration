@@ -91,6 +91,7 @@
                 <option value="leader d" @selected(request('jabatan')==='leader d')>Leader D</option>
                 <option value="leader e" @selected(request('jabatan')==='leader e')>Leader E</option>
                 <option value="leader f" @selected(request('jabatan')==='leader f')>Leader F</option>
+                <option value="leader k" @selected(request('jabatan')==='leader k')>Leader K</option>
                 <option value="shearing" @selected(request('jabatan')==='shearing')>Shearing</option>
                 <option value="handwork" @selected(request('jabatan')==='handwork')>Handwork</option>
                 <option value="foreman" @selected(request('jabatan')==='foreman')>Foreman</option>
@@ -142,6 +143,7 @@
                         'leader d'      => ['bg'=>'bg-violet-50','text'=>'text-violet-700','border'=>'border-violet-100'],
                         'leader e'      => ['bg'=>'bg-violet-50','text'=>'text-violet-700','border'=>'border-violet-100'],
                         'leader f'      => ['bg'=>'bg-violet-50','text'=>'text-violet-700','border'=>'border-violet-100'],
+                        'leader k'      => ['bg'=>'bg-violet-50','text'=>'text-violet-700','border'=>'border-violet-100'],
                         'shearing'      => ['bg'=>'bg-teal-50','text'=>'text-teal-700','border'=>'border-teal-100'],
                         'handwork'      => ['bg'=>'bg-orange-50','text'=>'text-orange-700','border'=>'border-orange-100'],
                         'foreman'       => ['bg'=>'bg-amber-50','text'=>'text-amber-700','border'=>'border-amber-100'],
@@ -321,6 +323,17 @@
                             <div class="text-left">
                                 <span class="block text-xs font-black text-slate-800 tracking-wide uppercase">Leader F</span>
                                 <span class="block text-[9px] font-medium text-slate-400">Line F Leader</span>
+                            </div>
+                        </div>
+
+                        <!-- Card Leader K -->
+                        <div onclick="setAddJabatan('leader k')" id="add_jab_leader-k" class="add-jab-card flex items-center gap-3 p-3 rounded-2xl border-2 border-slate-100 hover:border-violet-300 hover:bg-violet-50/10 cursor-pointer transition-all duration-200 group">
+                            <div class="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                                <i class="fas fa-users text-sm"></i>
+                            </div>
+                            <div class="text-left">
+                                <span class="block text-xs font-black text-slate-800 tracking-wide uppercase">Leader K</span>
+                                <span class="block text-[9px] font-medium text-slate-400">Line K Leader</span>
                             </div>
                         </div>
 
@@ -620,6 +633,17 @@
                             </div>
                         </div>
 
+                        <!-- Card Leader K -->
+                        <div onclick="setEditJabatan('leader k')" id="edit_jab_leader-k" class="edit-jab-card flex items-center gap-3 p-3 rounded-2xl border-2 border-slate-100 hover:border-violet-300 hover:bg-violet-50/10 cursor-pointer transition-all duration-200 group">
+                            <div class="w-9 h-9 rounded-xl bg-violet-50 text-violet-600 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
+                                <i class="fas fa-users text-sm"></i>
+                            </div>
+                            <div class="text-left">
+                                <span class="block text-xs font-black text-slate-800 tracking-wide uppercase">Leader K</span>
+                                <span class="block text-[9px] font-medium text-slate-400">Line K Leader</span>
+                            </div>
+                        </div>
+
                         <!-- Card Shearing -->
                         <div onclick="setEditJabatan('shearing')" id="edit_jab_shearing" class="edit-jab-card flex items-center gap-3 p-3 rounded-2xl border-2 border-slate-100 hover:border-teal-300 hover:bg-teal-50/10 cursor-pointer transition-all duration-200 group">
                             <div class="w-9 h-9 rounded-xl bg-teal-50 text-teal-600 flex items-center justify-center group-hover:scale-105 transition-transform flex-shrink-0">
@@ -854,6 +878,7 @@ const roleColors = {
     'leader d': { border: 'border-violet-500', bg: 'bg-violet-50/30', ring: 'ring-violet-500/20' },
     'leader e': { border: 'border-violet-500', bg: 'bg-violet-50/30', ring: 'ring-violet-500/20' },
     'leader f': { border: 'border-violet-500', bg: 'bg-violet-50/30', ring: 'ring-violet-500/20' },
+    'leader k': { border: 'border-violet-500', bg: 'bg-violet-50/30', ring: 'ring-violet-500/20' },
     shearing: { border: 'border-teal-500', bg: 'bg-teal-50/30', ring: 'ring-teal-500/20' },
     handwork: { border: 'border-orange-500', bg: 'bg-orange-50/30', ring: 'ring-orange-500/20' },
     foreman: { border: 'border-amber-500', bg: 'bg-amber-50/30', ring: 'ring-amber-500/20' },
