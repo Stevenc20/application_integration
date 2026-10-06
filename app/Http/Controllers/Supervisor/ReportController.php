@@ -968,7 +968,8 @@ class ReportController extends Controller
         }
 
         $userRole = strtolower(auth()->user()?->role ?? '');
-        $canEdit = in_array($userRole, ['foreman', 'superadmin']);
+        $isLeaderRole = str_starts_with($userRole, 'leader') || in_array($userRole, ['leader', 'teamleader', 'group leader']);
+        $canEdit = in_array($userRole, ['foreman', 'superadmin']) || $isLeaderRole;
 
         $authorizedScope = false;
         if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
@@ -1001,10 +1002,13 @@ class ReportController extends Controller
         $leaderSigned = in_array('teamleader', $signedRoles);
         $foremanSigned = in_array('foreman', $signedRoles);
 
-        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
+        if (in_array($userRole, ['superadmin', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             $ttdLocked = false;
         } elseif ($userRole === 'foreman') {
             $ttdLocked = !($leaderSigned && !$foremanSigned);
+        } elseif ($isLeaderRole) {
+            // Leader can edit as long as leader hasn't signed yet
+            $ttdLocked = $leaderSigned;
         } else {
             $ttdLocked = true;
         }
@@ -1038,7 +1042,8 @@ class ReportController extends Controller
     public function updateLkhCells(Request $request)
     {
         $userRole = strtolower(auth()->user()?->role ?? '');
-        if (!in_array($userRole, ['foreman', 'superadmin'])) {
+        $isLeaderRole = str_starts_with($userRole, 'leader') || in_array($userRole, ['leader', 'teamleader', 'group leader']);
+        if (!in_array($userRole, ['foreman', 'superadmin']) && !$isLeaderRole) {
             return response()->json(['error' => 'Anda tidak berhak mengedit data LKH'], 403);
         }
 
@@ -1067,11 +1072,17 @@ class ReportController extends Controller
             ->exists();
 
         if ($userRole !== 'superadmin') {
-            if (!$leaderSigned) {
-                return response()->json(['error' => 'Edit hanya terbuka setelah TTD Team Leader'], 422);
-            }
-            if ($foremanSigned) {
-                return response()->json(['error' => 'Edit terkunci karena TTD Foreman sudah diisi'], 422);
+            if ($isLeaderRole) {
+                if ($leaderSigned) {
+                    return response()->json(['error' => 'Edit terkunci karena TTD Team Leader sudah diisi'], 422);
+                }
+            } else { // Foreman
+                if (!$leaderSigned) {
+                    return response()->json(['error' => 'Edit hanya terbuka setelah TTD Team Leader'], 422);
+                }
+                if ($foremanSigned) {
+                    return response()->json(['error' => 'Edit terkunci karena TTD Foreman sudah diisi'], 422);
+                }
             }
         }
 

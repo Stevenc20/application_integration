@@ -88,7 +88,13 @@
                     $canEdit = $canEdit ?? false;
                     $ttdLocked = $ttdLocked ?? false;
                     $leaderSigned = $signatureStatus['teamleader']['signed'] ?? false;
-                    $editLockMsg = $leaderSigned ? 'Edit Terkunci (TTD)' : 'Menunggu TTD Team Leader';
+                    $userRole = strtolower(auth()->user()?->role ?? '');
+                    $isLeaderRole = str_starts_with($userRole, 'leader') || in_array($userRole, ['leader', 'teamleader', 'group leader']);
+                    if ($isLeaderRole) {
+                        $editLockMsg = 'Edit Terkunci (TTD Sudah Diisi)';
+                    } else {
+                        $editLockMsg = $leaderSigned ? 'Edit Terkunci (TTD)' : 'Menunggu TTD Team Leader';
+                    }
                 @endphp
                 @if ($canEdit)
                     @if ($ttdLocked)
