@@ -204,8 +204,19 @@
         }
         .large-table thead th{font-size:0.9vw!important;padding:0.5vw 0.3vw!important}
         .large-table thead th.line-header{font-size:1.2vw!important;padding:0.6vw 0.3vw!important}
-        .large-table td.desc-cell{font-size:1.2vw!important;padding-left:0.5vw!important}
-        .large-table .val-plan, .large-table .val-curr, .large-table .val-actual { font-size: 1.3vw!important; }
+        .large-table td.desc-cell{font-size:1.1vw!important;padding-left:0.5vw!important}
+        .large-table .val-plan, .large-table .val-curr, .large-table .val-actual { font-size: 1.15vw!important; }
+
+        #row-PROD_T .val-plan, #row-PROD_T .val-curr, #row-PROD_T .val-actual,
+        #row-TOTAL_DT .val-plan, #row-TOTAL_DT .val-curr, #row-TOTAL_DT .val-actual,
+        #row-DIES_T .val-plan, #row-DIES_T .val-curr, #row-DIES_T .val-actual,
+        #row-MACH_T .val-plan, #row-MACH_T .val-curr, #row-MACH_T .val-actual,
+        #row-MAT_T .val-plan, #row-MAT_T .val-curr, #row-MAT_T .val-actual,
+        #row-LOG_T .val-plan, #row-LOG_T .val-curr, #row-LOG_T .val-actual,
+        #row-OVERTIME .val-plan, #row-OVERTIME .val-curr, #row-OVERTIME .val-actual {
+            font-size: 1.0vw !important;
+            letter-spacing: -0.02em;
+        }
 
         #row-REPAIR .val-plan, #row-REPAIR .val-curr, #row-REPAIR .val-actual,
         #row-REJECT .val-plan, #row-REJECT .val-curr, #row-REJECT .val-actual {
