@@ -152,6 +152,8 @@ class DashboardDetailService
 
             $rows[] = [
                 'no'               => $no,
+                'job_master_id'    => $jobId,
+                'is_running'       => $job && in_array(strtolower($job->status), ['running', 'paused']),
                 'job_number'       => $plan->job_no ?? '-',
                 'p1'               => (bool) (($plan->p1 ?? false) ?: ($plan->a1 > 0) ?: ($plan->total_mesin >= 1)),
                 'p2'               => (bool) (($plan->p2 ?? false) ?: ($plan->a2 > 0) ?: ($plan->total_mesin >= 2)),
@@ -168,6 +170,8 @@ class DashboardDetailService
                 'tpt'              => $tpt,
                 'plan_finish'      => $planFinish ?: '-',
                 'actual_finish'    => $actualFinish,
+                'gsph_plan'        => (float) ($plan->gsph_item ?? 0),
+                'gsph_actual'      => $pressTime > 0 ? round($actualOk / ($pressTime / 60)) : 0,
             ];
         }
 

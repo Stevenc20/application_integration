@@ -793,20 +793,22 @@ function buildRightBody(rows, maxRows, overallPlan){
             const tp = j.tpt > 0 ? j.tpt + ' m' : '-';
             
             let gsphSt = 'font-weight:700;';
-            let gsphTxt = (j.gsph_plan > 0 || j.gsph_actual > 0) ? j.gsph_actual : '-';
+            const gAct = (j.gsph_actual !== undefined && j.gsph_actual !== null && !isNaN(j.gsph_actual)) ? Number(j.gsph_actual) : 0;
+            const gPln = (j.gsph_plan !== undefined && j.gsph_plan !== null && !isNaN(j.gsph_plan)) ? Number(j.gsph_plan) : 0;
+            let gsphTxt = (gPln > 0 || gAct > 0) ? String(gAct) : '-';
             
-            const planToUse = j.gsph_plan > 0 ? j.gsph_plan : (overallPlan || 0);
+            const planToUse = gPln > 0 ? gPln : (overallPlan || 0);
             
             if (planToUse > 0) {
-                const pct = (j.gsph_actual / planToUse) * 100;
+                const pct = (gAct / planToUse) * 100;
                 if (pct >= 100) {
                     gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
-                } else {
+                } else if (gAct > 0) {
                     const blinkClass = j.is_running ? 'animation:blink-red .8s ease-in-out infinite;' : '';
                     gsphSt = `background-color:#ef4444!important; color:#fff!important; font-weight:900; ${blinkClass}`;
-                    gsphTxt = `${j.gsph_actual} <span style="font-size:0.6vw;">⚠️</span>`;
+                    gsphTxt = `${gAct} <span style="font-size:0.6vw;">⚠️</span>`;
                 }
-            } else if (j.gsph_actual > 0) {
+            } else if (gAct > 0) {
                 gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
             }
 
