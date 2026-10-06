@@ -63,22 +63,22 @@ class ProfileController extends Controller
                 $path = public_path('uploads/' . $filename);
                 $dir = dirname($path);
                 if (!is_dir($dir)) {
-                    mkdir($dir, 0755, true);
+                    @mkdir($dir, 0775, true);
                 }
-                imagewebp($src, $path, 80);
-                imagedestroy($src);
-                chmod($path, 0644);
+                @imagewebp($src, $path, 80);
+                @imagedestroy($src);
+                @chmod($path, 0664);
                 $data['avatar'] = $filename;
             } else {
-                $ext = $image->getClientOriginalExtension();
+                $ext = $image->getClientOriginalExtension() ?: 'jpg';
                 $filename = 'avatars/' . uniqid() . '.' . $ext;
                 $path = public_path('uploads/' . $filename);
                 $dir = dirname($path);
                 if (!is_dir($dir)) {
-                    mkdir($dir, 0755, true);
+                    @mkdir($dir, 0775, true);
                 }
-                copy($image->getRealPath(), $path);
-                chmod($path, 0644);
+                @copy($image->getRealPath(), $path);
+                @chmod($path, 0664);
                 $data['avatar'] = $filename;
             }
         }
@@ -105,7 +105,7 @@ class ProfileController extends Controller
             // Pastikan folder uploads/avatars ada
             $uploadDir = public_path('uploads/avatars');
             if (!is_dir($uploadDir)) {
-                mkdir($uploadDir, 0755, true);
+                @mkdir($uploadDir, 0775, true);
             }
 
             // Hapus avatar lama jika ada
@@ -127,7 +127,7 @@ class ProfileController extends Controller
                     $path = public_path('uploads/' . $filename);
                     if (@imagewebp($src, $path, 80)) {
                         @imagedestroy($src);
-                        @chmod($path, 0644);
+                        @chmod($path, 0664);
                         $saved = true;
                     }
                 }
@@ -138,8 +138,10 @@ class ProfileController extends Controller
                 $ext = $image->getClientOriginalExtension() ?: 'jpg';
                 $filename = 'avatars/' . uniqid() . '.' . $ext;
                 $path = public_path('uploads/' . $filename);
-                copy($image->getRealPath(), $path);
-                @chmod($path, 0644);
+                if (!@copy($image->getRealPath(), $path)) {
+                    throw new \RuntimeException('Gagal menyalin file foto ke folder uploads. Pastikan permission folder public/uploads diatur ke 775 atau chown www-data.');
+                }
+                @chmod($path, 0664);
             }
 
             $user->update(['avatar' => $filename]);
