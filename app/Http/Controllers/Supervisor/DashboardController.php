@@ -52,7 +52,7 @@ class DashboardController extends Controller
     public function getApiData()
     {
         $date  = request('date', $this->defaultDashboardDate());
-        $shift = (int) request('shift', 1);
+        $shift = (int) request('shift', $this->defaultDashboardShift());
         $selectedLine = request('line');
 
         $lines = LineMaster::where('status', 'active')
@@ -108,7 +108,7 @@ class DashboardController extends Controller
     public function getDetailData()
     {
         $date  = request('date', $this->defaultDashboardDate());
-        $shift = (int) request('shift', 1);
+        $shift = (int) request('shift', $this->defaultDashboardShift());
         $selectedLine = request('line');
 
         $detailService = app(DashboardDetailService::class);
@@ -131,7 +131,7 @@ class DashboardController extends Controller
     public function stream(): StreamedResponse
     {
         $date  = request('date', $this->defaultDashboardDate());
-        $shift = (int) request('shift', 1);
+        $shift = (int) request('shift', $this->defaultDashboardShift());
         $selectedLine = request('line');
 
         $response = new StreamedResponse(function () use ($date, $shift, $selectedLine) {
@@ -212,12 +212,30 @@ class DashboardController extends Controller
     }
 
     /**
-     * Tanggal default dashboard. Sebelum jam 07:00 masih berjalan Shift Malam,
-     * jadi pakai tanggal kemarin supaya sinkron dengan Input Harian.
+     * Shift default dashboard.
+     * Shift 1: 07:30 - 21:00
+     * Shift 2: 21:00 - 07:30 (esok hari)
+     */
+    private function defaultDashboardShift(): int
+    {
+        $h = (int) now()->format('H');
+        $m = (int) now()->format('i');
+        $timeInMin = $h * 60 + $m;
+        // 07:30 = 450 menit, 21:00 = 1260 menit
+        return ($timeInMin >= 450 && $timeInMin < 1260) ? 1 : 2;
+    }
+
+    /**
+     * Tanggal default dashboard. Sebelum jam 07:30 masih berjalan Shift 2 (Malam),
+     * jadi pakai tanggal kemarin sebagai work_date produksi.
      */
     private function defaultDashboardDate(): string
     {
-        return (int) now()->format('H') < 7
+        $h = (int) now()->format('H');
+        $m = (int) now()->format('i');
+        $timeInMin = $h * 60 + $m;
+
+        return ($timeInMin < 450)
             ? now()->subDay()->toDateString()
             : now()->toDateString();
     }

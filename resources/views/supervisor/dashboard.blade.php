@@ -711,7 +711,29 @@ const IS_PER_PRESS = LINES.length === 1;
 const DASH_API_DATA   = @json(parse_url(route('supervisor.dashboard.api'), PHP_URL_PATH));
 const DASH_API_DETAIL = @json(parse_url(route('supervisor.dashboard.detail'), PHP_URL_PATH));
 
-let selectedShift = 1;
+let lastManualShiftAt = 0;
+
+function pad(n){ return String(n).padStart(2,'0'); }
+
+// Shift 1: 07:30 - 21:00
+// Shift 2: 21:00 - 07:30 (esok hari)
+function currentShiftFromClock(){
+    const n = new Date(), h = n.getHours(), m = n.getMinutes();
+    const timeInMin = h * 60 + m;
+    return (timeInMin >= 450 && timeInMin < 1260) ? 1 : 2;
+}
+
+// Work date produksi: jika jam < 07:30, masih terhitung work date kemarin
+function currentWorkDateFromClock(){
+    const n = new Date(), h = n.getHours(), m = n.getMinutes();
+    const timeInMin = h * 60 + m;
+    if (timeInMin < 450) {
+        n.setDate(n.getDate() - 1);
+    }
+    return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+}
+
+let selectedShift = currentShiftFromClock();
 let selectedDays  = 1;
 let charts = {};
 let LINE_KPI = {};
@@ -824,17 +846,30 @@ async function fetchDashboardData() {
 
 
 
-// Isi tanggal sebelum request pertama agar query string tidak kosong
-(function initDateInput(){
+// Inisialisasi tanggal & shift awal sesuai jam kerja produksi
+(function initDateAndShift(){
   const input = document.getElementById('dateInput');
-  if (!input || input.value) return;
-  const now = new Date();
-  const p = n => String(n).padStart(2, '0');
-  const today = `${now.getFullYear()}-${p(now.getMonth() + 1)}-${p(now.getDate())}`;
-  let saved = null;
-  try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
-  input.value = saved || today;
+  const workDate = currentWorkDateFromClock();
+  if (input) {
+    let saved = null;
+    try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
+    input.value = saved || workDate;
+  }
+  updateShiftButtonsUI(selectedShift);
 })();
+
+function updateShiftButtonsUI(s){
+  const s1 = document.getElementById('s1btn');
+  const s2 = document.getElementById('s2btn');
+  if(!s1 || !s2) return;
+  if(s === 1){
+      s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
+      s2.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+  } else {
+      s2.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
+      s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
+  }
+}
 
 // Menjalankan penarikan data pertama kali saat halaman dibuka
 fetchDashboardData();
@@ -850,38 +885,38 @@ try {
 // AUTO-REFRESH: Mengupdate data dashboard setiap 5 detik + BroadcastChannel dari Input Harian
 setInterval(fetchDashboardData, 5000);
 
-function pad(n){ return String(n).padStart(2,'0'); }
-
 function updateClock(){
   const now = new Date();
   document.getElementById('liveClock').textContent = `${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
   const opts = {day:'2-digit', month:'2-digit', year:'numeric'};
   document.getElementById('hdrDate').textContent = now.toLocaleDateString('id-ID', opts);
+
+  // Auto-switch shift sesuai jam kerja riil:
+  // Shift 1: 07:30 - 21:00
+  // Shift 2: 21:00 - 07:30
+  // Jika user tidak sengaja klik tombol manual dalam 5 menit terakhir, sinkronkan otomatis
+  const autoShift = currentShiftFromClock();
+  const autoWorkDate = currentWorkDateFromClock();
+  const dateInput = document.getElementById('dateInput');
+
+  if (autoShift !== selectedShift && (Date.now() - lastManualShiftAt) > 5 * 60 * 1000) {
+      selectedShift = autoShift;
+      updateShiftButtonsUI(selectedShift);
+      if (dateInput) {
+          dateInput.value = autoWorkDate;
+          try { localStorage.setItem('dash_filter_date', autoWorkDate); } catch(e) {}
+      }
+      flushCardCache();
+      fetchDashboardData();
+  }
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-(function(){
-  const now = new Date();
-  const today = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}`;
-  try { localStorage.removeItem('dash_filter_date'); } catch(e) {}
-  document.getElementById('dateInput').value = today;
-})();
-
-function setShift(s){
+function setShift(s, fromButton = true){
   selectedShift = s;
-  
-  const s1 = document.getElementById('s1btn');
-  const s2 = document.getElementById('s2btn');
-  
-  if(s === 1){
-      s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
-      s2.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
-  } else {
-      s2.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-white bg-red-500 shadow-sm";
-      s1.className = "px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700";
-  }
-  
+  if(fromButton) lastManualShiftAt = Date.now();
+  updateShiftButtonsUI(s);
   flushCardCache();
   fetchDashboardData();
 }
