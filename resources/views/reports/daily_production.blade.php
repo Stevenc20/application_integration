@@ -119,6 +119,15 @@
                         </button>
                     @endif
                 @endif
+                <a href="{{ route('supervisor.reports.daily_production', ['line' => $selectedLineName, 'shift' => $selectedShift, 'date' => $date, 'format' => 'pdf']) }}"
+                   class="flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm no-underline"
+                   style="background-color:#dc2626 !important;"
+                   onmouseover="this.style.backgroundColor='#b91c1c'" onmouseout="this.style.backgroundColor='#dc2626'">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z"/>
+                    </svg>
+                    <span>Export PDF</span>
+                </a>
                 <a href="{{ route('supervisor.reports.daily_production', ['line' => $selectedLineName, 'shift' => $selectedShift, 'date' => $date, 'format' => 'excel']) }}"
                    class="flex items-center gap-2 text-white text-xs font-bold px-4 py-2.5 rounded-xl transition-all shadow-sm no-underline"
                    style="background-color:#15803d !important;"

@@ -39,6 +39,17 @@ class ReportController extends Controller
             return $export->download();
         }
 
+        // PDF export
+        if ($request->query('format') === 'pdf') {
+            $pdf = Pdf::loadView('reports.daily_production_pdf', $data)
+                ->setPaper('a4', 'landscape')
+                ->setOption(['isRemoteEnabled' => true, 'isHtml5ParserEnabled' => true]);
+            $safeLine = \Illuminate\Support\Str::slug($data['selectedLineName'] ?? 'Line');
+            $safeShift = \Illuminate\Support\Str::slug($data['latestShiftName'] ?? 'Shift');
+            $filename = "LKH_{$safeLine}_{$data['date']}_{$safeShift}.pdf";
+            return $pdf->download($filename);
+        }
+
         return view('reports.daily_production', $data);
     }
 
