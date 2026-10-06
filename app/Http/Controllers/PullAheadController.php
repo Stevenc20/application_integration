@@ -297,7 +297,13 @@ if ($user->isRole(['ppc', 'manager'])) {
                 'success' => true,
                 'message' => 'Pull Ahead Request berhasil diajukan dan menunggu Approval PPC.'
             ]);
-        } catch (Exception $e) {
+        } catch (\Throwable $e) {
+            \Log::error('[PullAhead] submitRequest gagal: ' . $e->getMessage(), [
+                'user_id' => auth()->id(),
+                'request' => $request->all(),
+                'trace'   => $e->getTraceAsString(),
+            ]);
+
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage()

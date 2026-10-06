@@ -984,7 +984,17 @@ function submitTarikShift(e) {
             source_shift: nextShiftName || 'Shift Berikutnya'
         })
     })
-    .then(r => r.json())
+    .then(async r => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            let errorMsg = data.message || 'Terjadi kesalahan (' + r.status + ')';
+            if (data.errors) {
+                errorMsg = Object.values(data.errors).flat().join('\n');
+            }
+            throw new Error(errorMsg);
+        }
+        return data;
+    })
     .then(res => {
         if (res.success) {
             closeTarikShiftModal();
@@ -997,7 +1007,7 @@ function submitTarikShift(e) {
         }
     })
     .catch(err => {
-        alert('Error: ' + err.message);
+        alert('Gagal: ' + err.message);
         btn.disabled = false;
         btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Ajukan Tarik Shift';
     });

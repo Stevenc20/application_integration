@@ -44,6 +44,10 @@ class PullAheadService
         $plan = ProductionPlan::findOrFail($data['original_plan_id']);
 
         $availableQty = $this->calculateAvailableQty($plan);
+        if ($availableQty <= 0) {
+            $availableQty = (int)($plan->remaining_plan ?? $plan->plan ?? $plan->target_qty ?? 1);
+        }
+
         if ($data['qty_requested'] > $availableQty) {
             throw new Exception("Qty yang diminta ({$data['qty_requested']}) melebihi Qty yang tersedia ({$availableQty}).");
         }
