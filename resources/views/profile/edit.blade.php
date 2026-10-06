@@ -117,18 +117,34 @@ document.getElementById('avatar').addEventListener('change', async function(e) {
     const formData = new FormData();
     formData.append('avatar', uploadFile, uploadFile.name);
 
+    const avatarUrl = @json(parse_url(route('profile.avatar'), PHP_URL_PATH));
+    const tokenInput = document.querySelector('input[name="_token"]');
+    const csrfToken = tokenInput ? tokenInput.value : '';
+
     try {
-        const res = await fetch('{{ route('profile.avatar') }}', {
+        const res = await fetch(avatarUrl, {
             method: 'POST',
-            headers: { 'X-CSRF-TOKEN': document.querySelector('input[name="_token"]').value },
+            headers: {
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest'
+            },
             body: formData
         });
 
-        const data = await res.json();
-        if (data.success) {
+        const contentType = res.headers.get('content-type') || '';
+        let data;
+        if (contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            const rawText = await res.text();
+            throw new Error(`Server mengembalikan respon bukan JSON (Status ${res.status}): ${rawText.slice(0, 150)}`);
+        }
+
+        if (res.ok && data.success) {
             location.reload();
         } else {
-            alert(data.message || 'Gagal upload foto');
+            alert(data.message || (data.errors ? Object.values(data.errors).flat().join('\n') : 'Gagal upload foto'));
         }
     } catch (err) {
         alert('Gagal upload: ' + err.message);

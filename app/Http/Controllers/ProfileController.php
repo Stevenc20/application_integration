@@ -90,46 +90,79 @@ class ProfileController extends Controller
 
     public function updateAvatar(Request $request)
     {
-        $request->validate([
-            'avatar' => 'required|file|mimes:jpg,jpeg,png,webp|max:10240',
-        ], [
-            'avatar.mimes' => 'Avatar harus format JPG/PNG.',
-            'avatar.max'   => 'Avatar maksimal 10MB.',
-        ]);
+        try {
+            $request->validate([
+                'avatar' => 'required|file|mimes:jpg,jpeg,png,webp|max:10240',
+            ], [
+                'avatar.required' => 'File foto profil wajib dipilih.',
+                'avatar.mimes'    => 'Avatar harus berformat JPG, JPEG, PNG, atau WEBP.',
+                'avatar.max'      => 'Ukuran foto maksimal 10MB.',
+            ]);
 
-        $user = auth()->user();
-        $image = $request->file('avatar');
-        $src = @imagecreatefromstring(file_get_contents($image->getRealPath()));
+            $user = auth()->user();
+            $image = $request->file('avatar');
 
-        if ($src !== false) {
+            // Pastikan folder uploads/avatars ada
+            $uploadDir = public_path('uploads/avatars');
+            if (!is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+
+            // Hapus avatar lama jika ada
             if ($user->avatar) {
                 $oldPath = public_path('uploads/' . $user->avatar);
                 if (file_exists($oldPath)) {
-                    unlink($oldPath);
+                    @unlink($oldPath);
                 }
             }
-            $filename = 'avatars/' . uniqid() . '.webp';
-            $path = public_path('uploads/' . $filename);
-            $dir = dirname($path);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-            imagewebp($src, $path, 80);
-            imagedestroy($src);
-            chmod($path, 0644);
-            $user->update(['avatar' => $filename]);
-        } else {
-            $filename = 'avatars/' . uniqid() . '.' . $image->getClientOriginalExtension();
-            $path = public_path('uploads/' . $filename);
-            $dir = dirname($path);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
-            }
-            copy($image->getRealPath(), $path);
-            chmod($path, 0644);
-            $user->update(['avatar' => $filename]);
-        }
 
-        return response()->json(['success' => true, 'message' => 'Foto profil berhasil diperbarui.']);
+            $saved = false;
+            $filename = '';
+
+            // Coba simpan sebagai WEBP jika fungsi GD tersedia
+            if (function_exists('imagecreatefromstring') && function_exists('imagewebp')) {
+                $src = @imagecreatefromstring(file_get_contents($image->getRealPath()));
+                if ($src !== false) {
+                    $filename = 'avatars/' . uniqid() . '.webp';
+                    $path = public_path('uploads/' . $filename);
+                    if (@imagewebp($src, $path, 80)) {
+                        @imagedestroy($src);
+                        @chmod($path, 0644);
+                        $saved = true;
+                    }
+                }
+            }
+
+            // Fallback jika GD webp tidak berhasil / tidak tersedia
+            if (!$saved) {
+                $ext = $image->getClientOriginalExtension() ?: 'jpg';
+                $filename = 'avatars/' . uniqid() . '.' . $ext;
+                $path = public_path('uploads/' . $filename);
+                copy($image->getRealPath(), $path);
+                @chmod($path, 0644);
+            }
+
+            $user->update(['avatar' => $filename]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Foto profil berhasil diperbarui.',
+                'avatar'  => asset('uploads/' . $filename)
+            ]);
+        } catch (\Illuminate\Validation\ValidationException $ve) {
+            return response()->json([
+                'success' => false,
+                'message' => collect($ve->errors())->flatten()->first() ?: 'Validasi gagal.',
+                'errors'  => $ve->errors(),
+            ], 422);
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Profile avatar upload error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Terjadi kesalahan server saat menyimpan foto: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
