@@ -42,7 +42,7 @@
                 </span>
                 @endif
             </td>
-            <td colspan="25" class="font-bold text-amber-700 text-center">
+            <td colspan="26" class="font-bold text-amber-700 text-center">
                 @if ($job['schedule_start'] && $job['schedule_finish'])
                 <span class="px-2 py-0.5 rounded-full bg-white border border-amber-200 text-[10px] font-bold text-amber-700">
                     {{ abs($job['schedule_finish']->diffInMinutes($job['schedule_start'])) }} MINS
@@ -134,7 +134,7 @@
         </tr>
         @endif
     @empty
-        <tr><td colspan="35" class="text-center py-8 text-gray-500 font-bold">Tidak ada jadwal produksi</td></tr>
+        <tr><td colspan="36" class="text-center py-8 text-gray-500 font-bold">Tidak ada jadwal produksi</td></tr>
     @endforelse
 </tbody>
 @php

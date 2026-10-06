@@ -450,15 +450,14 @@ class ReportController extends Controller
                 $downtimes = $jobData->downtimes;
                 $breakdown = ProductionMetricsService::downtimeBreakdown($downtimes);
                 $downtimeTime = $breakdown['total'];
-                $confirmedDowntimes = $downtimes->filter(fn($dt) => !in_array(trim($dt->problem ?? ''), ['', '-']));
-                $breakdownConfirmed = ProductionMetricsService::downtimeBreakdown($confirmedDowntimes);
                 $dtBreakdown = [
-                    'prod_t' => $breakdownConfirmed['production'],
-                    'dies_t' => $breakdownConfirmed['dies'],
-                    'mach_t' => $breakdownConfirmed['machine'],
-                    'mat_t' => $breakdownConfirmed['material'],
-                    'log_t' => $breakdownConfirmed['logistic'],
-                    'ubp_t' => $breakdownConfirmed['ubp'],
+                    'prod_t' => $breakdown['production'],
+                    'dies_t' => $breakdown['dies'],
+                    'mach_t' => $breakdown['machine'],
+                    'mat_t' => $breakdown['material'],
+                    'log_t' => $breakdown['logistic'],
+                    'others_t' => $breakdown['others'],
+                    'ubp_t' => $breakdown['ubp'],
                 ];
                 $qcheckTime = $jobData->total_qcheck_minutes;
                 if ($jobDandoris) {
@@ -503,15 +502,14 @@ class ReportController extends Controller
                 $dandoriTime = $diesChangeTime + $variantChangeTime + $qcheckTime;
                 $breakdown = ProductionMetricsService::downtimeBreakdown($downtimes);
                 $downtimeTime = $breakdown['total'];
-                $confirmedDowntimes = $downtimes->filter(fn($dt) => !in_array(trim($dt->problem ?? ''), ['', '-']));
-                $breakdownConfirmed = ProductionMetricsService::downtimeBreakdown($confirmedDowntimes);
                 $dtBreakdown = [
-                    'prod_t' => $breakdownConfirmed['production'],
-                    'dies_t' => $breakdownConfirmed['dies'],
-                    'mach_t' => $breakdownConfirmed['machine'],
-                    'mat_t' => $breakdownConfirmed['material'],
-                    'log_t' => $breakdownConfirmed['logistic'],
-                    'ubp_t' => $breakdownConfirmed['ubp'],
+                    'prod_t' => $breakdown['production'],
+                    'dies_t' => $breakdown['dies'],
+                    'mach_t' => $breakdown['machine'],
+                    'mat_t' => $breakdown['material'],
+                    'log_t' => $breakdown['logistic'],
+                    'others_t' => $breakdown['others'],
+                    'ubp_t' => $breakdown['ubp'],
                 ];
             }
 

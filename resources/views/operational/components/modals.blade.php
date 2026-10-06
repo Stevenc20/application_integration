@@ -146,7 +146,7 @@
                             <span id="dtBtnText">Simpan Laporan</span>
                         </button>
                         <button onclick="closeDowntimeModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 font-bold text-sm transition-all">
-                            Tutup
+                            Isi Nanti
                         </button>
                     </div>
                 </div>

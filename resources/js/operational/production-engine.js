@@ -2029,23 +2029,51 @@ function editDowntimeFromIndex(index) {
 function saveDowntime() {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     const id = document.getElementById('dtEditId').value;
+    const jenis = (document.getElementById('dtJenis').value || '').trim();
+    if (!jenis) {
+        showToast('Pilih jenis downtime terlebih dahulu.', 'warning');
+        document.getElementById('dtJenis').focus();
+        return;
+    }
+
     let data = {
-        jenis_downtime: document.getElementById('dtJenis').value,
+        jenis_downtime: jenis,
         problem: document.getElementById('dtProblem').value,
         penyebab: document.getElementById('dtPenyebab').value,
         action: document.getElementById('dtAction').value,
         pic: document.getElementById('dtPIC').value
     };
+
     fetch(`/operational/downtime/${id}/update`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken },
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': window.ProductionConfig.csrfToken
+        },
         body: JSON.stringify(data)
-    }).then(() => {
-        showToast('Laporan disimpan', 'success');
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => { throw new Error(err.message || 'Gagal menyimpan laporan'); });
+        }
+        return res.json();
+    })
+    .then(res => {
+        if (res.success === false) {
+            showToast(res.message || 'Gagal menyimpan laporan', 'danger');
+            return;
+        }
+        showToast('Laporan downtime berhasil disimpan', 'success');
         loadDowntimes(window.currentDtJobId);
-        const formArea = document.getElementById('dtFormTitle').closest('.bg-gray-50');
+        const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
         if (formArea) formArea.classList.add('hidden');
         const line = jobMasterData?.[window.currentDtJobId]?.line || window.ProductionConfig?.currentLine;
         if (line) notifyLineStatusChange(line);
+    })
+    .catch(err => {
+        console.error('saveDowntime error:', err);
+        showToast(err.message || 'Terjadi kesalahan saat menyimpan', 'danger');
     });
 }
 
@@ -2066,7 +2094,7 @@ function renderDowntimeTable() {
     const filteredData = window.currentDowntimesList || [];
     const activeFilter = window.dtActiveFilter || 'downtime';
     const displayData = activeFilter === 'all' ? filteredData : filteredData.filter(dt => {
-        const type = dt.jenis_downtime.toLowerCase();
+        const type = (dt.jenis_downtime || '').toLowerCase();
         if (activeFilter === 'downtime') {
             return !['try out', 'tryout', 'break time'].some(v => type.includes(v));
         }
@@ -2079,7 +2107,7 @@ function renderDowntimeTable() {
         return type === activeFilter;
     });
 
-    const hasMissing = filteredData.some(dt => !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)'));
+    const hasMissing = filteredData.some(dt => !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)') || !dt.jenis_downtime || dt.jenis_downtime.toLowerCase() === 'downtime');
     const listAlert = document.getElementById('dtListAlertBanner');
     if (listAlert) {
         if (hasMissing) listAlert.classList.remove('hidden');
@@ -2093,10 +2121,15 @@ function renderDowntimeTable() {
         let end = dt.finish_time ? new Date(dt.finish_time).getHours().toString().padStart(2, '0') + ':' + new Date(dt.finish_time).getMinutes().toString().padStart(2, '0') : '--:--';
         let dur = dt.duration_seconds || 0;
         let durStr = dur >= 60 ? Math.floor(dur / 60) + 'm ' + (dur % 60) + 's' : dur + 's';
-        const isMissingDetail = !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)');
+        const isGenericType = !dt.jenis_downtime || ['downtime'].includes(dt.jenis_downtime.toLowerCase());
+        const isMissingDetail = !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)') || isGenericType;
+
+        const jenisBadge = isGenericType
+            ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">PILIH JENIS</span>`
+            : `<span class="font-bold uppercase text-[10px] text-slate-700">${dt.jenis_downtime}</span>`;
 
         return `<tr class="hover:bg-slate-50 transition-colors ${isMissingDetail ? 'bg-red-50/50' : ''}">
-                <td class="px-4 py-3 font-bold uppercase text-[10px] text-slate-700">${['downtime','try out','break time'].includes(dt.jenis_downtime.toLowerCase()) ? '' : dt.jenis_downtime}</td>
+                <td class="px-4 py-3">${jenisBadge}</td>
                 <td class="px-4 py-3 text-xs">
                     <div class="flex items-center gap-2">
                         <div class="font-bold ${isMissingDetail ? 'text-red-600' : 'text-slate-800'}">${dt.problem || '-'}</div>
