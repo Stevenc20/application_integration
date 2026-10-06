@@ -5,9 +5,9 @@
     $actualReject = $job->job_data->dailyProduction?->actual_reject ?? 0;
     $actualQty = $job->job_data->dailyProduction?->actual_qty ?? 0;
     $efficiency = $job->job_data->dailyProduction?->efficiency ?? 0;
-    $runtime = $job->job_data->dailyProduction?->runtime_seconds ?? 0;
-    $status = strtolower($job->job_data->status ?? 'pending');
-    $isCompleted = in_array($status, ['complete', 'finished']);
+    $rawStatus = strtolower($job->job_data->status ?? 'pending');
+    $isCompleted = in_array($rawStatus, ['complete', 'completed', 'finished', 'closed', 'done']);
+    $status = $isCompleted ? 'completed' : ($rawStatus === 'running' || $rawStatus === 'paused' ? 'running' : 'pending');
     $jobId = $job->job_data->id ?? 0;
     
     $firstPending = isset($pendingJobs) ? $pendingJobs->first() : null;

@@ -143,7 +143,19 @@ class InputHarianController extends Controller
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
         if ($request->filled('status') && $request->status !== '') {
-            $planQuery->where(DB::raw('LOWER(status)'), strtolower($request->status));
+            $filterStatus = strtolower($request->status);
+            if (in_array($filterStatus, ['completed', 'complete'])) {
+                $planQuery->whereIn(DB::raw('LOWER(status)'), ['complete', 'completed', 'finished', 'closed', 'done']);
+            } elseif ($filterStatus === 'running') {
+                $planQuery->whereIn(DB::raw('LOWER(status)'), ['running', 'approved']);
+            } elseif ($filterStatus === 'pending') {
+                $planQuery->where(function($q) {
+                    $q->where(DB::raw('LOWER(status)'), 'pending')
+                      ->orWhereNull('status');
+                });
+            } else {
+                $planQuery->where(DB::raw('LOWER(status)'), $filterStatus);
+            }
         }
 
         if ($currentShift !== 'all') {
@@ -270,7 +282,7 @@ class InputHarianController extends Controller
         // Determine if all jobs are done (for showing "Akhiri Shift" button)
         $jobPlans = $plans->filter(fn($p) => ($p->row_type ?? 'job') === 'job');
         $allJobsDone = $jobPlans->isNotEmpty() && $jobPlans->every(
-            fn($p) => optional($p->job_data)->status === 'complete'
+            fn($p) => in_array(strtolower(optional($p->job_data)->status ?? ''), ['complete', 'completed', 'finished', 'closed', 'done'])
         );
 
         // 4. DATE-AWARE ACTIVE JOB
@@ -329,13 +341,22 @@ class InputHarianController extends Controller
                 $activeJobQuery->whereIn('job_number', $scheduledJobNumbers);
             }
 
-            $activeJob = $activeJobQuery->with([
+            $activeJobs = $activeJobQuery->with([
                     'dailyProduction' => function ($q) use ($date) {
                         $q->where('work_date', $date);
                     },
                     'downtimes',
                     'dandoris'
-                ])->first();
+                ])->orderByDesc('started_at')->orderByDesc('id')->get();
+
+            $activeJob = $activeJobs->first();
+
+            // Auto cut-off: if there are other stale running jobs on this line/schedule, finish them automatically
+            if ($activeJobs->count() > 1) {
+                foreach ($activeJobs->slice(1) as $staleJob) {
+                    $this->productionService->finishJob($staleJob->id);
+                }
+            }
         }
 
         // Production Logs — always filtered by selected date
@@ -555,7 +576,7 @@ class InputHarianController extends Controller
                     ->update(['status' => 'finished', 'finish_time' => $nowTs]);
 
                 \App\Models\JobMaster::whereIn('id', $orphanedIds)
-                    ->update(['status' => 'closed', 'finished_at' => $nowTs]);
+                    ->update(['status' => 'complete', 'finished_at' => $nowTs]);
             }
         }
     }

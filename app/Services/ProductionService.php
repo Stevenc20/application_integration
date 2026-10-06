@@ -42,6 +42,19 @@ class ProductionService
             $session->status = 'running';
             $session->save();
 
+            // Auto cut-off: Stop and complete any other running job on the same line so only 1 job runs at a time
+            $currentJobMaster = JobMaster::find($jobId);
+            if ($currentJobMaster && $currentJobMaster->line) {
+                $otherRunningJobs = JobMaster::where('line', $currentJobMaster->line)
+                    ->where('id', '!=', $jobId)
+                    ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                    ->get();
+
+                foreach ($otherRunningJobs as $otherJob) {
+                    $this->finishJob($otherJob->id);
+                }
+            }
+
             $updateData = ['status' => 'running', 'finished_at' => null];
             
             if ($enqueueOnly) {
@@ -80,6 +93,19 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
             $job = JobMaster::findOrFail($jobId);
+            
+            // Auto cut-off: Stop and complete any other running job on the same line
+            if ($job->line) {
+                $otherRunningJobs = JobMaster::where('line', $job->line)
+                    ->where('id', '!=', $jobId)
+                    ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+                    ->get();
+
+                foreach ($otherRunningJobs as $otherJob) {
+                    $this->finishJob($otherJob->id);
+                }
+            }
+
             $job->update(['status' => 'running']);
             $this->syncPlanStatus($jobId, 'running');
 

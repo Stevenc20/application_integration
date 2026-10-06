@@ -132,7 +132,7 @@
                         <option value="">Semua Status</option>
                         <option value="pending" {{ strtolower(request('status'))=='pending'?'selected':'' }}>Pending</option>
                         <option value="running" {{ strtolower(request('status'))=='running'?'selected':'' }}>Running</option>
-                        <option value="complete" {{ strtolower(request('status'))=='complete'?'selected':'' }}>Complete</option>
+                        <option value="completed" {{ in_array(strtolower(request('status')), ['completed', 'complete']) ? 'selected' : '' }}>Completed</option>
                     </select>
                 </div>
                 <div class="lg:col-span-2">
@@ -216,7 +216,7 @@
                         <h3 class="text-sm font-black text-orange-800 uppercase tracking-widest">Akhiri Shift</h3>
                         <p class="text-[10px] font-bold text-orange-600 mt-0.5">
                             @php
-                                $completedCount = $jobs->filter(fn($p) => optional($p->job_data)->status === 'complete')->count();
+                                $completedCount = $jobs->filter(fn($p) => in_array(strtolower(optional($p->job_data)->status ?? ''), ['complete', 'completed', 'finished', 'closed', 'done']))->count();
                                 $totalJobs = $jobs->count();
                             @endphp
                             {{ $completedCount }}/{{ $totalJobs }} item selesai. Item yang belum mencapai target akan otomatis masuk recovery. Lengkapi downtime terlebih dahulu bila ada.
