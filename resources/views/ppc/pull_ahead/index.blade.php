@@ -327,7 +327,7 @@
     let currentReqId = null;
     let currentMaxQty = 0;
 
-    const pullAheadBase = "{{ route('ppc.pull_ahead.index') }}";
+    const pullAheadBase = '/ppc/pull-ahead';
 
     function buildContext(btn) {
         const wrap = document.getElementById('modalContext');
