@@ -40,9 +40,9 @@ class AutoBreakTime extends Command
             return 0;
         }
 
-        $runningJobs = JobMaster::where('status', 'running')
+        $runningJobs = JobMaster::whereIn('status', ['running', 'paused'])
             ->whereHas('productionSessions', function ($q) use ($today) {
-                $q->where('work_date', $today)->where('status', 'running');
+                $q->where('work_date', $today)->whereIn('status', ['running', 'paused']);
             })
             ->get();
 
@@ -78,6 +78,7 @@ class AutoBreakTime extends Command
                     'penyebab' => '-',
                     'action' => '-',
                     'pic' => 'AUTO BREAK',
+                    'source' => 'AUTO',
                     'start_time' => $now,
                 ]);
 

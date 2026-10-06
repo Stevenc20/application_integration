@@ -268,10 +268,10 @@ class InputHarianController extends Controller
             return $plan;
         });
 
-        // DYNAMIC QUEUE REORDERING: Pin active 'Running' job to top, rest maintain strict PPC row order
+        // DYNAMIC QUEUE REORDERING: Pin active 'Running' / 'Paused' job to top, rest maintain strict PPC row order
         $plans = $plans->sort(function($a, $b) {
-            $statusA = strtolower($a->job_data?->status ?? $a->status ?? 'pending') === 'running' ? 0 : 1;
-            $statusB = strtolower($b->job_data?->status ?? $b->status ?? 'pending') === 'running' ? 0 : 1;
+            $statusA = in_array(strtolower($a->job_data?->status ?? $a->status ?? 'pending'), ['running', 'paused']) ? 0 : 1;
+            $statusB = in_array(strtolower($b->job_data?->status ?? $b->status ?? 'pending'), ['running', 'paused']) ? 0 : 1;
 
             if ($statusA === $statusB) {
                 return $a->row_no <=> $b->row_no;
@@ -329,14 +329,14 @@ class InputHarianController extends Controller
                 return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
             })->toArray();
 
-            $activeJobQuery = JobMaster::where(DB::raw('LOWER(status)'), 'running');
+            $activeJobQuery = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
 
             if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
                 $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
                 $activeJobQuery->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
             }
 
-            // Only pick a running job if it belongs to current schedule plans
+            // Only pick a running/paused job if it belongs to current schedule plans
             if (!empty($scheduledJobNumbers)) {
                 $activeJobQuery->whereIn('job_number', $scheduledJobNumbers);
             }
@@ -351,10 +351,12 @@ class InputHarianController extends Controller
 
             $activeJob = $activeJobs->first();
 
-            // Auto cut-off: if there are other stale running jobs on this line/schedule, finish them automatically
+            // Auto cut-off: if there are multiple active jobs on this line/schedule, finish stale running ones
             if ($activeJobs->count() > 1) {
                 foreach ($activeJobs->slice(1) as $staleJob) {
-                    $this->productionService->finishJob($staleJob->id);
+                    if (strtolower($staleJob->status) === 'running') {
+                        $this->productionService->finishJob($staleJob->id);
+                    }
                 }
             }
         }

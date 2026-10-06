@@ -191,7 +191,7 @@ class InputHarianDataController extends Controller
         }
 
         // Active job data
-        $activeJob = JobMaster::where(DB::raw('LOWER(status)'), 'running');
+        $activeJob = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
             $activeJob->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
