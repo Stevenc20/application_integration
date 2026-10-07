@@ -434,15 +434,16 @@ class ProductionPlanController extends Controller
                             ->update(['production_plan_id' => null]);
 
                         // Auto-stop and close any JobMaster, Downtime, and ProductionSession linked to these old plans
-                        $jobIdentifiers = [];
-                        foreach ($ppcPlanIds as $pid) {
-                            $jobIdentifiers[] = "%-{$pid}";
+                        // Batch IDs into chunks to keep query fast and avoid massive single-query OR LIKE tree
+                        $oldJobs = collect();
+                        foreach ($ppcPlanIds->chunk(100) as $pidChunk) {
+                            $chunkJobs = \App\Models\JobMaster::where(function($q) use ($pidChunk) {
+                                foreach ($pidChunk as $pid) {
+                                    $q->orWhere('job_number', 'LIKE', "%-{$pid}");
+                                }
+                            })->get();
+                            $oldJobs = $oldJobs->merge($chunkJobs);
                         }
-                        $oldJobs = \App\Models\JobMaster::where(function($q) use ($ppcPlanIds, $jobIdentifiers) {
-                            foreach ($ppcPlanIds as $pid) {
-                                $q->orWhere('job_number', 'LIKE', "%-{$pid}");
-                            }
-                        })->get();
 
                         if ($oldJobs->isNotEmpty()) {
                             $oldJobIds = $oldJobs->pluck('id')->toArray();
@@ -570,15 +571,6 @@ class ProductionPlanController extends Controller
                     $skippedMeta = 0;
 
                     foreach ($sheetData['rows'] as $item) {
-                        Log::info('[TRACE ROW PARSER]', [
-                            'raw_row_no' => $item['row_no'] ?? 'KEY_MISSING',
-                            'type'       => gettype($item['row_no'] ?? null),
-                            'job_no'     => $item['job_no'] ?? null,
-                            'row_type'   => $item['row_type'] ?? null,
-                            'start'      => $item['start_time'] ?? null,
-                            'finish'     => $item['finish_time'] ?? null,
-                        ]);
-
                         // ── SAFETY NET: skip rows that are clearly Excel metadata, not jobs ──
                         $rawJm = $item['job_master'] ?? '';
                         $rawJn = $item['job_no'] ?? '';
@@ -683,18 +675,6 @@ class ProductionPlanController extends Controller
                             $breakStart = $item['start_time'] ?? '';
                             $breakFinish = $item['finish_time'] ?? '';
                             $breakKey = $lineId . '||break||' . $breakKeterangan . '||' . $breakStart . '||' . $breakFinish;
-                            Log::info('[BREAK DEDUP]', [
-                                'sheetType'    => $isRevSheet ? 'Rev' : 'non-Rev',
-                                'keterangan'   => $item['keterangan'] ?? null,
-                                'job_no'       => $item['job_no'] ?? null,
-                                'breakLabel'   => $breakKeterangan,
-                                'start'        => $breakStart,
-                                'finish'       => $breakFinish,
-                                'breakKey'     => $breakKey,
-                                'alreadyExists'=> isset($importedBreakKeys[$breakKey]),
-                                'lineId'       => $lineId,
-                                'press'        => $pressName,
-                            ]);
                             if (isset($importedBreakKeys[$breakKey])) {
                                 $skippedMeta++;
                                 continue;
@@ -703,13 +683,6 @@ class ProductionPlanController extends Controller
                         }
 
                         $finalRowNo = $this->safeVal($item['row_no']) ?: 0;
-                        
-                        Log::info('[TRACE IMPORT]', [
-                            'job'          => $jn,
-                            'raw_row_no'   => $item['row_no'] ?? 'KEY_MISSING',
-                            'final_row_no' => $finalRowNo,
-                            'row_type'     => $rowType,
-                        ]);
 
                         $rows[] = [
                             'line_master_id' => $lineId,
@@ -766,7 +739,7 @@ class ProductionPlanController extends Controller
                     }
 
                     $inserted = count($rows);
-                    foreach (array_chunk($rows, 100) as $chunk) {
+                    foreach (array_chunk($rows, 500) as $chunk) {
                         ProductionPlan::insert($chunk);
                     }
 
@@ -857,7 +830,7 @@ class ProductionPlanController extends Controller
                         }
                     }
                     if (!empty($batchJobs)) {
-                        foreach (array_chunk($batchJobs, 100) as $chunk) {
+                        foreach (array_chunk($batchJobs, 500) as $chunk) {
                             JobMaster::insertOrIgnore($chunk);
                         }
                     }
