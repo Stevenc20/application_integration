@@ -15,7 +15,10 @@ use App\Models\RecoverySchedule;
 use App\Services\ExcelScheduleParser;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Carbon\Carbon;
 
 class ProductionPlanController extends Controller
 {
@@ -65,7 +68,7 @@ class ProductionPlanController extends Controller
                 }
             }
         } catch (\Throwable $e) {
-            \Log::error("Failed to auto-sync PPC quantities: " . $e->getMessage());
+            Log::error("Failed to auto-sync PPC quantities: " . $e->getMessage());
         }
 
         $currentPress = strtoupper($request->get('press', 'PRESS A'));
@@ -306,7 +309,7 @@ class ProductionPlanController extends Controller
 
     public function import(Request $request)
     {
-        \Log::info("--- PRODUCTION PLAN IMPORT STARTED ---");
+        Log::info("--- PRODUCTION PLAN IMPORT STARTED ---");
         $request->validate([
             'excel_file' => 'required|file|max:51200|extensions:xlsx,xls,xlsm',
         ]);
@@ -338,16 +341,16 @@ class ProductionPlanController extends Controller
                         if ($parsed && !isset($parsed['error'])) {
                             $result = $parsed;
                             $parserSource = 'python';
-                            \Log::info('[IMPORT] Python engine succeeded.');
+                            Log::info('[IMPORT] Python engine succeeded.');
                         } else {
-                            \Log::warning("Python engine failed, falling back to PHP: " . ($parsed['error'] ?? 'Invalid JSON'));
+                            Log::warning("Python engine failed, falling back to PHP: " . ($parsed['error'] ?? 'Invalid JSON'));
                         }
                     } else {
-                        \Log::warning("Python engine produced no output, falling back to PHP.");
+                        Log::warning("Python engine produced no output, falling back to PHP.");
                     }
                 }
             } else {
-                \Log::info('[IMPORT] Python not found, using PHP fallback.');
+                Log::info('[IMPORT] Python not found, using PHP fallback.');
             }
 
             // ATTEMPT 2: PHP PhpSpreadsheet fallback
@@ -357,13 +360,13 @@ class ProductionPlanController extends Controller
                     $result = $parser->parse($dataPath, $originalName);
                     $parserSource = 'php';
                     if (isset($result['error'])) {
-                        \Log::error("PHP Excel Parser Error: " . $result['error']);
+                        Log::error("PHP Excel Parser Error: " . $result['error']);
                         @unlink($dataPath);
                         return back()->with('error', 'Error Parsing Excel: ' . $result['error']);
                     }
-                    \Log::info('[IMPORT] PHP ExcelParser succeeded.');
+                    Log::info('[IMPORT] PHP ExcelParser succeeded.');
                 } catch (\Throwable $e) {
-                    \Log::error("PHP ExcelParser crashed: " . $e->getMessage());
+                    Log::error("PHP ExcelParser crashed: " . $e->getMessage());
                     @unlink($dataPath);
                     return back()->with('error', 'Gagal membaca Excel: ' . $e->getMessage());
                 }
@@ -403,7 +406,7 @@ class ProductionPlanController extends Controller
             }
             $result['sheets'] = $sheets;
 
-            \DB::transaction(function () use ($result, $parsedDate, &$imported) {
+            DB::transaction(function () use ($result, $parsedDate, &$imported) {
                 $lineMap = LineMaster::pluck('id', 'line_name')->toArray();
 
                 $sheets = array_values($result['sheets'] ?? []);
@@ -567,7 +570,7 @@ class ProductionPlanController extends Controller
                     $skippedMeta = 0;
 
                     foreach ($sheetData['rows'] as $item) {
-                        \Log::info('[TRACE ROW PARSER]', [
+                        Log::info('[TRACE ROW PARSER]', [
                             'raw_row_no' => $item['row_no'] ?? 'KEY_MISSING',
                             'type'       => gettype($item['row_no'] ?? null),
                             'job_no'     => $item['job_no'] ?? null,
@@ -585,7 +588,7 @@ class ProductionPlanController extends Controller
                             strtoupper(trim($rawJn)) === 'JOB NO.'                             // "JOB NO." header row
                         );
                         if ($isMeta) {
-                            \Log::info('[IMPORT] Skipped metadata row', ['job_master' => $rawJm, 'job_no' => $rawJn]);
+                            Log::info('[IMPORT] Skipped metadata row', ['job_master' => $rawJm, 'job_no' => $rawJn]);
                             $skippedMeta++;
                             continue;
                         }
@@ -597,7 +600,7 @@ class ProductionPlanController extends Controller
                                 $jobKey = $lineId . '||' . $rawJm . '||' . $rawJn;
                                 $importedJobKeys[$jobKey] = true;
                             }
-                            \Log::info('[IMPORT] Skipped deleted row', ['keterangan' => $item['keterangan'], 'job_no' => $rawJn]);
+                            Log::info('[IMPORT] Skipped deleted row', ['keterangan' => $item['keterangan'], 'job_no' => $rawJn]);
                             $skippedMeta++;
                             continue;
                         }
@@ -631,7 +634,7 @@ class ProductionPlanController extends Controller
                             // Safety net: skip non-break rows misclassified as break (e.g. info/note row containing keyword like ISTIRAHAT)
                             // Legitimate breaks always have proper start_time; misclassified rows have empty start_time
                             if (empty($item['start_time'])) {
-                                \Log::info('[IMPORT] Skipped break misclassification', ['job_no' => $rawJn]);
+                                Log::info('[IMPORT] Skipped break misclassification', ['job_no' => $rawJn]);
                                 $skippedMeta++;
                                 continue;
                             }
@@ -680,7 +683,7 @@ class ProductionPlanController extends Controller
                             $breakStart = $item['start_time'] ?? '';
                             $breakFinish = $item['finish_time'] ?? '';
                             $breakKey = $lineId . '||break||' . $breakKeterangan . '||' . $breakStart . '||' . $breakFinish;
-                            \Log::info('[BREAK DEDUP]', [
+                            Log::info('[BREAK DEDUP]', [
                                 'sheetType'    => $isRevSheet ? 'Rev' : 'non-Rev',
                                 'keterangan'   => $item['keterangan'] ?? null,
                                 'job_no'       => $item['job_no'] ?? null,
@@ -701,7 +704,7 @@ class ProductionPlanController extends Controller
 
                         $finalRowNo = $this->safeVal($item['row_no']) ?: 0;
                         
-                        \Log::info('[TRACE IMPORT]', [
+                        Log::info('[TRACE IMPORT]', [
                             'job'          => $jn,
                             'raw_row_no'   => $item['row_no'] ?? 'KEY_MISSING',
                             'final_row_no' => $finalRowNo,
@@ -767,7 +770,7 @@ class ProductionPlanController extends Controller
                         ProductionPlan::insert($chunk);
                     }
 
-                    \Log::info('[IMPORT] Section stats', [
+                    Log::info('[IMPORT] Section stats', [
                         'shift' => $shiftName,
                         'press' => $pressName,
                         'rows_from_python' => $totalReceived,
@@ -780,7 +783,7 @@ class ProductionPlanController extends Controller
 
                 // Log Python's own row counts if available
                 if (isset($result['log'])) {
-                    \Log::info('[IMPORT] Python parser stats', $result['log']);
+                    Log::info('[IMPORT] Python parser stats', $result['log']);
                 }
  
             });
@@ -797,10 +800,10 @@ class ProductionPlanController extends Controller
                     'shift_name' => $shiftNames ?: '-',
                     'action' => 'import',
                     'snapshot_after' => ['sheets' => count($sheets), 'rows_imported' => $imported],
-                    'created_by' => auth()->id(),
+                    'created_by' => Auth::id(),
                 ]);
             } catch (\Throwable $e) {
-                \Log::warning("Failed to log schedule revision: " . $e->getMessage());
+                Log::warning("Failed to log schedule revision: " . $e->getMessage());
             }
 
             // CLEANUP DATA LAMA: Hapus PPC production plan untuk tanggal sebelum yang diimport
@@ -811,12 +814,12 @@ class ProductionPlanController extends Controller
                 ->whereNotIn('id', $activeRecoveryPlanIds)
                 ->delete();
             if ($oldPlansCount > 0) {
-                \Log::info("Import cleanup: {$oldPlansCount} old PPC plans deleted (before {$parsedDate})");
+                Log::info("Import cleanup: {$oldPlansCount} old PPC plans deleted (before {$parsedDate})");
             }
 
             @unlink($dataPath);
 
-            \Log::info('[IMPORT] Baseline saved — no timeline regeneration (per SRS Step 1)', [
+            Log::info('[IMPORT] Baseline saved — no timeline regeneration (per SRS Step 1)', [
                 'date' => $parsedDate,
                 'imported' => $imported,
             ]);
@@ -860,7 +863,7 @@ class ProductionPlanController extends Controller
                     }
                 }
             } catch (\Throwable $e) {
-                \Log::warning("Pre-creating JobMasters post-import warning: " . $e->getMessage());
+                Log::warning("Pre-creating JobMasters post-import warning: " . $e->getMessage());
             }
 
             // Auto-redirect to the first parsed sheet for convenience
@@ -882,7 +885,7 @@ class ProductionPlanController extends Controller
             return back()->with('success', "Import Berhasil! {$imported} data diproses.");
 
         } catch (\Throwable $e) {
-            \Log::error("Python Import Error: " . $e->getMessage());
+            Log::error("Python Import Error: " . $e->getMessage());
             return redirect()->back()->with('error', 'Gagal import: ' . $e->getMessage());
         }
     }
@@ -984,7 +987,7 @@ class ProductionPlanController extends Controller
                     $timelineGenerator->regenerateSection($target['date'], $target['shift'], $target['press']);
                 }
             } catch (\Throwable $e) {
-                \Log::warning('Resimulation after cancel failed: ' . $e->getMessage());
+                Log::warning('Resimulation after cancel failed: ' . $e->getMessage());
             }
         }
 
@@ -1000,7 +1003,7 @@ class ProductionPlanController extends Controller
         return response()->json(['success' => true, 'message' => $msg]);
     }
 
-    public function approveRecovery($id)
+    public function approveRecovery(int|string $id)
     {
         $schedule = \App\Models\RecoverySchedule::with('items')->findOrFail($id);
 
@@ -1010,14 +1013,14 @@ class ProductionPlanController extends Controller
 
         $schedule->update([
             'status' => 'approved',
-            'approved_by' => auth()->id(),
+            'approved_by' => Auth::id(),
             'approved_at' => now(),
         ]);
 
         return response()->json(['success' => true, 'message' => 'Recovery approved.']);
     }
 
-    public function rejectRecovery($id)
+    public function rejectRecovery(int|string $id)
     {
         $schedule = \App\Models\RecoverySchedule::with('items')->findOrFail($id);
 
@@ -1027,7 +1030,7 @@ class ProductionPlanController extends Controller
 
         $schedule->update([
             'status' => 'rejected',
-            'rejected_by' => auth()->id(),
+            'rejected_by' => Auth::id(),
             'rejected_at' => now(),
         ]);
 
@@ -1068,7 +1071,7 @@ class ProductionPlanController extends Controller
             $processedCount = $items->count();
 
             // Dapatkan hari untuk targetDate
-            $hari = \Carbon\Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
+            $hari = Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
             
             // Dapatkan line_master_id dari jadwal yang ada di hari tersebut, atau fallback
             $existingPlan = ProductionPlan::whereDate('plan_date', $targetDate)
@@ -1118,7 +1121,7 @@ class ProductionPlanController extends Controller
             $timelineGenerator = app(TimelineGenerationService::class);
             $timelineGenerator->regenerateSection($targetDate, $targetShift, $targetPress);
         } catch (\Throwable $e) {
-            \Log::warning('Resimulation after approve failed: ' . $e->getMessage());
+            Log::warning('Resimulation after approve failed: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -1146,7 +1149,7 @@ class ProductionPlanController extends Controller
         return null; 
     }
 
-    private function runPythonScript($python, $script, $file, $orig)
+    private function runPythonScript(string $python, string $script, string $file, string $orig)
     {
         $cmd = [ $python, $script, $file, $orig ];
         $process = proc_open($cmd, [1 => ['pipe','w'], 2 => ['pipe','w']], $pipes);
@@ -1157,13 +1160,13 @@ class ProductionPlanController extends Controller
         return $out ?: $err;
     }
 
-    private function safeVal($val, $default = null)
+    private function safeVal(mixed $val, mixed $default = null)
     {
         if (is_null($val) || $val === '') return $default;
         return $val;
     }
 
-    private function parseIndoDate($dateStr)
+    private function parseIndoDate(?string $dateStr)
     {
         if (!$dateStr) return now();
         
@@ -1172,7 +1175,7 @@ class ProductionPlanController extends Controller
             'JANUARI' => '01', 'FEBRUARI' => '02', 'MARET' => '03', 'APRIL' => '04',
             'MEI' => '05', 'MAY' => '05', 'JUNI' => '06', 'JULI' => '07', 'AGUSTUS' => '08',
             'SEPTEMBER' => '09', 'OKTOBER' => '10', 'NOVEMBER' => '11', 'DESEMBER' => '12',
-            'JAN' => '01', 'FEB' => '02', 'MAR' => '03', 'APR' => '04', 'MEI' => '05', 'JUN' => '06',
+            'JAN' => '01', 'FEB' => '02', 'MAR' => '03', 'APR' => '04', 'JUN' => '06',
             'JUL' => '07', 'AGU' => '08', 'SEP' => '09', 'OKT' => '10', 'NOV' => '11', 'DES' => '12'
         ];
 
@@ -1186,12 +1189,12 @@ class ProductionPlanController extends Controller
         try {
             // Match DD MM YYYY or DD-MM-YYYY or DD/MM/YYYY
             if (preg_match('/(\d{1,2})[\s\-\/](\d{1,2})[\s\-\/](\d{4})/', $dateStr, $m)) {
-                return \Carbon\Carbon::createFromDate($m[3], $m[2], $m[1]);
+                return Carbon::createFromDate($m[3], $m[2], $m[1]);
             }
             
             $clean = preg_replace('/[^0-9\- ]/', '', $dateStr);
             $clean = trim(preg_replace('/\s+/', '-', $clean));
-            return \Carbon\Carbon::parse($clean);
+            return Carbon::parse($clean);
         } catch (\Exception $e) {
             return now();
         }
@@ -1216,7 +1219,7 @@ class ProductionPlanController extends Controller
         ]);
     }
 
-    public function show($id)
+    public function show(int|string $id)
     {
         $plan = ProductionPlan::findOrFail($id);
 
@@ -1226,7 +1229,7 @@ class ProductionPlanController extends Controller
         ]);
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $plan = ProductionPlan::findOrFail($id);
 
@@ -1247,7 +1250,7 @@ class ProductionPlanController extends Controller
         ]);
     }
 
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         ProductionPlan::findOrFail($id)->delete();
 
@@ -1296,7 +1299,7 @@ class ProductionPlanController extends Controller
                 $timelineGenerator = app(TimelineGenerationService::class);
                 $timelineGenerator->regenerateForPlan($plan);
             } catch (\Throwable $e) {
-                \Log::warning("Timeline regeneration skipped after updateInline: " . $e->getMessage());
+                Log::warning("Timeline regeneration skipped after updateInline: " . $e->getMessage());
             }
         }
 
@@ -1331,7 +1334,7 @@ class ProductionPlanController extends Controller
         $ids = $request->ids;
 
         // AUDIT 1: Pastikan array $ids dari Javascript benar-benar masuk
-        \Log::info('[REORDER IDS]', [
+        Log::info('[REORDER IDS]', [
             'ids' => $ids
         ]);
 
@@ -1356,7 +1359,7 @@ class ProductionPlanController extends Controller
                 }
             }
 
-            \Log::info('[REORDER] RecoveryItem sort_order updated', [
+            Log::info('[REORDER] RecoveryItem sort_order updated', [
                 'count' => count($recoveryIds),
                 'orders' => RecoveryItem::whereIn('id', $recoveryIds)
                     ->pluck('sort_order', 'id')
@@ -1374,7 +1377,7 @@ class ProductionPlanController extends Controller
                 ->orderBy('row_no')
                 ->pluck('id', 'row_no');
                 
-            \Log::info('[REORDER AFTER UPDATE]', $rows->toArray());
+            Log::info('[REORDER AFTER UPDATE]', $rows->toArray());
 
             try {
                 $timelineGenerator = app(TimelineGenerationService::class);
@@ -1390,14 +1393,14 @@ class ProductionPlanController extends Controller
                     ProductionPlanUpdated::dispatch($dispatchPlan, 'row_no');
                 }
             } catch (\Throwable $e) {
-                \Log::warning("Timeline regeneration after reorder: " . $e->getMessage());
+                Log::warning("Timeline regeneration after reorder: " . $e->getMessage());
             }
         }
 
         return response()->json(['success' => true]);
     }
 
-    public function recalculate($id)
+    public function recalculate(int|string $id)
     {
         $plan = ProductionPlan::findOrFail($id);
         
@@ -1552,7 +1555,7 @@ class ProductionPlanController extends Controller
             $timelineGenerator = app(TimelineGenerationService::class);
             $timelineGenerator->regenerateForPlan($plan);
         } catch (\Throwable $e) {
-            \Log::warning("Timeline regeneration after addJob: " . $e->getMessage());
+            Log::warning("Timeline regeneration after addJob: " . $e->getMessage());
         }
 
         return response()->json([
@@ -1635,7 +1638,7 @@ class ProductionPlanController extends Controller
         $targetShift = $request->target_shift;
         $targetPress = $request->target_press;
 
-        $hari = \Carbon\Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
+        $hari = Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
 
         // Get line_master_id for the target press
         $lineMap = LineMaster::pluck('id', 'line_name')->toArray();
@@ -1677,13 +1680,13 @@ class ProductionPlanController extends Controller
             try {
                 $timelineGenerator->regenerateSection($section['date'], $section['shift'], $section['press']);
             } catch (\Throwable $e) {
-                \Log::warning('Resimulation after move (source): ' . $e->getMessage());
+                Log::warning('Resimulation after move (source): ' . $e->getMessage());
             }
         }
         try {
             $timelineGenerator->regenerateSection($targetDate, $targetShift, $targetPress);
         } catch (\Throwable $e) {
-            \Log::warning('Resimulation after move (target): ' . $e->getMessage());
+            Log::warning('Resimulation after move (target): ' . $e->getMessage());
         }
 
         return response()->json([

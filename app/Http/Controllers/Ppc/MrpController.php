@@ -14,6 +14,7 @@ use App\Models\StorageLocation;
 use App\Models\User;
 use App\Services\ExcelService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -162,7 +163,7 @@ class MrpController extends Controller
         return back()->with($imported > 0 ? 'success' : 'error', $msg);
     }
 
-    public function destroyDemand($id)
+    public function destroyDemand(int|string $id)
     {
         $mrpDemand = MrpDemand::findOrFail($id);
         $mrpDemand->delete();
@@ -185,7 +186,7 @@ class MrpController extends Controller
         DB::transaction(function () use ($demands) {
             $mrpRun = MrpRun::create([
                 'run_date' => now(),
-                'run_by'   => auth()->id() ?: (User::first()->id ?? User::create([
+                'run_by'   => Auth::id() ?: (User::first()->id ?? User::create([
                     'name' => 'Operator',
                     'email' => 'operator@example.com',
                     'password' => bcrypt('password123'),
@@ -269,14 +270,14 @@ class MrpController extends Controller
         return redirect()->route('mrp.index')->with('success', 'MRP Run berhasil dijalankan.');
     }
 
-    public function show($id)
+    public function show(int|string $id)
     {
         $mrpRun = MrpRun::findOrFail($id);
         $mrpRun->load('results.material', 'runBy');
         return view('mrp.show', compact('mrpRun'));
     }
 
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $mrpRun = MrpRun::findOrFail($id);
         $mrpRun->results()->delete();
@@ -284,7 +285,7 @@ class MrpController extends Controller
         return redirect()->route('mrp.index')->with('success', 'MRP Run berhasil dihapus.');
     }
 
-    public function exportExcel($id)
+    public function exportExcel(int|string $id)
     {
         $mrpRun = MrpRun::findOrFail($id);
         $mrpRun->load('results.material', 'runBy');
@@ -343,7 +344,7 @@ class MrpController extends Controller
         return ExcelService::download($spreadsheet, $filename);
     }
 
-    public function exportPdf($id)
+    public function exportPdf(int|string $id)
     {
         ini_set('memory_limit', '256M');
         $mrpRun = MrpRun::findOrFail($id);

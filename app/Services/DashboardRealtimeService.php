@@ -28,10 +28,6 @@ class DashboardRealtimeService
         $shortJob = fn($name) => strtoupper(trim(explode(' ', $name ?? '-')[0])) ?: '-';
         $planShiftText = self::SHIFT_PLAN_MAP[$shift] ?? 'Shift Pagi';
 
-        // Fallback tanggal: kalau tanggal yang diminta tidak punya schedule,
-        // pakai tanggal schedule terakhir yang punya job (bukan dashboard kosong).
-        $date = $this->resolvePlanDate($date);
-
         $shiftStartDt = $shift === 1
             ? Carbon::parse($date)->setTime(7, 30)
             : Carbon::parse($date)->subDay()->setTime(21, 0);

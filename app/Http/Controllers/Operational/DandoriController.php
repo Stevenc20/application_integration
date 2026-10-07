@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\JobMaster;
 use App\Models\Dandori;
 use App\Models\Downtime;
+use Illuminate\Support\Facades\Auth;
 use Carbon\Carbon;
 
 class DandoriController extends Controller
@@ -138,7 +139,7 @@ class DandoriController extends Controller
                 'start_time' => $now,
                 'penyebab' => '-',
                 'action' => '-',
-                'pic' => auth()->user()->name ?? 'OPERATOR'
+                'pic' => Auth::user()?->name ?? 'OPERATOR'
             ]);
         }
 
@@ -150,7 +151,7 @@ class DandoriController extends Controller
             'jenis_dandori' => $jenisDandori,
             'start_time'    => $now,
             'work_date'     => now()->toDateString(),
-            'created_by'    => auth()->id()
+            'created_by'    => Auth::id()
         ]);
 
         if ($request->wantsJson()) {
@@ -332,7 +333,7 @@ class DandoriController extends Controller
             'shift'       => 'Shift 1',
             'activity'    => $activity,
             'work_date'   => now()->toDateString(),
-            'created_by'  => auth()->id()
+            'created_by'  => Auth::id()
         ]);
     }
 

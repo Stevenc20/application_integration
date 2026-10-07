@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Ppc;
 use App\Http\Controllers\Controller;
 use App\Models\RecoveryItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 class RecoveryController extends Controller
 {
@@ -74,7 +76,7 @@ class RecoveryController extends Controller
         $item->update([
             'status'          => 'rejected',
             'rejected_at'     => now(),
-            'rejected_by'     => auth()->id(),
+            'rejected_by'     => Auth::id(),
             'rejection_notes' => $request->input('notes'),
         ]);
 
@@ -85,7 +87,7 @@ class RecoveryController extends Controller
             $timelineGenerator->regenerateSection($today, 'Shift Pagi', $press);
             $timelineGenerator->regenerateSection($today, 'Shift Malam', $press);
         } catch (\Throwable $e) {
-            \Log::warning('Resimulation after reject failed: ' . $e->getMessage());
+            Log::warning('Resimulation after reject failed: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -125,7 +127,7 @@ class RecoveryController extends Controller
             $item->update([
                 'status'          => 'rejected',
                 'rejected_at'     => now(),
-                'rejected_by'     => auth()->id(),
+                'rejected_by'     => Auth::id(),
                 'rejection_notes' => $notes,
             ]);
         }
@@ -139,7 +141,7 @@ class RecoveryController extends Controller
                 $timelineGenerator->regenerateSection($today, 'Shift Malam', $press);
             }
         } catch (\Throwable $e) {
-            \Log::warning('Resimulation after reject failed: ' . $e->getMessage());
+            Log::warning('Resimulation after reject failed: ' . $e->getMessage());
         }
 
         return response()->json([
@@ -194,7 +196,7 @@ class RecoveryController extends Controller
                 'stats'   => $result,
             ]);
         } catch (\Throwable $e) {
-            \Log::error('Scheduler failed: ' . $e->getMessage());
+            Log::error('Scheduler failed: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => 'Scheduler gagal: ' . $e->getMessage(),

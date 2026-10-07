@@ -33,14 +33,14 @@ class JobController extends Controller
         return back()->with('success', 'Job berhasil ditambahkan');
     }
 
-    public function delete($id)
+    public function delete(int|string $id)
     {
         JobMaster::findOrFail($id)->delete();
 
         return back()->with('success', 'Job berhasil dihapus');
     }
 
-   public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $request->validate([
             'job_number' => 'required',

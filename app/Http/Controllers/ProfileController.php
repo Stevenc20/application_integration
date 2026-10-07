@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -11,13 +13,15 @@ class ProfileController extends Controller
 {
     public function edit()
     {
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
         return view('profile.edit', compact('user'));
     }
 
     public function update(Request $request)
     {
-        $user = auth()->user();
+        /** @var User $user */
+        $user = Auth::user();
 
         $rules = [
             'name' => 'required|string|max:100',
@@ -99,7 +103,8 @@ class ProfileController extends Controller
                 'avatar.max'      => 'Ukuran foto maksimal 10MB.',
             ]);
 
-            $user = auth()->user();
+            /** @var User $user */
+            $user = Auth::user();
             $image = $request->file('avatar');
 
             // Pastikan folder uploads/avatars ada

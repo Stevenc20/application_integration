@@ -41,7 +41,7 @@ class DeviceLinkController extends Controller
     /**
      * Poll the pairing request status from the guest browser (Monitor).
      */
-    public function status(Request $request, $tokenHash)
+    public function status(Request $request, string $tokenHash)
     {
         $this->service->expirePairingRequests();
         $sessionHash = hash('sha256', $request->session()->getId());
@@ -62,7 +62,7 @@ class DeviceLinkController extends Controller
     /**
      * Consume an approved pairing request from the browser that created it (Monitor).
      */
-    public function consume(Request $request, $tokenHash)
+    public function consume(Request $request, string $tokenHash)
     {
         try {
             $deviceLink = DeviceLinkRequest::where('token_hash', $tokenHash)->firstOrFail();
@@ -157,7 +157,7 @@ class DeviceLinkController extends Controller
     /**
      * POST: Approve a scanned pairing request from the HP confirmation dialog.
      */
-    public function approve(Request $request, $tokenHash)
+    public function approve(Request $request, string $tokenHash)
     {
         try {
             $deviceLink = DeviceLinkRequest::where('token_hash', $tokenHash)->firstOrFail();
@@ -172,7 +172,7 @@ class DeviceLinkController extends Controller
     /**
      * POST: Cancel a pairing request (from HP).
      */
-    public function cancel(Request $request, $tokenHash)
+    public function cancel(Request $request, string $tokenHash)
     {
         try {
             $deviceLink = DeviceLinkRequest::where('token_hash', $tokenHash)->firstOrFail();

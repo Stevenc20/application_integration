@@ -12,6 +12,7 @@ use App\Models\MaterialStock;
 use App\Models\StorageLocation;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -99,7 +100,7 @@ class ProductionOrderController extends Controller
                     'planned_end_date'   => $request->planned_end_date,
                     'status'             => 'created',
                     'notes'              => $notes,
-                    'created_by'         => auth()->id() ?: (User::first()->id ?? User::create([
+                    'created_by'         => Auth::id() ?: (User::first()->id ?? User::create([
                         'name' => 'Operator',
                         'email' => 'operator@example.com',
                         'password' => bcrypt('password123'),

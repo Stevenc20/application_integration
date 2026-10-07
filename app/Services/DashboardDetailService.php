@@ -23,8 +23,6 @@ class DashboardDetailService
     {
         $planShiftText = self::SHIFT_MAP[$shift] ?? 'Shift Pagi';
 
-        // Fallback tanggal: pakai tanggal schedule terakhir yang punya job
-        $date = $this->resolvePlanDate($date);
         $workDate = $date;
 
         $isMorning = ($shift === 1);

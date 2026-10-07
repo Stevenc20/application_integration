@@ -96,7 +96,7 @@ class KaryawanController extends Controller
     /**
      * Update data karyawan.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $karyawan = Karyawan::findOrFail($id);
 
@@ -141,7 +141,7 @@ class KaryawanController extends Controller
     /**
      * Hapus karyawan.
      */
-    public function delete($id)
+    public function delete(int|string $id)
     {
         $karyawan = Karyawan::findOrFail($id);
         $karyawan->delete();

@@ -853,7 +853,13 @@ async function fetchDashboardData() {
   if (input) {
     let saved = null;
     try { saved = localStorage.getItem('dash_filter_date'); } catch(e) {}
-    input.value = saved || workDate;
+    // Jika tanggal yang tersimpan di localStorage lebih lampau dari workDate aktif,
+    // gunakan workDate agar data lama tidak nyantol setelah pergantian shift/hari.
+    if (!saved || saved < workDate) {
+      saved = workDate;
+      try { localStorage.setItem('dash_filter_date', workDate); } catch(e) {}
+    }
+    input.value = saved;
   }
   updateShiftButtonsUI(selectedShift);
 })();
