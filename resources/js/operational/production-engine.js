@@ -282,7 +282,7 @@ function _autoBreakTick() {
 
     if (breakWindow && !window._autoBreakActive && !alreadyRunningBreak) {
         _triggerAutoBreakStart(activeId, breakWindow);
-    } else if (!breakWindow && window._autoBreakActive && window._autoBreakDowntimeId) {
+    } else if (!breakWindow && (window._autoBreakActive || alreadyRunningBreak)) {
         _triggerAutoBreakEnd(activeId);
     }
 }
@@ -344,48 +344,68 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
 
 async function _triggerAutoBreakEnd(jobId) {
     try {
-        const dtId = window._autoBreakDowntimeId;
-        const res = await fetch(`/operational/downtime/${dtId}/finish`, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
-        }).then(r => r.json());
+        let dtId = window._autoBreakDowntimeId || window.runningDowntimes?.[`${jobId}_break`]?.id;
+        if (!dtId && window.jobDowntimeHistory?.[jobId]) {
+            const openBreak = window.jobDowntimeHistory[jobId].find(h => !h.end && h.type === 'break time');
+            if (openBreak) dtId = openBreak.id;
+        }
 
-        if (res.success) {
-            delete window.runningDowntimes[`${jobId}_break`];
-            window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
-
-            if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
-            const dt = res.downtime;
-            if (dt) {
-                window.jobDowntimeHistory[jobId].push({
-                    start: new Date(dt.start_time).getTime(),
-                    end: dt.finish_time ? new Date(dt.finish_time).getTime() : Date.now(),
-                    type: dt.jenis_downtime
-                });
-            }
-
-            const job = window.jobMasterData[jobId];
-            if (job && job._breakPaused) {
-                if (job._frozenTimer != null) {
-                    job.base_seconds = job._frozenTimer;
-                    job.started_at = new Date().toISOString();
-                }
-                delete job._breakPaused;
-                delete job._frozenTimer;
-                fetch(`/operational/job/${jobId}/resume`, {
+        let res = { success: true };
+        if (dtId) {
+            try {
+                res = await fetch(`/operational/downtime/${dtId}/finish`, {
                     method: 'POST',
                     headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
-                }).catch(() => {});
+                }).then(r => r.json());
+            } catch (err) {
+                console.warn('AutoBreak finish request error:', err);
             }
-
-            window._autoBreakActive = false;
-            window._autoBreakDowntimeId = null;
-
-            updateTimeline();
-            _updateBreakUI(jobId, null, false);
         }
+
+        delete window.runningDowntimes[`${jobId}_break`];
+        window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
+
+        if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
+        const dt = res?.downtime;
+        if (dt) {
+            window.jobDowntimeHistory[jobId].push({
+                start: new Date(dt.start_time).getTime(),
+                end: dt.finish_time ? new Date(dt.finish_time).getTime() : Date.now(),
+                type: dt.jenis_downtime
+            });
+        } else {
+            // Close any open break in history locally
+            for (const h of window.jobDowntimeHistory[jobId]) {
+                if (!h.end && h.type === 'break time') {
+                    h.end = Date.now();
+                }
+            }
+        }
+
+        const job = window.jobMasterData[jobId];
+        if (job && job._breakPaused) {
+            if (job._frozenTimer != null) {
+                job.base_seconds = job._frozenTimer;
+                job.started_at = new Date().toISOString();
+            }
+            delete job._breakPaused;
+            delete job._frozenTimer;
+            fetch(`/operational/job/${jobId}/resume`, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+            }).catch(() => {});
+        }
+
+        window._autoBreakActive = false;
+        window._autoBreakDowntimeId = null;
+
+        updateTimeline();
+        _updateBreakUI(jobId, null, false);
     } catch (e) {
         console.error('AutoBreak end error:', e);
+        window._autoBreakActive = false;
+        window._autoBreakDowntimeId = null;
+        _updateBreakUI(jobId, null, false);
     }
 }
 
@@ -448,22 +468,39 @@ function _updateBreakUI(jobId, label, isPaused) {
 (function() {
     const activeId = window.ProductionConfig?.currentActiveId;
     if (!activeId) return;
+    const now = new Date();
+    const breakWindow = _isInBreakWindow(now);
     const history = window.jobDowntimeHistory?.[activeId] || [];
+
     for (const h of history) {
         if (!h.end && h.type === 'break time') {
-            window._autoBreakActive = true;
-            window._autoBreakDowntimeId = h.id;
-            const job = window.jobMasterData?.[activeId];
-            if (job && !job._breakPaused) {
-                let currentSeconds = job.base_seconds || 0;
-                let jS = job.started_at ? new Date(job.started_at) : null;
-                const firstDandori = job.dandori_start ? new Date(job.dandori_start) : null;
-                const anchorTime = firstDandori || jS;
-                if (anchorTime) {
-                    currentSeconds += Math.floor((Date.now() - anchorTime.getTime()) / 1000);
+            if (breakWindow) {
+                // Legitimate active break window
+                window._autoBreakActive = true;
+                window._autoBreakDowntimeId = h.id;
+                const job = window.jobMasterData?.[activeId];
+                if (job && !job._breakPaused) {
+                    let currentSeconds = job.base_seconds || 0;
+                    let jS = job.started_at ? new Date(job.started_at) : null;
+                    const firstDandori = job.dandori_start ? new Date(job.dandori_start) : null;
+                    const anchorTime = firstDandori || jS;
+                    if (anchorTime) {
+                        currentSeconds += Math.floor((Date.now() - anchorTime.getTime()) / 1000);
+                    }
+                    job._frozenTimer = currentSeconds;
+                    job._breakPaused = true;
                 }
-                job._frozenTimer = currentSeconds;
-                job._breakPaused = true;
+                _updateBreakUI(activeId, breakWindow.label, true);
+            } else {
+                // Stale break from previous window — close it immediately
+                h.end = Date.now();
+                if (h.id) {
+                    fetch(`/operational/downtime/${h.id}/finish`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig?.csrfToken, 'Accept': 'application/json' }
+                    }).catch(() => {});
+                }
+                _updateBreakUI(activeId, null, false);
             }
             break;
         }
@@ -2258,11 +2295,11 @@ async function performSave(id, ok, repair, reject) {
                     jobMasterData[id].base_seconds = parseInt(data.runtime_seconds);
                 }
                 if (data.total_ok != null && jobMasterData[id]) {
-                    jobMasterData[id].actual_ok = parseInt(data.total_ok);
+                    jobMasterData[id].actual_ok = Math.max(0, parseInt(data.total_ok) || 0);
                     const el = document.getElementById('active-actual-display');
-                    if (el) el.textContent = data.total_ok;
+                    if (el) el.textContent = jobMasterData[id].actual_ok;
                     const rowInput = document.getElementById('actual-' + id);
-                    if (rowInput) rowInput.value = data.total_ok;
+                    if (rowInput) rowInput.value = jobMasterData[id].actual_ok;
                 }
                 if (data.log) {
                     const grid = document.getElementById('rekam-jejak-grid');
@@ -2281,7 +2318,11 @@ async function performSave(id, ok, repair, reject) {
             }
         } finally {
             if (!success && jobMasterData[id]) {
-                jobMasterData[id].actual_ok -= ok;
+                jobMasterData[id].actual_ok = Math.max(0, (jobMasterData[id].actual_ok || 0) - ok);
+                const activeDisplay = document.getElementById('active-actual-display');
+                if (activeDisplay) activeDisplay.textContent = jobMasterData[id].actual_ok;
+                const rowInput = document.getElementById('actual-' + id);
+                if (rowInput) rowInput.value = jobMasterData[id].actual_ok;
                 updateTimeline();
             }
         }
@@ -2430,14 +2471,15 @@ window.stepInput = function (id, amount, jobId = null) {
             window.openRRInputModal(targetJobId, type, amount);
         } else {
             const targetJobId = jobId || id.split('-').pop();
-            const current = jobMasterData[targetJobId]?.actual_ok || 0;
-            const newVal = current + amount;
-            if (newVal < 0) {
-                showToast('Nilai OK tidak boleh negatif', 'danger');
+            const parsedAmount = parseInt(amount, 10);
+            if (isNaN(parsedAmount) || parsedAmount === 0) {
                 if (input) input.value = '';
                 return;
             }
-            if (amount === 0) {
+            const current = Math.max(0, parseInt(jobMasterData[targetJobId]?.actual_ok, 10) || 0);
+            const newVal = Math.max(0, current + parsedAmount);
+            if (current + parsedAmount < 0) {
+                showToast('Nilai OK tidak boleh negatif', 'danger');
                 if (input) input.value = '';
                 return;
             }
@@ -2449,7 +2491,7 @@ window.stepInput = function (id, amount, jobId = null) {
                 if (activeDisplay) activeDisplay.textContent = newVal;
                 updateTimeline();
             }
-            performSave(targetJobId, amount, 0, 0);
+            performSave(targetJobId, parsedAmount, 0, 0);
         }
     }
 };
@@ -2480,9 +2522,12 @@ window.manualStep = function (id, inputId, jobId) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     const input = document.getElementById(inputId);
     if (input) {
-        const value = parseInt(input.value);
-        if (value && value > 0) {
+        const raw = input.value.trim();
+        const value = parseInt(raw, 10);
+        if (!isNaN(value) && value > 0) {
             stepInput(id, value, jobId);
+            input.value = '';
+        } else {
             input.value = '';
         }
     }

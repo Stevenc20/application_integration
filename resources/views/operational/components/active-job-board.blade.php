@@ -37,6 +37,29 @@
         <div class="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-red-500/3 to-transparent"></div>
         
         @php 
+            // Close any stale break downtime whose scheduled window has already passed
+            $activeBreakDt = \App\Models\Downtime::where('job_master_id', $activeJob->id)
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenis_downtime))'), ['break time', 'break'])
+                ->whereNull('finish_time')
+                ->first();
+            $currentBreakSchedule = null;
+            if ($activeBreakDt) {
+                $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
+                $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
+                $currShift = ((int) now()->format('H') >= 7 && (int) now()->format('H') < 19) ? 'Shift Pagi' : 'Shift Malam';
+                $currTimeStr = now()->format('H:i:s');
+                $currentBreakSchedule = \App\Models\MasterBreakTime::where('is_active', true)
+                    ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })
+                    ->where(function($q) use ($currShift) { $q->where('shift', $currShift)->orWhereNull('shift'); })
+                    ->where('waktu_mulai', '<=', $currTimeStr)
+                    ->where('waktu_selesai', '>=', $currTimeStr)
+                    ->first();
+                if (!$currentBreakSchedule) {
+                    $activeBreakDt->update(['finish_time' => now()]);
+                    $activeBreakDt = null;
+                }
+            }
+
             $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)->whereNull('finish_time')->orderByDesc('start_time')->first();
             $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
 
@@ -74,7 +97,8 @@
                 $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
             }
 
-            $isOnBreak = $activeDowntime && in_array(strtolower(trim($activeDowntime->jenis_downtime ?? '')), ['break time', 'break']);
+            $isBreakDowntime = $activeDowntime && in_array(strtolower(trim($activeDowntime->jenis_downtime ?? '')), ['break time', 'break']);
+            $isOnBreak = $isBreakDowntime && ($currentBreakSchedule !== null);
         @endphp
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-4 relative z-10 items-start">
@@ -423,8 +447,8 @@
                                         </button>
                                     </div>
                                     <div class="flex items-center gap-1.5">
-                                        <input type="number" id="manual-ok-{{ $activeJob->id }}" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-sm text-slate-800 font-bold outline-none focus:border-red-500 transition" onkeydown="if(event.key==='Enter'){manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})}">
-                                        <button onclick="manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-xs transition-all active:scale-95">OK</button>
+                                        <input type="number" id="manual-ok-{{ $activeJob->id }}" min="1" step="1" placeholder="0" class="min-w-0 flex-1 bg-white border border-slate-300 rounded-lg px-2.5 py-2 text-sm text-slate-800 font-bold outline-none focus:border-emerald-500 transition" onkeydown="if(event.key==='Enter'){event.preventDefault();manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})}">
+                                        <button type="button" onclick="manualStep('active-actual-{{ $activeJob->id }}','manual-ok-{{ $activeJob->id }}',{{ $activeJob->id }})" class="px-3 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs transition-all active:scale-95 shadow-sm shadow-emerald-200">OK</button>
                                     </div>
                                 </div>
                             </div>
