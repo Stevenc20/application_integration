@@ -1055,3 +1055,8 @@ Route::middleware(['auth', 'role:admin,superadmin', 'feature:security'])
         Route::get('/dashboard', [\App\Http\Controllers\SecurityController::class, 'index'])->name('dashboard');
         Route::get('/logs', [\App\Http\Controllers\SecurityController::class, 'logs'])->name('logs');
     });
+
+// ======================
+// PPC API FOR QA SYSTEM INTEGRATION
+// ======================
+Route::get('/api/v1/ppc/item-check', [\App\Http\Controllers\Api\PpcItemCheckController::class, 'index']);
