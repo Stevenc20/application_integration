@@ -15,7 +15,7 @@ class SyncProductionSchedule extends Command
      *
      * @var string
      */
-    protected $signature = 'qa:sync-schedule';
+    protected $signature = 'qa:sync-schedule {date? : The production plan date to sync (YYYY-MM-DD)}';
 
     /**
      * The console command description.
@@ -29,8 +29,9 @@ class SyncProductionSchedule extends Command
      */
     public function handle()
     {
-        $this->info('Starting production schedule sync...');
-        $date = Carbon::today();
+        $dateParam = $this->argument('date');
+        $date = $dateParam ? Carbon::parse($dateParam) : Carbon::today();
+        $this->info("Starting production schedule sync for {$date->toDateString()}...");
 
         try {
             // Hapus data dummy lama (yang SAP order no formatnya SPK-YYYYMMDD-0X)

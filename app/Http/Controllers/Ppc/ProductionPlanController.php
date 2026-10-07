@@ -866,6 +866,14 @@ class ProductionPlanController extends Controller
                 Log::warning("Pre-creating JobMasters post-import warning: " . $e->getMessage());
             }
 
+            // OTOMATIS SYNC KE QA: Setiap kali PPC upload jadwal baru, langsung sync ke QA schedules
+            try {
+                \Illuminate\Support\Facades\Artisan::call('qa:sync-schedule', ['date' => $parsedDate]);
+                Log::info("Auto-sync QA schedules triggered for date: {$parsedDate}");
+            } catch (\Throwable $e) {
+                Log::warning("Auto-sync QA schedule failed: " . $e->getMessage());
+            }
+
             // Auto-redirect to the first parsed sheet for convenience
             if (!empty($result['sheets'])) {
                 $firstKey = array_key_first($result['sheets']);
