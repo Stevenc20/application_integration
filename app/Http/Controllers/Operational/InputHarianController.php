@@ -362,14 +362,18 @@ class InputHarianController extends Controller
             $activeJob = $activeJobs->first();
 
             // Auto cut-off: if there are multiple active jobs on this line/schedule, finish truly stale running ones
-            // Never finish a job that has an ongoing dandori or is the selected activeJob!
+            // Never finish a job that has an ongoing dandori, 1st check, or has not started real production yet (!started_at)!
             if ($activeJobs->count() > 1) {
                 foreach ($activeJobs->slice(1) as $staleJob) {
                     $hasActiveDandori = $staleJob->downtimes->contains(function ($dt) {
                         return $dt->jenis_downtime === 'dandori' && is_null($dt->finish_time);
                     });
+                    $hasActiveFirstCheck = $staleJob->dandoris->contains(function ($d) {
+                        return ($d->jenis_dandori === '1st_check' || $d->activity === '1ST CHECK') && is_null($d->finish_time);
+                    });
+                    $isPreProduction = is_null($staleJob->started_at);
 
-                    if (strtolower($staleJob->status) === 'running' && !$hasActiveDandori) {
+                    if (strtolower($staleJob->status) === 'running' && !$hasActiveDandori && !$hasActiveFirstCheck && !$isPreProduction) {
                         $this->productionService->finishJob($staleJob->id);
                     }
                 }

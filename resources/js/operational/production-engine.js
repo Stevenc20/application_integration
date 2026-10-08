@@ -1425,7 +1425,7 @@ window.jsStopDandori = async function jsStopDandori(jobId) {
 
 window.jsToggleFirstCheck = function jsToggleFirstCheck(jobId) {
     if (window.runningDowntimes?.[`${jobId}_firstcheck`]) {
-        jsStopDandori(jobId);
+        jsStopFirstCheck(jobId);
     } else {
         jsStartFirstCheck(jobId);
     }
