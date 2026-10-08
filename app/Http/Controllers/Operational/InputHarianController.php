@@ -353,14 +353,23 @@ class InputHarianController extends Controller
                     },
                     'downtimes',
                     'dandoris'
-                ])->orderByDesc('started_at')->orderByDesc('id')->get();
+                ])
+                ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                ->orderByDesc('updated_at')
+                ->orderByDesc('id')
+                ->get();
 
             $activeJob = $activeJobs->first();
 
-            // Auto cut-off: if there are multiple active jobs on this line/schedule, finish stale running ones
+            // Auto cut-off: if there are multiple active jobs on this line/schedule, finish truly stale running ones
+            // Never finish a job that has an ongoing dandori or is the selected activeJob!
             if ($activeJobs->count() > 1) {
                 foreach ($activeJobs->slice(1) as $staleJob) {
-                    if (strtolower($staleJob->status) === 'running') {
+                    $hasActiveDandori = $staleJob->downtimes->contains(function ($dt) {
+                        return $dt->jenis_downtime === 'dandori' && is_null($dt->finish_time);
+                    });
+
+                    if (strtolower($staleJob->status) === 'running' && !$hasActiveDandori) {
                         $this->productionService->finishJob($staleJob->id);
                     }
                 }
@@ -868,7 +877,9 @@ class InputHarianController extends Controller
         $lineFilter = $request->get('line');
         $query = ProductionSession::where('status', 'running')
             ->whereDate('work_date', now()->toDateString())
-            ->with('jobMaster');
+            ->with('jobMaster')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id');
 
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
