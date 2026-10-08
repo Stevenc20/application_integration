@@ -180,7 +180,9 @@ function updateTimers() {
 
             const pS_time = Number(job.plan_start);
             const pE_time = Number(job.plan_end);
-            const plannedDurationMs = Math.max(pE_time - pS_time, 1000);
+            const schedDurationMs = Math.max(pE_time - pS_time, 1000);
+            const tptMs = (Number(job.tpt) > 0) ? (Number(job.tpt) * 60 * 1000) : schedDurationMs;
+            const plannedDurationMs = Math.max(tptMs, 1000);
 
             const anchorTime = Math.min(
                 jS ? jS.getTime() : Infinity,
@@ -193,7 +195,15 @@ function updateTimers() {
                 const jF = job.finished_at ? new Date(job.finished_at) : null;
                 const effectiveNow = isComplete ? (jF ? new Date(jF) : new Date(pE_time)) : now;
                 const finalEndTime = jF ? new Date(jF) : effectiveNow;
-                const expectedFinishTime = anchorTime + plannedDurationMs;
+
+                let activeStart = anchorTime;
+                if (jS || firstDandori) {
+                    activeStart = Math.min(
+                        jS ? jS.getTime() : Infinity,
+                        firstDandori ? firstDandori.getTime() : Infinity
+                    );
+                }
+                const expectedFinishTime = activeStart + plannedDurationMs;
 
                 const tD = Math.max(
                     plannedDurationMs / 1000,
@@ -1211,13 +1221,15 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             });
         } else {
             if (finalTime > lastPos) {
-                const segStart = (lastPos < effectiveActualStart) ? effectiveActualStart : lastPos;
+                // Eliminate gap: if job is running or was started, production fills seamlessly from lastPos to finalTime
+                const segStart = (actualStartMs && lastPos < actualStartMs && !hasDandori) ? actualStartMs : lastPos;
                 appendProduction(segStart, finalTime);
             }
         }
 
-        if (html === '' && effectiveActualStart) {
-            appendProduction(effectiveActualStart, finalTime);
+        if (html === '' && (actualStartMs || effectiveActualStart)) {
+            const initialStart = actualStartMs || effectiveActualStart;
+            appendProduction(initialStart, finalTime);
         }
 
         container.innerHTML = html;
