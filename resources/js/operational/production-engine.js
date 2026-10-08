@@ -558,12 +558,13 @@ function updateTimeline(forceAll = false) {
 
         let btn = document.getElementById(`${rd.btnType}-btn-${rd.jobId}`);
         if (btn) {
+            let label = rd.btnType === 'dandori_dt' ? 'SELESAI DOWNTIME' : `STOP ${rd.btnType.toUpperCase()}`;
             btn.innerHTML = `<span class="flex items-center justify-center gap-2">
                 <span class="relative flex h-2 w-2">
                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
                     <span class="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
                 </span>
-                STOP ${rd.btnType.toUpperCase()} (${timeStr})
+                ${label} (${timeStr})
             </span>`;
             btn.className = "w-full py-4 rounded-xl bg-red-600 text-white border-red-700 text-xs font-black uppercase animate-pulse scale-105 shadow-lg shadow-red-900/50 transition-all";
         }
@@ -1517,7 +1518,28 @@ window.handleDandoriDowntime = function handleDandoriDowntime(jobId) {
 
 async function _startDandoriDowntime(jobId) {
     await window.ActionRunner.run('Start Downtime', async () => {
-        // ——— 1. PAUSE DANDORI: finish the active dandori downtime record on server ———
+        // ——— 1. PAUSE DANDORI OR 1ST CHECK: finish active record on server ———
+        let wasInFirstCheck = false;
+        const fcKey = `${jobId}_firstcheck`;
+        const fcRd = window.runningDowntimes?.[fcKey];
+        if (fcRd) {
+            wasInFirstCheck = true;
+            try {
+                await fetch(`/operational/job/${jobId}/dandori/first-check/finish`, {
+                    method: 'POST',
+                    headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+                }).then(r => r.json());
+                if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
+                window.jobDowntimeHistory[jobId].push({
+                    id: fcRd.id,
+                    start: fcRd.start.getTime(),
+                    end: Date.now(),
+                    type: '1st_check'
+                });
+                delete window.runningDowntimes[fcKey];
+            } catch (e) { console.warn('Pause 1st check failed:', e); }
+        }
+
         const dandoriKey = `${jobId}_dandori`;
         const dandoriRd = window.runningDowntimes?.[dandoriKey];
         if (dandoriRd) {
@@ -1528,7 +1550,10 @@ async function _startDandoriDowntime(jobId) {
                 }).then(r => r.json());
                 if (!window.jobDowntimeHistory[jobId]) window.jobDowntimeHistory[jobId] = [];
                 window.jobDowntimeHistory[jobId].push({
-                    start: dandoriRd.start.getTime(), end: Date.now(), type: 'dandori'
+                    id: dandoriRd.id,
+                    start: dandoriRd.start.getTime(),
+                    end: Date.now(),
+                    type: 'dandori'
                 });
                 delete window.runningDowntimes[dandoriKey];
             } catch (e) { console.warn('Pause dandori failed:', e); }
@@ -1542,6 +1567,7 @@ async function _startDandoriDowntime(jobId) {
             if (anchor) secs += Math.floor((Date.now() - anchor.getTime()) / 1000);
             job._frozenTimer = secs;
             job._dandoriPaused = true;
+            if (wasInFirstCheck) job._wasInFirstCheck = true;
         }
 
         // ——— 3. START DOWNTIME on server ———
@@ -1562,11 +1588,11 @@ async function _startDandoriDowntime(jobId) {
             };
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
 
-            // Button → STOP DOWNTIME
-            const btn = document.getElementById(`dandori-dt-btn-${jobId}`);
+            // Button → SELESAI DOWNTIME
+            const btn = document.getElementById(`dandori_dt-btn-${jobId}`) || document.getElementById(`dandori-dt-btn-${jobId}`);
             if (btn) {
-                btn.className = btn.className.replace('bg-red-500/10', 'bg-red-500').replace('border-red-500/30', 'border-red-600').replace('text-red-400', 'text-white');
-                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 10a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z"/></svg> STOP DOWNTIME';
+                btn.className = btn.className.replace('bg-red-500/10', 'bg-red-600').replace('border-red-500/30', 'border-red-700').replace('text-red-500', 'text-white').replace('text-red-400', 'text-white');
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 fill-current" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg> Selesai Downtime';
             }
 
             // ——— 4. UPDATE STATUS BADGE → DOWNTIME ———
@@ -1581,10 +1607,10 @@ async function _startDandoriDowntime(jobId) {
                     dotClass: sd?.className || ''
                 };
             }
-            if (sc) sc.className = window._origDandoriStatus.containerClass.replace(/bg-amber-500\/10/g, 'bg-rose-500/10').replace(/border-amber-500\/20/g, 'border-rose-500/20');
-            if (st) { st.className = window._origDandoriStatus.textClass.replace(/text-amber-400/g, 'text-rose-400'); st.textContent = 'DOWNTIME'; }
-            if (sp) sp.className = window._origDandoriStatus.pingClass.replace(/bg-amber-500/g, 'bg-rose-500');
-            if (sd) sd.className = window._origDandoriStatus.dotClass.replace(/bg-amber-500/g, 'bg-rose-500');
+            if (sc) sc.className = window._origDandoriStatus.containerClass.replace(/bg-amber-500\/10/g, 'bg-rose-500/10').replace(/border-amber-500\/20/g, 'border-rose-500/20').replace(/bg-purple-500\/10/g, 'bg-rose-500/10').replace(/border-purple-500\/20/g, 'border-rose-500/20');
+            if (st) { st.className = window._origDandoriStatus.textClass.replace(/text-amber-400/g, 'text-rose-400').replace(/text-purple-400/g, 'text-rose-400'); st.textContent = 'DOWNTIME'; }
+            if (sp) sp.className = window._origDandoriStatus.pingClass.replace(/bg-amber-500/g, 'bg-rose-500').replace(/bg-purple-500/g, 'bg-rose-500');
+            if (sd) sd.className = window._origDandoriStatus.dotClass.replace(/bg-amber-500/g, 'bg-rose-500').replace(/bg-purple-500/g, 'bg-rose-500');
 
             // ——— 5. UPDATE ALERT BOX → DOWNTIME ———
             const alertBox = document.getElementById('active-downtime-alert-box');
@@ -1598,7 +1624,7 @@ async function _startDandoriDowntime(jobId) {
                 alertTitle.textContent = 'DOWNTIME';
             }
 
-            showToast('Downtime dimulai (Dandori dijeda)', 'danger');
+            showToast('Downtime dimulai (Dandori/1st Check dijeda)', 'danger');
             updateTimeline();
             updateLostTimeDisplay(jobId);
             notifyLineStatusChange(jobMasterData[jobId]?.line);
@@ -1634,13 +1660,13 @@ async function _finishDandoriDowntime(jobId) {
             window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes).length;
 
             // Button → DOWNTIME
-            const btn = document.getElementById(`dandori-dt-btn-${jobId}`);
+            const btn = document.getElementById(`dandori_dt-btn-${jobId}`) || document.getElementById(`dandori-dt-btn-${jobId}`);
             if (btn) {
-                btn.className = btn.className.replace('bg-red-500 ', 'bg-red-500/10 ').replace('border-red-600', 'border-red-500/30').replace('text-white', 'text-red-400');
-                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> DOWNTIME';
+                btn.className = "col-span-2 w-full py-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500 hover:text-white transition-all active:translate-y-0.5 cursor-pointer";
+                btn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg> Downtime';
             }
 
-            // ——— 2. RESTORE STATUS BADGE → DANDORI ———
+            // ——— 2. RESTORE STATUS BADGE ———
             if (window._origDandoriStatus) {
                 const sc = document.getElementById('realtime-status-container');
                 const st = document.getElementById('realtime-status-text');
@@ -1653,40 +1679,68 @@ async function _finishDandoriDowntime(jobId) {
                 delete window._origDandoriStatus;
             }
 
-            // ——— 3. RESTORE ALERT BOX → DANDORI ———
+            const job = jobMasterData[jobId];
+            const wasInFirstCheck = job?._wasInFirstCheck || false;
+
+            // ——— 3. RESTORE ALERT BOX ———
             const alertBox = document.getElementById('active-downtime-alert-box');
             const alertTitle = document.getElementById('active-downtime-title');
             if (alertBox) {
-                alertBox.className = alertBox.className.replace(/bg-red-500\/10/g, 'bg-amber-500/10').replace(/border-red-500\/30/g, 'border-amber-500/30');
+                alertBox.className = wasInFirstCheck 
+                    ? alertBox.className.replace(/bg-red-500\/10/g, 'bg-purple-500/10').replace(/border-red-500\/30/g, 'border-purple-500/30')
+                    : alertBox.className.replace(/bg-red-500\/10/g, 'bg-amber-500/10').replace(/border-red-500\/30/g, 'border-amber-500/30');
             }
             if (alertTitle) {
-                alertTitle.className = alertTitle.className.replace(/text-red-500/g, 'text-amber-500');
-                alertTitle.textContent = 'Dandori (Persiapan)';
+                alertTitle.className = wasInFirstCheck
+                    ? alertTitle.className.replace(/text-red-500/g, 'text-purple-400')
+                    : alertTitle.className.replace(/text-red-500/g, 'text-amber-500');
+                alertTitle.textContent = wasInFirstCheck ? '1st Check' : 'Dandori (Persiapan)';
             }
 
-            // ——— 4. RESUME DANDORI on server ———
-            try {
-                const dRes = await fetch(`/operational/job/${jobId}/dandori/start`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
-                    body: JSON.stringify({ date: window.ProductionConfig.currentDate })
-                }).then(r => r.json());
-                if (dRes.success && dRes.downtime) {
-                    const t = new Date();
-                    window.runningDowntimes[`${jobId}_dandori`] = {
-                        id: dRes.downtime.id, start: t, jobId: jobId, btnType: 'dandori', dtType: 'dandori'
-                    };
-                    const job = jobMasterData[jobId];
-                    if (job && job._dandoriPaused) {
-                        if (job._frozenTimer != null) { job.base_seconds = job._frozenTimer; }
-                        job.started_at = t.toISOString();
-                        delete job._dandoriPaused;
-                        delete job._frozenTimer;
+            // ——— 4. RESUME 1ST CHECK OR DANDORI on server ———
+            if (wasInFirstCheck) {
+                try {
+                    const fcRes = await fetch(`/operational/job/${jobId}/dandori/first-check/start`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
+                        body: JSON.stringify({ date: window.ProductionConfig.currentDate })
+                    }).then(r => r.json());
+                    if (fcRes.success && fcRes.dandori) {
+                        const t = new Date();
+                        window.runningDowntimes[`${jobId}_firstcheck`] = {
+                            id: fcRes.dandori.id, start: t, jobId: jobId, btnType: 'firstcheck', dtType: '1st_check'
+                        };
                     }
+                } catch (e) { console.warn('Resume 1st check failed:', e); }
+                if (job) {
+                    delete job._wasInFirstCheck;
+                    delete job._dandoriPaused;
+                    delete job._frozenTimer;
                 }
-            } catch (e) { console.warn('Resume dandori failed:', e); }
+                showToast('Downtime selesai, 1st Check dilanjutkan', 'success');
+            } else {
+                try {
+                    const dRes = await fetch(`/operational/job/${jobId}/dandori/start`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' },
+                        body: JSON.stringify({ date: window.ProductionConfig.currentDate })
+                    }).then(r => r.json());
+                    if (dRes.success && dRes.downtime) {
+                        const t = new Date();
+                        window.runningDowntimes[`${jobId}_dandori`] = {
+                            id: dRes.downtime.id, start: t, jobId: jobId, btnType: 'dandori', dtType: 'dandori'
+                        };
+                        if (job && job._dandoriPaused) {
+                            if (job._frozenTimer != null) { job.base_seconds = job._frozenTimer; }
+                            job.started_at = t.toISOString();
+                            delete job._dandoriPaused;
+                            delete job._frozenTimer;
+                        }
+                    }
+                } catch (e) { console.warn('Resume dandori failed:', e); }
+                showToast('Downtime selesai, Dandori dilanjutkan', 'success');
+            }
 
-            showToast('Downtime selesai, Dandori dilanjutkan', 'success');
             updateTimeline();
             updateLostTimeDisplay(jobId);
             notifyLineStatusChange(jobMasterData[jobId]?.line);

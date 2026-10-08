@@ -577,15 +577,23 @@ window.jobDowntimeHistory = {
                 'problem' => $dt->problem
             ];
         })->toArray(),
-        $jd->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && $d->finish_time)->map(function($d){
+        $jd->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check')->map(function($d) use ($jd) {
+            $endTs = $d->finish_time ? \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000 : null;
+            if (!$endTs) {
+                // If 1st check was paused by an active non-dandori downtime, anchor end to downtime start or now
+                $openDt = $jd->downtimes->whereNull('finish_time')->where('jenis_downtime', '!=', 'dandori')->first();
+                if ($openDt && $openDt->start_time) {
+                    $endTs = \Carbon\Carbon::parse($openDt->start_time)->timestamp * 1000;
+                }
+            }
             return [
                 'id' => 'fc_'.$d->id,
                 'start' => \Carbon\Carbon::parse($d->start_time)->timestamp * 1000,
-                'end' => \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000,
+                'end' => $endTs,
                 'type' => '1st_check',
                 'problem' => null
             ];
-        })->toArray()
+        })->filter(fn($item) => $item['end'] !== null)->values()->toArray()
     )) !!},
     @endif
     @endforeach
@@ -601,15 +609,22 @@ window.jobDowntimeHistory = {
                 'problem' => $dt->problem
             ];
         })->toArray(),
-        $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check' && $d->finish_time)->map(function($d){
+        $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check')->map(function($d) use ($activeJob) {
+            $endTs = $d->finish_time ? \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000 : null;
+            if (!$endTs) {
+                $openDt = $activeJob->downtimes->whereNull('finish_time')->where('jenis_downtime', '!=', 'dandori')->first();
+                if ($openDt && $openDt->start_time) {
+                    $endTs = \Carbon\Carbon::parse($openDt->start_time)->timestamp * 1000;
+                }
+            }
             return [
                 'id' => 'fc_'.$d->id,
                 'start' => \Carbon\Carbon::parse($d->start_time)->timestamp * 1000,
-                'end' => \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000,
+                'end' => $endTs,
                 'type' => '1st_check',
                 'problem' => null
             ];
-        })->toArray()
+        })->filter(fn($item) => $item['end'] !== null)->values()->toArray()
     )) !!},
     @endif
 };
