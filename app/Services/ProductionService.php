@@ -265,7 +265,22 @@ class ProductionService
     {
         return DB::transaction(function () use ($jobId, $data, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
-            
+
+            $job = JobMaster::find($jobId);
+            $planId = $this->resolvePlanId($jobId);
+            $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+            $maxTarget = (int) ($plan?->plan ?? $job?->target_qty ?? 0);
+
+            $incomingOk = (int) ($data['ok_qty'] ?? 0);
+            if ($incomingOk > 0 && $maxTarget > 0) {
+                $currentOk = (int) ProductionLog::where('job_master_id', $jobId)
+                    ->whereDate('created_at', now())->sum('ok_qty');
+                if (($currentOk + $incomingOk) > $maxTarget) {
+                    $sisa = max(0, $maxTarget - $currentOk);
+                    throw new \InvalidArgumentException("Target Plan maksimal {$maxTarget} PCS! Total OK tidak boleh melebihi target (Sisa: {$sisa} PCS).");
+                }
+            }
+
             $log = ProductionLog::create([
                 'job_master_id' => $jobId,
                 'ok_qty' => $data['ok_qty'] ?? 0,

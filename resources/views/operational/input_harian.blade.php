@@ -551,7 +551,7 @@ window.jobMasterData = {
                 : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->timestamp * 1000 : 'null') 
         }},
         base_seconds: {{ $activeJob->dailyProduction ? (int)$activeJob->dailyProduction->runtime_seconds : 0 }},
-        target_qty: {{ $activeJob->target_qty ?? 0 }},
+        target_qty: {{ ($activeProdPlan?->plan ?? $activeJob->target_qty) ?? 0 }},
         actual_ok: {{ $activeJob->dailyProduction?->actual_ok ?? 0 }},
         actual_repair: {{ $activeJob->dailyProduction?->actual_repair ?? 0 }},
         actual_reject: {{ $activeJob->dailyProduction?->actual_reject ?? 0 }},

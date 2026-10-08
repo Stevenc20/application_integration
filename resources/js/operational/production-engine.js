@@ -2321,6 +2321,13 @@ function saveJob(id, source) {
         showToast('Nilai OK tidak boleh negatif', 'danger');
         return;
     }
+    const targetMax = parseInt(jobMasterData[id]?.target_qty, 10) || 0;
+    if (targetMax > 0 && newActual > targetMax) {
+        showToast(`Target Plan maksimal ${targetMax} PCS! Total OK tidak boleh melebihi target.`, 'danger');
+        if (actualEl) actualEl.value = jobMasterData[id]?.actual_ok || '';
+        if (activeActualEl) activeActualEl.value = '';
+        return;
+    }
     if (newActual === 0) return;
 
     let currentActual = jobMasterData[id]?.actual_ok || 0;
@@ -2381,6 +2388,8 @@ async function performSave(id, ok, repair, reject) {
                     }
                 }
                 notifyLineStatusChange(jobMasterData[id]?.line);
+            } else {
+                showToast(data.message || 'Gagal menyimpan production log', 'danger');
             }
         } finally {
             if (!success && jobMasterData[id]) {
@@ -2543,6 +2552,15 @@ window.stepInput = function (id, amount, jobId = null) {
                 return;
             }
             const current = Math.max(0, parseInt(jobMasterData[targetJobId]?.actual_ok, 10) || 0);
+            const targetMax = parseInt(jobMasterData[targetJobId]?.target_qty, 10) || 0;
+
+            if (parsedAmount > 0 && targetMax > 0 && (current + parsedAmount) > targetMax) {
+                const sisa = Math.max(0, targetMax - current);
+                showToast(`Target Plan maksimal ${targetMax} PCS! Total OK tidak boleh melebihi target (Sisa: ${sisa} PCS).`, 'danger');
+                if (input) input.value = '';
+                return;
+            }
+
             const newVal = Math.max(0, current + parsedAmount);
             if (current + parsedAmount < 0) {
                 showToast('Nilai OK tidak boleh negatif', 'danger');
@@ -2591,6 +2609,14 @@ window.manualStep = function (id, inputId, jobId) {
         const raw = input.value.trim();
         const value = parseInt(raw, 10);
         if (!isNaN(value) && value > 0) {
+            const targetJobId = jobId || id.split('-').pop();
+            const current = Math.max(0, parseInt(jobMasterData[targetJobId]?.actual_ok, 10) || 0);
+            const targetMax = parseInt(jobMasterData[targetJobId]?.target_qty, 10) || 0;
+            if (targetMax > 0 && (current + value) > targetMax) {
+                const sisa = Math.max(0, targetMax - current);
+                showToast(`Target Plan maksimal ${targetMax} PCS! Input ${value} melebihi target (Sisa: ${sisa} PCS).`, 'danger');
+                return;
+            }
             stepInput(id, value, jobId);
             input.value = '';
         } else {

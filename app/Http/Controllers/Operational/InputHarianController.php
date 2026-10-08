@@ -29,22 +29,28 @@ class InputHarianController extends Controller
     public function saveProductionLog(Request $request, $id)
     {
         $this->guardLockedShift($id);
-        $workDate = $request->get('date') ?: now()->toDateString();
-        $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
+        try {
+            $workDate = $request->get('date') ?: now()->toDateString();
+            $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
 
-        return response()->json([
-            'success' => true,
-            'message' => 'Log input saved',
-            'total_ok' => $result['actualQty'],
-            'efficiency' => $result['efficiency'],
-            'runtime_seconds' => $result['runtime_seconds'] ?? 0,
-            'log' => [
-                'time' => $result['log']->created_at->format('H:i'),
-                'ok' => $result['log']->ok_qty,
-                'repair' => $result['log']->repair_qty,
-                'reject' => $result['log']->reject_qty,
-            ]
-        ]);
+            return response()->json([
+                'success' => true,
+                'message' => 'Log input saved',
+                'total_ok' => $result['actualQty'],
+                'efficiency' => $result['efficiency'],
+                'runtime_seconds' => $result['runtime_seconds'] ?? 0,
+                'log' => [
+                    'time' => $result['log']->created_at->format('H:i'),
+                    'ok' => $result['log']->ok_qty,
+                    'repair' => $result['log']->repair_qty,
+                    'reject' => $result['log']->reject_qty,
+                ]
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
     }
 
     public function index(Request $request)
