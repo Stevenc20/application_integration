@@ -879,9 +879,18 @@ class InputHarianController extends Controller
     public function activeJob(Request $request)
     {
         $lineFilter = $request->get('line');
-        $query = ProductionSession::where('status', 'running')
-            ->whereDate('work_date', now()->toDateString())
+        $query = ProductionSession::whereDate('work_date', now()->toDateString())
+            ->where(function ($q) {
+                $q->where('status', 'running')
+                    ->orWhere(function ($qq) {
+                        $qq->where('status', 'paused')
+                            ->whereHas('jobMaster.downtimes', function ($d) {
+                                $d->whereNull('finish_time')->where('jenis_downtime', 'break time');
+                            });
+                    });
+            })
             ->with('jobMaster')
+            ->orderByRaw("CASE WHEN status = 'running' THEN 0 ELSE 1 END")
             ->orderByDesc('updated_at')
             ->orderByDesc('id');
 

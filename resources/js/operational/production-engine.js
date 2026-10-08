@@ -393,6 +393,7 @@ async function _triggerAutoBreakEnd(jobId) {
         }
 
         const job = window.jobMasterData[jobId];
+        const wasBreakPaused = !!(job && job._breakPaused);
         if (job && job._breakPaused) {
             if (job._frozenTimer != null) {
                 job.base_seconds = job._frozenTimer;
@@ -400,11 +401,16 @@ async function _triggerAutoBreakEnd(jobId) {
             }
             delete job._breakPaused;
             delete job._frozenTimer;
+        }
+        // Resume server-side regardless of local flag state (flag is lost after reload);
+        // only skip if we positively know the job is already running.
+        if (!job || wasBreakPaused || job.status === 'paused' || job.status === undefined) {
             fetch(`/operational/job/${jobId}/resume`, {
                 method: 'POST',
                 headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
             }).catch(() => {});
         }
+        if (job) job.status = 'running';
 
         window._autoBreakActive = false;
         window._autoBreakDowntimeId = null;
@@ -502,13 +508,35 @@ function _updateBreakUI(jobId, label, isPaused) {
                 }
                 _updateBreakUI(activeId, breakWindow.label, true);
             } else {
-                // Stale break from previous window — close it immediately
+                // Stale break from previous window — close it immediately and resume the job
                 h.end = Date.now();
                 if (h.id) {
                     fetch(`/operational/downtime/${h.id}/finish`, {
                         method: 'POST',
                         headers: { 'X-CSRF-TOKEN': window.ProductionConfig?.csrfToken, 'Accept': 'application/json' }
                     }).catch(() => {});
+                }
+                const job = window.jobMasterData?.[activeId];
+                if (!job || job.status !== 'running') {
+                    fetch(`/operational/job/${activeId}/resume`, {
+                        method: 'POST',
+                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig?.csrfToken, 'Accept': 'application/json' }
+                    }).catch(() => {});
+                }
+                if (job) {
+                    if (job._breakPaused) {
+                        if (job._frozenTimer != null) {
+                            job.base_seconds = job._frozenTimer;
+                            job.started_at = new Date().toISOString();
+                        }
+                        delete job._breakPaused;
+                        delete job._frozenTimer;
+                    }
+                    job.status = 'running';
+                }
+                if (window.runningDowntimes) delete window.runningDowntimes[`${activeId}_break`];
+                if (window.ProductionConfig) {
+                    window.ProductionConfig.currentDowntimeCount = Object.keys(window.runningDowntimes || {}).length;
                 }
                 _updateBreakUI(activeId, null, false);
             }
@@ -2478,6 +2506,14 @@ window.selectCustomItem = function selectCustomItem(id, label) {
     toggleCustomSelect();
 }
 
+function _isInBreakState(activeId) {
+    if (window._autoBreakActive || window._autoBreakDowntimeId) return true;
+    if (activeId && window.jobMasterData?.[activeId]?._breakPaused) return true;
+    if (activeId && window.runningDowntimes?.[`${activeId}_break`]) return true;
+    if (_isInBreakWindow(new Date())) return true;
+    return false;
+}
+
 function checkSyncStatus() {
     if (window._isReloading || (window.ActionRunner && window.ActionRunner.locked)) return;
     const config = window.ProductionConfig;
@@ -2485,6 +2521,7 @@ function checkSyncStatus() {
     fetch(`/operational/active-job?line=${encodeURIComponent(line)}`, { headers: { 'Accept': 'application/json' } }).then(res => res.json()).then(data => {
         if (window._isReloading) return;
         if ((data.running && data.id !== config.currentActiveId) || (!data.running && config.currentActiveId !== null)) {
+            if (_isInBreakState(config.currentActiveId)) return;
             window._isReloading = true;
             location.reload();
         }

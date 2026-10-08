@@ -144,10 +144,11 @@
 
                         let baseSeconds = parseInt(data.total_seconds || 0);
                         let startTime = new Date(data.start_time);
+                        let isPaused = data.status === 'paused';
 
                         window.globalTimerInterval = setInterval(() => {
                             let diffInSeconds = Math.floor((new Date() - startTime) / 1000);
-                            let current = baseSeconds + Math.max(0, diffInSeconds);
+                            let current = isPaused ? baseSeconds : baseSeconds + Math.max(0, diffInSeconds);
 
                             let h = String(Math.floor(current/3600)).padStart(2,'0');
                             let m = String(Math.floor((current%3600)/60)).padStart(2,'0');
