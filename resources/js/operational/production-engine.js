@@ -1019,11 +1019,6 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         const container = document.getElementById(containerId);
         if (!container) return;
 
-        // Skip full re-render when hovering a timeline segment to prevent flicker
-        if (window.activeTimelineMarkerId && containerId.includes('container')) {
-            return;
-        }
-
         const job = jobMasterData[jobId];
         const isComplete = isJobComplete(job);
         const s = job?.status?.toLowerCase();
@@ -2888,8 +2883,10 @@ function initProductionEngine() {
 
         updateTimeline(true);
         updateTimers();
-        setInterval(() => updateTimers(), 1000);
-        setInterval(() => updateTimeline(false), 3000);
+        setInterval(() => {
+            updateTimers();
+            updateTimeline(false);
+        }, 1000);
         setInterval(checkSyncStatus, 5000);
         setInterval(syncActualQty, 8000);
 
@@ -2920,9 +2917,7 @@ function initProductionEngine() {
             const seg = e.target.closest('[data-ttid]');
             if (!seg) return;
             window.hideTimelineTooltip();
-            if (!('ontouchstart' in window || navigator.maxTouchPoints > 0)) {
-                window.resetTimelineMarkers();
-            }
+            window.resetTimelineMarkers();
         });
 
         // Responsive UX: Automatically hide tooltip and reset markers when scrolling any container
