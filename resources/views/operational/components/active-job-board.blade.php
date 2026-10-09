@@ -787,36 +787,36 @@
                 <div class="flex flex-col sm:flex-row items-stretch gap-3 bg-white p-3 rounded-[2rem] border border-slate-200 shadow-sm">
                     <div class="flex-1 relative" id="custom-select-container">
                         <input type="hidden" id="standby-job-select" value="{{ $firstJob ? $firstJob->id : '' }}">
-                        <button type="button" onclick="toggleCustomSelect()" id="custom-select-trigger" class="w-full h-14 bg-white border border-slate-300 rounded-2xl px-6 flex items-center justify-between text-sm text-slate-800 hover:border-red-400 transition-all outline-none shadow-inner group/select font-bold">
-                            <span id="custom-select-label">
+                        <button type="button" onclick="toggleCustomSelect()" id="custom-select-trigger" class="w-full h-14 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-2xl px-6 flex items-center justify-between text-sm text-slate-900 hover:border-red-400 transition-all outline-none shadow-sm group/select font-bold">
+                            <span id="custom-select-label" class="truncate text-slate-800 font-extrabold">
                                 @if($firstJob)
                                     [{{ $firstJob->job_number }}] {{ $firstJob->job_name }}
                                 @else
-                                    Tidak ada antrean job
+                                    <span class="text-slate-400 font-medium">Tidak ada antrean job</span>
                                 @endif
                             </span>
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-slate-400 group-hover/select:text-red-500 transition-transform duration-300" id="custom-select-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-slate-500 group-hover/select:text-red-500 transition-transform duration-300 shrink-0 ml-2" id="custom-select-arrow" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M19 9l-7 7-7-7"/></svg>
                         </button>
 
-                        <div id="custom-select-menu" class="hidden absolute bottom-full mb-3 left-0 right-0 bg-white border border-slate-200 rounded-2xl shadow-lg overflow-hidden z-[110] max-h-60 overflow-y-auto">
-                            <div class="px-4 py-3 border-b border-slate-100 bg-slate-100 flex items-center justify-between">
-                                <span class="text-[9px] font-black text-slate-400 uppercase tracking-widest">Urutan Antrean Jadwal PPC</span>
-                                <span class="text-[8px] font-black text-red-500 px-2 py-0.5 rounded-full bg-red-50 border border-red-200">Sesuai Urutan</span>
+                        <div id="custom-select-menu" class="hidden absolute bottom-full mb-3 left-0 right-0 bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden z-[110] max-h-60 overflow-y-auto">
+                            <div class="px-4 py-3 border-b border-slate-200 bg-slate-100 flex items-center justify-between">
+                                <span class="text-[9px] font-black text-slate-500 uppercase tracking-widest">Urutan Antrean Jadwal PPC</span>
+                                <span class="text-[8px] font-black text-red-600 px-2 py-0.5 rounded-full bg-red-100 border border-red-200">Sesuai Urutan</span>
                             </div>
                             <div class="p-2 space-y-1">
                                 @forelse($pendingJobs as $index => $pj)
-                                <div class="flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-red-50 transition-all group/item cursor-pointer" onclick="selectCustomItem({{ $pj->id }}, '[{{ $pj->job_number }}] {{ addslashes($pj->job_name) }}')">
-                                    <div class="w-8 h-8 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-500 group-hover/item:bg-red-100 group-hover/item:text-red-600 transition-all">
+                                <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all group/item cursor-pointer" onclick="selectCustomItem({{ $pj->id }}, '[{{ $pj->job_number }}] {{ addslashes($pj->job_name) }}')">
+                                    <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-700 group-hover/item:bg-red-600 group-hover/item:text-white group-hover/item:border-red-600 transition-all shadow-sm">
                                         {{ $index + 1 }}
                                     </div>
                                     <div class="flex-1 min-w-0 text-left">
-                                        <div class="flex items-center justify-between">
-                                            <p class="text-[10px] font-black text-slate-400 uppercase leading-none mb-1 group-hover/item:text-red-500">{{ $pj->job_number }}</p>
+                                        <div class="flex items-center justify-between gap-2">
+                                            <p class="text-[10px] font-black text-slate-500 uppercase leading-none mb-1 group-hover/item:text-red-600">{{ $pj->job_number }}</p>
                                             @if($index === 0)
-                                                <span class="text-[8px] font-black text-red-500 uppercase">Item Pertama (Aktif)</span>
+                                                <span class="text-[8px] font-black text-red-600 uppercase bg-red-100 px-1.5 py-0.5 rounded">Item Pertama (Aktif)</span>
                                             @endif
                                         </div>
-                                        <p class="text-xs font-bold text-slate-700 truncate">{{ $pj->job_name }}</p>
+                                        <p class="text-xs font-black text-slate-800 group-hover/item:text-slate-900 truncate">{{ $pj->job_name }}</p>
                                     </div>
                                 </div>
                                 @empty
