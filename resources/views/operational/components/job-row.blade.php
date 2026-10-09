@@ -21,12 +21,20 @@
         ?->sortBy('start_time')->first();
     if ($firstDan) {
         $actStartDerived = \Carbon\Carbon::parse($firstDan->start_time);
-        $planWindowMinutes = (!empty($job->start_time) && !empty($job->finish_time))
-            ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time))
-            : null;
-        $tptMinutesDerived = $planWindowMinutes ?: (float)($job->tpt ?? 0);
-        if ($tptMinutesDerived > 0) {
-            $actEndDerived = $actStartDerived->copy()->addMinutes($tptMinutesDerived);
+        if ($isCompleted) {
+            $finishTs = $job->job_data?->finished_at ?? $job->job_data?->updated_at;
+            if ($finishTs) {
+                $actEndDerived = \Carbon\Carbon::parse($finishTs);
+            }
+        }
+        if (!$actEndDerived) {
+            $planWindowMinutes = (!empty($job->start_time) && !empty($job->finish_time))
+                ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time))
+                : null;
+            $tptMinutesDerived = $planWindowMinutes ?: (float)($job->tpt ?? 0);
+            if ($tptMinutesDerived > 0) {
+                $actEndDerived = $actStartDerived->copy()->addMinutes($tptMinutesDerived);
+            }
         }
     }
 @endphp
@@ -285,9 +293,9 @@
             <div class="relative">
                 <div class="flex justify-between items-center mb-1.5">
                     <div class="flex items-center gap-2">
-                        <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">Actual Segmented Execution (Live Tracking)</span>
+                        <span class="text-[9px] font-black {{ $isCompleted ? 'text-slate-500' : 'text-blue-500' }} uppercase tracking-widest">Actual Segmented Execution {{ $isCompleted ? '(Selesai)' : '(Live Tracking)' }}</span>
                         @if(!empty($job->act_start) || !empty($job->act_finish) || $actStartDerived)
-                            <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-600 text-[8px] font-black tracking-tighter uppercase border border-blue-100">
+                            <span class="px-2 py-0.5 rounded {{ $isCompleted ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-blue-50 text-blue-600 border-blue-100' }} text-[8px] font-black tracking-tighter uppercase border">
                                 @if($actStartDerived && $actEndDerived)
                                     ACT: {{ $actStartDerived->format('H:i') }} - {{ $actEndDerived->format('H:i') }}
                                 @else
@@ -296,7 +304,7 @@
                             </span>
                         @endif
                     </div>
-                    <span id="pct-{{ $jobId }}" class="text-[9px] font-black text-blue-600 bg-blue-50 px-2 py-0.5 rounded shadow-sm border border-blue-100 tabular-nums">{{ $job->plan > 0 ? round(($actualOk + $actualRepair + $actualReject) / $job->plan * 100) : 0 }}%</span>
+                    <span id="pct-{{ $jobId }}" class="text-[9px] font-black {{ $isCompleted ? 'text-slate-600 bg-slate-100 border-slate-200' : 'text-blue-600 bg-blue-50 border-blue-100' }} px-2 py-0.5 rounded shadow-sm border tabular-nums">{{ $job->plan > 0 ? round(($actualOk + $actualRepair + $actualReject) / $job->plan * 100) : 0 }}%</span>
                 </div>
                 <div class="relative h-9 w-full mb-6 group hover:z-[60]">
                     <div class="absolute inset-0 bg-slate-900 rounded-xl border-2 border-slate-800 shadow-2xl overflow-hidden flex items-center">

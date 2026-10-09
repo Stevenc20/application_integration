@@ -510,7 +510,7 @@ class ProductionService
                     'actual_qty'      => $totalOk,
                     'actual_repair'   => $totalRepair,
                     'actual_reject'   => $totalReject,
-                    'efficiency'      => ($job && $job->capacity > 0) ? ($totalOk / $job->capacity) * 100 : 0
+                    'efficiency'      => ($job && $job->target_qty > 0) ? ($totalOk / $job->target_qty) * 100 : (($job && $job->capacity > 0) ? ($totalOk / $job->capacity) * 100 : 0)
                 ]
             );
 

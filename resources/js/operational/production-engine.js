@@ -109,7 +109,7 @@ function formatSeconds(sec) {
 function isJobComplete(job) {
     if (!job || !job.status) return false;
     const s = String(job.status).toLowerCase();
-    return s === 'complete' || s === 'finished';
+    return s === 'complete' || s === 'finished' || s === 'completed' || s === 'closed' || s === 'done';
 }
 
 function updateTimers() {
@@ -635,7 +635,7 @@ function updateTimeline(forceAll = false) {
             const pS = new Date(pS_time);
             const pE = new Date(pE_time);
 
-            const effectiveNow = isComplete ? (job.finished_at ? new Date(job.finished_at) : pE) : now;
+            const effectiveNow = isComplete ? (job.finished_at ? new Date(job.finished_at) : (job.updated_at ? new Date(job.updated_at) : pE)) : now;
 
             let jS = job.started_at ? new Date(job.started_at) : null;
             const jF = job.finished_at ? new Date(job.finished_at) : null;
@@ -701,11 +701,17 @@ function updateTimeline(forceAll = false) {
             // B. Update Table Row
             const rowPctEl = document.getElementById('pct-' + id);
             if (rowPctEl) {
-                const displayProgress = Math.round(realPct);
-                if (realPct > 100) {
-                    rowPctEl.innerHTML = `<span class="text-red-500 font-black">OVER ${displayProgress}%</span>`;
+                if (isComplete) {
+                    const rowActualTotal = (parseInt(job.actual_ok) || 0) + (parseInt(job.actual_repair) || 0) + (parseInt(job.actual_reject) || 0);
+                    const finalQtyPct = job.target_qty > 0 ? Math.round(rowActualTotal / job.target_qty * 100) : 0;
+                    rowPctEl.innerText = finalQtyPct + '%';
                 } else {
-                    rowPctEl.innerText = displayProgress + '%';
+                    const displayProgress = Math.round(realPct);
+                    if (realPct > 100) {
+                        rowPctEl.innerHTML = `<span class="text-red-500 font-black">OVER ${displayProgress}%</span>`;
+                    } else {
+                        rowPctEl.innerText = displayProgress + '%';
+                    }
                 }
             }
 
@@ -1229,12 +1235,12 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
 
                 let color = 'bg-red-600';
                 const isLast = rdIdx === runningDowntimesForJob.length - 1;
-                let extraClass = isLast ? 'active-growing' : '';
+                let extraClass = (!isComplete && isLast) ? 'active-growing' : '';
                 const typeLower = (rdItem.dtType || "").toLowerCase();
                 if (typeLower === 'dandori') color = 'bg-amber-400';
-                else if (typeLower === 'firstcheck' || typeLower === '1st_check') { color = 'bg-purple-500'; extraClass = isLast ? 'active-growing' : ''; }
+                else if (typeLower === 'firstcheck' || typeLower === '1st_check') { color = 'bg-purple-500'; extraClass = (!isComplete && isLast) ? 'active-growing' : ''; }
                 else if (typeLower === 'try out' || typeLower === 'tryout') color = 'bg-orange-500';
-                else if (typeLower === 'break time' || typeLower === 'break') { color = 'bg-slate-500'; extraClass = isLast ? 'active-growing' : ''; }
+                else if (typeLower === 'break time' || typeLower === 'break') { color = 'bg-slate-500'; extraClass = (!isComplete && isLast) ? 'active-growing' : ''; }
                 let displayType = rdItem.dtType || '';
                 if (typeLower !== 'dandori' && typeLower !== 'firstcheck' && typeLower !== '1st_check' && typeLower !== 'try out' && typeLower !== 'tryout' && typeLower !== 'break time' && typeLower !== 'break') {
                     displayType = 'Downtime ' + displayType;

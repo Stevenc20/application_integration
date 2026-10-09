@@ -510,7 +510,7 @@ window.jobMasterData = {
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->finish_time)->timestamp * 1000 
-                : ($jd->finished_at ? \Carbon\Carbon::parse($jd->finished_at)->timestamp * 1000 : 'null') 
+                : ($jd->finished_at ? \Carbon\Carbon::parse($jd->finished_at)->timestamp * 1000 : (in_array(strtolower($jd->status), ['complete', 'completed', 'finished', 'closed', 'done']) && $jd->updated_at ? \Carbon\Carbon::parse($jd->updated_at)->timestamp * 1000 : 'null')) 
         }},
         base_seconds: {{ $jd->dailyProduction ? (int)$jd->dailyProduction->runtime_seconds : 0 }},
         target_qty: {{ $job->plan ?? 0 }},
@@ -542,7 +542,7 @@ window.jobMasterData = {
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($activeJob->id) && $sessionMap->get($activeJob->id)?->finish_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($activeJob->id)->finish_time)->timestamp * 1000 
-                : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->timestamp * 1000 : 'null') 
+                : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->timestamp * 1000 : (in_array(strtolower($activeJob->status), ['complete', 'completed', 'finished', 'closed', 'done']) && $activeJob->updated_at ? \Carbon\Carbon::parse($activeJob->updated_at)->timestamp * 1000 : 'null')) 
         }},
         base_seconds: {{ $activeJob->dailyProduction ? (int)$activeJob->dailyProduction->runtime_seconds : 0 }},
         target_qty: {{ ($activeProdPlan?->plan ?? $activeJob->target_qty) ?? 0 }},
