@@ -602,22 +602,15 @@
                     @endphp
 
                     <div id="control-board-actions" class="mt-3 flex flex-col gap-3">
-                        {{-- Tombol Stop & Lanjut HANYA muncul jika 1st Check SUDAH pernah diselesaikan --}}
-                        @if($hasCompletedFirstCheck)
-                            <button onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                        @if($openFirstCheck || $hasCompletedFirstCheck)
+                            {{-- Jika 1st Check sudah dimulai atau selesai: LANGSUNG berubah jadi Stop & Lanjut Produksi --}}
+                            <button type="button" id="stop-dandori-btn-{{ $activeJob->id }}" onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
                                 Stop &amp; Lanjut Produksi
                             </button>
-                        @endif
-
-                        {{-- Tombol 1st Check / Stop 1st Check --}}
-                        @if($openFirstCheck)
-                            <button type="button" id="firstcheck-btn-{{ $activeJob->id }}" onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                Selesaikan 1st Check
-                            </button>
-                        @elseif(!$hasCompletedFirstCheck)
-                            <button type="button" id="firstcheck-btn-{{ $activeJob->id }}" onclick="jsToggleFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                        @else
+                            {{-- Sebelum 1st Check dimulai: tombol Mulai 1st Check --}}
+                            <button type="button" id="firstcheck-btn-{{ $activeJob->id }}" onclick="jsStartFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
                                 Mulai 1st Check
                             </button>
