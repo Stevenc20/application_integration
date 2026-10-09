@@ -306,6 +306,8 @@ class InputHarianController extends Controller
             }
         }
 
+        $activeJob = null;
+
         if ($request->filled('job_id')) {
             $requestedJob = JobMaster::with([
                 'dailyProduction' => function ($q) use ($date) {
