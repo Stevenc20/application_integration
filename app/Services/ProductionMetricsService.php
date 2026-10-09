@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Models\Downtime;
 use App\Models\ProductionPlan;
 use Illuminate\Support\Collection;
 
@@ -10,7 +11,7 @@ use Illuminate\Support\Collection;
  */
 class ProductionMetricsService
 {
-    public static function calculateProcessTime($ct, $plan): int
+    public static function calculateProcessTime(int|float|string|null $ct, int|float|string|null $plan): int
     {
         if (!$ct || !$plan) {
             return 0;
@@ -183,7 +184,7 @@ class ProductionMetricsService
     /**
      * Calculate duration_seconds for a downtime record, handling open/running records.
      */
-    private static function downtimeDurationSeconds($dt, \Carbon\Carbon $now): float
+    private static function downtimeDurationSeconds(Downtime $dt, \Carbon\Carbon $now): float
     {
         if (!empty($dt->duration_seconds)) {
             return (float) $dt->duration_seconds;
