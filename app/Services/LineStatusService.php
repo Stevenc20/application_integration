@@ -31,7 +31,8 @@ class LineStatusService
         $validRunningJobs = collect();
         foreach ($allRunningJobs as $job) {
             $plan = $job->production_plan;
-            if (!$plan || $plan->plan_date !== $today) {
+            $planDateStr = $plan && $plan->plan_date ? ($plan->plan_date instanceof \Carbon\Carbon ? $plan->plan_date->toDateString() : (string)$plan->plan_date) : null;
+            if (!$plan || $planDateStr !== $today) {
                 // Dangling/orphaned job from previous plan upload - auto close
                 $nowTs = now();
                 Downtime::where('job_master_id', $job->id)->whereNull('finish_time')->update(['finish_time' => $nowTs]);

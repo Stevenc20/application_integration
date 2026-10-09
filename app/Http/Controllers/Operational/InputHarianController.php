@@ -12,21 +12,23 @@ use App\Models\Downtime;
 use App\Models\LineMaster;
 use App\Models\ProductionLog;
 use App\Models\ShiftSubmission;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use App\Services\ProductionService;
 use App\Services\DashboardRealtimeService;
 
 class InputHarianController extends Controller
 {
-    protected $productionService;
+    protected ProductionService $productionService;
 
     public function __construct(ProductionService $productionService)
     {
         $this->productionService = $productionService;
     }
 
-    public function saveProductionLog(Request $request, $id)
+    public function saveProductionLog(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -56,8 +58,8 @@ class InputHarianController extends Controller
     public function index(Request $request)
     {
         $lineFilter = $request->get('line');
-        if (empty($lineFilter) && auth()->check()) {
-            $userRole = strtolower(auth()->user()->role);
+        if (empty($lineFilter) && Auth::check()) {
+            $userRole = strtolower($request->user()?->role ?? '');
             if ($userRole === 'leader a') {
                 $lineFilter = 'Line A';
             } elseif ($userRole === 'leader b') {
@@ -329,49 +331,54 @@ class InputHarianController extends Controller
                 return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
             })->toArray();
 
-            $activeJobQuery = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+            $baseActiveQuery = function() use ($lineFilter) {
+                $q = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+                if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
+                    $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+                    $q->where(function($lq) use ($normalizedLine) {
+                        $lq->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
+                           ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedLine}%"]);
+                    });
+                }
+                return $q;
+            };
 
-            if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
-                $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
-                $activeJobQuery->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
-            }
-
-            // Only pick a running/paused job if it belongs to current schedule plans
+            // 1. Coba cari active job yang ada di jadwal $plans saat ini
+            $activeJobs = collect();
             if (!empty($scheduledJobNumbers)) {
-                $activeJobQuery->whereIn('job_number', $scheduledJobNumbers);
+                $activeJobs = $baseActiveQuery()
+                    ->whereIn('job_number', $scheduledJobNumbers)
+                    ->with([
+                        'dailyProduction' => function ($q) use ($date) {
+                            $q->where('work_date', $date);
+                        },
+                        'downtimes',
+                        'dandoris'
+                    ])
+                    ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                    ->orderByDesc('updated_at')
+                    ->orderByDesc('id')
+                    ->get();
             }
 
-            $activeJobs = $activeJobQuery->with([
-                    'dailyProduction' => function ($q) use ($date) {
-                        $q->where('work_date', $date);
-                    },
-                    'downtimes',
-                    'dandoris'
-                ])
-                ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
-                ->orderByDesc('updated_at')
-                ->orderByDesc('id')
-                ->get();
+            // 2. Fallback: Jika filter status/search membuat $plans tidak memuat job yang running di line ini,
+            // TETAP temukan active job di line ini agar operator console / active job board tidak hilang!
+            if ($activeJobs->isEmpty()) {
+                $activeJobs = $baseActiveQuery()
+                    ->with([
+                        'dailyProduction' => function ($q) use ($date) {
+                            $q->where('work_date', $date);
+                        },
+                        'downtimes',
+                        'dandoris'
+                    ])
+                    ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                    ->orderByDesc('updated_at')
+                    ->orderByDesc('id')
+                    ->get();
+            }
 
             $activeJob = $activeJobs->first();
-
-            // Auto cut-off: if there are multiple active jobs on this line/schedule, finish truly stale running ones
-            // Never finish a job that has an ongoing dandori, 1st check, or has not started real production yet (!started_at)!
-            if ($activeJobs->count() > 1) {
-                foreach ($activeJobs->slice(1) as $staleJob) {
-                    $hasActiveDandori = $staleJob->downtimes->contains(function ($dt) {
-                        return $dt->jenis_downtime === 'dandori' && is_null($dt->finish_time);
-                    });
-                    $hasActiveFirstCheck = $staleJob->dandoris->contains(function ($d) {
-                        return ($d->jenis_dandori === '1st_check' || $d->activity === '1ST CHECK') && is_null($d->finish_time);
-                    });
-                    $isPreProduction = is_null($staleJob->started_at);
-
-                    if (strtolower($staleJob->status) === 'running' && !$hasActiveDandori && !$hasActiveFirstCheck && !$isPreProduction) {
-                        $this->productionService->finishJob($staleJob->id);
-                    }
-                }
-            }
         }
 
         // Production Logs — always filtered by selected date
@@ -476,7 +483,7 @@ class InputHarianController extends Controller
         ]);
     }
 
-    private function syncPlanToJobMaster($date, $shift)
+    private function syncPlanToJobMaster(string $date, string $shift)
     {
         // Tentukan Shift Terbaru (Revisi Terakhir)
         $latestShiftName = $shift;
@@ -596,7 +603,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function start(Request $request, $id)
+    public function start(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -607,7 +614,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function enqueue($id)
+    public function enqueue(int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -619,7 +626,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function startDandori(Request $request, $id)
+    public function startDandori(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -631,7 +638,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function finishDandori($jobId)
+    public function finishDandori(int|string $jobId)
     {
         $this->guardLockedShift($jobId);
         try {
@@ -648,7 +655,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function startFirstCheck(Request $request, $id)
+    public function startFirstCheck(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -660,7 +667,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function finishFirstCheck($jobId)
+    public function finishFirstCheck(int|string $jobId)
     {
         $this->guardLockedShift($jobId);
         try {
@@ -674,7 +681,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function pause($id)
+    public function pause(int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -685,7 +692,7 @@ class InputHarianController extends Controller
         }
     }
     
-    public function resume($id)
+    public function resume(int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -696,7 +703,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function restart($id)
+    public function restart(int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -707,7 +714,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function finish(Request $request, $id)
+    public function finish(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -724,7 +731,7 @@ class InputHarianController extends Controller
                 'runtime_seconds' => $runtime
             ]);
         } catch (\Throwable $e) {
-            \Log::error("Failed to finish job $id: " . $e->getMessage(), [
+            Log::error("Failed to finish job $id: " . $e->getMessage(), [
                 'exception' => $e,
                 'trace' => $e->getTraceAsString()
             ]);
@@ -735,7 +742,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function status($id)
+    public function status(int|string $id)
     {
         $job = JobMaster::find($id);
         
@@ -753,7 +760,7 @@ class InputHarianController extends Controller
         ]);
     }
 
-    public function saveQty(Request $request, $id)
+    public function saveQty(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         try {
@@ -789,7 +796,7 @@ class InputHarianController extends Controller
             ?: $this->getShift();
     }
 
-    private function guardLockedShift($jobMasterId)
+    private function guardLockedShift(int|string $jobMasterId)
     {
         $jm = JobMaster::find($jobMasterId);
         if (!$jm || !$jm->line) return;
@@ -815,7 +822,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function nextList($id)
+    public function nextList(int|string $id)
     {
         $current = JobMaster::find($id);
 
@@ -841,7 +848,7 @@ class InputHarianController extends Controller
         return response()->json($formatted);
     }
     
-    public function nextProcess(Request $request, $id)
+    public function nextProcess(Request $request, int|string $id)
     {
         $this->guardLockedShift($id);
         $nextJobId = $request->get('next_job_id');
@@ -873,96 +880,97 @@ class InputHarianController extends Controller
     public function activeJob(Request $request)
     {
         $lineFilter = $request->get('line');
-        $query = ProductionSession::whereDate('work_date', now()->toDateString())
-            ->where(function ($q) {
-                $q->where('status', 'running')
-                    ->orWhere(function ($qq) {
-                        $qq->where('status', 'paused')
-                            ->whereHas('jobMaster.downtimes', function ($d) {
-                                $d->whereNull('finish_time')->where('jenis_downtime', 'break time');
-                            });
-                    });
-            })
-            ->with('jobMaster')
-            ->orderByRaw("CASE WHEN status = 'running' THEN 0 ELSE 1 END")
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id');
-
+        $normalizedLine = '';
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
-            $query->whereHas('jobMaster', function ($q) use ($normalizedLine) {
-                $q->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
+        }
+
+        // Cari JobMaster yang sedang running atau paused di line ini
+        $jmQuery = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+        if ($normalizedLine) {
+            $jmQuery->where(function($q) use ($normalizedLine) {
+                $q->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
+                  ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedLine}%"]);
             });
         }
 
-        $session = $query->first();
+        $jobMaster = $jmQuery->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
 
-        if (!$session || !$session->jobMaster) {
+        if (!$jobMaster) {
             return response()->json(['running' => false]);
         }
-        $isDandori = \App\Models\Downtime::where('job_master_id', $session->jobMaster->id)
+
+        $session = ProductionSession::where('job_master_id', $jobMaster->id)
+            ->orderByDesc('id')
+            ->first();
+        $isDandori = \App\Models\Downtime::where('job_master_id', $jobMaster->id)
             ->where('jenis_downtime', 'dandori')
             ->whereNull('finish_time')
             ->exists();
 
-        $activeDowntime = \App\Models\Downtime::where('job_master_id', $session->jobMaster->id)
+        $activeDowntime = \App\Models\Downtime::where('job_master_id', $jobMaster->id)
             ->whereNull('finish_time')
             ->orderBy('created_at', 'desc')
             ->first();
 
         $urlParams = [];
-        $jobMaster = $session->jobMaster;
-        if ($jobMaster) {
-            $parts = explode('-', $jobMaster->job_number);
-            $planId = end($parts);
-            $plan = null;
-            if (is_numeric($planId)) {
-                $plan = \App\Models\ProductionPlan::find($planId);
-            }
-            
-            $rawLine = $plan ? $plan->press_name : $jobMaster->line;
-            $lineParam = $rawLine;
-            $upperLine = strtoupper(trim($rawLine));
-            if ($upperLine === 'PRESS A' || $upperLine === 'A' || $upperLine === 'LINE A') {
-                $lineParam = 'Line A';
-            } elseif ($upperLine === 'PRESS B' || $upperLine === 'B' || $upperLine === 'LINE B') {
-                $lineParam = 'Line B';
-            } elseif ($upperLine === 'PRESS C' || $upperLine === 'C' || $upperLine === 'LINE C') {
-                $lineParam = 'Line C';
-            } elseif ($upperLine === 'PRESS D' || $upperLine === 'D' || $upperLine === 'LINE D') {
-                $lineParam = 'Line D';
-            } elseif ($upperLine === 'SHEARING') {
-                $lineParam = 'Shearing';
-            } elseif ($upperLine === 'HANDWORK') {
-                $lineParam = 'Handwork';
-            }
-
-            if ($plan) {
-                $urlParams = [
-                    'line'  => $lineParam,
-                    'shift' => $plan->shift_name,
-                    'date'  => $plan->plan_date ? $plan->plan_date->toDateString() : $session->work_date,
-                ];
-            } else {
-                $urlParams = [
-                    'line' => $lineParam,
-                    'date' => $session->work_date,
-                ];
-            }
+        $parts = explode('-', $jobMaster->job_number);
+        $planId = end($parts);
+        $plan = null;
+        if (is_numeric($planId)) {
+            $plan = \App\Models\ProductionPlan::find($planId);
         }
+        
+        $rawLine = $plan ? $plan->press_name : $jobMaster->line;
+        $lineParam = $rawLine;
+        $upperLine = strtoupper(trim($rawLine));
+        if ($upperLine === 'PRESS A' || $upperLine === 'A' || $upperLine === 'LINE A') {
+            $lineParam = 'Line A';
+        } elseif ($upperLine === 'PRESS B' || $upperLine === 'B' || $upperLine === 'LINE B') {
+            $lineParam = 'Line B';
+        } elseif ($upperLine === 'PRESS C' || $upperLine === 'C' || $upperLine === 'LINE C') {
+            $lineParam = 'Line C';
+        } elseif ($upperLine === 'PRESS D' || $upperLine === 'D' || $upperLine === 'LINE D') {
+            $lineParam = 'Line D';
+        } elseif ($upperLine === 'SHEARING') {
+            $lineParam = 'Shearing';
+        } elseif ($upperLine === 'HANDWORK') {
+            $lineParam = 'Handwork';
+        }
+
+        $workDate = $session ? $session->work_date : now()->toDateString();
+        if ($plan) {
+            $urlParams = [
+                'line'  => $lineParam,
+                'shift' => $plan->shift_name,
+                'date'  => $plan->plan_date ? ($plan->plan_date instanceof \Carbon\Carbon ? $plan->plan_date->toDateString() : (string)$plan->plan_date) : $workDate,
+            ];
+        } else {
+            $urlParams = [
+                'line' => $lineParam,
+                'date' => $workDate,
+            ];
+        }
+
+        $startTimeStr = ($session && $session->start_time) 
+            ? \Carbon\Carbon::parse($session->start_time)->toIso8601String() 
+            : ($jobMaster->started_at ? \Carbon\Carbon::parse($jobMaster->started_at)->toIso8601String() : now()->toIso8601String());
 
         return response()->json([
             'running' => true,
-            'id' => $session->jobMaster->id,
-            'status' => $session->jobMaster->status,
+            'id' => $jobMaster->id,
+            'status' => $jobMaster->status,
             'is_dandori' => $isDandori,
             'active_downtime_count' => $activeDowntime ? 1 : 0,
             'active_downtime_type' => $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : null,
-            'job_name' => $session->jobMaster->job_name,
-            'job_number' => $session->jobMaster->job_number,
-            'total_seconds' => $session->total_seconds,
-            'start_time' => \Carbon\Carbon::parse($session->start_time)->toIso8601String(),
-            'url' => route('operational.input_harian', $urlParams) . '#row-' . $session->jobMaster->id
+            'job_name' => $jobMaster->job_name,
+            'job_number' => $jobMaster->job_number,
+            'total_seconds' => $session ? $session->total_seconds : 0,
+            'start_time' => $startTimeStr,
+            'url' => route('operational.input_harian', $urlParams) . '#row-' . $jobMaster->id
         ]);
     }
 
@@ -971,7 +979,7 @@ class InputHarianController extends Controller
     DOWNTIME MANAGEMENT
     ====================================================
     */
-    public function getDowntimes($job_id)
+    public function getDowntimes(int|string $job_id)
     {
         $downtimes = Downtime::where('job_master_id', $job_id)
             ->orderBy('created_at', 'desc')
@@ -980,7 +988,7 @@ class InputHarianController extends Controller
         return response()->json($downtimes);
     }
 
-    public function startDowntime(Request $request, $job_id)
+    public function startDowntime(Request $request, int|string $job_id)
     {
         $this->guardLockedShift($job_id);
         try {
@@ -994,7 +1002,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function finishDowntime($id)
+    public function finishDowntime(int|string $id)
     {
         try {
             $dt = Downtime::find($id);
@@ -1012,7 +1020,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function updateDowntime(Request $request, $id)
+    public function updateDowntime(Request $request, int|string $id)
     {
         $downtime = Downtime::find($id);
         if (!$downtime) return response()->json(['success' => false, 'message' => 'Downtime not found']);
@@ -1038,7 +1046,7 @@ class InputHarianController extends Controller
         ]);
     }
 
-    public function deleteDowntime($id)
+    public function deleteDowntime(int|string $id)
     {
         try {
             $dt = Downtime::find($id);
@@ -1053,7 +1061,7 @@ class InputHarianController extends Controller
         }
     }
 
-    public function showLogs($id)
+    public function showLogs(int|string $id)
     {
         $job = JobMaster::with(['dailyProduction', 'downtimes'])->findOrFail($id);
         $logs = ProductionLog::where('job_master_id', $id)
@@ -1063,7 +1071,7 @@ class InputHarianController extends Controller
         return view('operational.log_detail', compact('job', 'logs'));
     }
 
-    public function getQty(Request $request, $id)
+    public function getQty(Request $request, int|string $id)
     {
         $date = $request->get('date') ?: now()->toDateString();
         $daily = DailyProduction::where('job_master_id', $id)
@@ -1078,7 +1086,7 @@ class InputHarianController extends Controller
         ]);
     }
 
-    public function submitShift(Request $request, $lineId)
+    public function submitShift(Request $request, int|string $lineId)
     {
         try {
             $date = $request->get('date', now()->toDateString());
@@ -1248,7 +1256,7 @@ class InputHarianController extends Controller
             // All writes in one transaction; if cut-off fails, everything rolls back.
             DB::transaction(function () use ($cutoffAt, $date, $shiftName, $lineMaster, $shiftMasterId, $shiftValue, $existing, $comment) {
                 $cutOffService = app(\App\Services\CutOffService::class);
-                $cutOffService->processCutOff($date, $shiftName, $cutoffAt);
+                $cutOffService->processCutOff($date, $shiftName);
 
                 if ($existing) {
                     // Resubmit after a previous cancellation: reactivate the same row so the
@@ -1256,7 +1264,7 @@ class InputHarianController extends Controller
                     // cancel_count is intentionally NOT reset: only one cancellation per shift.
                     $existing->update([
                         'submitted_at' => $cutoffAt,
-                        'submitted_by' => auth()->id(),
+                        'submitted_by' => Auth::id(),
                         'comment'      => $comment,
                         'cancelled_at' => null,
                         'cancelled_by' => null,
@@ -1268,17 +1276,17 @@ class InputHarianController extends Controller
                         'shift'           => $shiftValue,
                         'shift_master_id' => $shiftMasterId,
                         'submitted_at'    => $cutoffAt,
-                        'submitted_by'    => auth()->id(),
+                        'submitted_by'    => Auth::id(),
                         'comment'         => $comment,
                     ]);
                 }
             });
 
-            \Illuminate\Support\Facades\Log::info("[SHIFT SUBMIT] Shift submitted", [
+            Log::info("[SHIFT SUBMIT] Shift submitted", [
                 'line_id' => $lineMaster->id,
                 'date' => $date,
                 'shift' => $shiftName,
-                'by' => auth()->id(),
+                'by' => Auth::id(),
                 'resubmit_after_cancel' => (bool) ($existing && $existing->cancelled_at),
                 'comment' => $comment,
             ]);
@@ -1288,7 +1296,7 @@ class InputHarianController extends Controller
                 'message' => $existing ? 'Shift berhasil disubmit ulang!' : 'Shift berhasil disubmit!',
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('[SHIFT SUBMIT] Error: ' . $e->getMessage());
+            Log::error('[SHIFT SUBMIT] Error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -1304,7 +1312,7 @@ class InputHarianController extends Controller
      * leader resubmit afterwards. The cut-off is only effective once the shift is
      * actually resubmitted/finalized.
      */
-    public function cancelShift(Request $request, $lineId)
+    public function cancelShift(Request $request, int|string $lineId)
     {
         try {
             $date = $request->get('date', now()->toDateString());
@@ -1389,15 +1397,15 @@ class InputHarianController extends Controller
             $submission->update([
                 'comment'      => $comment ?: $submission->comment,
                 'cancelled_at' => now(),
-                'cancelled_by' => auth()->id(),
+                'cancelled_by' => Auth::id(),
                 'cancel_count' => $submission->cancel_count + 1,
             ]);
 
-            \Illuminate\Support\Facades\Log::info("[SHIFT CANCEL] Shift submission cancelled", [
+            Log::info("[SHIFT CANCEL] Shift submission cancelled", [
                 'line_id' => $lineMaster->id,
                 'date' => $date,
                 'shift' => $shiftName,
-                'by' => auth()->id(),
+                'by' => Auth::id(),
                 'submission_id' => $submission->id,
                 'recovery_schedules_cleaned' => $emptySchedules->count(),
             ]);
@@ -1407,7 +1415,7 @@ class InputHarianController extends Controller
                 'message' => 'Akhiri Shift dibatalkan. Data dapat diperbaiki dan disubmit ulang.',
             ]);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('[SHIFT CANCEL] Error: ' . $e->getMessage());
+            Log::error('[SHIFT CANCEL] Error: ' . $e->getMessage());
             return response()->json([
                 'success' => false,
                 'message' => $e->getMessage(),
@@ -1419,7 +1427,7 @@ class InputHarianController extends Controller
      * Resolve line master, shift master id, shift name and shift value (1=Pagi, 2=Malam)
      * shared by submitShift and cancelShift. Returns [LineMaster, ?int, string, int].
      */
-    private function resolveSubmitContext(Request $request, $lineId): array
+    private function resolveSubmitContext(Request $request, int|string $lineId): array
     {
         $shiftMasterId = $request->input('shift_master_id');
         $shiftName = $request->input('shift');
