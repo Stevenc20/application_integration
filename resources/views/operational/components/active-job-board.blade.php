@@ -73,10 +73,12 @@
                 ->first();
             $openDandori = \App\Models\Downtime::where('job_master_id', $activeJob->id)->where('jenis_downtime', 'dandori')->whereNull('finish_time')->first();
             $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
-            // $isDandori = true as long as job is in pre-production phase (no started_at yet), OR active 1st check/dandori record
-            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null) || $wasInFirstCheck || ($hasActiveNonDandoriDt && !$activeJob->started_at);
+            $sessionStartTime = \App\Models\ProductionSession::where('job_master_id', $activeJob->id)->whereDate('work_date', $date)->value('start_time');
+            $effectiveStartedAt = $activeJob->started_at ?? $sessionStartTime;
+            // $isDandori = true if open dandori or open 1st check or was in first check or (pre-production non-dandori downtime)
+            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null) || $wasInFirstCheck || ($hasActiveNonDandoriDt && !$effectiveStartedAt);
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
-            $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($activeJob->started_at ?? null);
+            $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($effectiveStartedAt ?? null);
 
             $prodPlan = $activeJob->production_plan;
             $schedStart = $prodPlan ? $prodPlan->start_time : ($activeJob->plan_start ? \Carbon\Carbon::parse($activeJob->plan_start)->format('H:i') : '07:40');
@@ -248,7 +250,7 @@
                         $statusBg = 'bg-amber-500/10 border-amber-500/20';
                         $statusText = 'text-amber-400';
                         $statusPulseColor = 'bg-amber-500';
-                    } elseif (!$activeJob->started_at) {
+                    } elseif (!$effectiveStartedAt) {
                         $statusLabel = 'PENDING';
                         $statusBg = 'bg-slate-100 border-slate-200';
                         $statusText = 'text-slate-500';
@@ -374,7 +376,7 @@
             <!-- Performance Console (Left Area) -->
             <div class="lg:col-span-9">
                 <!-- Quick Entry & Performance Console (min-h-[220px]) -->
-                @if($activeJob->started_at && !$isDandori)
+                @if($effectiveStartedAt && !$isDandori)
                 <div class="p-5 bg-red-50/50 border border-red-200 rounded-3xl min-h-[220px] flex flex-col gap-4 h-full">
                     <!-- Header -->
                     <div class="flex items-center justify-between border-b border-red-200 pb-3">
@@ -548,7 +550,7 @@
                     }
                 @endphp
 
-                @if(!$activeJob->started_at && !$isDandori)
+                @if(!$effectiveStartedAt && !$isDandori && !$firstDandori && (strtolower($activeJob->status) === 'pending'))
                 <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[260px] flex flex-col h-full">
                     <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                         <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>
@@ -694,7 +696,7 @@
             </div> {{-- end #active-work-area --}}
             
             {{-- REPAIR & REJECT INCIDENT LIST (per active job, loaded inline) --}}
-            @if($activeJob->started_at)
+            @if($effectiveStartedAt)
             <div class="lg:col-span-12 mt-4 pt-4 border-t border-slate-200">
                 <div class="flex items-center justify-between mb-3">
                     <div class="flex items-center gap-2">
