@@ -11,6 +11,7 @@ use App\Models\ProductionLog;
 use App\Models\HambatanJalur;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 use App\Services\DashboardRealtimeService;
 
 class ProductionService
@@ -18,7 +19,7 @@ class ProductionService
     /**
      * Start a job and its session.
      */
-    public function startJob($jobId, $enqueueOnly = false)
+    public function startJob(int $jobId, bool $enqueueOnly = false)
     {
         return DB::transaction(function () use ($jobId, $enqueueOnly) {
             $session = ProductionSession::firstOrCreate(
@@ -88,7 +89,7 @@ class ProductionService
     /**
      * Start Dandori process for a job.
      */
-    public function startDandori($jobId, $workDate = null)
+    public function startDandori(int $jobId, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
@@ -150,7 +151,7 @@ class ProductionService
                 'activity'    => 'DANDORI',
                 'start_time'  => $now,
                 'work_date'   => $workDate,
-                'created_by'  => auth()->id()
+                'created_by'  => Auth::id()
             ]);
 
             $this->signalDashboard($jobId);
@@ -162,55 +163,65 @@ class ProductionService
     /**
      * Finish Dandori process.
      */
-    public function finishDandori($jobId)
+    public function finishDandori(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
+            $now = now();
             $downtime = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
                 ->first();
 
             if ($downtime) {
-                $now = now();
                 $durationSeconds = abs($now->diffInSeconds(Carbon::parse($downtime->start_time)));
                 $downtime->update([
                     'finish_time' => $now,
                     'duration_seconds' => $durationSeconds
                 ]);
-                
-                $dandori = Dandori::where('next_job_id', $jobId)
-                    ->whereNull('finish_time')
-                    ->first();
-                
-                if ($dandori) {
-                    $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
-                    $dandori->update([
-                        'finish_time' => $now,
-                        'duration_minutes' => round($duration, 2)
-                    ]);
-                }
-
-                // After dandori, job starts production
-                JobMaster::where('id', $jobId)->update(['started_at' => $now, 'status' => 'running']);
-                $this->syncPlanStatus($jobId, 'running');
-                
-                $session = ProductionSession::firstOrCreate(
-                    ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
-                );
-                $session->update(['start_time' => $now, 'status' => 'running']);
-
-                $this->signalDashboard($jobId);
-
-                return true;
             }
-            return false;
+            
+            $dandori = Dandori::where('next_job_id', $jobId)
+                ->whereNull('finish_time')
+                ->first();
+            
+            if ($dandori) {
+                $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
+                $dandori->update([
+                    'finish_time' => $now,
+                    'duration_minutes' => round($duration, 2)
+                ]);
+            }
+
+            // After dandori, job starts production
+            $job = JobMaster::find($jobId);
+            if ($job) {
+                $jobUpdate = ['status' => 'running'];
+                if (!$job->started_at) {
+                    $jobUpdate['started_at'] = $now;
+                }
+                $job->update($jobUpdate);
+                $this->syncPlanStatus($jobId, 'running');
+            }
+            
+            $session = ProductionSession::firstOrCreate(
+                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
+            );
+            $sessionUpdate = ['status' => 'running'];
+            if (!$session->start_time) {
+                $sessionUpdate['start_time'] = $now;
+            }
+            $session->update($sessionUpdate);
+
+            $this->signalDashboard($jobId);
+
+            return true;
         });
     }
 
     /**
      * Start 1st Check process for a job (during dandori).
      */
-    public function startFirstCheck($jobId, $workDate = null)
+    public function startFirstCheck(int $jobId, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
@@ -225,7 +236,7 @@ class ProductionService
                 'jenis_dandori' => '1st_check',
                 'start_time'    => $now,
                 'work_date'     => $workDate,
-                'created_by'    => auth()->id()
+                'created_by'    => Auth::id()
             ]);
 
             $this->signalDashboard($jobId);
@@ -237,7 +248,7 @@ class ProductionService
     /**
      * Finish 1st Check process.
      */
-    public function finishFirstCheck($jobId)
+    public function finishFirstCheck(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
             $dandori = Dandori::where('next_job_id', $jobId)
@@ -261,7 +272,7 @@ class ProductionService
     /**
      * Save production log and update daily metrics.
      */
-    public function saveProductionLog($jobId, array $data, $workDate = null)
+    public function saveProductionLog(int $jobId, array $data, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $data, $workDate) {
             $workDate = $workDate ?: now()->toDateString();
@@ -351,7 +362,7 @@ class ProductionService
     /**
      * Pause a job.
      */
-    public function pauseJob($jobId)
+    public function pauseJob(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
             $runtime = $this->calculateRuntime($jobId);
@@ -384,7 +395,7 @@ class ProductionService
     /**
      * Resume a paused job.
      */
-    public function resumeJob($jobId)
+    public function resumeJob(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
             $session = ProductionSession::where('job_master_id', $jobId)
@@ -409,7 +420,7 @@ class ProductionService
     /**
      * Restart a job (reset metrics for today).
      */
-    public function restartJob($jobId)
+    public function restartJob(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
             $session = ProductionSession::firstOrCreate(
@@ -443,7 +454,7 @@ class ProductionService
     /**
      * Finish a job and sync metrics.
      */
-    public function finishJob($jobId, $nextJobId = null, $skipIdle = false, $finalOk = null, $finalRepair = null, $finalReject = null, array $skippedActions = [])
+    public function finishJob(int $jobId, int|string|null $nextJobId = null, bool $skipIdle = false, int|float|null $finalOk = null, int|float|null $finalRepair = null, int|float|null $finalReject = null, array $skippedActions = [])
     {
         return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions) {
             // Auto-close any active downtimes for this job
@@ -602,7 +613,7 @@ class ProductionService
     /**
      * Start a downtime event.
      */
-    public function startDowntime($jobId, array $data)
+    public function startDowntime(int $jobId, array $data)
     {
         return DB::transaction(function () use ($jobId, $data) {
             $downtime = Downtime::create([
@@ -671,7 +682,7 @@ class ProductionService
     /**
      * Finish a downtime event.
      */
-    public function finishDowntime($downtimeId)
+    public function finishDowntime(int $downtimeId)
     {
         return DB::transaction(function () use ($downtimeId) {
             $downtime = Downtime::find($downtimeId);
@@ -704,7 +715,7 @@ class ProductionService
     /**
      * Delete a downtime event and recalculate totals.
      */
-    public function deleteDowntime($downtimeId)
+    public function deleteDowntime(int $downtimeId)
     {
         return DB::transaction(function () use ($downtimeId) {
             $downtime = Downtime::find($downtimeId);
@@ -730,7 +741,7 @@ class ProductionService
     /**
      * Calculate current runtime in seconds for a job.
      */
-    public function calculateRuntime($jobId)
+    public function calculateRuntime(int $jobId)
     {
         $session = ProductionSession::where('job_master_id', $jobId)
             ->whereDate('work_date', now()->toDateString())
@@ -750,7 +761,7 @@ class ProductionService
     /**
      * Save daily production summary data.
      */
-    public function saveDailyProduction($jobId, array $data)
+    public function saveDailyProduction(int $jobId, array $data)
     {
         return DB::transaction(function () use ($jobId, $data) {
             $runtime = $this->calculateRuntime($jobId);
@@ -788,7 +799,7 @@ class ProductionService
                     'downtime_seconds'  => $downtime,
                     'efficiency'        => $efficiency,
                     'remarks'           => $data['remarks'] ?? null,
-                    'saved_by'          => auth()->id(),
+                    'saved_by'          => Auth::id(),
                     'status'            => 'complete',
                 ]
             );
@@ -805,7 +816,7 @@ class ProductionService
         });
     }
 
-    private function resolvePlanId($jobId): ?int
+    private function resolvePlanId(int $jobId): ?int
     {
         $job = \App\Models\JobMaster::find($jobId);
         if (!$job) return null;
@@ -829,7 +840,7 @@ class ProductionService
         return $plan?->id;
     }
 
-    private function createRecoveryItem($plan, $job, $actualOk, $recoveryQty, $status, $isUnresolvable = false)
+    private function createRecoveryItem(?\App\Models\ProductionPlan $plan, JobMaster $job, int|float $actualOk, float $recoveryQty, string $status, bool $isUnresolvable = false)
     {
         $date = now()->toDateString();
         $shiftName = $this->getShift();
@@ -868,7 +879,7 @@ class ProductionService
         ]);
     }
 
-    private function notifyPpcUsers($job, $recoveryItem)
+    private function notifyPpcUsers(JobMaster $job, \App\Models\RecoveryItem $recoveryItem)
     {
         $ppcUsers = \App\Models\User::where('role', 'like', '%ppc%')->get();
         foreach ($ppcUsers as $user) {
@@ -893,7 +904,7 @@ class ProductionService
     /**
      * Get the next job in sequence or by manual selection.
      */
-    public function getNextJob($currentJobId, $selectedNextId = null)
+    public function getNextJob(int $currentJobId, int|string|null $selectedNextId = null)
     {
         if ($selectedNextId) {
             return JobMaster::where('id', $selectedNextId)
@@ -944,7 +955,7 @@ class ProductionService
     /**
      * Sync ProductionPlan status and quantities based on JobMaster
      */
-    private function syncPlan($jobId, $status = null, $ok = null, $repair = null, $reject = null)
+    private function syncPlan(int $jobId, ?string $status = null, int|float|null $ok = null, int|float|null $repair = null, int|float|null $reject = null)
     {
         $jobMaster = \App\Models\JobMaster::find($jobId);
         if (!$jobMaster) return;
@@ -1018,12 +1029,12 @@ class ProductionService
     /**
      * Sync ProductionPlan status based on JobMaster
      */
-    private function syncPlanStatus($jobId, $status)
+    private function syncPlanStatus(int $jobId, string $status)
     {
         $this->syncPlan($jobId, $status);
     }
 
-    private function signalDashboard($jobId): void
+    private function signalDashboard(int $jobId): void
     {
         $job = JobMaster::find($jobId);
         if ($job && $job->line) {
