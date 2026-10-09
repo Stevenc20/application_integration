@@ -306,79 +306,100 @@ class InputHarianController extends Controller
             }
         }
 
-        if ($isHistorical) {
-            // Historical mode: cari job yang punya dailyProduction di tanggal ini
-            $activeJobQuery = JobMaster::whereHas('dailyProduction', function ($q) use ($date) {
-                $q->where('work_date', $date);
-            })->with([
+        if ($request->filled('job_id')) {
+            $requestedJob = JobMaster::with([
                 'dailyProduction' => function ($q) use ($date) {
                     $q->where('work_date', $date);
                 },
                 'downtimes',
-            ]);
+                'dandoris'
+            ])->find($request->query('job_id'));
 
-            if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
-                $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
-                $activeJobQuery->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"]);
+            if ($requestedJob) {
+                $activeJob = $requestedJob;
             }
+        }
 
-            $activeJob = $activeJobQuery->first();
-        } else {
-            // Today mode: cari job running realtime yang sesuai dengan jadwal aktif hari ini
-            $scheduledJobNumbers = $plans->map(function($p) {
-                $jn = trim($p->job_no ?? '');
-                $jm = trim($p->job_master ?? '');
-                return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
-            })->toArray();
+        if (!$activeJob) {
+            if ($isHistorical) {
+                // Historical mode: cari job yang punya dailyProduction di tanggal ini
+                $activeJobQuery = JobMaster::whereHas('dailyProduction', function ($q) use ($date) {
+                    $q->where('work_date', $date);
+                })->with([
+                    'dailyProduction' => function ($q) use ($date) {
+                        $q->where('work_date', $date);
+                    },
+                    'downtimes',
+                ]);
 
-            $baseActiveQuery = function() use ($lineFilter) {
-                $q = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
                 if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
                     $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
-                    $q->where(function($lq) use ($normalizedLine) {
-                        $lq->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
+                    $activeJobQuery->where(function($lq) use ($normalizedLine, $lineFilter) {
+                        $lq->whereRaw("UPPER(TRIM(line)) = ?", [strtoupper(trim($lineFilter))])
+                           ->orWhereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
                            ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedLine}%"]);
                     });
                 }
-                return $q;
-            };
 
-            // 1. Coba cari active job yang ada di jadwal $plans saat ini
-            $activeJobs = collect();
-            if (!empty($scheduledJobNumbers)) {
-                $activeJobs = $baseActiveQuery()
-                    ->whereIn('job_number', $scheduledJobNumbers)
-                    ->with([
-                        'dailyProduction' => function ($q) use ($date) {
-                            $q->where('work_date', $date);
-                        },
-                        'downtimes',
-                        'dandoris'
-                    ])
-                    ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
-                    ->orderByDesc('updated_at')
-                    ->orderByDesc('id')
-                    ->get();
+                $activeJob = $activeJobQuery->first();
+            } else {
+                // Today mode: cari job running realtime yang sesuai dengan jadwal aktif hari ini
+                $scheduledJobNumbers = $plans->map(function($p) {
+                    $jn = trim($p->job_no ?? '');
+                    $jm = trim($p->job_master ?? '');
+                    return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+                })->toArray();
+
+                $baseActiveQuery = function() use ($lineFilter) {
+                    $q = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+                    if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
+                        $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
+                        $q->where(function($lq) use ($normalizedLine, $lineFilter) {
+                            $lq->whereRaw("UPPER(TRIM(line)) = ?", [strtoupper(trim($lineFilter))])
+                               ->orWhereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
+                               ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedLine}%"]);
+                        });
+                    }
+                    return $q;
+                };
+
+                // 1. Coba cari active job yang ada di jadwal $plans saat ini
+                $activeJobs = collect();
+                if (!empty($scheduledJobNumbers)) {
+                    $activeJobs = $baseActiveQuery()
+                        ->whereIn('job_number', $scheduledJobNumbers)
+                        ->with([
+                            'dailyProduction' => function ($q) use ($date) {
+                                $q->where('work_date', $date);
+                            },
+                            'downtimes',
+                            'dandoris'
+                        ])
+                        ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                        ->orderByDesc('updated_at')
+                        ->orderByDesc('id')
+                        ->get();
+                }
+
+                // 2. Fallback: Jika filter status/search membuat $plans tidak memuat job yang running di line ini,
+                // TETAP temukan active job di line ini agar operator console / active job board tidak hilang!
+                if ($activeJobs->isEmpty()) {
+                    $activeJobs = $baseActiveQuery()
+                        ->with([
+                            'dailyProduction' => function ($q) use ($date) {
+                                $q->where('work_date', $date);
+                            },
+                            'downtimes',
+                            'dandoris'
+                        ])
+                        ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                        ->orderByDesc('updated_at')
+                        ->orderByDesc('id')
+                        ->get();
+                }
+
+                $activeJob = $activeJobs->first();
             }
-
-            // 2. Fallback: Jika filter status/search membuat $plans tidak memuat job yang running di line ini,
-            // TETAP temukan active job di line ini agar operator console / active job board tidak hilang!
-            if ($activeJobs->isEmpty()) {
-                $activeJobs = $baseActiveQuery()
-                    ->with([
-                        'dailyProduction' => function ($q) use ($date) {
-                            $q->where('work_date', $date);
-                        },
-                        'downtimes',
-                        'dandoris'
-                    ])
-                    ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
-                    ->orderByDesc('updated_at')
-                    ->orderByDesc('id')
-                    ->get();
-            }
-
-            $activeJob = $activeJobs->first();
         }
 
         // Production Logs — always filtered by selected date
@@ -561,46 +582,8 @@ class InputHarianController extends Controller
                     'status'     => 'pending',
                 ]));
             }
-        }
-
-        // Cleanup orphaned running/paused jobs for this shift/date whose plan was removed/overwritten
-        $activeIdentifiers = $plans->map(function ($plan) {
-            $jn = trim($plan->job_no ?? '');
-            $jm = trim($plan->job_master ?? '');
-            return $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
-        })->toArray();
-
-        if (!empty($activeIdentifiers)) {
-            $orphanedJobs = \App\Models\JobMaster::whereIn('status', ['running', 'paused'])
-                ->where(function ($q) {
-                    $q->where('job_number', 'LIKE', '%-%');
-                })
-                ->whereNotIn('job_number', $activeIdentifiers)
-                ->whereHas('dailyProduction', function ($dq) use ($date) {
-                    $dq->where('work_date', $date);
-                })
-                ->get();
-
-            if ($orphanedJobs->isNotEmpty()) {
-                $orphanedIds = $orphanedJobs->pluck('id')->toArray();
-                $nowTs = now();
-
-                \App\Models\Downtime::whereIn('job_master_id', $orphanedIds)
-                    ->whereNull('finish_time')
-                    ->update(['finish_time' => $nowTs]);
-
-                \App\Models\Dandori::whereIn('next_job_id', $orphanedIds)
-                    ->whereNull('finish_time')
-                    ->update(['finish_time' => $nowTs]);
-
-                \App\Models\ProductionSession::whereIn('job_master_id', $orphanedIds)
-                    ->where('status', 'running')
-                    ->update(['status' => 'finished', 'finish_time' => $nowTs]);
-
-                \App\Models\JobMaster::whereIn('id', $orphanedIds)
-                    ->update(['status' => 'complete', 'finished_at' => $nowTs]);
-            }
-        }
+        // Note: Do NOT auto-cutoff running/paused jobs here to prevent terminating ongoing production
+        // when the operator switches shifts, lines, or views.
     }
 
     public function start(Request $request, int|string $id)
