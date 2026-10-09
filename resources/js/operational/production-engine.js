@@ -2502,7 +2502,11 @@ window.selectCustomItem = function selectCustomItem(id, label) {
     const select = document.getElementById('standby-job-select');
     if (select) select.value = id;
     const lbl = document.getElementById('custom-select-label');
-    if (lbl) { lbl.innerText = label; lbl.classList.add('text-white', 'font-bold'); }
+    if (lbl) {
+        lbl.innerText = label;
+        lbl.classList.remove('text-white', 'text-slate-400');
+        lbl.classList.add('text-slate-900', 'font-extrabold');
+    }
     toggleCustomSelect();
 }
 
