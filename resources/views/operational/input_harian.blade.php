@@ -810,26 +810,65 @@ function openShiftValidationModal(issues) {
     if (!body) return;
     body.innerHTML = '';
     const sections = [
-        { key: 'dt', label: 'Downtime', color: 'red', icon: '⏱' },
-        { key: 'repair', label: 'Repair', color: 'orange', icon: '🔧' },
-        { key: 'reject', label: 'Reject', color: 'rose', icon: '🗑' },
-        { key: 'remain', label: 'Remain', color: 'yellow', icon: '📦' },
+        { 
+            key: 'dt', 
+            label: 'Downtime', 
+            icon: '⏱', 
+            boxClass: 'bg-red-50/70 border border-red-200', 
+            headerClass: 'text-red-800', 
+            btnClass: 'bg-red-600 hover:bg-red-700 text-white shadow-sm' 
+        },
+        { 
+            key: 'repair', 
+            label: 'Repair', 
+            icon: '🔧', 
+            boxClass: 'bg-orange-50/70 border border-orange-200', 
+            headerClass: 'text-orange-800', 
+            btnClass: 'bg-orange-600 hover:bg-orange-700 text-white shadow-sm' 
+        },
+        { 
+            key: 'reject', 
+            label: 'Reject', 
+            icon: '🗑', 
+            boxClass: 'bg-rose-50/70 border border-rose-200', 
+            headerClass: 'text-rose-800', 
+            btnClass: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm' 
+        },
+        { 
+            key: 'remain', 
+            label: 'Remain', 
+            icon: '📦', 
+            boxClass: 'bg-amber-50/70 border border-amber-200', 
+            headerClass: 'text-amber-800', 
+            btnClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm' 
+        },
     ];
     sections.forEach(s => {
         const items = issues[s.key] || [];
         let listHtml = items.length === 0
-            ? '<p class="mt-1 text-xs text-slate-500">Tidak ada masalah.</p>'
-            : '<ul class="mt-2 space-y-1">' + items.map(item =>
-                '<li class="flex items-center justify-between text-xs text-slate-300">' +
-                    '<span>&bull; ' + item.item + ': ' + item.issue + '</span>' +
-                    '<button onclick="goToIssue(\'' + s.key + '\',' + item.plan_id + ',' + item.job_master_id + ',' + (item.dt_id || 'null') + ')" class="ml-2 px-2 py-0.5 bg-' + s.color + '-500/20 hover:bg-' + s.color + '-500/30 text-' + s.color + '-300 rounded-lg text-[10px] font-bold transition-all whitespace-nowrap">' +
-                        '&rarr; Buka' +
+            ? '<p class="mt-2 text-xs text-emerald-700 font-bold flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Tidak ada masalah.</p>'
+            : '<ul class="mt-2.5 space-y-2">' + items.map(item =>
+                '<li class="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">' +
+                    '<div class="flex items-center gap-2 text-left min-w-0 pr-2">' +
+                        '<span class="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>' +
+                        '<span class="font-bold text-slate-800 truncate leading-snug">' + item.item + ': <span class="font-medium text-slate-600">' + item.issue + '</span></span>' +
+                    '</div>' +
+                    '<button onclick="goToIssue(\'' + s.key + '\',' + item.plan_id + ',' + item.job_master_id + ',' + (item.dt_id || 'null') + ')" class="ml-2 px-3 py-1 ' + s.btnClass + ' rounded-lg text-[10px] font-black transition-all whitespace-nowrap flex items-center gap-1 shrink-0 cursor-pointer">' +
+                        '<span>Buka</span> &rarr;' +
                     '</button>' +
                 '</li>'
             ).join('') + '</ul>';
         body.innerHTML +=
-            '<div class="bg-' + s.color + '-500/10 border border-' + s.color + '-500/20 rounded-xl p-4">' +
-                '<h4 class="text-sm font-black text-' + s.color + '-400 uppercase tracking-wider">' + s.icon + ' ' + s.label + ' (' + items.length + ' item)</h4>' +
+            '<div class="' + s.boxClass + ' rounded-2xl p-4 shadow-sm">' +
+                '<div class="flex items-center justify-between">' +
+                    '<h4 class="text-xs font-black ' + s.headerClass + ' uppercase tracking-wider flex items-center gap-2">' +
+                        '<span>' + s.icon + '</span>' +
+                        '<span>' + s.label + '</span>' +
+                    '</h4>' +
+                    '<span class="text-[10px] font-black px-2 py-0.5 rounded-full ' + (items.length > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200') + '">' +
+                        items.length + ' item' +
+                    '</span>' +
+                '</div>' +
                 listHtml +
             '</div>';
     });
