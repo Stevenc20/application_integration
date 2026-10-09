@@ -334,8 +334,8 @@
                     @endphp
 
                     {{-- Press Cards Grid --}}
-                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                        @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'PRESS E', 'PRESS F', 'PRESS K'] as $idx => $press)
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                        @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D'] as $idx => $press)
                         @php
                             $colors = [
                                 ['from-rose-500', 'to-red-600', 'bg-rose-50', 'text-rose-700', 'border-rose-200', 'shadow-rose-100'],

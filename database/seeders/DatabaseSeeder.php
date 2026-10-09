@@ -29,9 +29,6 @@ class DatabaseSeeder extends Seeder
             ['line_code' => 'PB', 'line_name' => 'PRESS B', 'status' => 'active'],
             ['line_code' => 'PC', 'line_name' => 'PRESS C', 'status' => 'active', 'production_end' => '22:00'],
             ['line_code' => 'PD', 'line_name' => 'PRESS D', 'status' => 'active', 'production_start' => '12:45'],
-            ['line_code' => 'PE', 'line_name' => 'PRESS E', 'status' => 'active'],
-            ['line_code' => 'PF', 'line_name' => 'PRESS F', 'status' => 'active'],
-            ['line_code' => 'PK', 'line_name' => 'PRESS K', 'status' => 'active'],
         ];
 
         foreach ($lines as $l) {
