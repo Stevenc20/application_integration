@@ -68,7 +68,7 @@ class PullAheadService
     /**
      * PPC menyetujui request, tentukan qty final & posisi sequence
      */
-    public function approveRequest(PullAheadRequest $request, $qtyApproved, $finalSequenceAfterId, $approverId)
+    public function approveRequest(PullAheadRequest $request, int|float|string $qtyApproved, int|string|null $finalSequenceAfterId, int|string|null $approverId)
     {
         DB::beginTransaction();
         try {
@@ -150,7 +150,7 @@ class PullAheadService
     /**
      * PPC menolak request
      */
-    public function rejectRequest(PullAheadRequest $request, $approverId, $remarks = null)
+    public function rejectRequest(PullAheadRequest $request, int|string|null $approverId, ?string $remarks = null)
     {
         $request->update([
             'status'      => 'REJECTED',
