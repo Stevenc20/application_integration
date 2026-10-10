@@ -678,7 +678,7 @@ class LembarInspeksiController extends Controller
             );
         } catch (\Exception $e) {
             // Jangan gagalkan LI save hanya karena template upsert gagal
-            \Illuminate\Support\Facades\Log::warning('LI Template upsert failed: ' . $e->getMessage());
+            \Illuminate\Support\FacadesLog::warning('LI Template upsert failed: ' . $e->getMessage());
         }
     }
 
@@ -1371,7 +1371,7 @@ class LembarInspeksiController extends Controller
             \Storage::disk('public')->put($path, base64_decode($image));
             return '/storage/' . $path;
         } catch (\Exception $e) {
-            \Log::error('Image Storage Error: ' . $e->getMessage());
+            Log::error('Image Storage Error: ' . $e->getMessage());
             return $base64Data;
         }
     }
@@ -1846,7 +1846,7 @@ class LembarInspeksiController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            \Log::error('Excel Import Error: ' . $e->getMessage());
+            Log::error('Excel Import Error: ' . $e->getMessage());
             return response()->json([
                 'message' => 'Gagal membaca file Excel. Pastikan format file sesuai.',
                 'error' => $e->getMessage()

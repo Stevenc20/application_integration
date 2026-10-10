@@ -72,14 +72,14 @@ class BomController extends Controller
         return redirect()->route('boms.index')->with('success', 'BOM berhasil dibuat.');
     }
 
-    public function show($id)
+    public function show(int|string $id)
     {
         $bom = Bom::findOrFail($id);
         $bom->load('material', 'items.material');
         return view('boms.show', compact('bom'));
     }
 
-    public function edit($id)
+    public function edit(int|string $id)
     {
         $bom = Bom::findOrFail($id);
         $materials = Material::where('status', 'Aktif')->orderBy('kode')->get();
@@ -87,7 +87,7 @@ class BomController extends Controller
         return view('boms.edit', compact('bom', 'materials'));
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $bom = Bom::findOrFail($id);
         $request->validate([
@@ -117,7 +117,7 @@ class BomController extends Controller
         return redirect()->route('boms.show', $bom->id)->with('success', 'BOM berhasil diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $bom = Bom::findOrFail($id);
         $bom->items()->delete();

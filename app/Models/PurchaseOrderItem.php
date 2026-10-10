@@ -37,7 +37,7 @@ class PurchaseOrderItem extends Model
         return $this->qty;
     }
 
-    public function setQuantityAttribute($value)
+    public function setQuantityAttribute(mixed $value)
     {
         $this->qty = $value;
     }
@@ -47,7 +47,7 @@ class PurchaseOrderItem extends Model
         return $this->qty_received;
     }
 
-    public function setQuantityReceivedAttribute($value)
+    public function setQuantityReceivedAttribute(mixed $value)
     {
         $this->qty_received = $value;
     }

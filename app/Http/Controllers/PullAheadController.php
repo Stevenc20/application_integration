@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Models\PullAheadRequest;
 use App\Models\ProductionPlan;
 use App\Services\PullAheadService;
@@ -227,7 +228,7 @@ if ($user->isRole(['ppc', 'manager'])) {
             try {
                 $avail = $this->pullAheadService->calculateAvailableQty($plan);
             } catch (\Throwable $e) {
-                \Log::warning('[PullAhead] calculateAvailableQty gagal: ' . $e->getMessage());
+                Log::warning('[PullAhead] calculateAvailableQty gagal: ' . $e->getMessage());
                 $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
             }
             if ($avail <= 0) {
@@ -298,7 +299,7 @@ if ($user->isRole(['ppc', 'manager'])) {
                 'message' => 'Pull Ahead Request berhasil diajukan dan menunggu Approval PPC.'
             ]);
         } catch (\Throwable $e) {
-            \Log::error('[PullAhead] submitRequest gagal: ' . $e->getMessage(), [
+            Log::error('[PullAhead] submitRequest gagal: ' . $e->getMessage(), [
                 'user_id' => auth()->id(),
                 'request' => $request->all(),
                 'trace'   => $e->getTraceAsString(),

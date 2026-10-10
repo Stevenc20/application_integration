@@ -5,6 +5,7 @@ namespace App\Http\Controllers\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 
 class UserController extends Controller
@@ -68,7 +69,7 @@ class UserController extends Controller
             $data['password'] = Hash::make($request->password);
         }
 
-        if ($user->role === 'superadmin' && $user->id === auth()->id() && $request->role !== 'superadmin') {
+        if ($user->role === 'superadmin' && $user->id === Auth::id() && $request->role !== 'superadmin') {
             return back()->with('error', 'You cannot remove your own super admin status.');
         }
 
@@ -86,7 +87,7 @@ class UserController extends Controller
             }
         }
 
-        if (auth()->id() == $user->id) {
+        if (Auth::id() == $user->id) {
             return back()->with('error', 'Cannot delete your own account.');
         }
 

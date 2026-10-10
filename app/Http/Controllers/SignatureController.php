@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Signature;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use App\Models\LineAssignment;
 use App\Models\ProductionPlan;
 use App\Support\SignatureScopeNormalizer;
@@ -44,7 +45,7 @@ class SignatureController extends Controller
             return true;
         }
 
-        $userId = auth()->id();
+        $userId = Auth::id();
         [$standardLine, $standardShift] = $this->canonicalPair($lineName, $shiftName);
 
         $targetLine = $this->normalizeLine($standardLine);
@@ -75,7 +76,9 @@ class SignatureController extends Controller
 
     private function userRole(): string
     {
-        return strtolower(auth()->user()?->role ?? '');
+        /** @var \App\Models\User|null $user */
+        $user = Auth::user();
+        return $user ? strtolower((string) $user->role) : '';
     }
 
     private function ownsRole(string $userRole, string $sigRole): bool
@@ -99,7 +102,7 @@ class SignatureController extends Controller
             return true;
         }
         
-        $userId = auth()->id();
+        $userId = Auth::id();
         
         $assignments = LineAssignment::where(function($q) use ($userId, $sigRole) {
             if ($sigRole === 'teamleader') $q->where('leader_user_id', $userId);
@@ -309,7 +312,7 @@ class SignatureController extends Controller
         $hour = (int) now()->format('H');
         $workDate = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
 
-        $userId = auth()->id();
+        $userId = Auth::id();
         $assignments = LineAssignment::where(function ($q) use ($userId, $sigRole) {
             if ($sigRole === 'teamleader') $q->where('leader_user_id', $userId);
             elseif ($sigRole === 'foreman') $q->where('foreman_user_id', $userId);

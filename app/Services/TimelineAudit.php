@@ -7,36 +7,36 @@ use Illuminate\Support\Str;
 
 class TimelineAudit
 {
-    protected static $correlationId = null;
-    protected static $context = [];
-    protected static $startTime = null;
-    protected static $lastTime = null;
+    protected static ?string $correlationId = null;
+    protected static array $context = [];
+    protected static ?float $startTime = null;
+    protected static ?float $lastTime = null;
 
-    public static function isEnabled()
+    public static function isEnabled(): bool
     {
         return env('TIMELINE_AUDIT', true);
     }
 
-    public static function beginTrace($action, $context = [])
+    public static function beginTrace(string $action, array $context = []): void
     {
         if (!self::isEnabled()) return;
         self::$correlationId = strtoupper($action) . '-' . now()->format('Ymd-His') . '-' . strtoupper(Str::random(4));
         self::$context = $context;
         self::$startTime = microtime(true);
         self::$lastTime = self::$startTime;
-        
+
         Log::info("[AUDIT:" . self::$correlationId . "] BEGIN $action", $context);
     }
 
-    public static function getCorrelationId()
+    public static function getCorrelationId(): string
     {
         return self::$correlationId ?? 'NO-TRACE';
     }
 
-    public static function log($message, $data = [])
+    public static function log(string $message, array $data = []): void
     {
         if (!self::isEnabled()) return;
-        
+
         $now = microtime(true);
         $duration = self::$lastTime ? round(($now - self::$lastTime) * 1000) . 'ms' : '0ms';
         self::$lastTime = $now;
@@ -47,7 +47,7 @@ class TimelineAudit
         Log::info("$prefix $message", $data);
     }
 
-    public static function logError(\Throwable $e, $additionalContext = [])
+    public static function logError(\Throwable $e, array $additionalContext = []): void
     {
         if (!self::isEnabled()) return;
 
@@ -58,7 +58,7 @@ class TimelineAudit
         Log::error("[AUDIT:" . self::getCorrelationId() . "] ERROR", $data);
     }
 
-    public static function logDelete($id, $job, $caller, $reason)
+    public static function logDelete(int|string|null $id, mixed $job, ?string $caller, ?string $reason): void
     {
         self::log("DELETE PLAN", [
             'id' => $id,
@@ -68,7 +68,7 @@ class TimelineAudit
         ]);
     }
 
-    public static function logUpdate($id, $job, $changes, $caller)
+    public static function logUpdate(int|string|null $id, mixed $job, array $changes, ?string $caller): void
     {
         self::log("UPDATE PLAN", [
             'id' => $id,
@@ -78,7 +78,7 @@ class TimelineAudit
         ]);
     }
 
-    public static function logSplit($parentId, $childId, $reason)
+    public static function logSplit(int|string|null $parentId, int|string|null $childId, ?string $reason): void
     {
         self::log("SPLIT", [
             'parent' => $parentId,
@@ -87,7 +87,7 @@ class TimelineAudit
         ]);
     }
 
-    public static function logBreak($start, $finish)
+    public static function logBreak(?string $start, ?string $finish): void
     {
         self::log("CREATE BREAK", [
             'start' => $start,
@@ -95,7 +95,7 @@ class TimelineAudit
         ]);
     }
 
-    public static function logCursor($before, $after, $jobName)
+    public static function logCursor(mixed $before, mixed $after, ?string $jobName): void
     {
         self::log("CURSOR MOVE", [
             'before' => $before,
@@ -104,10 +104,10 @@ class TimelineAudit
         ]);
     }
 
-    public static function logStats($label, $date, $shifts)
+    public static function logStats(string $label, string $date, array $shifts): void
     {
         if (!self::isEnabled()) return;
-        
+
         $query = \App\Models\ProductionPlan::whereDate('plan_date', $date)
             ->whereIn('shift_name', $shifts);
 
@@ -138,12 +138,13 @@ class TimelineAudit
         ]);
     }
 
-    public static function logDatasetHash($label, $plans)
+    public static function logDatasetHash(string $label, array|\Illuminate\Support\Collection $plans): void
     {
         if (!self::isEnabled()) return;
 
-        $details = collect($plans)->map(function($row) {
-            return [
+        $details = collect();
+        foreach ($plans as $row) {
+            $details->push([
                 'row_no' => $row->row_no,
                 'id' => $row->id,
                 'job' => $row->job_no,
@@ -156,8 +157,8 @@ class TimelineAudit
                 'finish_time' => $row->finish_time,
                 'parent' => $row->parent_job_id,
                 'recovery' => $row->recovery_id
-            ];
-        });
+            ]);
+        }
 
         $hash = md5(json_encode($details));
 
@@ -168,7 +169,7 @@ class TimelineAudit
         ]);
     }
 
-    public static function dumpSequence($plans)
+    public static function dumpSequence(array|\Illuminate\Support\Collection $plans): void
     {
         if (!self::isEnabled()) return;
         $dump = [];

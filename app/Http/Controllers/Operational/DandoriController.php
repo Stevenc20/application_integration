@@ -63,7 +63,7 @@ class DandoriController extends Controller
     /* =====================================================
        GET DETAIL JOB (FOR MODAL)
     ===================================================== */
-    public function getDetail($id)
+    public function getDetail(int|string $id)
     {
         $job = JobMaster::findOrFail($id);
 
@@ -101,7 +101,7 @@ class DandoriController extends Controller
     /* =====================================================
        START DANDORI
     ===================================================== */
-    public function start(Request $request, $id, $type)
+    public function start(Request $request, int|string $id, string $type)
     {
         $job = JobMaster::findOrFail($id);
         
@@ -163,7 +163,7 @@ class DandoriController extends Controller
     /* =====================================================
        STOP DANDORI
     ===================================================== */
-    public function stop($id)
+    public function stop(int|string $id)
     {
         $row = Dandori::findOrFail($id);
         $finish = now();
@@ -197,7 +197,7 @@ class DandoriController extends Controller
     /* =====================================================
        RESTART DANDORI
     ===================================================== */
-    public function restart($id)
+    public function restart(int|string $id)
     {
         $row = Dandori::findOrFail($id);
         $activityName = $row->activity;
@@ -279,7 +279,7 @@ class DandoriController extends Controller
        AUTO OPEN DARI INPUT HARIAN
        SAAT KLIK BUTTON DANDORI
     ===================================================== */
-    public function direct($jobId)
+    public function direct(int|string $jobId)
     {
         $job = JobMaster::findOrFail($jobId);
 
@@ -293,7 +293,7 @@ class DandoriController extends Controller
         );
     }
 
-    public function create($jobId)
+    public function create(int|string $jobId)
 {
     $job = JobMaster::findOrFail($jobId);
 

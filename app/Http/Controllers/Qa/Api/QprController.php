@@ -7,6 +7,7 @@ use App\Models\Qpr;
 use App\Models\QprAction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use App\Models\ApprovalToken;
 use Illuminate\Support\Str;
 
@@ -643,7 +644,7 @@ class QprController extends Controller
                 return response()->json(['message' => 'Draft disimpan', 'data' => $qpr->load('actions')]);
                 } catch (\Exception $e) {
                     DB::rollBack();
-                    \Log::error('QPR Store Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine() . ' | File: ' . $e->getFile());
+                    Log::error('QPR Store Error: ' . $e->getMessage() . ' | Line: ' . $e->getLine() . ' | File: ' . $e->getFile());
                     return response()->json(['message' => 'Gagal menyimpan QPR', 'error' => $e->getMessage()], 500);
                 }
         }

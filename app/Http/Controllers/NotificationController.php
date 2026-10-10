@@ -27,6 +27,7 @@ class NotificationController extends Controller
                     'id' => $n->id,
                     'message' => $n->data['message'] ?? '',
                     'hambatan_id' => $n->data['hambatan_id'] ?? null,
+                    'recovery_id' => $n->data['recovery_id'] ?? null,
                     'created_at' => $n->created_at->diffForHumans(),
                 ];
             });

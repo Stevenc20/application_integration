@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class Stock extends Model
@@ -25,7 +26,7 @@ class Stock extends Model
     ];
 
     // Scope filter
-    public function scopeSearch($query, $keyword)
+    public function scopeSearch(Builder $query, string $keyword)
     {
         return $query->where(function ($q) use ($keyword) {
             $q->where('job_no',    'like', "%{$keyword}%")
@@ -34,17 +35,17 @@ class Stock extends Model
         });
     }
 
-    public function scopeByProses($query, $proses)
+    public function scopeByProses(Builder $query, ?string $proses)
     {
         return $proses ? $query->where('proses', $proses) : $query;
     }
 
-    public function scopeByCustomer($query, $customer)
+    public function scopeByCustomer(Builder $query, ?string $customer)
     {
         return $customer ? $query->where('customer', $customer) : $query;
     }
 
-    public function scopeByRemarks($query, $remarks)
+    public function scopeByRemarks(Builder $query, ?string $remarks)
     {
         return $remarks ? $query->where('remarks', $remarks) : $query;
     }

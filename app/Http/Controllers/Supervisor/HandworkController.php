@@ -10,6 +10,7 @@ use App\Models\JobMaster;
 use App\Models\RepairRejectLog;
 use App\Models\RepairRejectImage;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class HandworkController extends Controller
@@ -117,7 +118,7 @@ class HandworkController extends Controller
 
     public function storeItem(Request $request)
     {
-        \Log::info('Handwork storeItem called', [
+        Log::info('Handwork storeItem called', [
             'method' => $request->method(),
             'headers' => $request->headers->all(),
             'all_input' => $request->all(),
@@ -179,7 +180,7 @@ class HandworkController extends Controller
                     'image_type'           => 'after',
                 ]);
             } catch (\Throwable $e) {
-                \Log::error('HW store image failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
+                Log::error('HW store image failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
             }
         }
 

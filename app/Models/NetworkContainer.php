@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class NetworkContainer extends Model
@@ -24,12 +25,12 @@ class NetworkContainer extends Model
         'last_checked_at' => 'datetime',
     ];
 
-    public function scopeUp($q)
+    public function scopeUp(Builder $q)
     {
         return $q->where('status', 'running');
     }
 
-    public function scopeDown($q)
+    public function scopeDown(Builder $q)
     {
         return $q->where('status', '!=', 'running');
     }

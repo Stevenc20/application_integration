@@ -68,7 +68,7 @@ class VendorController extends Controller
         return redirect()->back()->with('success', 'Vendor berhasil diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $vendor = Vendor::findOrFail($id);
         $vendor->delete();

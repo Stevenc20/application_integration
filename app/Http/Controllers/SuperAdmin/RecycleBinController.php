@@ -43,7 +43,7 @@ class RecycleBinController extends Controller
         return response()->json($this->buildStats());
     }
 
-    public function restore($id)
+    public function restore(int|string $id)
     {
         $trash = ProductionDataTrash::active()->findOrFail($id);
         $data = $trash->data;
@@ -64,7 +64,7 @@ class RecycleBinController extends Controller
         }
     }
 
-    public function forceDelete($id)
+    public function forceDelete(int|string $id)
     {
         $trash = ProductionDataTrash::active()->findOrFail($id);
 

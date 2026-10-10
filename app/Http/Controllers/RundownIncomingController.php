@@ -812,7 +812,7 @@ class RundownIncomingController extends Controller
         return null;
     }
 
-    private function getLatestNonEmptyMasterFields($jobNo)
+    private function getLatestNonEmptyMasterFields(string $jobNo)
     {
         $finish = RundownIncoming::where('job_no', $jobNo)
             ->where('category', 'SINGLE PART')
@@ -834,7 +834,7 @@ class RundownIncomingController extends Controller
         ];
     }
 
-    private function generateTemplateForDate($sheetDate)
+    private function generateTemplateForDate(string $sheetDate)
     {
         $latestItemsIds = DB::table('rundown_incomings')
             ->select(DB::raw('MAX(id) as max_id'))
@@ -941,7 +941,7 @@ class RundownIncomingController extends Controller
         }
     }
 
-    private function cascadeInventoryUpdates($jobNo, $startSheetDate, $startStokAkhir, $newPricePc = null, $jobNoFinish = null, $typePallet = null)
+    private function cascadeInventoryUpdates(string $jobNo, string $startSheetDate, string|int|float $startStokAkhir, $newPricePc = null, $jobNoFinish = null, $typePallet = null)
     {
         $monthMap = [
             'JANUARI'=>1,'FEBRUARI'=>2,'MARET'=>3,'APRIL'=>4,'MEI'=>5,'JUNI'=>6,

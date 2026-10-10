@@ -69,7 +69,7 @@ class StorageLocationController extends Controller
         return redirect()->back()->with('success', 'Storage Location berhasil diperbarui.');
     }
 
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $location = StorageLocation::findOrFail($id);
         $location->delete();

@@ -139,7 +139,7 @@ class LembarInspeksi extends Model
 
     // ── Helper: cari detail NG untuk sel appearance (format keyed "6_1" atau legacy list) ──
 
-    protected function findNgDetailForCell(int $row, $sample): ?array
+    protected function findNgDetailForCell(int $row, int|string $sample): ?array
     {
         $ngDetails = $this->ng_details ?? [];
         if (empty($ngDetails) || ! is_array($ngDetails)) {

@@ -66,7 +66,7 @@ class ProductionAnalyticsController extends Controller
         return ($hour >= 7 && $hour < 19) ? 'Shift Pagi' : 'Shift Malam';
     }
 
-    private function overviewData($dateFrom, $dateTo, $line, $shift, $status)
+    private function overviewData(?string $dateFrom, ?string $dateTo, ?string $line, ?string $shift, ?string $status)
     {
         // 1. Aggregate stats from DailyProduction (for summary row)
         $dpQuery = DailyProduction::whereBetween('work_date', [$dateFrom, $dateTo]);
@@ -197,7 +197,7 @@ class ProductionAnalyticsController extends Controller
         return compact('stats', 'dailyTrend', 'achievement', 'downtimeAgg', 'plans', 'totalPlanTarget');
     }
 
-    private function timelineData($dateFrom, $dateTo, $line)
+    private function timelineData(?string $dateFrom, ?string $dateTo, ?string $line)
     {
         $logsQuery = ProductionLog::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
             ->with('jobMaster');
@@ -216,7 +216,7 @@ class ProductionAnalyticsController extends Controller
         return compact('logs', 'downtimes');
     }
 
-    private function historyData(Request $request, $dateFrom, $dateTo, $line, $shift)
+    private function historyData(Request $request, ?string $dateFrom, ?string $dateTo, ?string $line, ?string $shift)
     {
         $query = DailyProduction::with(['jobMaster.downtimes' => function ($q) use ($dateFrom, $dateTo) {
                 $q->select('job_master_id', 'jenis_downtime', 'duration_seconds', 'start_time')
@@ -234,7 +234,7 @@ class ProductionAnalyticsController extends Controller
         return compact('records');
     }
 
-    private function moreDetailData($dateFrom, $dateTo, $line, $shift)
+    private function moreDetailData(?string $dateFrom, ?string $dateTo, ?string $line, ?string $shift)
     {
         $dpQuery = DailyProduction::whereBetween('work_date', [$dateFrom, $dateTo]);
         if ($line) {
@@ -322,7 +322,7 @@ class ProductionAnalyticsController extends Controller
         return compact('active', 'completed', 'archived');
     }
 
-    public function jobDetail($id)
+    public function jobDetail(int|string $id)
     {
         $job = JobMaster::with([
             'dailyProduction',

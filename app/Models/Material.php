@@ -62,7 +62,7 @@ class Material extends Model
         return $this->kode;
     }
 
-    public function setCodeAttribute($value)
+    public function setCodeAttribute(mixed $value)
     {
         $this->kode = $value;
     }
@@ -72,7 +72,7 @@ class Material extends Model
         return $this->nama;
     }
 
-    public function setNameAttribute($value)
+    public function setNameAttribute(mixed $value)
     {
         $this->nama = $value;
     }
@@ -82,7 +82,7 @@ class Material extends Model
         return $this->tipe;
     }
 
-    public function setTypeAttribute($value)
+    public function setTypeAttribute(mixed $value)
     {
         $this->tipe = $value;
     }
@@ -92,7 +92,7 @@ class Material extends Model
         return $this->uom;
     }
 
-    public function setUnitOfMeasureAttribute($value)
+    public function setUnitOfMeasureAttribute(mixed $value)
     {
         $this->uom = $value;
     }
@@ -102,7 +102,7 @@ class Material extends Model
         return $this->qty_case;
     }
 
-    public function setQtyPerCaseAttribute($value)
+    public function setQtyPerCaseAttribute(mixed $value)
     {
         $this->qty_case = $value;
     }
@@ -112,7 +112,7 @@ class Material extends Model
         return $this->min_stok;
     }
 
-    public function setMinStockAttribute($value)
+    public function setMinStockAttribute(mixed $value)
     {
         $this->min_stok = $value;
     }
@@ -122,7 +122,7 @@ class Material extends Model
         return $this->status === 'Aktif';
     }
 
-    public function setIsActiveAttribute($value)
+    public function setIsActiveAttribute(mixed $value)
     {
         $this->status = $value ? 'Aktif' : 'Tidak Aktif';
     }

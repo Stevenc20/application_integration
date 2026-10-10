@@ -13,6 +13,7 @@ use App\Models\SkmOrderItem;
 use App\Models\StorageLocation;
 use App\Services\ExcelService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -84,7 +85,7 @@ class SummaryKanbanController extends Controller
                 'order_date' => $request->order_date,
                 'status'     => 'draft',
                 'notes'      => $request->notes,
-                'created_by' => auth()->id(),
+                'created_by' => Auth::id(),
             ]);
 
             foreach ($request->items as $item) {
@@ -182,7 +183,7 @@ class SummaryKanbanController extends Controller
                     'status'              => 'Approved',
                     'total_amount'        => $totalAmount,
                     'catatan'             => 'Auto-generated dari ' . $skm->skm_number,
-                    'created_by'          => auth()->id(),
+                    'created_by'          => Auth::id(),
                 ]);
 
                 foreach ($items as $item) {
@@ -344,7 +345,7 @@ class SummaryKanbanController extends Controller
                 'period'       => trim((string)($row[3] ?? '')) ?: date('Y-m'),
                 'notes'        => trim((string)($row[4] ?? '')) ?: null,
                 'is_active'    => true,
-                'created_by'   => auth()->id(),
+                'created_by'   => Auth::id(),
             ]);
             $imported++;
         }

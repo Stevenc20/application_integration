@@ -35,7 +35,7 @@ class MaterialStock extends Model
         return $this->qty;
     }
 
-    public function setQuantityAttribute($value)
+    public function setQuantityAttribute(mixed $value)
     {
         $this->qty = $value;
     }

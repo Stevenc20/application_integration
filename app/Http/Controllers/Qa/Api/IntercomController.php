@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\IntercomCall;
 use App\Models\LembarInspeksi;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class IntercomController extends Controller
 {
@@ -129,7 +130,7 @@ class IntercomController extends Controller
     // Menyelesaikan panggilan (reset status)
     public function completeCall($liId)
     {
-        \Log::info('[INTERCOM] completeCall', ['liId' => $liId]);
+        Log::info('[INTERCOM] completeCall', ['liId' => $liId]);
         $call = IntercomCall::where('lembar_inspeksi_id', $liId)->first();
 
         if ($call) {
@@ -157,7 +158,7 @@ class IntercomController extends Controller
             return response()->json(['success' => false, 'data' => null, 'message' => 'Missing user_id or role']);
         }
 
-        // \Log::info('[INTERCOM] checkActiveIncoming', [
+        // Log::info('[INTERCOM] checkActiveIncoming', [
         //     'user_id' => $userId,
         //     'role'    => $role,
         // ]);
@@ -182,7 +183,7 @@ class IntercomController extends Controller
                 ->first();
         }
 
-        // \Log::info('[INTERCOM] checkActiveIncoming result', [
+        // Log::info('[INTERCOM] checkActiveIncoming result', [
         //     'call' => $call ? $call->id : null,
         // ]);
 

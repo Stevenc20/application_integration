@@ -5,6 +5,7 @@ namespace App\Services;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Shared\Date as ExcelDate;
 use PhpOffice\PhpSpreadsheet\Style\NumberFormat;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 use Carbon\Carbon;
 
 class ExcelScheduleParser
@@ -129,7 +130,7 @@ class ExcelScheduleParser
         return $result;
     }
 
-    private function parseSheet($ws, string $sheetName): array
+    private function parseSheet(Worksheet $ws, string $sheetName): array
     {
         $allRows = $ws->toArray();
         $total = count($allRows);
@@ -409,7 +410,7 @@ class ExcelScheduleParser
         return false;
     }
 
-    private function fmtTime($v): ?string
+    private function fmtTime(mixed $v): ?string
     {
         if ($v === null) return null;
         if ($v instanceof \DateTimeInterface) return $v->format('H:i');
@@ -426,7 +427,7 @@ class ExcelScheduleParser
         return null;
     }
 
-    private function safeF($v): float
+    private function safeF(mixed $v): float
     {
         if ($v === null) return 0.0;
         if (is_numeric($v)) return (float)$v;
@@ -435,13 +436,13 @@ class ExcelScheduleParser
         return (float)$s;
     }
 
-    private function safeI($v): int
+    private function safeI(mixed $v): int
     {
         if ($v === null) return 0;
         return (int)((float)((string)$v));
     }
 
-    private function nonEmpty($v): bool
+    private function nonEmpty(mixed $v): bool
     {
         if ($v === null) return false;
         $s = trim((string)$v);

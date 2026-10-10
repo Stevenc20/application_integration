@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\JobMaster;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Http\Request;
 
 class DailyProduction extends Model
 {
@@ -32,22 +33,22 @@ class DailyProduction extends Model
         return $this->belongsTo(JobMaster::class, 'job_master_id');
     }
 
-    public function getActualOkAttribute($value): int
+    public function getActualOkAttribute(mixed $value): int
     {
         return (int)($value ?: ($this->actual_qty - ($this->repair_qty ?? 0) - ($this->reject_qty ?? 0)));
     }
 
-    public function getActualRepairAttribute($value): int
+    public function getActualRepairAttribute(mixed $value): int
     {
         return (int)($value ?: ($this->repair_qty ?? 0));
     }
 
-    public function getActualRejectAttribute($value): int
+    public function getActualRejectAttribute(mixed $value): int
     {
         return (int)($value ?: ($this->reject_qty ?? 0));
     }
 
-  public function saveQty(Request $request, $id)
+  public function saveQty(Request $request, int|string $id)
 {
     $qty = (int) $request->actual_qty;
     $repair = (int) $request->repair_qty;

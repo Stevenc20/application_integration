@@ -25,7 +25,7 @@ class Vendor extends Model
         return $this->kode;
     }
 
-    public function setCodeAttribute($value)
+    public function setCodeAttribute(mixed $value)
     {
         $this->kode = $value;
     }
@@ -35,7 +35,7 @@ class Vendor extends Model
         return $this->nama;
     }
 
-    public function setNameAttribute($value)
+    public function setNameAttribute(mixed $value)
     {
         $this->nama = $value;
     }
@@ -51,7 +51,7 @@ class Vendor extends Model
         return 'general';
     }
 
-    public function setVendorTypeAttribute($value)
+    public function setVendorTypeAttribute(mixed $value)
     {
         if ($value === 'coil_center') {
             $this->tipe = 'Coil Center (Supplier Bahan Baku)';
@@ -67,7 +67,7 @@ class Vendor extends Model
         return $this->status === 'Aktif';
     }
 
-    public function setIsActiveAttribute($value)
+    public function setIsActiveAttribute(mixed $value)
     {
         $this->status = $value ? 'Aktif' : 'Tidak Aktif';
     }

@@ -6,8 +6,10 @@ use App\Models\MasterBreakTime;
 use App\Models\ProductionPlan;
 use App\Models\RecoveryItem;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 
 /**
@@ -21,7 +23,7 @@ class TimelineGenerationService
         // Normalize date to Y-m-d format (handles "2026-05-08 00:00:00" from DB queries)
         $date = \Carbon\Carbon::parse($date)->format('Y-m-d');
 
-        \Log::info('[REGEN START]', [
+        Log::info('[REGEN START]', [
             'date' => $date,
             'shift' => $shiftName,
             'press' => $pressName,
@@ -189,11 +191,11 @@ class TimelineGenerationService
             ->values();
 
         if ($plans->isEmpty()) {
-            \Log::info('[REGEN] Aborted — no job plans found', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName]);
+            Log::info('[REGEN] Aborted — no job plans found', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName]);
             return ['updated' => 0, 'overflow' => []];
         }
 
-        \Log::info('[REGEN] Plans loaded', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'count' => $plans->count()]);
+        Log::info('[REGEN] Plans loaded', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'count' => $plans->count()]);
 
         $firstPlan = $plans->first();
         $resolvedPressName = $pressName ?: ($firstPlan->press_name ?? 'PRESS A');
@@ -231,7 +233,7 @@ class TimelineGenerationService
                 ->first(['production_start', 'production_end']);
         }
 
-        \Log::info('[REGEN] Press config resolved', [
+        Log::info('[REGEN] Press config resolved', [
             'lineMasterId' => $lineMasterId,
             'pressName' => $pressName,
             'resolvedPressName' => $resolvedPressName,
@@ -240,7 +242,7 @@ class TimelineGenerationService
         ]);
 
         $breakWindows = $this->resolveBreakWindows($date, $shiftName, $hari);
-        \Log::info('[REGEN] Break windows resolved', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'count' => count($breakWindows)]);
+        Log::info('[REGEN] Break windows resolved', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'count' => count($breakWindows)]);
         
         // Sort breaks chronologically by start time
         usort($breakWindows, fn ($a, $b) => MasterBreakTime::timeToMinutes($a['start']) <=> MasterBreakTime::timeToMinutes($b['start']));
@@ -306,7 +308,7 @@ class TimelineGenerationService
 
             $itemPlan = $plansArray[$i];
             
-            \Log::info("=========== ITERATION ===========\n" .
+            Log::info("=========== ITERATION ===========\n" .
                 "Index : {$i}\n" .
                 "Job : {$itemPlan->job_no}\n" .
                 "source_type : " . ($itemPlan->source_type ?? 'ppc') . "\n" .
@@ -525,7 +527,7 @@ foreach ($breakWindows as $idx => $b) {
             ],
         ];
 
-        \Log::info('[REGEN] Job split (Session A)', [
+        Log::info('[REGEN] Job split (Session A)', [
             'job' => $itemPlan->job_no,
             'start' => MasterBreakTime::minutesToTime($startTimeMins),
             'finish' => $b['start'],
@@ -564,7 +566,7 @@ foreach ($breakWindows as $idx => $b) {
             $clone->process_time = $sessionBProcessTime;
             $clone->tpt = $sessionBTpt;
 
-            \Log::info("SESSION B CREATED\n" .
+            Log::info("SESSION B CREATED\n" .
                 "Old Job : {$itemPlan->job_no}\n" .
                 "Remaining Qty : {$remainingQty}\n" .
                 "Inserted Index : {$i}\n" .
@@ -615,7 +617,7 @@ foreach ($breakWindows as $idx => $b) {
             $currentTimeMins = $adjustedFinishMins;
             $i++;
 
-            \Log::info('[REGEN] Job normal', [
+            Log::info('[REGEN] Job normal', [
                 'job' => $itemPlan->job_no,
                 'source_type' => $itemPlan->source_type ?? 'ppc',
                 'start' => $jobStartStr,
@@ -665,7 +667,7 @@ foreach ($breakWindows as $idx => $b) {
 
         $jobCount = count(array_filter($outputSequence, fn ($o) => $o['type'] === 'job'));
         $breakCount = count(array_filter($outputSequence, fn ($o) => $o['type'] === 'break'));
-        \Log::info('[REGEN] Output sequence built', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'total' => count($outputSequence), 'jobs' => $jobCount, 'breaks' => $breakCount]);
+        Log::info('[REGEN] Output sequence built', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'total' => count($outputSequence), 'jobs' => $jobCount, 'breaks' => $breakCount]);
 
         // Sequence is already in processing order (Excel row order), which is the desired
         // user-facing order.  Breaks are inserted inline when they overlap, so no re-sort needed.
@@ -705,7 +707,7 @@ foreach ($breakWindows as $idx => $b) {
             }
         }
 
-        \Log::info('[REGEN] Persisting output sequence', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'rows' => count($outputSequence)]);
+        Log::info('[REGEN] Persisting output sequence', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'rows' => count($outputSequence)]);
 
         // 3. Database transaction persist
         $updated = 0;
@@ -789,7 +791,7 @@ foreach ($breakWindows as $idx => $b) {
                     if ($plan->source_type === 'recovery') {
                         $logData['new_id'] = $plan->id;
                     }
-                    \Log::info('[REGEN TRACE PERSIST]', $logData);
+                    Log::info('[REGEN TRACE PERSIST]', $logData);
                 }
                 $updated++;
             }
@@ -813,7 +815,7 @@ foreach ($breakWindows as $idx => $b) {
                     ->update(['status' => 'waiting_approval']);
 
                 if ($affected > 0) {
-                    \Log::info('[REGEN UNUSED RECOVERY] Reverted to waiting_approval', [
+                    Log::info('[REGEN UNUSED RECOVERY] Reverted to waiting_approval', [
                         'plan_id' => $ur->id,
                         'job_no' => $ur->job_no,
                         'recovery_item_id' => $ur->recovery_id,
@@ -853,8 +855,8 @@ foreach ($breakWindows as $idx => $b) {
                 ->update(['row_no' => null]);
         }
 
-        \Log::info('[REGEN END]');
-        \Log::info('[REGEN] Complete', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'updated' => $updated, 'overflow_count' => count($overflow)]);
+        Log::info('[REGEN END]');
+        Log::info('[REGEN] Complete', ['date' => $date, 'shift' => $shiftName, 'press' => $pressName, 'updated' => $updated, 'overflow_count' => count($overflow)]);
 
         return ['updated' => $updated, 'overflow' => $overflow];
     }
@@ -964,7 +966,7 @@ foreach ($breakWindows as $idx => $b) {
     {
         $dayKey = $this->resolveDayKey($date, $hari);
 
-        \Log::info('[TRACE BREAK DB]', [
+        Log::info('[TRACE BREAK DB]', [
             'date' => $date,
             'shiftName' => $shiftName,
             'hari_raw' => $hari,
@@ -1007,7 +1009,7 @@ foreach ($breakWindows as $idx => $b) {
         // Fallback to legacy fixed breaks when no DB entries match this shift
         if (empty($windows)) {
             $legacy = $this->legacyFixedBreaks($dayKey);
-            \Log::info("resolveBreakWindows: DB empty for {$date} {$shiftName} ({$dayKey}), using legacy: " . count($legacy) . " breaks");
+            Log::info("resolveBreakWindows: DB empty for {$date} {$shiftName} ({$dayKey}), using legacy: " . count($legacy) . " breaks");
             return $legacy;
         }
 
@@ -1182,7 +1184,7 @@ foreach ($breakWindows as $idx => $b) {
         return null;
     }
 
-    private function applyPressFilter($query, ?string $pressName): void
+    private function applyPressFilter(Builder $query, ?string $pressName): void
     {
         if (!$pressName) {
             return;

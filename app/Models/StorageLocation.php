@@ -30,7 +30,7 @@ class StorageLocation extends Model
         return $this->kode;
     }
 
-    public function setCodeAttribute($value)
+    public function setCodeAttribute(mixed $value)
     {
         $this->kode = $value;
     }
@@ -40,7 +40,7 @@ class StorageLocation extends Model
         return $this->nama;
     }
 
-    public function setNameAttribute($value)
+    public function setNameAttribute(mixed $value)
     {
         $this->nama = $value;
     }
@@ -50,7 +50,7 @@ class StorageLocation extends Model
         return $this->deskripsi;
     }
 
-    public function setDescriptionAttribute($value)
+    public function setDescriptionAttribute(mixed $value)
     {
         $this->deskripsi = $value;
     }
@@ -60,7 +60,7 @@ class StorageLocation extends Model
         return $this->tipe_material;
     }
 
-    public function setMaterialTypeAttribute($value)
+    public function setMaterialTypeAttribute(mixed $value)
     {
         $this->tipe_material = $value;
     }

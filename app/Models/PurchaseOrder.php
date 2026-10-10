@@ -64,7 +64,7 @@ class PurchaseOrder extends Model
         return $this->attributes['no_po'] ?? null;
     }
 
-    public function setPoNumberAttribute($value)
+    public function setPoNumberAttribute(mixed $value)
     {
         $this->attributes['no_po'] = $value;
     }
@@ -75,7 +75,7 @@ class PurchaseOrder extends Model
         return $val ? \Carbon\Carbon::parse($val) : null;
     }
 
-    public function setOrderDateAttribute($value)
+    public function setOrderDateAttribute(mixed $value)
     {
         $this->attributes['tanggal_order'] = $value;
     }
@@ -86,7 +86,7 @@ class PurchaseOrder extends Model
         return $val ? \Carbon\Carbon::parse($val) : null;
     }
 
-    public function setExpectedDeliveryDateAttribute($value)
+    public function setExpectedDeliveryDateAttribute(mixed $value)
     {
         $this->attributes['estimasi_terima'] = $value;
     }
@@ -96,12 +96,12 @@ class PurchaseOrder extends Model
         return $this->attributes['catatan'] ?? null;
     }
 
-    public function setNotesAttribute($value)
+    public function setNotesAttribute(mixed $value)
     {
         $this->attributes['catatan'] = $value;
     }
 
-    public function getStatusAttribute($value)
+    public function getStatusAttribute(mixed $value)
     {
         if (!$value) return null;
         return strtolower(str_replace(' ', '_', $value));

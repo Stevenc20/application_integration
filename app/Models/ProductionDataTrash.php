@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class ProductionDataTrash extends Model
@@ -27,14 +28,14 @@ class ProductionDataTrash extends Model
         ];
     }
 
-    public function scopeExpired($query)
+    public function scopeExpired(Builder $query)
     {
         return $query->whereNotNull('expires_at')
             ->whereNull('deleted_at')
             ->where('expires_at', '<', now());
     }
 
-    public function scopeActive($query)
+    public function scopeActive(Builder $query)
     {
         return $query->whereNull('deleted_at');
     }

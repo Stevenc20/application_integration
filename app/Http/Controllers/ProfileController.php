@@ -6,6 +6,7 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -163,7 +164,7 @@ class ProfileController extends Controller
                 'errors'  => $ve->errors(),
             ], 422);
         } catch (\Throwable $e) {
-            \Illuminate\Support\Facades\Log::error('Profile avatar upload error: ' . $e->getMessage(), [
+            \Illuminate\Support\FacadesLog::error('Profile avatar upload error: ' . $e->getMessage(), [
                 'trace' => $e->getTraceAsString()
             ]);
             return response()->json([

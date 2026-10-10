@@ -220,7 +220,7 @@ class DashboardDetailService
         return $plans;
     }
 
-    private function pressMatches($plan, string $lineName): bool
+    private function pressMatches(ProductionPlan $plan, string $lineName): bool
     {
         $target = $this->normalizePressName($lineName);
         if ($target === '') {

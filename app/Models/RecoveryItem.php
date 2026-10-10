@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
@@ -55,42 +56,42 @@ class RecoveryItem extends Model
         'rejected_at' => 'datetime',
     ];
 
-    public function scopePending($q)
+    public function scopePending(Builder $q)
     {
         return $q->where('status', 'waiting_approval');
     }
 
-    public function scopeWaitingApproval($q)
+    public function scopeWaitingApproval(Builder $q)
     {
         return $q->where('status', 'waiting_approval');
     }
 
-    public function scopeApproved($q)
+    public function scopeApproved(Builder $q)
     {
         return $q->where('status', 'approved');
     }
 
-    public function scopeRejected($q)
+    public function scopeRejected(Builder $q)
     {
         return $q->where('status', 'rejected');
     }
 
-    public function scopeScheduled($q)
+    public function scopeScheduled(Builder $q)
     {
         return $q->where('status', 'scheduled');
     }
 
-    public function scopeInProduction($q)
+    public function scopeInProduction(Builder $q)
     {
         return $q->where('status', 'in_production');
     }
 
-    public function scopeCompleted($q)
+    public function scopeCompleted(Builder $q)
     {
         return $q->where('status', 'completed');
     }
 
-    public function scopeForPress($q, $pressName)
+    public function scopeForPress(Builder $q, ?string $pressName)
     {
         return $q->where('press_name', $pressName);
     }

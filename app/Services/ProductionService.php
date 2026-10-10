@@ -538,7 +538,7 @@ class ProductionService
             $mismatch = null;
             $autoRecoveryItem = null;
             $job = \App\Models\JobMaster::find($jobId);
-            $actualQty = $finalOk ?? 0;
+            $actualQty = $finalOk !== null ? (float) $finalOk : (float) ($totalOk ?? 0);
 
             if ($planId) {
                 $parts = explode('-', $job->job_number);
@@ -551,19 +551,19 @@ class ProductionService
                 }
 
                 $plan = \App\Models\ProductionPlan::find($planId);
-                if ($plan) {
-                    $planQty = (float) ($plan->plan ?? 0);
-                    if ($planQty > 0 && $actualQty < $planQty) {
-                        $recoveryQty = $planQty - $actualQty;
-                        $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQty, $recoveryQty, 'waiting_approval');
-                    }
+                $planQty = (float) (($plan && (float) ($plan->plan ?? 0) > 0) ? $plan->plan : ($job->target_qty ?? 0));
+                if ($planQty > 0 && $actualQty < $planQty) {
+                    $recoveryQty = $planQty - $actualQty;
+                    $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQty, $recoveryQty, 'waiting_approval');
                 }
             }
 
-            if (!$planId && !$mismatch && !$autoRecoveryItem) {
-                $recoveryQty = (float) ($job->target_qty ?? 0) - $actualQty;
-                if ($recoveryQty < 0) $recoveryQty = 0;
-                $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQty, $recoveryQty, 'waiting_approval', true);
+            if (!$autoRecoveryItem && $job) {
+                $planQty = (float) ($job->target_qty ?? 0);
+                if ($planQty > 0 && $actualQty < $planQty) {
+                    $recoveryQty = $planQty - $actualQty;
+                    $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQty, $recoveryQty, 'waiting_approval', true);
+                }
             }
 
             if ($autoRecoveryItem) {
@@ -856,7 +856,7 @@ class ProductionService
         return \App\Models\RecoveryItem::create([
             'recovery_schedule_id' => $schedule->id,
             'production_plan_id' => $plan ? $plan->id : null,
-            'job_no' => $job->job_number,
+            'job_no' => $plan && !empty($plan->job_no) ? $plan->job_no : $job->job_number,
             'job_name' => $job->job_name,
             'job_master' => $job->job_name,
             'press_name' => $plan ? $plan->press_name : $job->line,
@@ -881,7 +881,9 @@ class ProductionService
 
     private function notifyPpcUsers(JobMaster $job, \App\Models\RecoveryItem $recoveryItem)
     {
-        $ppcUsers = \App\Models\User::where('role', 'like', '%ppc%')->get();
+        $ppcUsers = \App\Models\User::whereRaw("LOWER(role) LIKE '%ppc%'")
+            ->orWhereIn('role', ['admin', 'superadmin', 'ppc'])
+            ->get();
         foreach ($ppcUsers as $user) {
             $user->notify(new \App\Notifications\ItemTidakTercapaiNotification($job, $recoveryItem));
         }

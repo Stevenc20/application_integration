@@ -57,7 +57,7 @@ class RecoveryController extends Controller
     /**
      * Reject a single recovery item.
      */
-    public function rejectItem(Request $request, $id)
+    public function rejectItem(Request $request, int|string $id)
     {
         $request->validate([
             'notes' => 'nullable|string|max:500',

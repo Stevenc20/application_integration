@@ -2,7 +2,9 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\DB;
 
 class ProductionPlan extends Model
 {
@@ -105,14 +107,14 @@ class ProductionPlan extends Model
         return $this->belongsTo(JobMaster::class, 'job_no', 'job_number');
     }
 
-    public function scopeVisibleOnTimeline($query)
+    public function scopeVisibleOnTimeline(Builder $query)
     {
         return $query->whereIn('row_type', ['job', 'break'])
             ->where(function($q) {
-                $q->whereNotIn(\DB::raw('UPPER(TRIM(job_master))'), [
+                $q->whereNotIn(DB::raw('UPPER(TRIM(job_master))'), [
                     'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
                 ])
-                ->whereNotIn(\DB::raw('UPPER(TRIM(job_no))'), [
+                ->whereNotIn(DB::raw('UPPER(TRIM(job_no))'), [
                     'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
                 ]);
             })
@@ -128,30 +130,30 @@ class ProductionPlan extends Model
             });
     }
 
-    public function scopeKpiJobs($query)
+    public function scopeKpiJobs(Builder $query)
     {
         return $query->where('row_type', 'job')
             ->where(function($q) {
-                $q->whereNotIn(\DB::raw('UPPER(TRIM(job_master))'), [
+                $q->whereNotIn(DB::raw('UPPER(TRIM(job_master))'), [
                     'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
                 ])
-                ->whereNotIn(\DB::raw('UPPER(TRIM(job_no))'), [
+                ->whereNotIn(DB::raw('UPPER(TRIM(job_no))'), [
                     'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN', 'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
                 ]);
             });
     }
 
-    public function scopePpc($query)
+    public function scopePpc(Builder $query)
     {
         return $query->where('source_type', 'ppc');
     }
 
-    public function scopeRecovery($query)
+    public function scopeRecovery(Builder $query)
     {
         return $query->where('source_type', 'recovery');
     }
 
-    public function scopeInProduction($query)
+    public function scopeInProduction(Builder $query)
     {
         return $query->whereHas('recoveryItem', function ($q) {
             $q->where('status', 'in_production');

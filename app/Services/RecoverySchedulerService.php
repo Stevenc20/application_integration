@@ -117,7 +117,7 @@ class RecoverySchedulerService
     /**
      * Calculate how many minutes this recovery item needs.
      */
-    private function calculateItemMinutes($item): float
+    private function calculateItemMinutes(RecoveryItem $item): float
     {
         $ctDetik = (float)($item->ct_detik ?? 0);
         $dct = (float)($item->dct ?? 0);

@@ -9,11 +9,13 @@ use App\Models\JobMaster;
 use App\Models\LineMaster;
 use App\Models\ShiftSubmission;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
 class RepairRejectController extends Controller
 {
-    private function guardLockedShift($jobMasterId)
+    private function guardLockedShift(int|string $jobMasterId)
     {
         $jm = JobMaster::find($jobMasterId);
         if (!$jm || !$jm->line) return;
@@ -108,7 +110,7 @@ class RepairRejectController extends Controller
             'images.*'       => 'nullable|file|max:5120',
         ]);
 
-        $validated['created_by'] = auth()->id();
+        $validated['created_by'] = Auth::id();
         $workDate = $request->get('date', now()->toDateString());
 
         $log = RepairRejectLog::create($validated);
@@ -136,7 +138,7 @@ class RepairRejectController extends Controller
                         'image_type'           => 'before',
                     ]);
                 } catch (\Throwable $e) {
-                    \Log::error('RR store image[' . $i . '] failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
+                    Log::error('RR store image[' . $i . '] failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
                 }
             }
         }
@@ -160,7 +162,7 @@ class RepairRejectController extends Controller
     /**
      * Hapus satu log + gambarnya
      */
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $log = RepairRejectLog::with('images')->findOrFail($id);
         $this->guardLockedShift($log->job_master_id);
@@ -179,7 +181,7 @@ class RepairRejectController extends Controller
     /**
      * Ambil history repair/reject untuk job tertentu (dipakai di input_harian AJAX)
      */
-    public function getByJob($jobId)
+    public function getByJob(int|string $jobId)
     {
         $logs = RepairRejectLog::with(['images', 'creator'])
             ->where('job_master_id', $jobId)
@@ -209,7 +211,7 @@ class RepairRejectController extends Controller
     /**
      * Update log repair / reject
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $log = RepairRejectLog::findOrFail($id);
         $this->guardLockedShift($log->job_master_id);
@@ -253,7 +255,7 @@ class RepairRejectController extends Controller
                         'image_type'           => 'before',
                     ]);
                 } catch (\Throwable $e) {
-                    \Log::error('RR update image[' . $i . '] failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
+                    Log::error('RR update image[' . $i . '] failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
                 }
             }
         }

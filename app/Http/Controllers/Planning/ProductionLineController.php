@@ -82,7 +82,7 @@ class ProductionLineController extends Controller
     /**
      * Show a single line (for edit modal).
      */
-    public function show($id)
+    public function show(int|string $id)
     {
         $line = LineMaster::findOrFail($id);
         return response()->json(['success' => true, 'line' => $line]);
@@ -91,7 +91,7 @@ class ProductionLineController extends Controller
     /**
      * Update a production line.
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $line = LineMaster::findOrFail($id);
 
@@ -121,7 +121,7 @@ class ProductionLineController extends Controller
     /**
      * Toggle status (quick action from table).
      */
-    public function toggleStatus(Request $request, $id)
+    public function toggleStatus(Request $request, int|string $id)
     {
         $line = LineMaster::findOrFail($id);
         $newStatus = $request->input('status');
@@ -140,7 +140,7 @@ class ProductionLineController extends Controller
     /**
      * Soft-delete a production line.
      */
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $line = LineMaster::findOrFail($id);
 

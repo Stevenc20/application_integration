@@ -124,7 +124,7 @@ class ProductionOrderController extends Controller
         return redirect()->route('production_orders.index')->with('success', "{$count} Production Order berhasil dibuat.");
     }
 
-    public function show($id)
+    public function show(int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         $productionOrder->load('material', 'bom', 'components.material', 'components.storageLocation', 'createdBy');
@@ -165,7 +165,7 @@ class ProductionOrderController extends Controller
         ));
     }
 
-    public function edit($id)
+    public function edit(int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         if (!in_array($productionOrder->status, ['created'])) {
@@ -176,7 +176,7 @@ class ProductionOrderController extends Controller
         return view('production_orders.edit', compact('productionOrder', 'materials', 'boms'));
     }
 
-    public function update(Request $request, $id)
+    public function update(Request $request, int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         if ($productionOrder->status !== 'created') {
@@ -211,7 +211,7 @@ class ProductionOrderController extends Controller
         return redirect()->route('production_orders.show', $productionOrder->id)->with('success', 'Production Order diperbarui.');
     }
 
-    public function release($id)
+    public function release(int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         if ($productionOrder->status !== 'created') {
@@ -238,7 +238,7 @@ class ProductionOrderController extends Controller
         return back()->with('success', $orders->count() . ' Production Order berhasil di-release.');
     }
 
-    public function goodsIssue(Request $request, $id)
+    public function goodsIssue(Request $request, int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         if (!in_array($productionOrder->status, ['released', 'in_progress'])) {
@@ -326,7 +326,7 @@ class ProductionOrderController extends Controller
         return back()->with('success', 'Goods Issue to Production berhasil diposting.');
     }
 
-    public function confirm(Request $request, $id)
+    public function confirm(Request $request, int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         $request->validate([
@@ -427,7 +427,7 @@ class ProductionOrderController extends Controller
         return back()->with('success', 'Konfirmasi produksi berhasil. Stok produk jadi telah diperbarui.');
     }
 
-    public function printLabel($id)
+    public function printLabel(int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         $productionOrder->load('material', 'components.material');
@@ -436,7 +436,7 @@ class ProductionOrderController extends Controller
         return view('production_orders.print', compact('productionOrder', 'barcode'));
     }
 
-    public function print($id)
+    public function print(int|string $id)
     {
         return $this->printLabel($id);
     }
@@ -448,7 +448,7 @@ class ProductionOrderController extends Controller
         return $pdf->stream('production_orders.pdf');
     }
 
-    public function destroy($id)
+    public function destroy(int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         if ($productionOrder->status !== 'created') {
@@ -458,7 +458,7 @@ class ProductionOrderController extends Controller
         return redirect()->route('production_orders.index')->with('success', 'Production Order berhasil dihapus.');
     }
 
-    public function cancel($id)
+    public function cancel(int|string $id)
     {
         $productionOrder = ProductionOrder::findOrFail($id);
         if (!in_array($productionOrder->status, ['created', 'released'])) {

@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\MasterStamping;
 use Illuminate\Http\Request;
 use PhpOffice\PhpSpreadsheet\IOFactory;
+use PhpOffice\PhpSpreadsheet\Spreadsheet;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class MasterStampingController extends Controller
 {
@@ -241,7 +243,7 @@ class MasterStampingController extends Controller
         return response()->json($items);
     }
 
-    private function getCellValue($sheet, $col, $row)
+    private function getCellValue(?Worksheet $sheet, int $col, int $row)
     {
         $cell = $sheet->getCellByColumnAndRow($col, $row);
         if (!$cell) return null;
@@ -257,14 +259,14 @@ class MasterStampingController extends Controller
         return $val !== null ? trim((string)$val) : null;
     }
 
-    private function safeFloat($val)
+    private function safeFloat(mixed $val)
     {
         if ($val === null || $val === '') return null;
         $val = str_replace(',', '.', $val);
         return is_numeric($val) ? floatval($val) : null;
     }
 
-    private function getSheetByNameCaseInsensitive($spreadsheet, $name)
+    private function getSheetByNameCaseInsensitive(Spreadsheet $spreadsheet, string $name)
     {
         $sheetNames = $spreadsheet->getSheetNames();
         $lowerName = strtolower($name);

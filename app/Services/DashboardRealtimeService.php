@@ -480,8 +480,8 @@ class DashboardRealtimeService
         $lines = [];
         $prefix = 'dash_update_';
         $prefixLen = strlen($prefix);
-        foreach (Cache::getMultiple(/* all keys not possible with file cache */) ?: [] as $key => $val) {
-            // fallback handled in stream endpoint
+        foreach (Cache::getMultiple([]) as $key => $val) {
+            // all keys not possible with file cache; fallback handled in stream endpoint
         }
         return $lines;
     }
@@ -501,7 +501,7 @@ class DashboardRealtimeService
         return null;
     }
 
-    private function downtimeDurationSeconds($dt): float
+    private function downtimeDurationSeconds(Downtime $dt): float
     {
         if (!empty($dt->duration_seconds)) {
             return (float) $dt->duration_seconds;
@@ -585,7 +585,7 @@ class DashboardRealtimeService
         return $plans;
     }
 
-    private function pressMatches($plan, string $lineName): bool
+    private function pressMatches(ProductionPlan $plan, string $lineName): bool
     {
         $target = $this->normalizePressName($lineName);
         if ($target === '') {

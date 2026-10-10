@@ -244,8 +244,8 @@ class ProductionPlanController extends Controller
         $pendingRecoveryItems = RecoveryItem::pending()
             ->with('schedule')
             ->where(function ($q) use ($date) {
-                $q->where('original_date', '<', $date)  // only show on days AFTER the original date
-                  ->orWhere('source_date', '<', $date);
+                $q->where('original_date', '<=', $date)
+                  ->orWhere('source_date', '<=', $date);
             })
             ->whereHas('schedule', function ($q) {
                 $q->where('status', 'waiting_approval');

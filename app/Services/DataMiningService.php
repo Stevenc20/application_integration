@@ -6,6 +6,7 @@ use App\Models\DailyProduction;
 use App\Models\Downtime;
 use App\Models\RepairRejectLog;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class DataMiningService
@@ -291,13 +292,14 @@ class DataMiningService
     /**
      * Helper to compute Z-Score anomalies for a dataset.
      */
-    private function calculateZScoreAnomalies($collection, $valKey, string $metricName, float $threshold, callable $formatter): array
+    private function calculateZScoreAnomalies(Collection $collection, string|callable $valKey, string $metricName, float $threshold, callable $formatter): array
     {
         if ($collection->isEmpty()) return [];
 
-        $values = $collection->map(function($item) use ($valKey) {
-            return is_callable($valKey) ? $valKey($item) : (float) ($item->{$valKey} ?? 0);
-        })->toArray();
+        $values = [];
+        foreach ($collection as $item) {
+            $values[] = is_callable($valKey) ? $valKey($item) : (float) ($item->{$valKey} ?? 0);
+        }
 
         $count = count($values);
         if ($count < 3) return [];

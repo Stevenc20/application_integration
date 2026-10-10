@@ -23,11 +23,14 @@
         @forelse($notifications as $n)
             @php
                 $hambatanId = $n->data['hambatan_id'] ?? null;
+                $recoveryId = $n->data['recovery_id'] ?? null;
                 $message = $n->data['message'] ?? 'Notifikasi';
+                $isClickable = $hambatanId || $recoveryId;
             @endphp
-            <div class="notif-item flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors {{ $n->read_at ? '' : 'bg-red-50/30' }} {{ $hambatanId ? 'cursor-pointer' : '' }}"
+            <div class="notif-item flex items-start gap-4 px-5 py-4 hover:bg-gray-50 transition-colors {{ $n->read_at ? '' : 'bg-red-50/30' }} {{ $isClickable ? 'cursor-pointer' : '' }}"
                  data-id="{{ $n->id }}"
-                 data-hambatan-id="{{ $hambatanId }}">
+                 data-hambatan-id="{{ $hambatanId }}"
+                 data-recovery-id="{{ $recoveryId }}">
                 <div class="flex-shrink-0 mt-1">
                     <div class="w-10 h-10 rounded-full {{ $n->read_at ? 'bg-gray-100 text-gray-400' : 'bg-red-100 text-primary-red' }} flex items-center justify-center">
                         <i class="bx bx-bell text-lg"></i>
@@ -97,9 +100,15 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target.closest('.mark-read-btn')) return;
             const id = this.dataset.id;
             const hambatanId = this.dataset.hambatanId;
-            if (!hambatanId || !id) return;
-            navigator.sendBeacon('/notifications/' + id + '/read', new URLSearchParams({ _token: csrfToken }));
-            window.location.href = '/hambatan-jalur/' + hambatanId;
+            const recoveryId = this.dataset.recoveryId;
+            if (!id) return;
+            if (hambatanId) {
+                navigator.sendBeacon('/notifications/' + id + '/read', new URLSearchParams({ _token: csrfToken }));
+                window.location.href = '/hambatan-jalur/' + hambatanId;
+            } else if (recoveryId) {
+                navigator.sendBeacon('/notifications/' + id + '/read', new URLSearchParams({ _token: csrfToken }));
+                window.location.href = '{{ route("recovery.index") }}';
+            }
         });
     });
 

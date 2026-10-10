@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Qa\Api;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use App\Models\ItemCheck;
 
 class ItemCheckController extends Controller
@@ -214,7 +215,7 @@ class ItemCheckController extends Controller
 
     public function update(Request $request, $id)
     {
-        // \Log::info('ItemCheck update called', ['id' => $id, 'status' => $request->input('status')]);
+        // Log::info('ItemCheck update called', ['id' => $id, 'status' => $request->input('status')]);
         $itemCheck = ItemCheck::find($id);
 
         if (!$itemCheck) {
@@ -347,7 +348,7 @@ class ItemCheckController extends Controller
                 $itemCheck->qpr_id = $qpr->id;
                 $itemCheck->save();
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Gagal auto-generate QPR untuk Keeper NG: ' . $e->getMessage());
+                \Illuminate\Support\FacadesLog::error('Gagal auto-generate QPR untuk Keeper NG: ' . $e->getMessage());
             }
         } elseif ($hasNg && $itemCheck->qpr_generated && $itemCheck->qpr_id) {
             try {
@@ -367,7 +368,7 @@ class ItemCheckController extends Controller
                     $qpr->save();
                 }
             } catch (\Exception $e) {
-                \Illuminate\Support\Facades\Log::error('Gagal sinkronisasi update QPR qty: ' . $e->getMessage());
+                \Illuminate\Support\FacadesLog::error('Gagal sinkronisasi update QPR qty: ' . $e->getMessage());
             }
         }
 
@@ -486,7 +487,7 @@ class ItemCheckController extends Controller
                     $qprGenerated = true;
                     $qprId = $qpr->id;
                 } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::error('Gagal auto-generate QPR untuk Keeper NG saat sign: ' . $e->getMessage());
+                    \Illuminate\Support\FacadesLog::error('Gagal auto-generate QPR untuk Keeper NG saat sign: ' . $e->getMessage());
                 }
             }
         }
