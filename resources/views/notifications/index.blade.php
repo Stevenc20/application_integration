@@ -107,7 +107,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 window.location.href = '/hambatan-jalur/' + hambatanId;
             } else if (recoveryId) {
                 navigator.sendBeacon('/notifications/' + id + '/read', new URLSearchParams({ _token: csrfToken }));
-                window.location.href = '{{ route("recovery.index") }}';
+                window.location.href = '{{ route("ppc.planning.recovery.index") }}';
             }
         });
     });

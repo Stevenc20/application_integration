@@ -126,7 +126,7 @@
                     a.href = '{{ url("/hambatan-jalur") }}/' + n.hambatan_id;
                     a.classList.add('cursor-pointer');
                 } else if (n.recovery_id) {
-                    a.href = '{{ route("recovery.index") }}';
+                    a.href = '{{ route("ppc.planning.recovery.index") }}';
                     a.classList.add('cursor-pointer');
                 } else {
                     a.href = '#';
@@ -141,7 +141,7 @@
                     if (n.hambatan_id) {
                         window.location.href = '{{ url("/hambatan-jalur") }}/' + n.hambatan_id;
                     } else if (n.recovery_id) {
-                        window.location.href = '{{ route("recovery.index") }}';
+                        window.location.href = '{{ route("ppc.planning.recovery.index") }}';
                     }
                 });
                 notifList.appendChild(a);
