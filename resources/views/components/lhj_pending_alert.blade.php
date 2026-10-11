@@ -35,7 +35,7 @@
                         <div class="text-xs text-gray-500 truncate">{{ $hambatan->problem }}</div>
                     </div>
                     <a href="{{ route('hambatan-jalur.show', $hambatan->id) }}"
-                       class="shrink-0 inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-sm font-bold py-2 px-3 rounded-lg shadow transition-all">
+                       class="lhj-sign-link shrink-0 inline-flex items-center gap-1 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-sm font-bold py-2 px-3 rounded-lg shadow transition-all">
                         Tanda Tangan
                     </a>
                 </div>
@@ -68,6 +68,12 @@
             sessionStorage.setItem(snoozeKey, String(Date.now() + 5 * 60 * 1000));
         });
     }
+
+    document.querySelectorAll('.lhj-sign-link').forEach(function (link) {
+        link.addEventListener('click', function () {
+            sessionStorage.setItem(snoozeKey, String(Date.now() + 10 * 60 * 1000));
+        });
+    });
 })();
 </script>
 @endif
