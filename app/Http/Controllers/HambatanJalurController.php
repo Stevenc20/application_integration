@@ -75,6 +75,39 @@ class HambatanJalurController extends Controller
         return view('hambatan-jalur.show', compact('item', 'isLineLeader', 'repairRejectLogs'));
     }
 
+    public function pendingSign()
+    {
+        $userRole = strtolower(Auth::user()->role ?? '');
+
+        $items = collect();
+        if (str_starts_with($userRole, 'leader')) {
+            $items = HambatanJalur::where('status', 'pic_signed')
+                ->orderByDesc('signed_at')
+                ->get()
+                ->filter(function ($hambatan) use ($userRole) {
+                    $letter = trim(str_ireplace('press', '', (string) $hambatan->line_name));
+                    return ('leader ' . strtolower($letter)) === $userRole;
+                })
+                ->values()
+                ->map(function ($hambatan) {
+                    return [
+                        'id'            => $hambatan->id,
+                        'line_name'     => $hambatan->line_name,
+                        'job_no'        => $hambatan->job_no,
+                        'nama_part'     => $hambatan->nama_part,
+                        'jenis_hambatan'=> $hambatan->jenis_hambatan,
+                        'url'           => route('hambatan-jalur.show', $hambatan->id),
+                    ];
+                });
+        }
+
+        return response()->json([
+            'success' => true,
+            'count'   => $items->count(),
+            'items'   => $items,
+        ]);
+    }
+
     public function sign($id, Request $request)
     {
         $item = HambatanJalur::findOrFail($id);

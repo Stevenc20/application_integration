@@ -1,3 +1,17 @@
+@php
+    $pendingSignRole = strtolower(auth()->user()->role ?? '');
+    $pendingSignItems = collect();
+    if (str_starts_with($pendingSignRole, 'leader')) {
+        $pendingSignItems = \App\Models\HambatanJalur::where('status', 'pic_signed')
+            ->orderByDesc('signed_at')
+            ->get()
+            ->filter(function ($h1) use ($pendingSignRole) {
+                $letter = trim(str_ireplace('press', '', (string) $h1->line_name));
+                return ('leader ' . strtolower($letter)) === $pendingSignRole;
+            })
+            ->values();
+    }
+@endphp
 <header class="bg-white shadow-sm z-30 shrink-0 relative">
     <div class="flex items-center justify-between px-4 py-3 md:px-6">
         <div class="flex items-center">
@@ -8,7 +22,39 @@
         </div>
         <div class="flex items-center space-x-4">
             <span class="text-sm text-gray-500 max-sm:hidden sm:block font-medium" id="liveClockTopbar"></span>
-            
+
+            {{-- LHJ PENDING SIGN --}}
+            @if(str_starts_with($pendingSignRole, 'leader'))
+            <div class="relative" id="lhjSignWrapper">
+                <button id="lhjSignBtn" class="relative flex items-center gap-2 p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none" title="LHJ menunggu tanda tangan Anda">
+                    <i class="bx bxs-edit-alt text-xl"></i>
+                    <span id="lhjSignBadge" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">{{ $pendingSignItems->count() }}</span>
+                    <span id="lhjSignDot" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" style="animation: notifPulse 1.5s ease-in-out infinite"></span>
+                </button>
+                <div id="lhjSignDropdown" class="fixed top-16 left-4 right-4 sm:absolute sm:top-auto sm:-right-4 sm:left-auto sm:w-[420px] mt-2 bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible scale-95 transition-all duration-200 origin-top-right z-50 max-h-[36rem] overflow-y-auto">
+                    <div class="px-5 py-4 border-b border-gray-100">
+                        <p class="text-base font-bold text-gray-800">LHJ Perlu Tanda Tangan</p>
+                        <p class="text-xs font-semibold text-red-600 mt-0.5"><i class="bx bx-info-circle align-middle mr-0.5"></i>Status: WAJIB TTD — sudah ditandatangani PIC</p>
+                    </div>
+                    <div id="lhjSignList" class="divide-y divide-gray-50">
+                        @foreach($pendingSignItems as $p1)
+                        <a href="{{ route('hambatan-jalur.show', $p1->id) }}" class="flex items-start gap-3 px-5 py-3 hover:bg-red-50/40 transition-colors border-b border-gray-50 last:border-b-0">
+                            <span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600">
+                                <i class="bx bx-check text-sm"></i>
+                            </span>
+                            <span class="min-w-0">
+                                <span class="block text-sm font-bold text-gray-800 truncate">{{ $p1->line_name }} · {{ $p1->job_no }}</span>
+                                <span class="block text-xs text-gray-500 truncate">{{ $p1->nama_part }} ({{ $p1->jenis_hambatan }})</span>
+                            </span>
+                            <span class="ml-auto shrink-0 text-[10px] font-black text-red-600 border border-red-200 bg-red-50 rounded-md px-2 py-1">TTD</span>
+                        </a>
+                        @endforeach
+                    </div>
+                    <div id="lhjSignEmpty" class="{{ $pendingSignItems->isNotEmpty() ? 'hidden ' : '' }}p-4 text-center text-xs text-gray-400">Tidak ada LHJ menunggu tanda tangan</div>
+                </div>
+            </div>
+            @endif
+
             {{-- NOTIFICATION BELL --}}
             <div class="relative" id="notificationBellWrapper">
                 <button id="notificationBellBtn" class="relative flex items-center gap-2 p-2 text-gray-500 hover:text-primary-red hover:bg-gray-50 rounded-lg transition-colors focus:outline-none">
@@ -172,6 +218,78 @@
         // Poll every 5s for instant notification
         fetchNotifications();
         setInterval(fetchNotifications, 5000);
+
+        // === LHJ PENDING SIGN ===
+        const lhjBtn = document.getElementById('lhjSignBtn');
+        const lhjDropdown = document.getElementById('lhjSignDropdown');
+        const lhjList = document.getElementById('lhjSignList');
+        const lhjEmpty = document.getElementById('lhjSignEmpty');
+
+        function fetchPendingLhj() {
+            if (!lhjBtn) return;
+            fetch('{{ route("hambatan-jalur.pending-sign") }}', { headers: { 'Accept': 'application/json' } })
+            .then(r => r.ok ? r.json() : null)
+            .then(data => {
+                if (!data) return;
+                const badge = document.getElementById('lhjSignBadge');
+                const dot = document.getElementById('lhjSignDot');
+                if (data.count > 0) {
+                    badge.textContent = data.count;
+                    badge.classList.remove('hidden');
+                    dot.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                    dot.classList.add('hidden');
+                }
+                if (lhjDropdown && lhjDropdown.classList.contains('visible')) {
+                    renderPendingLhj(data);
+                }
+            });
+        }
+
+        function renderPendingLhj(data) {
+            lhjList.innerHTML = '';
+            if (!data.items || data.items.length === 0) {
+                lhjEmpty.classList.remove('hidden');
+                return;
+            }
+            lhjEmpty.classList.add('hidden');
+            data.items.forEach(function(item) {
+                const a = document.createElement('a');
+                a.href = item.url;
+                a.className = 'flex items-start gap-3 px-5 py-3 hover:bg-red-50/40 transition-colors border-b border-gray-50 last:border-b-0';
+                a.innerHTML =
+                    '<span class="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-red-100 text-red-600"><i class="bx bx-check text-sm"></i></span>' +
+                    '<span class="min-w-0"><span class="block text-sm font-bold text-gray-800 truncate">' + (item.line_name || '-') + ' · ' + (item.job_no || '-') + '</span>' +
+                    '<span class="block text-xs text-gray-500 truncate">' + (item.nama_part || '-') + ' (' + (item.jenis_hambatan || '-') + ')</span></span>' +
+                    '<span class="ml-auto shrink-0 text-[10px] font-black text-red-600 border border-red-200 bg-red-50 rounded-md px-2 py-1">TTD</span>';
+                lhjList.appendChild(a);
+            });
+        }
+
+        if (lhjBtn && lhjDropdown) {
+            lhjBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                const isHidden = lhjDropdown.classList.contains('opacity-0');
+                if (isHidden) {
+                    lhjDropdown.classList.remove('opacity-0', 'invisible', 'scale-95');
+                    lhjDropdown.classList.add('opacity-100', 'visible', 'scale-100');
+                    fetchPendingLhj();
+                } else {
+                    lhjDropdown.classList.add('opacity-0', 'invisible', 'scale-95');
+                    lhjDropdown.classList.remove('opacity-100', 'visible', 'scale-100');
+                }
+            });
+            document.addEventListener('click', function(e) {
+                if (!lhjBtn.contains(e.target) && !lhjDropdown.contains(e.target)) {
+                    lhjDropdown.classList.add('opacity-0', 'invisible', 'scale-95');
+                    lhjDropdown.classList.remove('opacity-100', 'visible', 'scale-100');
+                }
+            });
+        }
+
+        fetchPendingLhj();
+        setInterval(fetchPendingLhj, 15000);
 
         // === USER DROPDOWN ===
         const btn = document.getElementById('userDropdownBtn');

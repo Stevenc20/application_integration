@@ -987,6 +987,7 @@ Route::middleware(['auth', 'role:dies_shop,plant_service,irm,logistik,produksi,s
     ->controller(\App\Http\Controllers\HambatanJalurController::class)
     ->group(function () {
         Route::get('/', 'index')->name('index');
+        Route::get('/pending-sign', 'pendingSign')->name('pending-sign');
         Route::get('/{id}', 'show')->name('show');
         Route::post('/{id}/sign', 'sign')->name('sign');
         Route::post('/{id}/leader-sign', 'leaderSign')->name('leader-sign');
