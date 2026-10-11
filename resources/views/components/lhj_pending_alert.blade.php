@@ -62,9 +62,26 @@
         overlay.style.display = 'none';
     }
 
+    function hideLhjPrompt() {
+        overlay.style.display = 'none';
+    }
+
+    function syncFromServer() {
+        var u = '{{ route("hambatan-jalur.pending-sign") }}';
+        fetch(u, { headers: { 'Accept': 'application/json' } })
+            .then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) {
+                if (!data) return;
+                if (data.count === 0) {
+                    sessionStorage.removeItem(snoozeKey);
+                    hideLhjPrompt();
+                }
+            });
+    }
+
     if (laterBtn) {
         laterBtn.addEventListener('click', function () {
-            overlay.style.display = 'none';
+            hideLhjPrompt();
             sessionStorage.setItem(snoozeKey, String(Date.now() + 5 * 60 * 1000));
         });
     }
@@ -73,6 +90,11 @@
         link.addEventListener('click', function () {
             sessionStorage.setItem(snoozeKey, String(Date.now() + 10 * 60 * 1000));
         });
+    });
+
+    syncFromServer();
+    window.addEventListener('pageshow', function (e) {
+        if (e.persisted) syncFromServer();
     });
 })();
 </script>
