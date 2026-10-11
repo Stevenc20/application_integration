@@ -45,7 +45,7 @@
             Belum ada schedule untuk hari ini ({{ now()->translatedFormat('d M Y') }}). Menampilkan schedule tanggal
             <strong>{{ \Carbon\Carbon::parse($activeDate)->translatedFormat('d M Y') }}</strong>.
         </p>
-        <a href="{{ route('ppc.planning.production_plan', ['date' => $activeDate]) }}" class="sm:ml-auto text-xs font-black uppercase text-amber-700 hover:text-amber-900 whitespace-nowrap">
+        <a href="{{ route('ppc.planning.production_plan') }}" class="sm:ml-auto text-xs font-black uppercase text-amber-700 hover:text-amber-900 whitespace-nowrap">
             Buka Production Plan →
         </a>
     </div>
@@ -346,7 +346,7 @@
                             $c = $colors[$idx % count($colors)];
                             $row = $pressLookup[$normalizePress($press)] ?? null;
                         @endphp
-                        <a href="{{ route('ppc.planning.production_plan', ['date' => $activeDate, 'press' => $press]) }}" class="group block p-5 rounded-2xl border {{ $c[4] }} {{ $c[2] }} hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                        <a href="{{ route('ppc.planning.production_plan', ['press' => $press]) }}" class="group block p-5 rounded-2xl border {{ $c[4] }} {{ $c[2] }} hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
                             <div class="flex items-center justify-between mb-3">
                                 <div class="w-9 h-9 bg-gradient-to-br {{ $c[0] }} {{ $c[1] }} rounded-xl flex items-center justify-center shadow-md {{ $c[5] }}">
                                     <span class="text-white text-[11px] font-black">{{ substr($press, -1) }}</span>
