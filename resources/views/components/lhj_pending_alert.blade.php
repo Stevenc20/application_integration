@@ -22,32 +22,35 @@
 @if($pendingLhj->isNotEmpty())
 <div id="lhjPendingRoot">
     <div id="lhjPendingOverlay"
-         class="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-3 sm:p-6 overflow-hidden"
-         style="display:flex">
-        <div class="my-auto w-full max-w-[550px] max-h-[calc(100dvh-60px)] sm:max-h-[calc(100dvh-120px)] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200 overflow-hidden">
-            <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100 shrink-0">
+         style="display:flex;position:fixed;inset:0;align-items:center;justify-content:center;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);padding:20px;overflow:hidden;z-index:999;">
+        <div class="bg-white rounded-2xl shadow-2xl border border-gray-200"
+             style="width:100%;max-width:550px;max-height:calc(100dvh - 100px);display:flex;flex-direction:column;overflow:hidden;margin:auto;">
+            <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100"
+                 style="flex-shrink:0;">
                 <div class="w-16 h-16 bg-gray-900 text-white rounded-full flex items-center justify-center mx-auto mb-4 ring-8 ring-gray-100">
                     <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                 </div>
                 <h3 class="text-lg font-bold text-gray-900 mb-1 text-center">Laporan Hambatan Jalur Menunggu Tanda Tangan</h3>
                 <p class="text-sm text-gray-500 text-center">Ada {{ $pendingLhj->count() }} LHJ menunggu tanda tangan Anda. Segera tandatangani agar laporan dianggap SAH.</p>
             </div>
-            <div class="space-y-3 p-4 overflow-y-auto min-h-0 flex-1">
-                @foreach($pendingLhj as $hambatan)
-                <div class="border border-gray-200 rounded-xl p-3 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div class="min-w-0 flex-1">
-                        <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ $hambatan->line_name }} · {{ $hambatan->jenis_hambatan }}</div>
-                        <div class="text-sm font-bold text-gray-900 truncate">{{ $hambatan->job_no }} — {{ $hambatan->nama_part }}</div>
-                        <div class="text-xs text-gray-500 truncate">{{ $hambatan->problem }}</div>
+            <div class="p-4" style="flex:1;min-height:0;overflow-y:auto;">
+                <div class="space-y-3">
+                    @foreach($pendingLhj as $hambatan)
+                    <div class="border border-gray-200 rounded-xl p-3 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-[10px] font-black text-gray-400 uppercase tracking-widest">{{ $hambatan->line_name }} · {{ $hambatan->jenis_hambatan }}</div>
+                            <div class="text-sm font-bold text-gray-900 truncate">{{ $hambatan->job_no }} — {{ $hambatan->nama_part }}</div>
+                            <div class="text-xs text-gray-500 truncate">{{ $hambatan->problem }}</div>
+                        </div>
+                        <a href="{{ route('hambatan-jalur.show', $hambatan->id) }}"
+                           class="lhj-sign-link shrink-0 inline-flex items-center justify-center gap-1 bg-gray-900 hover:bg-gray-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow transition-all">
+                            Tanda Tangan
+                        </a>
                     </div>
-                    <a href="{{ route('hambatan-jalur.show', $hambatan->id) }}"
-                       class="lhj-sign-link shrink-0 inline-flex items-center justify-center gap-1 bg-gray-900 hover:bg-gray-700 text-white text-sm font-bold py-2.5 px-4 rounded-lg shadow transition-all">
-                        Tanda Tangan
-                    </a>
+                    @endforeach
                 </div>
-                @endforeach
             </div>
-            <div class="border-t border-gray-100 p-3 shrink-0">
+            <div class="border-t border-gray-100 p-3" style="flex-shrink:0;">
                 <button type="button" id="lhjLaterBtn"
                         class="w-full text-gray-500 hover:text-gray-800 hover:bg-gray-100 font-semibold py-2.5 rounded-xl transition-colors">
                     Nanti saja (tandatangani nanti)
