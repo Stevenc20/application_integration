@@ -31,12 +31,11 @@
                     <span id="lhjSignBadge" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">{{ $pendingSignItems->count() }}</span>
                     <span id="lhjSignDot" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" style="animation: notifPulse 1.5s ease-in-out infinite"></span>
                 </button>
-                <div id="lhjSignDropdown" class="fixed top-16 left-4 right-4 sm:absolute sm:top-auto sm:-right-4 sm:left-auto sm:w-[420px] mt-2 bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible scale-95 transition-all duration-200 origin-top-right z-50 max-h-[36rem] overflow-y-auto">
-                    <div class="px-5 py-4 border-b border-gray-100 flex items-start justify-between gap-3">
+                <div id="lhjSignDropdown" class="absolute right-0 mt-2 w-[min(420px,calc(100vw-2.5rem))] max-w-[420px] bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible scale-95 transition-all duration-200 origin-top-right z-50 max-h-[36rem] overflow-y-auto">
+                    <div class="px-5 py-3.5 border-b border-gray-100 flex items-start justify-between gap-3">
                         <div class="min-w-0">
-                            <p class="text-base font-bold text-gray-800">LHJ Perlu Tanda Tangan</p>
-                            <p class="text-xs font-semibold text-red-600 mt-0.5"><i class="bx bx-info-circle align-middle mr-0.5"></i>Status: WAJIB TTD — sudah ditandatangani PIC</p>
-                            <p class="text-[11px] text-gray-500 mt-1 leading-snug">Laporan Hambatan Jalur di bawah sudah ditandatangani PIC dan menunggu tanda tangan Anda (GL/FRM). Segera tandatangani agar laporan dianggap SAH.</p>
+                            <p class="text-sm font-bold text-gray-800">LHJ Perlu Tanda Tangan</p>
+                            <p class="text-[11px] font-semibold text-red-600 mt-0.5"><i class="bx bx-info-circle align-middle mr-0.5"></i>WAJIB TTD — menunggu tanda tangan Anda</p>
                         </div>
                         <button type="button" id="lhjSignClose" class="shrink-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-1.5 -m-1 transition-colors" title="Tutup">
                             <i class="bx bx-x text-xl"></i>
