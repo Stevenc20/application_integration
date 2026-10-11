@@ -1105,7 +1105,8 @@ class InputHarianController extends Controller
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
-            if ($shiftName) {
+            if ($shiftName && !str_contains($shiftName, 'all')) {
+                // Gunakan shift name terbaru / like prefix agar revisi shift (REV 1, dsb) tetap match
                 $planQuery->where('shift_name', 'like', "{$shiftName}%");
             }
 
@@ -1132,10 +1133,18 @@ class InputHarianController extends Controller
                     return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
                 })->filter()->values()->toArray();
 
-                $parentJobMasters = \App\Models\JobMaster::whereIn('job_number', $parentIdentifiers)
+                $rawParentJobNos = $parentPlans->pluck('job_no')->filter()->values()->toArray();
+
+                $parentJobMasters = \App\Models\JobMaster::where(function($q) use ($parentIdentifiers, $rawParentJobNos) {
+                        $q->whereIn('job_number', $parentIdentifiers);
+                        if (!empty($rawParentJobNos)) {
+                            $q->orWhereIn('job_number', $rawParentJobNos);
+                        }
+                    })
                     ->with(['dailyProduction', 'downtimes', 'repairRejects'])
-                    ->get()
-                    ->keyBy('job_number');
+                    ->get();
+
+                $parentJobMastersByIdentifier = $parentJobMasters->keyBy('job_number');
 
                 $parentIds = $parentPlans->pluck('id')->filter()->values()->toArray();
                 $childPlansMap = \App\Models\ProductionPlan::whereIn('parent_job_id', $parentIds)
@@ -1181,7 +1190,21 @@ class InputHarianController extends Controller
                     if (blank($jn) && blank($jm)) continue;
                     $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
 
-                    $jobMaster = $parentJobMasters->get($identifier);
+                    // Cari JobMaster: coba via identifier lengkap, fallback ke job_no murni atau job_name
+                    $jobMaster = $parentJobMastersByIdentifier->get($identifier)
+                        ?? $parentJobMasters->first(fn($j) => $jn && $j->job_number === $jn)
+                        ?? $parentJobMasters->first(fn($j) => $jn && str_starts_with($j->job_number, $jn . '-'))
+                        ?? $parentJobMasters->first(fn($j) => $jm && $j->job_name === $jm);
+
+                    if (!$jobMaster) {
+                        // Direct DB fallback jika belum termuat di parentJobMasters
+                        $jobMaster = \App\Models\JobMaster::where('job_number', $identifier)
+                            ->orWhere('job_number', $jn)
+                            ->orWhere('job_number', 'like', $jn . '-%')
+                            ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                            ->first();
+                    }
+
                     if (!$jobMaster) continue;
 
                     $allJms = collect([$jobMaster]);
@@ -1222,15 +1245,15 @@ class InputHarianController extends Controller
                             }
                         }
 
-                        $daily = $dailyForDate->get($jm->id) ?? $dailyLatest->get($jm->id);
+                        $daily = $dailyForDate->get($jm->id) ?? $dailyLatest->get($jm->id) ?? $jm->dailyProduction;
                         $repairQty = (int)($daily->actual_repair ?? 0);
                         $rejectQty = (int)($daily->actual_reject ?? 0);
 
                         // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog
-                        if ($repairQty === 0 && method_exists($jm, 'productionLogs')) {
+                        if ($repairQty === 0) {
                             $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('repair_qty');
                         }
-                        if ($rejectQty === 0 && method_exists($jm, 'productionLogs')) {
+                        if ($rejectQty === 0) {
                             $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('reject_qty');
                         }
 

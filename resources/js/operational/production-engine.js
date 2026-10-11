@@ -1811,9 +1811,14 @@ async function restartJob(id) {
     });
 }
 
-window.finishJob = function finishJob(id, jobNumber, jobName) {
+window.finishJob = function finishJob(id, jobNumber, jobName, explicitTargetQty) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     window.currentFinishId = id;
+    if (explicitTargetQty !== undefined && explicitTargetQty !== null && !isNaN(explicitTargetQty)) {
+        window.currentFinishTargetQty = parseFloat(explicitTargetQty);
+    } else {
+        window.currentFinishTargetQty = null;
+    }
     showConfirm('Selesaikan Proses?', 'Apakah Anda yakin item ' + jobNumber + ' sudah selesai?', () => {
         closeConfirmModal();
         const titleEl = document.getElementById('finishJobTitle');
@@ -1862,6 +1867,8 @@ window.finishJob = function finishJob(id, jobNumber, jobName) {
 
         autoCloseJobDowntimes(id).then(() => {
             openFinishModal();
+            // Re-trigger in case modal DOM elements needed visibility
+            setTimeout(() => window.updateFinishModalShortageAlert(), 50);
         });
     });
 }
@@ -1873,7 +1880,13 @@ window.updateFinishModalShortageAlert = function () {
     if (!alertBox || !descEl || !id) return;
 
     const job = (window.jobMasterData && window.jobMasterData[id]) || {};
-    const planQty = parseFloat(job.target_qty || 0);
+    let planQty = 0;
+    if (window.currentFinishTargetQty !== null && window.currentFinishTargetQty !== undefined && !isNaN(window.currentFinishTargetQty)) {
+        planQty = parseFloat(window.currentFinishTargetQty);
+    } else {
+        planQty = parseFloat(job.target_qty || 0);
+    }
+
     const finalOkInput = document.getElementById('final-ok');
     const actualOk = finalOkInput ? (parseFloat(finalOkInput.value) || 0) : (parseFloat(job.actual_ok) || 0);
 

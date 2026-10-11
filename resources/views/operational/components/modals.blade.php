@@ -28,11 +28,11 @@
                 </div>
                 <div class="bg-orange-50 p-3 rounded-xl border border-orange-100">
                     <label class="block text-[10px] font-black text-orange-400 uppercase mb-1">Repair</label>
-                    <input type="number" id="final-repair" value="0" class="w-full bg-transparent font-black text-orange-700 outline-none text-lg">
+                    <input type="number" id="final-repair" value="0" oninput="updateFinishModalShortageAlert()" class="w-full bg-transparent font-black text-orange-700 outline-none text-lg">
                 </div>
                 <div class="bg-red-50 p-3 rounded-xl border border-red-100">
                     <label class="block text-[10px] font-black text-red-400 uppercase mb-1">Reject</label>
-                    <input type="number" id="final-reject" value="0" class="w-full bg-transparent font-black text-red-700 outline-none text-lg">
+                    <input type="number" id="final-reject" value="0" oninput="updateFinishModalShortageAlert()" class="w-full bg-transparent font-black text-red-700 outline-none text-lg">
                 </div>
             </div>
 

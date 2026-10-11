@@ -677,7 +677,10 @@
                             Cek List Downtime
                             <svg xmlns="http://http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 fill-current" viewBox="0 0 24 24"><path d="M18 13h-5v5c0 .55-.45 1-1 1s-1-.45-1-1v-5H6c-.55 0-1-.45-1-1s.45-1 1-1h5V6c0-.55.45-1 1-1s1 .45 1 1v5h5c.55 0 1 .45 1 1s-.45 1-1 1z"/></svg>
                         </button>
-                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}')" class="w-full py-3 rounded-xl bg-red-600/10 border border-red-500/50 text-red-500 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group hover:bg-red-600 hover:text-white active:translate-y-0.5 cursor-pointer">
+                        @php
+                            $targetQtyVal = ($prodPlan?->plan ?? $activeJob->target_qty) ?? 0;
+                        @endphp
+                        <button onclick="finishJob({{ $activeJob->id }}, '{{ $activeJob->job_number }}', '{{ addslashes($activeJob->job_name) }}', {{ $targetQtyVal }})" class="w-full py-3 rounded-xl bg-red-600/10 border border-red-500/50 text-red-500 font-black text-sm uppercase tracking-wider transition-all flex items-center justify-center gap-2 group hover:bg-red-600 hover:text-white active:translate-y-0.5 cursor-pointer">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M6 18L18 6M6 6l12 12"/></svg>
                             Selesaikan Job
                             <svg xmlns="http://http://www.w3.org/2000/svg" class="w-3.5 h-3.5 opacity-0 -translate-x-1 group-hover:opacity-100 group-hover:translate-x-0 transition-all duration-200 fill-current" viewBox="0 0 24 24"><path d="M18 13h-5v5c0 .55-.45 1-1 1s-1-.45-1-1v-5H6c-.55 0-1-.45-1-1s.45-1 1-1h5V6c0-.55.45-1 1-1s1 .45 1 1v5h5c.55 0 1 .45 1 1s-.45 1-1 1z"/></svg>

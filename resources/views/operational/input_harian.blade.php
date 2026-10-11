@@ -718,7 +718,11 @@ function submitShift() {
 
         const params = new URLSearchParams(window.location.search);
         const commentInput = document.getElementById('shiftCommentInput');
-        fetch('{{ route('operational.shift.submit', ['lineId' => '__LINE__']) }}'.replace('__LINE__', params.get('line') || 'Line A'), {
+        const activeLine = params.get('line') || (window.ProductionConfig && window.ProductionConfig.currentLine) || '{{ $lineFilter ?? "Line A" }}';
+        const activeShift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
+        const activeDate = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
+
+        fetch('{{ route('operational.shift.submit', ['lineId' => '__LINE__']) }}'.replace('__LINE__', encodeURIComponent(activeLine)), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -726,8 +730,8 @@ function submitShift() {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                date: params.get('date') || '{{ $date }}',
-                shift: params.get('shift') || 'Shift Pagi',
+                date: activeDate,
+                shift: activeShift,
                 comment: commentInput ? commentInput.value.trim() : '',
             }),
         })
@@ -775,7 +779,11 @@ function cancelShift() {
         btn.innerHTML = '<svg class="animate-spin w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Membatalkan...';
 
         const params = new URLSearchParams(window.location.search);
-        fetch('{{ route('operational.shift.cancel', ['lineId' => '__LINE__']) }}'.replace('__LINE__', params.get('line') || 'Line A'), {
+        const activeLine = params.get('line') || (window.ProductionConfig && window.ProductionConfig.currentLine) || '{{ $lineFilter ?? "Line A" }}';
+        const activeShift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
+        const activeDate = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
+
+        fetch('{{ route('operational.shift.cancel', ['lineId' => '__LINE__']) }}'.replace('__LINE__', encodeURIComponent(activeLine)), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -783,8 +791,8 @@ function cancelShift() {
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
-                date: params.get('date') || '{{ $date }}',
-                shift: params.get('shift') || 'Shift Pagi',
+                date: activeDate,
+                shift: activeShift,
             }),
         })
         .then(r => r.json().then(data => ({ status: r.status, data })))
