@@ -383,13 +383,13 @@
                         if (!$selesai && $dt?->duration_seconds && $mulai) {
                             $selesai = $mulai->copy()->addSeconds((int) $dt->duration_seconds);
                         }
-                        $totalDetik = $dt?->duration_seconds !== null ? (int) $dt->duration_seconds : ($mulai && $selesai ? abs($selesai->diffInSeconds($mulai)) : null);
+                        $totalMenit = ($mulai && $selesai) ? abs($selesai->copy()->startOfMinute()->diffInMinutes($mulai->copy()->startOfMinute())) : null;
                         $selesaiFmt = $selesai ? ($mulai && $selesai->isSameDay($mulai) ? $selesai->format('H:i') : $selesai->format('d M Y H:i')) : null;
                     @endphp
                     @if($mulai)
                         {{ $mulai->format('d M Y H:i') }} - {{ $selesaiFmt ?? '...............' }}
-                        @if($totalDetik !== null)
-                            <span class="text-gray-500">({{ intdiv($totalDetik, 60) }} menit)</span>
+                        @if($totalMenit !== null)
+                            <span class="text-gray-500">({{ $totalMenit }} menit)</span>
                         @endif
                     @else
                         ________________________
