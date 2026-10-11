@@ -49,7 +49,8 @@
                     <div id="lhjSignEmpty" class="{{ $pendingSignItems->isNotEmpty() ? 'hidden ' : '' }}p-4 text-center text-xs text-gray-400">Tidak ada LHJ menunggu tanda tangan</div>
                 </div>
                 <div id="lhjInfoPopover" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-[1200]">
-                    <div class="px-4 py-3.5 flex items-start justify-between gap-3">
+                    <span class="absolute -top-1.5 right-3 h-3 w-3 rotate-45 border-t border-l border-gray-200 bg-white rounded-[2px]"></span>
+                    <div class="relative px-4 py-3.5 flex items-start justify-between gap-3">
                         <div class="min-w-0">
                             <p class="text-sm font-bold text-gray-800">LHJ Perlu Tanda Tangan</p>
                             <p class="text-[11px] font-semibold text-red-600 mt-0.5"><i class="bx bx-info-circle align-middle mr-0.5"></i>WAJIB TTD — menunggu tanda tangan Anda</p>
@@ -232,6 +233,7 @@
         const lhjList = document.getElementById('lhjSignList');
         const lhjEmpty = document.getElementById('lhjSignEmpty');
         const lhjPopover = document.getElementById('lhjInfoPopover');
+        let lhjPopoverDismissed = false;
 
         function fetchPendingLhj() {
             if (!lhjBtn) return;
@@ -245,12 +247,13 @@
                     badge.textContent = data.count;
                     badge.classList.remove('hidden');
                     dot.classList.remove('hidden');
-                    if (lhjPopover && sessionStorage.getItem('lhjInfoDismissed') !== '1') {
+                    if (lhjPopover && !lhjPopoverDismissed) {
                         lhjPopover.classList.remove('hidden');
                     }
                 } else {
                     badge.classList.add('hidden');
                     dot.classList.add('hidden');
+                    lhjPopoverDismissed = false;
                     if (lhjPopover) lhjPopover.classList.add('hidden');
                 }
                 if (lhjDropdown && lhjDropdown.classList.contains('visible')) {
@@ -302,7 +305,7 @@
             if (lhjInfoClose) {
                 lhjInfoClose.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    sessionStorage.setItem('lhjInfoDismissed', '1');
+                    lhjPopoverDismissed = true;
                     if (lhjPopover) lhjPopover.classList.add('hidden');
                 });
             }
