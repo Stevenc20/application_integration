@@ -32,15 +32,6 @@
                     <span id="lhjSignDot" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" style="animation: notifPulse 1.5s ease-in-out infinite"></span>
                 </button>
                 <div id="lhjSignDropdown" class="absolute right-0 mt-2 w-[min(420px,calc(100vw-2.5rem))] max-w-[420px] bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible scale-95 transition-all duration-200 origin-top-right z-50 max-h-[36rem] overflow-y-auto">
-                    <div class="px-5 py-3.5 border-b border-gray-100 flex items-start justify-between gap-3">
-                        <div class="min-w-0">
-                            <p class="text-sm font-bold text-gray-800">LHJ Perlu Tanda Tangan</p>
-                            <p class="text-[11px] font-semibold text-red-600 mt-0.5"><i class="bx bx-info-circle align-middle mr-0.5"></i>WAJIB TTD — menunggu tanda tangan Anda</p>
-                        </div>
-                        <button type="button" id="lhjSignClose" class="shrink-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-1.5 -m-1 transition-colors" title="Tutup">
-                            <i class="bx bx-x text-xl"></i>
-                        </button>
-                    </div>
                     <div id="lhjSignList" class="divide-y divide-gray-50">
                         @foreach($pendingSignItems as $p1)
                         <a href="{{ route('hambatan-jalur.show', $p1->id) }}" class="flex items-start gap-3 px-5 py-3 hover:bg-red-50/40 transition-colors border-b border-gray-50 last:border-b-0">
@@ -56,6 +47,17 @@
                         @endforeach
                     </div>
                     <div id="lhjSignEmpty" class="{{ $pendingSignItems->isNotEmpty() ? 'hidden ' : '' }}p-4 text-center text-xs text-gray-400">Tidak ada LHJ menunggu tanda tangan</div>
+                </div>
+                <div id="lhjInfoPopover" class="hidden absolute right-0 mt-2 w-72 bg-white rounded-xl shadow-xl border border-gray-200 z-[1200]">
+                    <div class="px-4 py-3.5 flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                            <p class="text-sm font-bold text-gray-800">LHJ Perlu Tanda Tangan</p>
+                            <p class="text-[11px] font-semibold text-red-600 mt-0.5"><i class="bx bx-info-circle align-middle mr-0.5"></i>WAJIB TTD — menunggu tanda tangan Anda</p>
+                        </div>
+                        <button type="button" id="lhjInfoClose" class="shrink-0 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-lg p-1.5 -m-1 transition-colors" title="Tutup">
+                            <i class="bx bx-x text-xl"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             @endif
@@ -229,6 +231,7 @@
         const lhjDropdown = document.getElementById('lhjSignDropdown');
         const lhjList = document.getElementById('lhjSignList');
         const lhjEmpty = document.getElementById('lhjSignEmpty');
+        const lhjPopover = document.getElementById('lhjInfoPopover');
 
         function fetchPendingLhj() {
             if (!lhjBtn) return;
@@ -242,9 +245,13 @@
                     badge.textContent = data.count;
                     badge.classList.remove('hidden');
                     dot.classList.remove('hidden');
+                    if (lhjPopover && sessionStorage.getItem('lhjInfoDismissed') !== '1') {
+                        lhjPopover.classList.remove('hidden');
+                    }
                 } else {
                     badge.classList.add('hidden');
                     dot.classList.add('hidden');
+                    if (lhjPopover) lhjPopover.classList.add('hidden');
                 }
                 if (lhjDropdown && lhjDropdown.classList.contains('visible')) {
                     renderPendingLhj(data);
@@ -291,12 +298,12 @@
                     lhjDropdown.classList.remove('opacity-100', 'visible', 'scale-100');
                 }
             });
-            const lhjSignClose = document.getElementById('lhjSignClose');
-            if (lhjSignClose) {
-                lhjSignClose.addEventListener('click', function(e) {
+            const lhjInfoClose = document.getElementById('lhjInfoClose');
+            if (lhjInfoClose) {
+                lhjInfoClose.addEventListener('click', function(e) {
                     e.stopPropagation();
-                    lhjDropdown.classList.add('opacity-0', 'invisible', 'scale-95');
-                    lhjDropdown.classList.remove('opacity-100', 'visible', 'scale-100');
+                    sessionStorage.setItem('lhjInfoDismissed', '1');
+                    if (lhjPopover) lhjPopover.classList.add('hidden');
                 });
             }
         }
