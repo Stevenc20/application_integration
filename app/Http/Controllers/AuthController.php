@@ -53,7 +53,7 @@ class AuthController extends Controller
 
             'supervisor' => redirect()->route('supervisor.dashboard'),
 
-            'foreman' => redirect()->route('supervisor.dashboard'),
+            'foreman' => redirect()->route('operational.input_harian'),
 
             'operator' => redirect()->route('operator.dashboard'),
 
