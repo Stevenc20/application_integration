@@ -57,7 +57,9 @@ class AuthController extends Controller
 
             'operator' => redirect()->route('operator.dashboard'),
 
-            'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => redirect()->route('supervisor.dashboard'),
+            'leader a', 'leader b', 'leader c', 'leader d', 'leader' => redirect()->route('operational.input_harian'),
+
+            'shearing', 'handwork' => redirect()->route('supervisor.dashboard'),
 
             'ppc' => redirect()->route('ppc.dashboard'),
 
