@@ -214,6 +214,7 @@
         });
     </script>
     @include('components.pull_ahead_alert')
+    @include('components.lhj_pending_alert')
     @stack('modals')
     @yield('scripts')
     @stack('scripts')
