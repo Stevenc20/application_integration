@@ -747,6 +747,12 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(func
     Route::post('/pull-ahead/{id}/reject', [PullAheadController::class, 'reject'])->name('pull_ahead.reject');
 });
 
+// Alias global untuk recovery.index agar kompatibel di seluruh layout/role
+Route::middleware(['auth'])->group(function () {
+    Route::get('/recovery', [\App\Http\Controllers\Ppc\RecoveryController::class, 'index'])->name('recovery.index');
+    Route::get('/recovery-history', [\App\Http\Controllers\Ppc\RecoveryController::class, 'index'])->name('recovery.history');
+});
+
 // ======================
 // PPC - Sub Modules (from IPPI-PPLC)
 // ======================

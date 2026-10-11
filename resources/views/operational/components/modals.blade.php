@@ -24,7 +24,7 @@
             <div class="grid grid-cols-3 gap-3">
                 <div class="bg-blue-50 p-3 rounded-xl border border-blue-100">
                     <label class="block text-[10px] font-black text-blue-400 uppercase mb-1">Actual OK</label>
-                    <input type="number" id="final-ok" value="0" class="w-full bg-transparent font-black text-blue-700 outline-none text-lg">
+                    <input type="number" id="final-ok" value="0" oninput="updateFinishModalShortageAlert()" class="w-full bg-transparent font-black text-blue-700 outline-none text-lg">
                 </div>
                 <div class="bg-orange-50 p-3 rounded-xl border border-orange-100">
                     <label class="block text-[10px] font-black text-orange-400 uppercase mb-1">Repair</label>
@@ -35,6 +35,20 @@
                     <input type="number" id="final-reject" value="0" class="w-full bg-transparent font-black text-red-700 outline-none text-lg">
                 </div>
             </div>
+
+            {{-- ALERT TIDAK TERCAPAI --}}
+            <div id="finishShortageAlert" class="hidden p-3.5 bg-red-50 border border-red-200 rounded-2xl">
+                <div class="flex items-start gap-2.5">
+                    <div class="w-6 h-6 rounded-lg bg-red-100 text-red-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-black text-red-800 uppercase tracking-tight" id="finishShortageTitle">Item Tidak Tercapai Target!</p>
+                        <p class="text-xs text-red-700 mt-0.5 font-bold" id="finishShortageDesc">-</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="text-[10px] text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-center font-semibold">
                 ⚠️ Pastikan Repair & Reject sudah diinput melalui form Repair/Reject
             </div>

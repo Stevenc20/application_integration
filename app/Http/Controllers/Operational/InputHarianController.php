@@ -1226,16 +1226,31 @@ class InputHarianController extends Controller
                         $repairQty = (int)($daily->actual_repair ?? 0);
                         $rejectQty = (int)($daily->actual_reject ?? 0);
 
-                        $rrOnDate = $jm->repairRejects->filter(
-                            fn($r) => $r->created_at && $r->created_at->toDateString() === $date
-                        );
+                        // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog
+                        if ($repairQty === 0 && method_exists($jm, 'productionLogs')) {
+                            $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('repair_qty');
+                        }
+                        if ($rejectQty === 0 && method_exists($jm, 'productionLogs')) {
+                            $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('reject_qty');
+                        }
+
+                        // Cek catatan form Repair & Reject untuk job ini (pada tanggal shift atau pada jobMaster ini)
+                        $rrLogs = $jm->repairRejects ?? collect();
+                        $rrOnDate = $rrLogs->filter(function($r) use ($date) {
+                            if (!$r->created_at) return true;
+                            $rDate = $r->created_at instanceof \Carbon\Carbon ? $r->created_at->toDateString() : substr((string)$r->created_at, 0, 10);
+                            return $rDate === $date;
+                        });
+                        if ($rrOnDate->isEmpty() && $rrLogs->isNotEmpty()) {
+                            $rrOnDate = $rrLogs;
+                        }
 
                         if ($repairQty > 0) {
                             $hasRR = $rrOnDate->contains(fn($r) => $r->type === 'repair');
                             if (!$hasRR) {
                                 $issues['repair'][] = [
                                     'item'          => $itemName,
-                                    'issue'         => $repairQty . ' pcs Repair tanpa catatan form',
+                                    'issue'         => $repairQty . ' pcs Repair belum ada form detail',
                                     'job_master_id' => $jm->id,
                                     'plan_id'       => $plan->id,
                                 ];
@@ -1247,7 +1262,7 @@ class InputHarianController extends Controller
                             if (!$hasRR) {
                                 $issues['reject'][] = [
                                     'item'          => $itemName,
-                                    'issue'         => $rejectQty . ' pcs Reject tanpa catatan form',
+                                    'issue'         => $rejectQty . ' pcs Reject belum ada form detail',
                                     'job_master_id' => $jm->id,
                                     'plan_id'       => $plan->id,
                                 ];

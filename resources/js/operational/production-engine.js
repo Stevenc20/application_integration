@@ -1858,11 +1858,33 @@ window.finishJob = function finishJob(id, jobNumber, jobName) {
         if (finalRepairInput) finalRepairInput.value = job.actual_repair || 0;
         if (finalRejectInput) finalRejectInput.value = job.actual_reject || 0;
 
+        window.updateFinishModalShortageAlert();
+
         autoCloseJobDowntimes(id).then(() => {
             openFinishModal();
         });
     });
 }
+
+window.updateFinishModalShortageAlert = function () {
+    const id = window.currentFinishId;
+    const alertBox = document.getElementById('finishShortageAlert');
+    const descEl = document.getElementById('finishShortageDesc');
+    if (!alertBox || !descEl || !id) return;
+
+    const job = (window.jobMasterData && window.jobMasterData[id]) || {};
+    const planQty = parseFloat(job.target_qty || 0);
+    const finalOkInput = document.getElementById('final-ok');
+    const actualOk = finalOkInput ? (parseFloat(finalOkInput.value) || 0) : (parseFloat(job.actual_ok) || 0);
+
+    if (planQty > 0 && actualOk < planQty) {
+        const shortQty = planQty - actualOk;
+        descEl.innerHTML = `Target Plan: <b>${planQty} pcs</b> | Aktual OK: <b>${actualOk} pcs</b>.<br>Kurang <b>${shortQty} pcs</b>. Kekurangan ini otomatis masuk antrean <b>Recovery PPC</b>.`;
+        alertBox.classList.remove('hidden');
+    } else {
+        alertBox.classList.add('hidden');
+    }
+};
 
 window.submitFinalJobWithNext = function (stopSession) {
     const nextSelect = document.getElementById('nextSelect');
