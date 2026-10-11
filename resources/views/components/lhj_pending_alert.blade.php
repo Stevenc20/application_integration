@@ -22,7 +22,7 @@
 @if($pendingLhj->isNotEmpty())
 <div id="lhjPendingRoot">
     <div id="lhjPendingOverlay"
-         class="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+         class="fixed inset-0 z-[999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
          style="display:flex">
         <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full flex flex-col border border-gray-200 max-h-[85dvh]">
             <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100 shrink-0">
@@ -32,7 +32,7 @@
                 <h3 class="text-lg font-bold text-gray-900 mb-1 text-center">Laporan Hambatan Jalur Menunggu Tanda Tangan</h3>
                 <p class="text-sm text-gray-500 text-center">Ada {{ $pendingLhj->count() }} LHJ menunggu tanda tangan Anda. Segera tandatangani agar laporan dianggap SAH.</p>
             </div>
-            <div class="space-y-3 p-4 overflow-y-auto min-h-0">
+            <div class="space-y-3 p-4 overflow-y-auto min-h-0 max-h-[48dvh]">
                 @foreach($pendingLhj as $hambatan)
                 <div class="border border-gray-200 rounded-xl p-3 bg-gray-50 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div class="min-w-0 flex-1">
