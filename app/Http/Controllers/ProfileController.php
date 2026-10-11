@@ -26,7 +26,7 @@ class ProfileController extends Controller
 
         $rules = [
             'name' => 'required|string|max:100',
-            'nrp'  => 'required|digits:4|unique:users,nrp,' . $user->id,
+            'nrp'  => 'required|digits_between:4,20|unique:users,nrp,' . $user->id,
         ];
 
         if ($request->filled('password')) {
@@ -38,7 +38,7 @@ class ProfileController extends Controller
         }
 
         $request->validate($rules, [
-            'nrp.digits' => 'NRP harus 4 digit angka.',
+            'nrp.digits_between' => 'NRP harus 4-20 digit angka.',
             'password.confirmed' => 'Konfirmasi password tidak cocok.',
             'password.min' => 'Password minimal 6 karakter.',
             'avatar.mimes' => 'Avatar harus format JPG/PNG.',

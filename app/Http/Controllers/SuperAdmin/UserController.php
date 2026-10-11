@@ -22,13 +22,13 @@ class UserController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'nrp' => 'required|digits:4|unique:users,nrp',
+            'nrp' => 'required|digits_between:4,20|unique:users,nrp',
             'password' => 'required|min:6',
             'role' => 'required',
             'position_id' => 'nullable|exists:positions,id',
             'section_id' => 'nullable|exists:sections,id',
         ], [
-            'nrp.digits' => 'NRP harus 4 digit angka.',
+            'nrp.digits_between' => 'NRP harus 4-20 digit angka.',
             'nrp.unique' => 'NRP sudah terdaftar, gunakan NRP yang lain.',
         ]);
 
@@ -48,12 +48,12 @@ class UserController extends Controller
     {
         $request->validate([
             'name' => 'required',
-            'nrp' => 'required|digits:4|unique:users,nrp,' . $user->id,
+            'nrp' => 'required|digits_between:4,20|unique:users,nrp,' . $user->id,
             'role' => 'required',
             'position_id' => 'nullable|exists:positions,id',
             'section_id' => 'nullable|exists:sections,id',
         ], [
-            'nrp.digits' => 'NRP harus 4 digit angka.',
+            'nrp.digits_between' => 'NRP harus 4-20 digit angka.',
             'nrp.unique' => 'NRP sudah digunakan user lain.',
         ]);
 

@@ -230,7 +230,7 @@
                 </div>
                 <div>
                     <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">NRP Karyawan</label>
-                    <input type="text" name="nrp_karyawan" required placeholder="Nomor Registrasi Pegawai (4 digit)..."
+                    <input type="text" name="nrp_karyawan" required placeholder="Nomor Registrasi Pegawai (4-20 digit)..."
                         class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-rose-500 focus:border-transparent transition-all">
                 </div>
                 <div>

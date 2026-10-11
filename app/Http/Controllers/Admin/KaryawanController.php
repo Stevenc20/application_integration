@@ -59,11 +59,11 @@ class KaryawanController extends Controller
     {
         $request->validate([
             'nama_karyawan' => 'required|string|max:100',
-            'nrp_karyawan'  => 'required|digits:4|unique:karyawans,nrp_karyawan',
+            'nrp_karyawan'  => 'required|digits_between:4,20|unique:karyawans,nrp_karyawan',
             'jabatan'       => 'required|in:admin,operator,leader,leader a,leader b,leader c,leader d,shearing,handwork,foreman,supervisor,ppc,quality,production,manager,kadiv,direktur,presdir,superadmin,dies_shop,plant_service,irm,logistik,produksi',
             'password'      => 'nullable|string|min:6',
         ], [
-            'nrp_karyawan.digits' => 'NRP harus 4 digit angka.',
+            'nrp_karyawan.digits_between' => 'NRP harus 4-20 digit angka.',
             'nrp_karyawan.unique' => 'NRP sudah terdaftar, gunakan NRP yang lain.',
             'password.min'        => 'Password minimal 6 karakter.',
         ]);
@@ -102,7 +102,7 @@ class KaryawanController extends Controller
 
         $request->validate([
             'nama_karyawan' => 'required|string|max:100',
-            'nrp_karyawan'  => 'required|digits:4|unique:karyawans,nrp_karyawan,' . $id . ',id_karyawan',
+            'nrp_karyawan'  => 'required|digits_between:4,20|unique:karyawans,nrp_karyawan,' . $id . ',id_karyawan',
             'jabatan'       => 'required|in:admin,operator,leader,leader a,leader b,leader c,leader d,shearing,handwork,foreman,supervisor,ppc,quality,production,manager,kadiv,direktur,presdir,superadmin,dies_shop,plant_service,irm,logistik,produksi',
             'password'      => 'nullable|string|min:6',
         ], [
