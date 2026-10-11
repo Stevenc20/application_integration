@@ -375,7 +375,26 @@
             {{-- WAKTU --}}
             <tr>
                 <td class="hj-label">WAKTU</td>
-                <td colspan="2" class="hj-value">{{ $item->waktu ? \Carbon\Carbon::parse($item->waktu)->format('d M Y H:i') : '________________________' }}</td>
+                <td colspan="2" class="hj-value">
+                    @php
+                        $dt = $item->downtime;
+                        $mulai = $dt?->start_time ? \Carbon\Carbon::parse($dt->start_time) : ($item->waktu ? \Carbon\Carbon::parse($item->waktu) : null);
+                        $selesai = $dt?->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : null;
+                        if (!$selesai && $dt?->duration_seconds && $mulai) {
+                            $selesai = $mulai->copy()->addSeconds((int) $dt->duration_seconds);
+                        }
+                        $totalDetik = $dt?->duration_seconds !== null ? (int) $dt->duration_seconds : ($mulai && $selesai ? abs($selesai->diffInSeconds($mulai)) : null);
+                        $selesaiFmt = $selesai ? ($mulai && $selesai->isSameDay($mulai) ? $selesai->format('H:i') : $selesai->format('d M Y H:i')) : null;
+                    @endphp
+                    @if($mulai)
+                        {{ $mulai->format('d M Y H:i') }} - {{ $selesaiFmt ?? '...............' }}
+                        @if($totalDetik !== null)
+                            <span class="text-gray-500">({{ intdiv($totalDetik, 60) }} menit)</span>
+                        @endif
+                    @else
+                        ________________________
+                    @endif
+                </td>
             </tr>
             {{-- PCS NUMBER (dari Repair/Reject) --}}
             @if($repairRejectLogs->isNotEmpty())

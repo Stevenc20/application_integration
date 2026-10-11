@@ -362,7 +362,23 @@
                             </div>
                             <div class="flex flex-col gap-0.5">
                                 <span class="label">Waktu</span>
-                                <span class="value">{{ $item->waktu ? \Carbon\Carbon::parse($item->waktu)->format('d M Y H:i') : '-' }}</span>
+                                <span class="value">
+                                    @php
+                                        $dt = $item->downtime;
+                                        $mulai = $dt?->start_time ? \Carbon\Carbon::parse($dt->start_time) : ($item->waktu ? \Carbon\Carbon::parse($item->waktu) : null);
+                                        $selesai = $dt?->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : null;
+                                        if (!$selesai && $dt?->duration_seconds && $mulai) {
+                                            $selesai = $mulai->copy()->addSeconds((int) $dt->duration_seconds);
+                                        }
+                                        $totalDetik = $dt?->duration_seconds !== null ? (int) $dt->duration_seconds : ($mulai && $selesai ? abs($selesai->diffInSeconds($mulai)) : null);
+                                        $selesaiFmt = $selesai ? ($mulai && $selesai->isSameDay($mulai) ? $selesai->format('H:i') : $selesai->format('d M Y H:i')) : null;
+                                    @endphp
+                                    @if($mulai)
+                                        {{ $mulai->format('d M Y H:i') }} - {{ $selesaiFmt ?? '...............' }}@if($totalDetik !== null) <span class="text-gray-400">({{ intdiv($totalDetik, 60) }} menit)</span>@endif
+                                    @else
+                                        -
+                                    @endif
+                                </span>
                             </div>
                         </div>
 
