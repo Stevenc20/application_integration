@@ -13,6 +13,10 @@
                 return ('leader ' . strtolower($letter)) === $lhjRole;
             })
             ->values();
+    } elseif ($lhjRole === 'foreman') {
+        $pendingLhj = \App\Models\HambatanJalur::where('status', 'leader_signed')
+            ->orderByDesc('leader_signed_at')
+            ->get();
     }
 @endphp
 @if($pendingLhj->isNotEmpty())
@@ -25,7 +29,7 @@
                 <svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
             </div>
             <h3 class="text-xl font-bold text-gray-800 mb-1 text-center">Laporan Hambatan Jalur Menunggu Tanda Tangan</h3>
-            <p class="text-sm text-gray-500 mb-4 text-center">Ada {{ $pendingLhj->count() }} LHJ untuk line Anda yang sudah ditandatangani PIC. Segera tandatangani agar laporan dianggap SAH.</p>
+            <p class="text-sm text-gray-500 mb-4 text-center">Ada {{ $pendingLhj->count() }} LHJ menunggu tanda tangan Anda. Segera tandatangani agar laporan dianggap SAH.</p>
             <div class="space-y-3">
                 @foreach($pendingLhj as $hambatan)
                 <div class="border border-amber-200 rounded-xl p-3 bg-amber-50/50 flex items-center justify-between gap-3">

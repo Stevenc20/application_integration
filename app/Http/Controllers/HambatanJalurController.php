@@ -35,11 +35,11 @@ class HambatanJalurController extends Controller
             $query->where('jenis_hambatan', $jenis);
         }
 
-        if ($statusFilter && in_array($statusFilter, ['open', 'pic_signed', 'signed'])) {
+        if ($statusFilter && in_array($statusFilter, ['open', 'pic_signed', 'leader_signed', 'signed'])) {
             $query->where('status', $statusFilter);
         }
 
-        $items = $query->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'pic_signed' THEN 1 ELSE 2 END")
+        $items = $query->orderByRaw("CASE status WHEN 'open' THEN 0 WHEN 'pic_signed' THEN 1 WHEN 'leader_signed' THEN 2 ELSE 3 END")
             ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->withQueryString();
@@ -49,6 +49,7 @@ class HambatanJalurController extends Controller
         $baseQuery = $jenis ? HambatanJalur::where('jenis_hambatan', $jenis) : HambatanJalur::query();
         $counts['open'] = (clone $baseQuery)->where('status', 'open')->count();
         $counts['pic_signed'] = (clone $baseQuery)->where('status', 'pic_signed')->count();
+        $counts['leader_signed'] = (clone $baseQuery)->where('status', 'leader_signed')->count();
         $counts['signed'] = (clone $baseQuery)->where('status', 'signed')->count();
 
         $currentTab = $statusFilter ?: 'all';
@@ -58,7 +59,7 @@ class HambatanJalurController extends Controller
 
     public function show($id)
     {
-        $item = HambatanJalur::with('downtime.jobMaster', 'signer', 'leaderSigner')->findOrFail($id);
+        $item = HambatanJalur::with('downtime.jobMaster', 'signer', 'leaderSigner', 'foremanSigner')->findOrFail($id);
 
         $allowed = $this->roleToJenis();
         if ($allowed && $item->jenis_hambatan !== $allowed) {
@@ -67,12 +68,15 @@ class HambatanJalurController extends Controller
 
         $isLineLeader = $this->isLineLeader($item);
 
+        $userRole = strtolower(Auth::user()->role ?? '');
+        $canForemanSign = $userRole === 'foreman' && $item->status === 'leader_signed';
+
         $repairRejectLogs = collect();
         if ($item->downtime && $item->downtime->job_master_id) {
             $repairRejectLogs = RepairRejectLog::where('job_master_id', $item->downtime->job_master_id)->get();
         }
 
-        return view('hambatan-jalur.show', compact('item', 'isLineLeader', 'repairRejectLogs'));
+        return view('hambatan-jalur.show', compact('item', 'isLineLeader', 'canForemanSign', 'repairRejectLogs'));
     }
 
     public function pendingSign()
@@ -89,23 +93,31 @@ class HambatanJalurController extends Controller
                     return ('leader ' . strtolower($letter)) === $userRole;
                 })
                 ->values()
-                ->map(function ($hambatan) {
-                    return [
-                        'id'            => $hambatan->id,
-                        'line_name'     => $hambatan->line_name,
-                        'job_no'        => $hambatan->job_no,
-                        'nama_part'     => $hambatan->nama_part,
-                        'jenis_hambatan'=> $hambatan->jenis_hambatan,
-                        'url'           => route('hambatan-jalur.show', $hambatan->id),
-                    ];
-                });
+                ->map(fn ($hambatan) => $this->pendingItemData($hambatan));
+        } elseif ($userRole === 'foreman') {
+            $items = HambatanJalur::where('status', 'leader_signed')
+                ->orderByDesc('leader_signed_at')
+                ->get()
+                ->map(fn ($hambatan) => $this->pendingItemData($hambatan));
         }
 
         return response()->json([
             'success' => true,
             'count'   => $items->count(),
-            'items'   => $items,
+            'items'   => $items->values(),
         ]);
+    }
+
+    private function pendingItemData(HambatanJalur $hambatan): array
+    {
+        return [
+            'id'             => $hambatan->id,
+            'line_name'      => $hambatan->line_name,
+            'job_no'         => $hambatan->job_no,
+            'nama_part'      => $hambatan->nama_part,
+            'jenis_hambatan' => $hambatan->jenis_hambatan,
+            'url'            => route('hambatan-jalur.show', $hambatan->id),
+        ];
     }
 
     public function sign($id, Request $request)
@@ -165,7 +177,7 @@ class HambatanJalurController extends Controller
         ]);
 
         $item->update([
-            'status' => 'signed',
+            'status' => 'leader_signed',
             'leader_signature_image' => $request->input('leader_signature_image'),
             'leader_signed_at' => now(),
             'leader_signed_by' => Auth::id(),
@@ -177,7 +189,49 @@ class HambatanJalurController extends Controller
             ->where('data->hambatan_id', $item->id)
             ->get()->each->markAsRead();
 
-        return redirect()->route('hambatan-jalur.show', $item->id)->with('success', 'Tanda tangan leader berhasil. Laporan selesai.');
+        // Notify all foremen to sign the final step
+        $this->notifyForemen($item);
+
+        return redirect()->route('hambatan-jalur.show', $item->id)->with('success', 'Tanda tangan leader berhasil. Laporan menunggu tanda tangan foreman (FRM).');
+    }
+
+    public function foremanSign($id, Request $request)
+    {
+        $item = HambatanJalur::findOrFail($id);
+
+        if ($item->status !== 'leader_signed') {
+            return back()->with('error', 'Status tidak valid. Leader/GL harus menandatangani terlebih dahulu.');
+        }
+
+        if (!str_starts_with(strtolower(Auth::user()->role ?? ''), 'foreman')) {
+            return back()->with('error', 'Anda bukan foreman.');
+        }
+
+        $request->validate([
+            'foreman_signature_image' => 'required|string',
+        ]);
+
+        $item->update([
+            'status' => 'signed',
+            'foreman_signature_image' => $request->input('foreman_signature_image'),
+            'foreman_signed_at' => now(),
+            'foreman_signed_by' => Auth::id(),
+        ]);
+
+        auth()->user()->unreadNotifications()
+            ->where('type', \App\Notifications\HambatanJalurSigned::class)
+            ->where('data->hambatan_id', $item->id)
+            ->get()->each->markAsRead();
+
+        return redirect()->route('hambatan-jalur.show', $item->id)->with('success', 'Tanda tangan foreman berhasil. Laporan selesai.');
+    }
+
+    private function notifyForemen(HambatanJalur $hambatan): void
+    {
+        $foremen = User::where('role', 'foreman')->get();
+        foreach ($foremen as $foreman) {
+            $foreman->notify(new HambatanJalurSigned($hambatan));
+        }
     }
 
     private function isLineLeader(HambatanJalur $hambatan): bool

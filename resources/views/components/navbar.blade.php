@@ -10,6 +10,10 @@
                 return ('leader ' . strtolower($letter)) === $pendingSignRole;
             })
             ->values();
+    } elseif ($pendingSignRole === 'foreman') {
+        $pendingSignItems = \App\Models\HambatanJalur::where('status', 'leader_signed')
+            ->orderByDesc('leader_signed_at')
+            ->get();
     }
 @endphp
 <header class="bg-white shadow-sm z-30 shrink-0 relative">
@@ -24,7 +28,7 @@
             <span class="text-sm text-gray-500 max-sm:hidden sm:block font-medium" id="liveClockTopbar"></span>
 
             {{-- LHJ PENDING SIGN --}}
-            @if(str_starts_with($pendingSignRole, 'leader'))
+            @if(str_starts_with($pendingSignRole, 'leader') || $pendingSignRole === 'foreman')
             <div class="relative" id="lhjSignWrapper">
                 <button id="lhjSignBtn" class="relative flex items-center gap-2 p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none" title="LHJ menunggu tanda tangan Anda">
                     <i class="bx bxs-edit-alt text-xl"></i>

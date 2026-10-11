@@ -226,7 +226,7 @@
     .hj-sig-table td:last-child { border-bottom: none; }
 
     .hj-sig-trigger { padding: 8px; }
-    #signatureArea .border-2, #leaderSignatureArea .border-2 {
+    #signatureArea .border-2, #leaderSignatureArea .border-2, #foremanSignatureArea .border-2 {
         width: 100% !important;
         max-width: 250px;
     }
@@ -267,11 +267,13 @@
     @php
         $canPicSign = $item->status === 'open' && !$item->signature_image;
         $canLeaderSign = $item->status === 'pic_signed' && ($isLineLeader ?? false);
-        $showForm = $canPicSign || $canLeaderSign;
+        $canForemanSign = $canForemanSign ?? false;
+        $showForm = $canPicSign || $canLeaderSign || $canForemanSign;
+        $sigMode = $canPicSign ? 'pic' : ($canLeaderSign ? 'leader' : ($canForemanSign ? 'foreman' : 'none'));
     @endphp
 
     @if($showForm)
-    <form action="{{ $canPicSign ? route('hambatan-jalur.sign', $item->id) : route('hambatan-jalur.leader-sign', $item->id) }}" method="POST" id="hj-sign-form">
+    <form action="{{ $canPicSign ? route('hambatan-jalur.sign', $item->id) : ($canLeaderSign ? route('hambatan-jalur.leader-sign', $item->id) : route('hambatan-jalur.foreman-sign', $item->id)) }}" method="POST" id="hj-sign-form">
     @csrf
     @endif
 
@@ -370,7 +372,7 @@
             {{-- PIC HAMBATAN --}}
             <tr>
                 <td class="hj-label">PIC<br>HAMBATAN</td>
-                <td colspan="2" class="hj-value">@if($item->status === 'signed' && $item->signer){{ $item->signer->name }} ({{ $item->signer->nrp }})@else{{ $item->pic_hambatan ?? '________________________' }}@endif</td>
+                <td colspan="2" class="hj-value">@if($item->signature_image && $item->signer){{ $item->signer->name }} ({{ $item->signer->nrp }})@else{{ $item->pic_hambatan ?? '________________________' }}@endif</td>
             </tr>
             {{-- WAKTU --}}
             <tr>
@@ -492,7 +494,7 @@
         </div>
 
         {{-- SIGNATURE --}}
-        @php $sigInputName = $canPicSign ? 'signature_image' : 'leader_signature_image'; @endphp
+        @php $sigInputName = $canPicSign ? 'signature_image' : ($canLeaderSign ? 'leader_signature_image' : 'foreman_signature_image'); @endphp
         <table class="hj-sig-table">
             <tr>
                 <td>
@@ -559,9 +561,34 @@
                 </td>
                 <td>
                     <p class="font-bold text-[#991b1b] text-[11px] mb-2">Dilaporkan oleh,</p>
-                    <div class="mt-8 mb-8"></div>
-                    <p class="text-gray-400 text-[11px]">Nama : _______________</p>
-                    <p class="text-gray-400 text-[11px]">NRP  : _______________</p>
+                    @if($canForemanSign)
+                        <input type="hidden" name="foreman_signature_image" id="foreman_signature_image" value="">
+                        <div id="foremanSignatureTrigger" class="hj-sig-trigger">
+                            <svg class="w-7 h-7 text-red-300 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                            <p class="text-gray-400 text-[11px]">Nama : _______________</p>
+                            <p class="text-gray-400 text-[11px]">NRP  : _______________</p>
+                            <p class="text-xs text-red-600 font-bold mt-1">Klik untuk tanda tangan</p>
+                        </div>
+                        <div id="foremanSignatureArea" class="hidden mt-2">
+                            <div class="border-2 border-dashed border-red-200 rounded-xl overflow-hidden bg-white mx-auto" style="max-width:250px;height:100px;">
+                                <canvas id="foremanSignatureCanvas" width="250" height="100" style="display:block;width:100%;max-width:250px;height:100px;" class="touch-none cursor-crosshair"></canvas>
+                            </div>
+                            <div class="flex items-center justify-center gap-2 mt-3">
+                                <button type="button" id="clearForemanSignature" class="px-3 py-1.5 text-[10px] font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Hapus</button>
+                                <button type="button" id="confirmForemanSignature" class="px-4 py-1.5 text-[10px] font-bold text-white bg-gradient-to-r from-red-600 to-red-700 rounded-lg hover:shadow-lg shadow-red-500/25 transition">Selesai</button>
+                                <button type="button" id="cancelForemanSignature" class="px-3 py-1.5 text-[10px] font-bold text-gray-500 bg-gray-100 rounded-lg hover:bg-gray-200 transition">Batal</button>
+                            </div>
+                        </div>
+                    @elseif($item->foreman_signature_image)
+                        <div class="flex justify-center my-2"><img src="{{ $item->foreman_signature_image }}" alt="Tanda Tangan" class="max-h-16"></div>
+                        <p class="text-sm font-bold text-gray-800 mt-1">{{ $item->foremanSigner->name ?? '_______________' }}</p>
+                        <p class="text-[10px] text-gray-500">{{ $item->foremanSigner->role ?? '_______________' }} — NRP : {{ $item->foremanSigner->nrp ?? '_______________' }}</p>
+                        <p class="text-[10px] text-gray-400 mt-1">{{ $item->foreman_signed_at ? \Carbon\Carbon::parse($item->foreman_signed_at)->format('d M Y H:i') : '' }}</p>
+                    @else
+                        <div class="mt-8 mb-8"></div>
+                        <p class="text-gray-400 text-[11px]">Nama : _______________</p>
+                        <p class="text-gray-400 text-[11px]">NRP  : _______________</p>
+                    @endif
                 </td>
             </tr>
         </table>
@@ -574,6 +601,10 @@
         @elseif($canLeaderSign)
         <div class="hj-footer-pending">
             <p class="text-xs text-red-700 font-semibold">✏️ Tanda tangan sebagai GL / FRM, lalu klik <strong>Selesai</strong></p>
+        </div>
+        @elseif($canForemanSign)
+        <div class="hj-footer-pending">
+            <p class="text-xs text-red-700 font-semibold">✏️ Tanda tangan sebagai Foreman (FRM), lalu klik <strong>Selesai</strong></p>
         </div>
         @elseif($item->status === 'signed')
         <div class="hj-footer-signed rounded-b-[16px]">
@@ -588,19 +619,18 @@
     @endif
 
     @if($showForm)
-    @php $isLeader = $canLeaderSign ? 'true' : 'false'; @endphp
     <script src="https://cdn.jsdelivr.net/npm/signature_pad@4.2.0/dist/signature_pad.umd.min.js"></script>
     <script>
     document.addEventListener('DOMContentLoaded', function() {
-        const isLeader = {{ $isLeader }};
-        const prefix = isLeader ? 'leader' : '';
-        const triggerId = prefix ? 'leaderSignatureTrigger' : 'signatureTrigger';
-        const areaId = prefix ? 'leaderSignatureArea' : 'signatureArea';
-        const canvasId = prefix ? 'leaderSignatureCanvas' : 'signatureCanvas';
-        const clearId = prefix ? 'clearLeaderSignature' : 'clearSignature';
-        const confirmId = prefix ? 'confirmLeaderSignature' : 'confirmSignature';
-        const cancelId = prefix ? 'cancelLeaderSignature' : 'cancelSignature';
-        const hiddenId = prefix ? 'leader_signature_image' : 'signature_image';
+        const mode = '{{ $sigMode }}';
+        const prefix = mode === 'leader' ? 'leader' : (mode === 'foreman' ? 'foreman' : '');
+        const triggerId = prefix ? prefix + 'SignatureTrigger' : 'signatureTrigger';
+        const areaId = prefix ? prefix + 'SignatureArea' : 'signatureArea';
+        const canvasId = prefix ? prefix + 'SignatureCanvas' : 'signatureCanvas';
+        const clearId = prefix ? 'clear' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Signature' : 'clearSignature';
+        const confirmId = prefix ? 'confirm' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Signature' : 'confirmSignature';
+        const cancelId = prefix ? 'cancel' + prefix.charAt(0).toUpperCase() + prefix.slice(1) + 'Signature' : 'cancelSignature';
+        const hiddenId = prefix ? prefix + '_signature_image' : 'signature_image';
 
         const trigger = document.getElementById(triggerId);
         const area = document.getElementById(areaId);

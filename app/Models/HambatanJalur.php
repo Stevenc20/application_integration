@@ -28,6 +28,9 @@ class HambatanJalur extends Model
         'leader_signature_image',
         'leader_signed_at',
         'leader_signed_by',
+        'foreman_signature_image',
+        'foreman_signed_at',
+        'foreman_signed_by',
     ];
 
     public function downtime()
@@ -43,5 +46,10 @@ class HambatanJalur extends Model
     public function leaderSigner()
     {
         return $this->belongsTo(User::class, 'leader_signed_by');
+    }
+
+    public function foremanSigner()
+    {
+        return $this->belongsTo(User::class, 'foreman_signed_by');
     }
 }

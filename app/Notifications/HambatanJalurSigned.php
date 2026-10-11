@@ -30,7 +30,7 @@ class HambatanJalurSigned extends Notification
             'jenis_hambatan' => $this->hambatan->jenis_hambatan,
             'pic_hambatan' => $this->hambatan->pic_hambatan,
             'mesin' => $this->hambatan->mesin,
-            'message' => 'Hambatan ' . $this->hambatan->line_name . ' (' . $this->hambatan->jenis_hambatan . ') telah ditandatangani PIC dan membutuhkan tanda tangan Anda.',
+            'message' => 'Hambatan ' . $this->hambatan->line_name . ' (' . $this->hambatan->jenis_hambatan . ') menunggu tanda tangan Anda.',
         ];
     }
 }

@@ -981,7 +981,7 @@ Route::middleware(['auth', 'role:presdir'])->prefix('presdir')->name('presdir.')
 // ======================
 // HAMBATAN JALUR
 // ======================
-Route::middleware(['auth', 'role:dies_shop,plant_service,irm,logistik,produksi,supervisor,admin,leader,shearing,handwork', 'feature:hambatan_jalur'])
+Route::middleware(['auth', 'role:dies_shop,plant_service,irm,logistik,produksi,supervisor,admin,leader,foreman,shearing,handwork', 'feature:hambatan_jalur'])
     ->prefix('hambatan-jalur')
     ->name('hambatan-jalur.')
     ->controller(\App\Http\Controllers\HambatanJalurController::class)
@@ -991,6 +991,7 @@ Route::middleware(['auth', 'role:dies_shop,plant_service,irm,logistik,produksi,s
         Route::get('/{id}', 'show')->name('show');
         Route::post('/{id}/sign', 'sign')->name('sign');
         Route::post('/{id}/leader-sign', 'leaderSign')->name('leader-sign');
+        Route::post('/{id}/foreman-sign', 'foremanSign')->name('foreman-sign');
     });
 
 // ======================
