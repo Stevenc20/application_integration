@@ -1101,7 +1101,13 @@ class InputHarianController extends Controller
             }
 
             // ── VALIDATION: Pastikan semua downtime, repair, dan reject terisi lengkap sebelum shift berakhir ──
-            $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            $normalizedPress = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineMaster->line_name)));
+
+            $planQuery = \App\Models\ProductionPlan::where(function($q) use ($date) {
+                    $q->whereDate('plan_date', $date)
+                      ->orWhereDate('created_at', $date)
+                      ->orWhereDate('updated_at', $date);
+                })
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
@@ -1110,12 +1116,49 @@ class InputHarianController extends Controller
                 $planQuery->where('shift_name', 'like', "{$shiftName}%");
             }
 
-            $normalizedPress = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineMaster->line_name)));
             $planQuery->whereRaw("
                 REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
             ", ["%{$normalizedPress}%"]);
 
             $plans = $planQuery->get();
+
+            // TAMBAHAN: Tarik juga JobMaster yang aktif/dikerjakan di line ini pada hari ini atau memiliki DailyProduction hari ini
+            $activeJms = \App\Models\JobMaster::where(function($q) use ($normalizedPress, $lineMaster) {
+                    $q->whereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedPress}%"])
+                      ->orWhere('line', 'LIKE', "%{$lineMaster->line_name}%");
+                })
+                ->where(function($q) use ($date) {
+                    $q->whereDate('started_at', $date)
+                      ->orWhereDate('finished_at', $date)
+                      ->orWhereDate('updated_at', $date)
+                      ->orWhereIn('status', ['running', 'paused', 'complete', 'completed'])
+                      ->orWhereHas('dailyProduction', function($dp) use ($date) {
+                          $dp->whereDate('work_date', $date);
+                      });
+                })
+                ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                ->get();
+
+            // Jika ada job master yang belum tercover di $plans, carikan plan terkaitnya atau buat representasi plan
+            $existingJobNos = $plans->pluck('job_no')->filter()->map(fn($v) => strtoupper(trim($v)))->all();
+            foreach ($activeJms as $ajm) {
+                $rawNo = strtoupper(trim(strpos($ajm->job_number, '-') !== false ? substr($ajm->job_number, 0, strrpos($ajm->job_number, '-')) : $ajm->job_number));
+                if (!in_array($rawNo, $existingJobNos) && !in_array(strtoupper(trim($ajm->job_number)), $existingJobNos)) {
+                    // Cari ProductionPlan terdekat untuk job ini
+                    $matchingPlan = \App\Models\ProductionPlan::where(function($pq) use ($rawNo, $ajm) {
+                            $pq->where('job_no', $rawNo)
+                              ->orWhere('job_no', $ajm->job_number);
+                        })
+                        ->where('row_type', 'job')
+                        ->orderByDesc('plan_date')
+                        ->first();
+
+                    if ($matchingPlan) {
+                        $plans->push($matchingPlan);
+                        $existingJobNos[] = $rawNo;
+                    }
+                }
+            }
 
             $issues = [
                 'dt'     => [],
@@ -1124,7 +1167,7 @@ class InputHarianController extends Controller
                 'remain' => [],
             ];
 
-            if ($plans->isNotEmpty()) {
+            if ($plans->isNotEmpty() || $activeJms->isNotEmpty()) {
                 $parentPlans = $plans->filter(fn($p) => !$p->parent_job_id);
                 $parentIdentifiers = $parentPlans->map(function($p) {
                     $jn = trim($p->job_no ?? '');
@@ -1144,6 +1187,8 @@ class InputHarianController extends Controller
                     ->with(['dailyProduction', 'downtimes', 'repairRejects'])
                     ->get();
 
+                // Merge dengan $activeJms agar semua job master termuat lengkap
+                $parentJobMasters = $parentJobMasters->merge($activeJms)->unique('id')->values();
                 $parentJobMastersByIdentifier = $parentJobMasters->keyBy('job_number');
 
                 $parentIds = $parentPlans->pluck('id')->filter()->values()->toArray();
@@ -1257,23 +1302,17 @@ class InputHarianController extends Controller
                             $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('reject_qty');
                         }
 
-                        // Cek catatan form Repair & Reject untuk job ini (pada tanggal shift atau pada jobMaster ini)
+                        // Cek catatan form Repair & Reject untuk job ini
                         $rrLogs = $jm->repairRejects ?? collect();
-                        $rrOnDate = $rrLogs->filter(function($r) use ($date) {
-                            if (!$r->created_at) return true;
-                            $rDate = $r->created_at instanceof \Carbon\Carbon ? $r->created_at->toDateString() : substr((string)$r->created_at, 0, 10);
-                            return $rDate === $date;
-                        });
-                        if ($rrOnDate->isEmpty() && $rrLogs->isNotEmpty()) {
-                            $rrOnDate = $rrLogs;
-                        }
+                        $totalRepairLogged = (int) $rrLogs->where('type', 'repair')->sum('qty_a');
+                        $totalRejectLogged = (int) $rrLogs->where('type', 'reject')->sum('qty_a');
 
                         if ($repairQty > 0) {
-                            $hasRR = $rrOnDate->contains(fn($r) => $r->type === 'repair');
-                            if (!$hasRR) {
+                            if ($totalRepairLogged < $repairQty) {
+                                $missingRepair = $repairQty - $totalRepairLogged;
                                 $issues['repair'][] = [
                                     'item'          => $itemName,
-                                    'issue'         => $repairQty . ' pcs Repair belum ada form detail',
+                                    'issue'         => $missingRepair . ' pcs Repair belum ada form detail (Lapor: ' . $repairQty . ', Detail: ' . $totalRepairLogged . ')',
                                     'job_master_id' => $jm->id,
                                     'plan_id'       => $plan->id,
                                 ];
@@ -1281,11 +1320,11 @@ class InputHarianController extends Controller
                         }
 
                         if ($rejectQty > 0) {
-                            $hasRR = $rrOnDate->contains(fn($r) => $r->type === 'reject');
-                            if (!$hasRR) {
+                            if ($totalRejectLogged < $rejectQty) {
+                                $missingReject = $rejectQty - $totalRejectLogged;
                                 $issues['reject'][] = [
                                     'item'          => $itemName,
-                                    'issue'         => $rejectQty . ' pcs Reject belum ada form detail',
+                                    'issue'         => $missingReject . ' pcs Reject belum ada form detail (Lapor: ' . $rejectQty . ', Detail: ' . $totalRejectLogged . ')',
                                     'job_master_id' => $jm->id,
                                     'plan_id'       => $plan->id,
                                 ];

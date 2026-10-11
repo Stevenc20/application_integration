@@ -824,58 +824,61 @@ function openShiftValidationModal(issues) {
             key: 'dt', 
             label: 'Downtime', 
             icon: '⏱', 
-            boxClass: 'bg-red-50/70 border border-red-200', 
-            headerClass: 'text-red-800', 
+            boxClass: 'bg-white border-2 border-red-300 shadow-sm', 
+            headerClass: 'text-red-700 font-black', 
             btnClass: 'bg-red-600 hover:bg-red-700 text-white shadow-sm' 
         },
         { 
             key: 'repair', 
             label: 'Repair', 
             icon: '🔧', 
-            boxClass: 'bg-orange-50/70 border border-orange-200', 
-            headerClass: 'text-orange-800', 
-            btnClass: 'bg-orange-600 hover:bg-orange-700 text-white shadow-sm' 
+            boxClass: 'bg-white border-2 border-amber-300 shadow-sm', 
+            headerClass: 'text-amber-700 font-black', 
+            btnClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm' 
         },
         { 
             key: 'reject', 
             label: 'Reject', 
             icon: '🗑', 
-            boxClass: 'bg-rose-50/70 border border-rose-200', 
-            headerClass: 'text-rose-800', 
+            boxClass: 'bg-white border-2 border-rose-300 shadow-sm', 
+            headerClass: 'text-rose-700 font-black', 
             btnClass: 'bg-rose-600 hover:bg-rose-700 text-white shadow-sm' 
         },
         { 
             key: 'remain', 
             label: 'Remain', 
             icon: '📦', 
-            boxClass: 'bg-amber-50/70 border border-amber-200', 
-            headerClass: 'text-amber-800', 
-            btnClass: 'bg-amber-600 hover:bg-amber-700 text-white shadow-sm' 
+            boxClass: 'bg-white border-2 border-blue-300 shadow-sm', 
+            headerClass: 'text-blue-700 font-black', 
+            btnClass: 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm' 
         },
     ];
     sections.forEach(s => {
         const items = issues[s.key] || [];
         let listHtml = items.length === 0
-            ? '<p class="mt-2 text-xs text-emerald-700 font-bold flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Tidak ada masalah.</p>'
-            : '<ul class="mt-2.5 space-y-2">' + items.map(item =>
-                '<li class="flex items-center justify-between text-xs bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">' +
-                    '<div class="flex items-center gap-2 text-left min-w-0 pr-2">' +
-                        '<span class="w-1.5 h-1.5 rounded-full bg-slate-400 shrink-0"></span>' +
-                        '<span class="font-bold text-slate-800 truncate leading-snug">' + item.item + ': <span class="font-medium text-slate-600">' + item.issue + '</span></span>' +
+            ? '<p class="mt-2.5 text-xs text-emerald-800 font-bold flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Tidak ada masalah.</p>'
+            : '<ul class="mt-3 space-y-2">' + items.map(item =>
+                '<li class="flex items-center justify-between text-xs bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm transition-colors">' +
+                    '<div class="flex items-start gap-2 text-left min-w-0 pr-2">' +
+                        '<span class="w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1"></span>' +
+                        '<div class="min-w-0 leading-snug">' +
+                            '<span class="font-black text-slate-950 block text-xs">' + item.item + '</span>' +
+                            '<span class="font-bold text-red-600 block text-[11px] mt-0.5">' + item.issue + '</span>' +
+                        '</div>' +
                     '</div>' +
-                    '<button onclick="goToIssue(\'' + s.key + '\',' + item.plan_id + ',' + item.job_master_id + ',' + (item.dt_id || 'null') + ')" class="ml-2 px-3 py-1 ' + s.btnClass + ' rounded-lg text-[10px] font-black transition-all whitespace-nowrap flex items-center gap-1 shrink-0 cursor-pointer">' +
+                    '<button onclick="goToIssue(\'' + s.key + '\',' + item.plan_id + ',' + item.job_master_id + ',' + (item.dt_id || 'null') + ')" class="ml-2 px-3 py-1.5 ' + s.btnClass + ' rounded-lg text-xs font-black transition-all whitespace-nowrap flex items-center gap-1 shrink-0 cursor-pointer">' +
                         '<span>Buka</span> &rarr;' +
                     '</button>' +
                 '</li>'
             ).join('') + '</ul>';
         body.innerHTML +=
-            '<div class="' + s.boxClass + ' rounded-2xl p-4 shadow-sm">' +
-                '<div class="flex items-center justify-between">' +
+            '<div class="' + s.boxClass + ' rounded-2xl p-4">' +
+                '<div class="flex items-center justify-between border-b border-slate-100 pb-2">' +
                     '<h4 class="text-xs font-black ' + s.headerClass + ' uppercase tracking-wider flex items-center gap-2">' +
-                        '<span>' + s.icon + '</span>' +
+                        '<span class="text-sm">' + s.icon + '</span>' +
                         '<span>' + s.label + '</span>' +
                     '</h4>' +
-                    '<span class="text-[10px] font-black px-2 py-0.5 rounded-full ' + (items.length > 0 ? 'bg-red-100 text-red-700 border border-red-200' : 'bg-emerald-100 text-emerald-700 border border-emerald-200') + '">' +
+                    '<span class="text-[11px] font-black px-2.5 py-0.5 rounded-full ' + (items.length > 0 ? 'bg-red-600 text-white' : 'bg-emerald-100 text-emerald-800 border border-emerald-300') + '">' +
                         items.length + ' item' +
                     '</span>' +
                 '</div>' +
