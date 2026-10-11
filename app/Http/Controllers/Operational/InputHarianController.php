@@ -1148,9 +1148,29 @@ class InputHarianController extends Controller
                 })->filter()->values()->toArray();
 
                 $childJobMasters = \App\Models\JobMaster::whereIn('job_number', $childIdentifiers)
-                    ->with(['downtimes', 'repairRejects'])
+                    ->with(['downtimes', 'repairRejects', 'dailyProduction'])
                     ->get()
                     ->keyBy('job_number');
+
+                $allDailyJmIds = $parentJobMasters->pluck('id')
+                    ->merge($childJobMasters->pluck('id'))
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                $dailyForDate = \App\Models\DailyProduction::whereIn('job_master_id', $allDailyJmIds)
+                    ->whereDate('work_date', $date)
+                    ->orderBy('id', 'desc')
+                    ->get()
+                    ->keyBy('job_master_id');
+
+                $dailyLatest = \App\Models\DailyProduction::whereIn('job_master_id', $allDailyJmIds)
+                    ->orderBy('work_date', 'desc')
+                    ->orderBy('id', 'desc')
+                    ->get()
+                    ->unique('job_master_id')
+                    ->keyBy('job_master_id');
 
                 // ── VALIDATION LOOP: Periksa downtime, repair, reject ──
                 foreach ($plans as $plan) {
@@ -1202,24 +1222,32 @@ class InputHarianController extends Controller
                             }
                         }
 
-                        if ($jm->dailyProduction && $jm->dailyProduction->actual_repair > 0) {
-                            $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'repair');
+                        $daily = $dailyForDate->get($jm->id) ?? $dailyLatest->get($jm->id);
+                        $repairQty = (int)($daily->actual_repair ?? 0);
+                        $rejectQty = (int)($daily->actual_reject ?? 0);
+
+                        $rrOnDate = $jm->repairRejects->filter(
+                            fn($r) => $r->created_at && $r->created_at->toDateString() === $date
+                        );
+
+                        if ($repairQty > 0) {
+                            $hasRR = $rrOnDate->contains(fn($r) => $r->type === 'repair');
                             if (!$hasRR) {
                                 $issues['repair'][] = [
                                     'item'          => $itemName,
-                                    'issue'         => (int)$jm->dailyProduction->actual_repair . ' pcs Repair tanpa catatan form',
+                                    'issue'         => $repairQty . ' pcs Repair tanpa catatan form',
                                     'job_master_id' => $jm->id,
                                     'plan_id'       => $plan->id,
                                 ];
                             }
                         }
 
-                        if ($jm->dailyProduction && $jm->dailyProduction->actual_reject > 0) {
-                            $hasRR = $jm->repairRejects->contains(fn($r) => $r->type === 'reject');
+                        if ($rejectQty > 0) {
+                            $hasRR = $rrOnDate->contains(fn($r) => $r->type === 'reject');
                             if (!$hasRR) {
                                 $issues['reject'][] = [
                                     'item'          => $itemName,
-                                    'issue'         => (int)$jm->dailyProduction->actual_reject . ' pcs Reject tanpa catatan form',
+                                    'issue'         => $rejectQty . ' pcs Reject tanpa catatan form',
                                     'job_master_id' => $jm->id,
                                     'plan_id'       => $plan->id,
                                 ];
