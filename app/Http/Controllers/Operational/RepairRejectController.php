@@ -34,7 +34,7 @@ class RepairRejectController extends Controller
             'line_id' => $lineMaster->id,
             'work_date' => $date,
             'shift' => $shiftVal,
-        ])->exists();
+        ])->whereNull('cancelled_at')->exists();
 
         if ($locked) {
             throw new \Exception('Shift sudah dikunci. Data Repair/Reject tidak dapat diubah.');
