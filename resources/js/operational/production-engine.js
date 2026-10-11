@@ -2519,12 +2519,23 @@ function _isInBreakState(activeId) {
     return false;
 }
 
+function _isModalOpen() {
+    const ids = ['confirmModal', 'shiftValidationModal', 'tarikShiftModal', 'downtimeModal', 'rrInputModal', 'rrListModal', 'skipConfirmModal'];
+    for (const id of ids) {
+        const el = document.getElementById(id);
+        if (el && !el.classList.contains('hidden')) return true;
+    }
+    return false;
+}
+
 function checkSyncStatus() {
     if (window._isReloading || (window.ActionRunner && window.ActionRunner.locked)) return;
+    if (_isModalOpen()) return;
     const config = window.ProductionConfig;
     const line = config.currentLine || '';
     fetch(`/operational/active-job?line=${encodeURIComponent(line)}`, { headers: { 'Accept': 'application/json' } }).then(res => res.json()).then(data => {
         if (window._isReloading) return;
+        if (_isModalOpen()) return;
         if ((data.running && data.id !== config.currentActiveId) || (!data.running && config.currentActiveId !== null)) {
             if (_isInBreakState(config.currentActiveId)) return;
             window._isReloading = true;
