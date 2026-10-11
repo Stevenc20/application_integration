@@ -185,6 +185,7 @@ function updateTimers() {
             const plannedDurationMs = Math.max(tptMs, 1000);
 
             const anchorTime = Math.min(
+                job._prodStart ? new Date(job._prodStart).getTime() : Infinity,
                 jS ? jS.getTime() : Infinity,
                 firstDandori ? firstDandori.getTime() : Infinity,
                 ...historyStarts
@@ -652,6 +653,7 @@ function updateTimeline(forceAll = false) {
 
             const firstDandori = job.dandori_start ? new Date(job.dandori_start) : null;
             const anchorTime = Math.min(
+                job._prodStart ? new Date(job._prodStart).getTime() : Infinity,
                 jS ? jS.getTime() : Infinity,
                 firstDandori ? firstDandori.getTime() : Infinity,
                 ...historyStarts
@@ -664,8 +666,9 @@ function updateTimeline(forceAll = false) {
             const finalEndTime = jF ? new Date(jF) : effectiveNow;
 
             let activeStart = anchorTime;
-            if (jS || firstDandori) {
+            if (jS || firstDandori || job._prodStart) {
                 activeStart = Math.min(
+                    job._prodStart ? new Date(job._prodStart).getTime() : Infinity,
                     jS ? jS.getTime() : Infinity,
                     firstDandori ? firstDandori.getTime() : Infinity
                 );
@@ -1140,7 +1143,8 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         };
 
         const hasDandori = !!firstDandori;
-        const actualStartMs = jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : null;
+        const stableAnchorMs = job._prodStart ? new Date(job._prodStart).getTime() : null;
+        const actualStartMs = stableAnchorMs || (jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : null);
 
         const effectiveActualStart = actualStartMs ||
             (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null) ||
@@ -1151,9 +1155,9 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
             return;
         }
 
-        const firstProdHistory = normalizedHistory.find(h => h.type !== 'dandori' && h.type !== 'setup')?.start;
+        const firstProdHistory = normalizedHistory.find(h => h.type !== 'dandori' && h.type !== 'setup' && h.type !== 'break time' && h.type !== 'break')?.start;
         const firstAnyHistory = normalizedHistory.length ? normalizedHistory[0].start : null;
-        let effectiveProductionStart = firstProdHistory || actualStartMs || firstAnyHistory || effectiveActualStart;
+        let effectiveProductionStart = actualStartMs || firstProdHistory || firstAnyHistory || effectiveActualStart;
 
         if (!effectiveProductionStart || isNaN(effectiveProductionStart)) {
             effectiveProductionStart = (effectiveActualStart && !isNaN(effectiveActualStart)) ? effectiveActualStart : anchor;
@@ -2891,6 +2895,13 @@ function initProductionEngine() {
                 };
             }
         })();
+
+        for (const jobId in window.jobMasterData) {
+            const job = window.jobMasterData[jobId];
+            if (job && (job.prod_start || job.started_at)) {
+                job._prodStart = job.prod_start || job.started_at;
+            }
+        }
 
         updateTimeline(true);
         updateTimers();

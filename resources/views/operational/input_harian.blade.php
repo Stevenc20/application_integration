@@ -507,6 +507,7 @@ window.jobMasterData = {
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->start_time)->timestamp * 1000 
                 : ($jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : 'null') 
         }},
+        prod_start: {{ $jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : 'null' }},
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->finish_time)->timestamp * 1000 
@@ -539,6 +540,7 @@ window.jobMasterData = {
                 ? \Carbon\Carbon::parse($sessionMap->get($activeJob->id)->start_time)->timestamp * 1000 
                 : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->timestamp * 1000 : 'null') 
         }},
+        prod_start: {{ $activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->timestamp * 1000 : 'null' }},
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($activeJob->id) && $sessionMap->get($activeJob->id)?->finish_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($activeJob->id)->finish_time)->timestamp * 1000 
