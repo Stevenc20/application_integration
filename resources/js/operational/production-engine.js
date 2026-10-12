@@ -150,8 +150,6 @@ function updateTimers() {
             if (job._breakPaused && job._frozenTimer != null) {
                 const frozen = formatSeconds(job._frozenTimer);
                 timerEl.textContent = frozen;
-                const breakTimerEl = document.getElementById('break-overlay-timer');
-                if (breakTimerEl) breakTimerEl.textContent = frozen;
                 continue;
             }
 
@@ -290,6 +288,17 @@ function _autoBreakTick() {
 
     const breakWindow = _isInBreakWindow(now);
     const alreadyRunningBreak = window.runningDowntimes?.[`${activeId}_break`];
+
+    // ——— LIVE COUNTDOWN BREAK OVERLAY ———
+    if (breakWindow || window._autoBreakActive || alreadyRunningBreak) {
+        const breakTimerEl = document.getElementById('break-overlay-timer');
+        if (breakTimerEl && breakWindow) {
+            const currentSecondsOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+            const endSecondsOfDay = breakWindow.endMin * 60;
+            const remainingSecs = Math.max(0, endSecondsOfDay - currentSecondsOfDay);
+            breakTimerEl.textContent = formatSeconds(remainingSecs);
+        }
+    }
 
     if (breakWindow && !window._autoBreakActive && !alreadyRunningBreak) {
         _triggerAutoBreakStart(activeId, breakWindow);

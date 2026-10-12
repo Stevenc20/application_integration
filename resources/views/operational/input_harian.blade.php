@@ -707,8 +707,8 @@ window.closeConfirmModal = window.closeConfirmModal || function() {
     }, 150);
 };
 
-function submitShift() {
-    showConfirm('Akhiri Shift?', 'Semua data akan difinalisasi. Item yang belum mencapai target akan masuk antrean recovery.', function () {
+function submitShift(confirmed) {
+    const doFinalize = function () {
         closeConfirmModal();
         const btns = document.querySelectorAll('#submitShiftBtn, [onclick="submitShift()"]');
         btns.forEach(b => {
@@ -733,6 +733,7 @@ function submitShift() {
                 date: activeDate,
                 shift: activeShift,
                 comment: commentInput ? commentInput.value.trim() : '',
+                confirm_review: !!confirmed,
             }),
         })
         .then(r => r.json().then(data => ({ status: r.status, data })))
@@ -753,6 +754,12 @@ function submitShift() {
                     b.disabled = false;
                     b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
                 });
+            } else if (data.needs_review) {
+                openShiftReviewModal(data.review);
+                btns.forEach(b => {
+                    b.disabled = false;
+                    b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
+                });
             } else {
                 alert('Gagal: ' + (data.message || 'Unknown error'));
                 btns.forEach(b => {
@@ -768,7 +775,12 @@ function submitShift() {
                 b.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Akhiri Shift';
             });
         });
-    });
+    };
+    if (confirmed) {
+        doFinalize();
+        return;
+    }
+    showConfirm('Akhiri Shift?', 'Semua data akan difinalisasi. Item yang belum mencapai target akan masuk antrean recovery.', doFinalize);
 }
 
 function cancelShift() {
@@ -894,6 +906,89 @@ function closeShiftValidationModal() {
     const modal = document.getElementById('shiftValidationModal');
     modal.classList.remove('flex');
     modal.classList.add('hidden');
+}
+
+// ── Shift Review Modal Functions (konfirmasi item Repair/Reject sebelum finalisasi) ──
+function openShiftReviewModal(review) {
+    const body = document.getElementById('shiftReviewBody');
+    if (!body) return;
+    body.innerHTML = '';
+    const sections = [
+        {
+            key: 'repair',
+            label: 'Repair',
+            icon: '🔧',
+            boxClass: 'bg-white border-2 border-amber-200 shadow-sm',
+            headerClass: 'text-amber-700 font-black',
+            btnComplete: 'bg-emerald-600 hover:bg-emerald-700',
+            btnIncomplete: 'bg-red-600 hover:bg-red-700',
+        },
+        {
+            key: 'reject',
+            label: 'Reject',
+            icon: '🗑',
+            boxClass: 'bg-white border-2 border-rose-200 shadow-sm',
+            headerClass: 'text-rose-700 font-black',
+            btnComplete: 'bg-emerald-600 hover:bg-emerald-700',
+            btnIncomplete: 'bg-red-600 hover:bg-red-700',
+        },
+    ];
+    sections.forEach(s => {
+        const items = (review[s.key] || []).filter(i => i.logged > 0 || i.qty > 0);
+        let listHtml = items.length === 0
+            ? '<p class="mt-2.5 text-xs text-emerald-800 font-bold flex items-center gap-1.5"><svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 13l4 4L19 7"/></svg> Tidak ada item.</p>'
+            : '<ul class="mt-3 space-y-2">' + items.map(item => {
+                const ok = item.status === 'ok';
+                return '<li class="flex items-center justify-between text-xs bg-slate-50 hover:bg-slate-100 p-3 rounded-xl border border-slate-300 shadow-sm transition-colors">' +
+                    '<div class="flex items-start gap-2 text-left min-w-0 pr-2">' +
+                        '<span class="w-2 h-2 rounded-full ' + (ok ? 'bg-emerald-500' : 'bg-red-500') + ' shrink-0 mt-1"></span>' +
+                        '<div class="min-w-0 leading-snug">' +
+                            '<span class="font-black text-slate-950 block text-xs">' + item.item + '</span>' +
+                            '<span class="' + (ok ? 'text-emerald-700' : 'text-red-600') + ' font-bold block text-[11px] mt-0.5">' + item.issue + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<button onclick="goToReviewIssue(\'' + s.key + '\',' + item.plan_id + ',' + item.job_master_id + ')" class="ml-2 px-3 py-1.5 ' + (ok ? s.btnComplete : s.btnIncomplete) + ' text-white rounded-lg text-xs font-black transition-all whitespace-nowrap flex items-center gap-1 shrink-0 cursor-pointer">' +
+                        '<span>Buka</span> &rarr;' +
+                    '</button>' +
+                '</li>';
+            }).join('') + '</ul>';
+        body.innerHTML +=
+            '<div class="' + s.boxClass + ' rounded-2xl p-4">' +
+                '<div class="flex items-center justify-between border-b border-slate-100 pb-2">' +
+                    '<h4 class="text-xs font-black ' + s.headerClass + ' uppercase tracking-wider flex items-center gap-2">' +
+                        '<span class="text-sm">' + s.icon + '</span>' +
+                        '<span>' + s.label + '</span>' +
+                    '</h4>' +
+                    '<span class="text-[11px] font-black px-2.5 py-0.5 rounded-full ' + (items.length > 0 ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-500') + '">' +
+                        items.length + ' item' +
+                    '</span>' +
+                '</div>' +
+                listHtml +
+            '</div>';
+    });
+    const modal = document.getElementById('shiftReviewModal');
+    if (modal) {
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+}
+
+function closeShiftReviewModal() {
+    const modal = document.getElementById('shiftReviewModal');
+    if (modal) {
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+    }
+}
+
+function goToReviewIssue(type, planId, jobMasterId) {
+    closeShiftReviewModal();
+    goToIssue(type, planId, jobMasterId, null);
+}
+
+function confirmShiftReview() {
+    closeShiftReviewModal();
+    submitShift(true);
 }
 
 function goToIssue(type, planId, jobMasterId, dtId) {

@@ -1143,6 +1143,11 @@ class InputHarianController extends Controller
                 'remain' => [],
             ];
 
+            $review = [
+                'repair' => [],
+                'reject' => [],
+            ];
+
             if ($plans->isNotEmpty()) {
                 $parentPlans = $plans->filter(fn($p) => !$p->parent_job_id);
                 $parentIdentifiers = $parentPlans->map(function($p) {
@@ -1325,6 +1330,34 @@ class InputHarianController extends Controller
                     $totalRepairLogged = (int) $rrLogs->where('type', 'repair')->sum('qty_a');
                     $totalRejectLogged = (int) $rrLogs->where('type', 'reject')->sum('qty_a');
 
+                    if ($repairQty > 0 || $totalRepairLogged > 0) {
+                        $review['repair'][] = [
+                            'item'          => $itemName,
+                            'issue'         => $totalRepairLogged >= $repairQty
+                                ? $totalRepairLogged . ' pcs sudah ada form lengkap'
+                                : max(0, $repairQty - $totalRepairLogged) . ' pcs Repair belum ada form (Lapor: ' . $repairQty . ', Form: ' . $totalRepairLogged . ')',
+                            'status'        => $totalRepairLogged >= $repairQty ? 'ok' : 'incomplete',
+                            'qty'           => $repairQty,
+                            'logged'        => $totalRepairLogged,
+                            'job_master_id' => $jm->id,
+                            'plan_id'       => $planId,
+                        ];
+                    }
+
+                    if ($rejectQty > 0 || $totalRejectLogged > 0) {
+                        $review['reject'][] = [
+                            'item'          => $itemName,
+                            'issue'         => $totalRejectLogged >= $rejectQty
+                                ? $totalRejectLogged . ' pcs sudah ada form lengkap'
+                                : max(0, $rejectQty - $totalRejectLogged) . ' pcs Reject belum ada form (Lapor: ' . $rejectQty . ', Form: ' . $totalRejectLogged . ')',
+                            'status'        => $totalRejectLogged >= $rejectQty ? 'ok' : 'incomplete',
+                            'qty'           => $rejectQty,
+                            'logged'        => $totalRejectLogged,
+                            'job_master_id' => $jm->id,
+                            'plan_id'       => $planId,
+                        ];
+                    }
+
                     if ($repairQty > 0) {
                         if ($totalRepairLogged < $repairQty) {
                             $missingRepair = $repairQty - $totalRepairLogged;
@@ -1357,6 +1390,16 @@ class InputHarianController extends Controller
                         'issues'     => $issues,
                     ], 422);
                 }
+            }
+
+            // ── REVIEW: minta konfirmasi item Repair/Reject shift ini sebelum finalisasi ──
+            if (!$request->boolean('confirm_review')
+                && (!empty($review['repair']) || !empty($review['reject']))) {
+                return response()->json([
+                    'success'     => false,
+                    'needs_review' => true,
+                    'review'      => $review,
+                ], 200);
             }
 
             $cutoffAt = now();
