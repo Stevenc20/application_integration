@@ -979,6 +979,13 @@ class InputHarianController extends Controller
         $this->guardLockedShift($job_id);
         try {
             $downtime = $this->productionService->startDowntime($job_id, $request->all());
+            if (!$downtime) {
+                return response()->json([
+                    'success' => false,
+                    'skipped' => true,
+                    'message' => 'Downtime tidak dapat dimulai (downtime lain sedang aktif).'
+                ], 200);
+            }
             return response()->json([
                 'success' => true,
                 'downtime' => $downtime

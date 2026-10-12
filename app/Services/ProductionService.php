@@ -616,13 +616,45 @@ class ProductionService
     public function startDowntime(int $jobId, array $data)
     {
         return DB::transaction(function () use ($jobId, $data) {
+            // Pessimistic locking on JobMaster to serialize concurrent downtime requests
+            $job = JobMaster::where('id', $jobId)->lockForUpdate()->first();
+            if (!$job) {
+                throw new \Exception('Job tidak ditemukan.');
+            }
+
+            $dtType = $data['jenis_downtime'] ?? 'other';
+
+            // Idempotency check: if an open downtime with the exact same type already exists, return it
+            $existing = Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', $dtType)
+                ->whereNull('finish_time')
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
+
+            // Auto-break guard: if a manual downtime is currently active, do NOT start auto break
+            if (strtolower(trim($dtType)) === 'break time') {
+                $activeManual = Downtime::where('job_master_id', $jobId)
+                    ->whereNull('finish_time')
+                    ->where('jenis_downtime', '!=', 'break time')
+                    ->where('jenis_downtime', '!=', 'dandori')
+                    ->first();
+                if ($activeManual) {
+                    // Manual downtime has precedence; Auto Break is not started
+                    return null;
+                }
+            }
+
             $downtime = Downtime::create([
                 'job_master_id' => $jobId,
-                'jenis_downtime' => $data['jenis_downtime'],
-                'problem' => $data['problem'],
-                'penyebab' => $data['penyebab'],
-                'action' => $data['action'],
-                'pic' => $data['pic'],
+                'jenis_downtime' => $dtType,
+                'problem' => $data['problem'] ?? null,
+                'penyebab' => $data['penyebab'] ?? null,
+                'action' => $data['action'] ?? null,
+                'pic' => $data['pic'] ?? null,
+                'source' => $data['source'] ?? null,
                 'start_time' => now()
             ]);
 
@@ -685,24 +717,86 @@ class ProductionService
     public function finishDowntime(int $downtimeId)
     {
         return DB::transaction(function () use ($downtimeId) {
-            $downtime = Downtime::find($downtimeId);
+            $downtime = Downtime::where('id', $downtimeId)->lockForUpdate()->first();
             if (!$downtime) return null;
 
-            $finishTime = now();
-            $startTime = Carbon::parse($downtime->start_time);
-            $durationSeconds = abs($finishTime->diffInSeconds($startTime));
+            // Robust idempotent check:
+            // 1. If both finish_time and valid duration_seconds are set, return immediately.
+            if ($downtime->finish_time !== null && $downtime->duration_seconds !== null && $downtime->duration_seconds > 0) {
+                return $downtime;
+            }
 
-            $downtime->update([
-                'finish_time' => $finishTime,
-                'duration_seconds' => $durationSeconds
-            ]);
+            // 2. If finish_time already exists but duration_seconds is missing/zero:
+            //    Preserve the existing finish_time and compute duration strictly from start_time to that finish_time.
+            if ($downtime->finish_time !== null) {
+                $finishTime = Carbon::parse($downtime->finish_time);
+                $startTime = Carbon::parse($downtime->start_time ?: $downtime->created_at ?: $finishTime);
+                $durationSeconds = (int) abs($finishTime->diffInSeconds($startTime));
 
+                $downtime->update([
+                    'duration_seconds' => $durationSeconds
+                ]);
+            }
+            // 3. If duration_seconds already exists but finish_time is missing:
+            //    Backfill finish_time as start_time + duration_seconds (do NOT invent now()).
+            elseif ($downtime->duration_seconds !== null && $downtime->duration_seconds > 0) {
+                $startTime = Carbon::parse($downtime->start_time ?: $downtime->created_at ?: now());
+                $finishTime = $startTime->copy()->addSeconds((int) $downtime->duration_seconds);
+                $durationSeconds = (int) $downtime->duration_seconds;
+
+                $downtime->update([
+                    'finish_time' => $finishTime
+                ]);
+            }
+            // 4. Clean finish: neither finish_time nor duration_seconds is set yet.
+            else {
+                $finishTime = now();
+                $startTime = Carbon::parse($downtime->start_time ?: $downtime->created_at ?: now());
+                $durationSeconds = (int) abs($finishTime->diffInSeconds($startTime));
+
+                $downtime->update([
+                    'finish_time' => $finishTime,
+                    'duration_seconds' => $durationSeconds
+                ]);
+            }
+
+            // Resolve target work_date strictly from the active session of this job
+            $session = ProductionSession::where('job_master_id', $downtime->job_master_id)
+                ->orderByDesc('id')
+                ->first();
+
+            $targetWorkDate = $session?->work_date;
+            if (!$targetWorkDate) {
+                $daily = DailyProduction::where('job_master_id', $downtime->job_master_id)
+                    ->orderByDesc('id')
+                    ->first();
+                $targetWorkDate = $daily?->work_date;
+            }
+
+            if (!$targetWorkDate) {
+                $targetWorkDate = Carbon::parse($downtime->start_time ?: $downtime->created_at)->toDateString();
+            }
+
+            // Calculate shift window bounds for the target session to accurately scope downtimes
+            // Shift Pagi: work_date 07:00 -> work_date 19:00
+            // Shift Malam: work_date 19:00 -> work_date + 1 day 07:00
+            $windowStart = Carbon::parse($targetWorkDate)->setTime(7, 0, 0);
+            $windowEnd = Carbon::parse($targetWorkDate)->addDay()->setTime(7, 0, 0);
+
+            // Sum finished downtimes for this job that strictly fall within this session's window
             $totalDowntime = Downtime::where('job_master_id', $downtime->job_master_id)
-                ->whereDate('created_at', now()->toDateString())
+                ->whereNotNull('finish_time')
+                ->where(function ($q) use ($windowStart, $windowEnd, $targetWorkDate) {
+                    $q->whereBetween('start_time', [$windowStart, $windowEnd])
+                      ->orWhere(function ($sub) use ($windowStart, $windowEnd) {
+                          $sub->whereNull('start_time')
+                              ->whereBetween('created_at', [$windowStart, $windowEnd]);
+                      });
+                })
                 ->sum('duration_seconds');
 
             DailyProduction::updateOrCreate(
-                ['job_master_id' => $downtime->job_master_id, 'work_date' => now()->toDateString()],
+                ['job_master_id' => $downtime->job_master_id, 'work_date' => $targetWorkDate],
                 ['downtime_seconds' => $totalDowntime]
             );
 

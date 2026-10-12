@@ -299,6 +299,8 @@ function _autoBreakTick() {
 }
 
 async function _triggerAutoBreakStart(jobId, breakInfo) {
+    if (window._autoBreakInFlight) return;
+    window._autoBreakInFlight = true;
     try {
         const res = await fetch(`/operational/job/${jobId}/downtime/start`, {
             method: 'POST',
@@ -316,11 +318,11 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
             })
         }).then(r => r.json());
 
-        if (res.success) {
+        if (res.success && res.downtime && res.downtime.jenis_downtime === 'break time') {
             window._autoBreakActive = true;
             window._autoBreakDowntimeId = res.downtime.id;
 
-            const startTime = new Date();
+            const startTime = new Date(res.downtime.start_time || Date.now());
             window.runningDowntimes[`${jobId}_break`] = {
                 id: res.downtime.id, start: startTime, jobId: jobId,
                 btnType: 'break', dtType: 'break time',
@@ -350,6 +352,8 @@ async function _triggerAutoBreakStart(jobId, breakInfo) {
         }
     } catch (e) {
         console.error('AutoBreak start error:', e);
+    } finally {
+        window._autoBreakInFlight = false;
     }
 }
 
