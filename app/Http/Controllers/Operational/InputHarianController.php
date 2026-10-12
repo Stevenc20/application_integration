@@ -1226,7 +1226,9 @@ class InputHarianController extends Controller
                     ->unique('job_master_id')
                     ->keyBy('job_master_id');
 
-                // ── VALIDATION LOOP: Periksa downtime, repair, reject ──
+                // ── VALIDATION: Kumpulkan semua JobMaster yang relevan di line ini ──
+                $allJmsToValidate = collect();
+
                 foreach ($plans as $plan) {
                     if ($plan->parent_job_id) continue;
 
@@ -1235,14 +1237,12 @@ class InputHarianController extends Controller
                     if (blank($jn) && blank($jm)) continue;
                     $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
 
-                    // Cari JobMaster: coba via identifier lengkap, fallback ke job_no murni atau job_name
                     $jobMaster = $parentJobMastersByIdentifier->get($identifier)
                         ?? $parentJobMasters->first(fn($j) => $jn && $j->job_number === $jn)
                         ?? $parentJobMasters->first(fn($j) => $jn && str_starts_with($j->job_number, $jn . '-'))
                         ?? $parentJobMasters->first(fn($j) => $jm && $j->job_name === $jm);
 
                     if (!$jobMaster) {
-                        // Direct DB fallback jika belum termuat di parentJobMasters
                         $jobMaster = \App\Models\JobMaster::where('job_number', $identifier)
                             ->orWhere('job_number', $jn)
                             ->orWhere('job_number', 'like', $jn . '-%')
@@ -1250,85 +1250,110 @@ class InputHarianController extends Controller
                             ->first();
                     }
 
-                    if (!$jobMaster) continue;
+                    if ($jobMaster) {
+                        $jobMaster->validation_item_name = $plan->job_no ?: $plan->job_master;
+                        $jobMaster->validation_plan_id = $plan->id;
+                        $allJmsToValidate->put($jobMaster->id, $jobMaster);
+                    }
 
-                    $allJms = collect([$jobMaster]);
                     $children = $childPlansMap->get($plan->id, collect());
                     foreach ($children as $child) {
                         $childKey = trim($child->job_no ?? '') . '-' . $child->id;
                         $childJm = $childJobMasters->get($childKey);
-                        if ($childJm) $allJms->push($childJm);
+                        if ($childJm) {
+                            $childJm->validation_item_name = $child->job_no ?: $child->job_master;
+                            $childJm->validation_plan_id = $child->id;
+                            $allJmsToValidate->put($childJm->id, $childJm);
+                        }
+                    }
+                }
+
+                // Tambahkan semua activeJms pada line ini jika belum masuk
+                foreach ($activeJms as $ajm) {
+                    if (!$allJmsToValidate->has($ajm->id)) {
+                        $ajmRawNo = strpos($ajm->job_number, '-') !== false ? substr($ajm->job_number, 0, strrpos($ajm->job_number, '-')) : $ajm->job_number;
+                        $ajm->validation_item_name = $ajmRawNo ?: $ajm->job_name;
+                        $ajmPlan = \App\Models\ProductionPlan::where('job_no', $ajmRawNo)->orWhere('job_no', $ajm->job_number)->orderByDesc('id')->first();
+                        $ajm->validation_plan_id = $ajmPlan?->id ?? 0;
+                        $allJmsToValidate->put($ajm->id, $ajm);
+                    }
+                }
+
+                // ── VALIDATION LOOP: Periksa downtime, repair, reject ──
+                foreach ($allJmsToValidate as $jm) {
+                    $itemName = $jm->validation_item_name ?? ($jm->job_name ?: $jm->job_number);
+                    $planId = $jm->validation_plan_id ?? 0;
+
+                    foreach ($jm->downtimes ?? [] as $dt) {
+                        if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
+                            continue;
+                        }
+                        if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
+                            $issues['dt'][] = [
+                                'item'          => $itemName,
+                                'issue'         => 'problem/penyebab/action belum lengkap',
+                                'dt_id'         => $dt->id,
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $planId,
+                            ];
+                        }
                     }
 
-                    $itemName = $plan->job_no ?: $plan->job_master;
-
-                    foreach ($allJms as $jm) {
-                        foreach ($jm->downtimes ?? [] as $dt) {
-                            if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
-                                continue;
-                            }
-                            if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
-                                $issues['dt'][] = [
-                                    'item'          => $itemName,
-                                    'issue'         => 'problem/penyebab/action belum lengkap',
-                                    'dt_id'         => $dt->id,
-                                    'job_master_id' => $jm->id,
-                                    'plan_id'       => $plan->id,
-                                ];
-                            }
+                    foreach ($jm->repairRejects ?? [] as $rr) {
+                        if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
+                            $key = $rr->type === 'reject' ? 'reject' : 'repair';
+                            $issues[$key][] = [
+                                'item'          => $itemName,
+                                'issue'         => 'area_problem/root_cause/countermeasure belum lengkap',
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $planId,
+                            ];
                         }
+                    }
 
-                        foreach ($jm->repairRejects ?? [] as $rr) {
-                            if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
-                                $key = $rr->type === 'reject' ? 'reject' : 'repair';
-                                $issues[$key][] = [
-                                    'item'          => $itemName,
-                                    'issue'         => 'area_problem/root_cause/countermeasure belum lengkap',
-                                    'job_master_id' => $jm->id,
-                                    'plan_id'       => $plan->id,
-                                ];
-                            }
+                    // Ambil actual repair & reject dari DailyProduction atau ProductionLog
+                    $daily = $dailyForDate->get($jm->id) 
+                        ?? $dailyLatest->get($jm->id) 
+                        ?? \App\Models\DailyProduction::where('job_master_id', $jm->id)->orderByDesc('work_date')->orderByDesc('id')->first()
+                        ?? $jm->dailyProduction;
+
+                    $repairQty = (int)($daily->actual_repair ?? 0);
+                    $rejectQty = (int)($daily->actual_reject ?? 0);
+
+                    // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog
+                    if ($repairQty === 0) {
+                        $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('repair_qty');
+                    }
+                    if ($rejectQty === 0) {
+                        $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('reject_qty');
+                    }
+
+                    // Cek form detail Repair & Reject yang tersimpan
+                    $rrLogs = $jm->repairRejects ?? \App\Models\RepairRejectLog::where('job_master_id', $jm->id)->get();
+                    $totalRepairLogged = (int) $rrLogs->where('type', 'repair')->sum('qty_a');
+                    $totalRejectLogged = (int) $rrLogs->where('type', 'reject')->sum('qty_a');
+
+                    if ($repairQty > 0) {
+                        if ($totalRepairLogged < $repairQty) {
+                            $missingRepair = $repairQty - $totalRepairLogged;
+                            $issues['repair'][] = [
+                                'item'          => $itemName,
+                                'issue'         => $missingRepair . ' pcs Repair belum ada form detail (Lapor: ' . $repairQty . ', Form: ' . $totalRepairLogged . ')',
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $planId,
+                            ];
                         }
+                    }
 
-                        $daily = $dailyForDate->get($jm->id) ?? $dailyLatest->get($jm->id) ?? $jm->dailyProduction;
-                        $repairQty = (int)($daily->actual_repair ?? 0);
-                        $rejectQty = (int)($daily->actual_reject ?? 0);
-
-                        // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog
-                        if ($repairQty === 0) {
-                            $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('repair_qty');
-                        }
-                        if ($rejectQty === 0) {
-                            $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('reject_qty');
-                        }
-
-                        // Cek catatan form Repair & Reject untuk job ini
-                        $rrLogs = $jm->repairRejects ?? collect();
-                        $totalRepairLogged = (int) $rrLogs->where('type', 'repair')->sum('qty_a');
-                        $totalRejectLogged = (int) $rrLogs->where('type', 'reject')->sum('qty_a');
-
-                        if ($repairQty > 0) {
-                            if ($totalRepairLogged < $repairQty) {
-                                $missingRepair = $repairQty - $totalRepairLogged;
-                                $issues['repair'][] = [
-                                    'item'          => $itemName,
-                                    'issue'         => $missingRepair . ' pcs Repair belum ada form detail (Lapor: ' . $repairQty . ', Detail: ' . $totalRepairLogged . ')',
-                                    'job_master_id' => $jm->id,
-                                    'plan_id'       => $plan->id,
-                                ];
-                            }
-                        }
-
-                        if ($rejectQty > 0) {
-                            if ($totalRejectLogged < $rejectQty) {
-                                $missingReject = $rejectQty - $totalRejectLogged;
-                                $issues['reject'][] = [
-                                    'item'          => $itemName,
-                                    'issue'         => $missingReject . ' pcs Reject belum ada form detail (Lapor: ' . $rejectQty . ', Detail: ' . $totalRejectLogged . ')',
-                                    'job_master_id' => $jm->id,
-                                    'plan_id'       => $plan->id,
-                                ];
-                            }
+                    if ($rejectQty > 0) {
+                        if ($totalRejectLogged < $rejectQty) {
+                            $missingReject = $rejectQty - $totalRejectLogged;
+                            $issues['reject'][] = [
+                                'item'          => $itemName,
+                                'issue'         => $missingReject . ' pcs Reject belum ada form detail (Lapor: ' . $rejectQty . ', Form: ' . $totalRejectLogged . ')',
+                                'job_master_id' => $jm->id,
+                                'plan_id'       => $planId,
+                            ];
                         }
                     }
                 }
