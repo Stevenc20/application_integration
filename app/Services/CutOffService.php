@@ -24,10 +24,11 @@ class CutOffService
             $stats['cancelled'] = 0;
 
             // --- Phase 1: Handle existing 'continue' items ---
-            $continueItems = RecoveryItem::where('status', 'continue')
+            $continueItemsQuery = RecoveryItem::where('status', 'continue')
                 ->whereDate('source_date', $date)
-                ->where('source_shift', $shiftName)
-                ->get();
+                ->where('source_shift', $shiftName);
+
+            $continueItems = $continueItemsQuery->get();
 
             $nextShiftName = $shiftName === 'Shift Pagi' ? 'Shift Malam' : 'Shift Pagi';
             $nextDate = $shiftName === 'Shift Pagi' ? $date : \Carbon\Carbon::parse($date)->addDay()->toDateString();
@@ -77,15 +78,17 @@ class CutOffService
                 ->filter()
                 ->toArray();
 
-            $unfinishedPlans = ProductionPlan::whereDate('plan_date', $date)
-                ->where('shift_name', $shiftName)
+            $unfinishedPlansQuery = ProductionPlan::whereDate('plan_date', $date)
+                ->where('shift_name', 'like', "{$shiftName}%")
                 ->where('row_type', 'job')
+                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                 ->whereNotIn('id', $existingPlanIds)
                 ->where(function ($q) {
                     $q->whereRaw('COALESCE(ok, 0) < COALESCE(plan, 0)')
                       ->orWhereNull('ok');
-                })
-                ->get();
+                });
+
+            $unfinishedPlans = $unfinishedPlansQuery->get();
 
             $stats['total_unfinished'] = $unfinishedPlans->count();
 

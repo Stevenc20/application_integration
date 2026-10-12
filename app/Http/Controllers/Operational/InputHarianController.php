@@ -1112,17 +1112,22 @@ class InputHarianController extends Controller
             // ── VALIDATION: Pastikan semua downtime, repair, dan reject terisi lengkap sebelum shift berakhir ──
             $normalizedPress = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineMaster->line_name)));
 
-            $planQuery = \App\Models\ProductionPlan::where(function($q) use ($date) {
-                    $q->whereDate('plan_date', $date)
-                      ->orWhereDate('created_at', $date)
-                      ->orWhereDate('updated_at', $date);
-                })
+            // 1. Tentukan SHIFT TERBARU (Revisi Terakhir) yang cocok dengan shift ini
+            $latestShiftName = $shiftName;
+            if ($shiftName && !str_contains($shiftName, 'all')) {
+                $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                    ->where('shift_name', 'like', "{$shiftName}%")
+                    ->orderByDesc('updated_at')
+                    ->value('shift_name') ?: $shiftName;
+            }
+
+            // 2. Query ProductionPlan KHUSUS jadwal shift dan tanggal saat ini untuk line ini
+            $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
-            if ($shiftName && !str_contains($shiftName, 'all')) {
-                // Gunakan shift name terbaru / like prefix agar revisi shift (REV 1, dsb) tetap match
-                $planQuery->where('shift_name', 'like', "{$shiftName}%");
+            if ($latestShiftName && !str_contains($latestShiftName, 'all')) {
+                $planQuery->where('shift_name', $latestShiftName);
             }
 
             $planQuery->whereRaw("
@@ -1131,44 +1136,6 @@ class InputHarianController extends Controller
 
             $plans = $planQuery->get();
 
-            // TAMBAHAN: Tarik juga JobMaster yang aktif/dikerjakan di line ini pada hari ini atau memiliki DailyProduction hari ini
-            $activeJms = \App\Models\JobMaster::where(function($q) use ($normalizedPress, $lineMaster) {
-                    $q->whereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedPress}%"])
-                      ->orWhere('line', 'LIKE', "%{$lineMaster->line_name}%");
-                })
-                ->where(function($q) use ($date) {
-                    $q->whereDate('started_at', $date)
-                      ->orWhereDate('finished_at', $date)
-                      ->orWhereDate('updated_at', $date)
-                      ->orWhereIn('status', ['running', 'paused', 'complete', 'completed'])
-                      ->orWhereHas('dailyProduction', function($dp) use ($date) {
-                          $dp->whereDate('work_date', $date);
-                      });
-                })
-                ->with(['dailyProduction', 'downtimes', 'repairRejects'])
-                ->get();
-
-            // Jika ada job master yang belum tercover di $plans, carikan plan terkaitnya atau buat representasi plan
-            $existingJobNos = $plans->pluck('job_no')->filter()->map(fn($v) => strtoupper(trim($v)))->all();
-            foreach ($activeJms as $ajm) {
-                $rawNo = strtoupper(trim(strpos($ajm->job_number, '-') !== false ? substr($ajm->job_number, 0, strrpos($ajm->job_number, '-')) : $ajm->job_number));
-                if (!in_array($rawNo, $existingJobNos) && !in_array(strtoupper(trim($ajm->job_number)), $existingJobNos)) {
-                    // Cari ProductionPlan terdekat untuk job ini
-                    $matchingPlan = \App\Models\ProductionPlan::where(function($pq) use ($rawNo, $ajm) {
-                            $pq->where('job_no', $rawNo)
-                              ->orWhere('job_no', $ajm->job_number);
-                        })
-                        ->where('row_type', 'job')
-                        ->orderByDesc('plan_date')
-                        ->first();
-
-                    if ($matchingPlan) {
-                        $plans->push($matchingPlan);
-                        $existingJobNos[] = $rawNo;
-                    }
-                }
-            }
-
             $issues = [
                 'dt'     => [],
                 'repair' => [],
@@ -1176,7 +1143,7 @@ class InputHarianController extends Controller
                 'remain' => [],
             ];
 
-            if ($plans->isNotEmpty() || $activeJms->isNotEmpty()) {
+            if ($plans->isNotEmpty()) {
                 $parentPlans = $plans->filter(fn($p) => !$p->parent_job_id);
                 $parentIdentifiers = $parentPlans->map(function($p) {
                     $jn = trim($p->job_no ?? '');
@@ -1193,11 +1160,19 @@ class InputHarianController extends Controller
                             $q->orWhereIn('job_number', $rawParentJobNos);
                         }
                     })
-                    ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                    ->with([
+                        'dailyProduction' => function ($q) use ($date) {
+                            $q->whereDate('work_date', $date);
+                        },
+                        'downtimes' => function ($q) use ($date) {
+                            $q->whereDate('start_time', $date);
+                        },
+                        'repairRejects' => function ($q) use ($date) {
+                            $q->whereDate('created_at', $date);
+                        },
+                    ])
                     ->get();
 
-                // Merge dengan $activeJms agar semua job master termuat lengkap
-                $parentJobMasters = $parentJobMasters->merge($activeJms)->unique('id')->values();
                 $parentJobMastersByIdentifier = $parentJobMasters->keyBy('job_number');
 
                 $parentIds = $parentPlans->pluck('id')->filter()->values()->toArray();
@@ -1211,7 +1186,17 @@ class InputHarianController extends Controller
                 })->filter()->values()->toArray();
 
                 $childJobMasters = \App\Models\JobMaster::whereIn('job_number', $childIdentifiers)
-                    ->with(['downtimes', 'repairRejects', 'dailyProduction'])
+                    ->with([
+                        'dailyProduction' => function ($q) use ($date) {
+                            $q->whereDate('work_date', $date);
+                        },
+                        'downtimes' => function ($q) use ($date) {
+                            $q->whereDate('start_time', $date);
+                        },
+                        'repairRejects' => function ($q) use ($date) {
+                            $q->whereDate('created_at', $date);
+                        },
+                    ])
                     ->get()
                     ->keyBy('job_number');
 
@@ -1228,14 +1213,7 @@ class InputHarianController extends Controller
                     ->get()
                     ->keyBy('job_master_id');
 
-                $dailyLatest = \App\Models\DailyProduction::whereIn('job_master_id', $allDailyJmIds)
-                    ->orderBy('work_date', 'desc')
-                    ->orderBy('id', 'desc')
-                    ->get()
-                    ->unique('job_master_id')
-                    ->keyBy('job_master_id');
-
-                // ── VALIDATION: Kumpulkan semua JobMaster yang relevan di line ini ──
+                // ── VALIDATION: Kumpulkan JobMaster yang sesuai jadwal shift ini saja ──
                 $allJmsToValidate = collect();
 
                 foreach ($plans as $plan) {
@@ -1255,7 +1233,17 @@ class InputHarianController extends Controller
                         $jobMaster = \App\Models\JobMaster::where('job_number', $identifier)
                             ->orWhere('job_number', $jn)
                             ->orWhere('job_number', 'like', $jn . '-%')
-                            ->with(['dailyProduction', 'downtimes', 'repairRejects'])
+                            ->with([
+                                'dailyProduction' => function ($q) use ($date) {
+                                    $q->whereDate('work_date', $date);
+                                },
+                                'downtimes' => function ($q) use ($date) {
+                                    $q->whereDate('start_time', $date);
+                                },
+                                'repairRejects' => function ($q) use ($date) {
+                                    $q->whereDate('created_at', $date);
+                                },
+                            ])
                             ->first();
                     }
 
@@ -1277,23 +1265,15 @@ class InputHarianController extends Controller
                     }
                 }
 
-                // Tambahkan semua activeJms pada line ini jika belum masuk
-                foreach ($activeJms as $ajm) {
-                    if (!$allJmsToValidate->has($ajm->id)) {
-                        $ajmRawNo = strpos($ajm->job_number, '-') !== false ? substr($ajm->job_number, 0, strrpos($ajm->job_number, '-')) : $ajm->job_number;
-                        $ajm->validation_item_name = $ajmRawNo ?: $ajm->job_name;
-                        $ajmPlan = \App\Models\ProductionPlan::where('job_no', $ajmRawNo)->orWhere('job_no', $ajm->job_number)->orderByDesc('id')->first();
-                        $ajm->validation_plan_id = $ajmPlan?->id ?? 0;
-                        $allJmsToValidate->put($ajm->id, $ajm);
-                    }
-                }
-
                 // ── VALIDATION LOOP: Periksa downtime, repair, reject ──
                 foreach ($allJmsToValidate as $jm) {
                     $itemName = $jm->validation_item_name ?? ($jm->job_name ?: $jm->job_number);
                     $planId = $jm->validation_plan_id ?? 0;
 
                     foreach ($jm->downtimes ?? [] as $dt) {
+                        if ($dt->start_time && \Carbon\Carbon::parse($dt->start_time)->toDateString() !== $date) {
+                            continue;
+                        }
                         if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
                             continue;
                         }
@@ -1320,25 +1300,28 @@ class InputHarianController extends Controller
                         }
                     }
 
-                    // Ambil actual repair & reject dari DailyProduction atau ProductionLog
-                    $daily = $dailyForDate->get($jm->id) 
-                        ?? $dailyLatest->get($jm->id) 
-                        ?? \App\Models\DailyProduction::where('job_master_id', $jm->id)->orderByDesc('work_date')->orderByDesc('id')->first()
-                        ?? $jm->dailyProduction;
+                    // Ambil actual repair & reject khusus work_date jadwal shift ini
+                    $daily = $dailyForDate->get($jm->id);
 
                     $repairQty = (int)($daily->actual_repair ?? 0);
                     $rejectQty = (int)($daily->actual_reject ?? 0);
 
-                    // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog
+                    // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog pada tanggal shift ini
                     if ($repairQty === 0) {
-                        $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('repair_qty');
+                        $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)
+                            ->whereDate('created_at', $date)
+                            ->sum('repair_qty');
                     }
                     if ($rejectQty === 0) {
-                        $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('reject_qty');
+                        $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)
+                            ->whereDate('created_at', $date)
+                            ->sum('reject_qty');
                     }
 
                     // Cek form detail Repair & Reject yang tersimpan
-                    $rrLogs = $jm->repairRejects ?? \App\Models\RepairRejectLog::where('job_master_id', $jm->id)->get();
+                    $rrLogs = $jm->repairRejects ?? \App\Models\RepairRejectLog::where('job_master_id', $jm->id)
+                        ->whereDate('created_at', $date)
+                        ->get();
                     $totalRepairLogged = (int) $rrLogs->where('type', 'repair')->sum('qty_a');
                     $totalRejectLogged = (int) $rrLogs->where('type', 'reject')->sum('qty_a');
 
@@ -1377,11 +1360,12 @@ class InputHarianController extends Controller
             }
 
             $cutoffAt = now();
+            $cutoffStats = ['created' => 0];
 
             // All writes in one transaction; if cut-off fails, everything rolls back.
-            DB::transaction(function () use ($cutoffAt, $date, $shiftName, $lineMaster, $shiftMasterId, $shiftValue, $existing, $comment) {
+            DB::transaction(function () use ($cutoffAt, $date, $shiftName, $lineMaster, $shiftMasterId, $shiftValue, $existing, $comment, &$cutoffStats) {
                 $cutOffService = app(\App\Services\CutOffService::class);
-                $cutOffService->processCutOff($date, $shiftName);
+                $cutoffStats = $cutOffService->processCutOff($date, $shiftName);
 
                 if ($existing) {
                     // Resubmit after a previous cancellation: reactivate the same row so the
@@ -1414,11 +1398,13 @@ class InputHarianController extends Controller
                 'by' => Auth::id(),
                 'resubmit_after_cancel' => (bool) ($existing && $existing->cancelled_at),
                 'comment' => $comment,
+                'recovered' => $cutoffStats['created'] ?? 0,
             ]);
 
             return response()->json([
-                'success' => true,
-                'message' => $existing ? 'Shift berhasil disubmit ulang!' : 'Shift berhasil disubmit!',
+                'success'   => true,
+                'message'   => $existing ? 'Shift berhasil disubmit ulang!' : 'Shift berhasil disubmit!',
+                'recovered' => $cutoffStats['created'] ?? 0,
             ]);
         } catch (\Throwable $e) {
             Log::error('[SHIFT SUBMIT] Error: ' . $e->getMessage());
