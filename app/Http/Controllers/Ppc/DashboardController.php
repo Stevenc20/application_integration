@@ -70,19 +70,17 @@ class DashboardController extends Controller
         $totalOkQty   = (float) $baseQuery()->sum('ok');
         $isTodayData  = ($activeDate === $today);
 
-        // 5. Recovery Alert: item pending dari hari sebelumnya
+        // 5. Recovery Alert: item pending yang membutuhkan persetujuan
         $recoveryAlert = null;
         $pendingRecoveries = RecoveryItem::pending()
-            ->where(function ($q) use ($today) {
-                $q->whereDate('original_date', '<', $today)
-                  ->orWhereDate('source_date', '<', $today);
-            })
+            ->orderByDesc('id')
             ->get();
 
         if ($pendingRecoveries->isNotEmpty()) {
             $recoveryAlert = [
                 'total' => $pendingRecoveries->count(),
-                'presses' => $pendingRecoveries->pluck('press_name')->unique()->values()->toArray(),
+                'presses' => $pendingRecoveries->pluck('press_name')->filter()->unique()->values()->toArray(),
+                'items' => $pendingRecoveries,
             ];
         }
 

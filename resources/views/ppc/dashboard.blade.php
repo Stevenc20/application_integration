@@ -377,15 +377,73 @@
                         </div>
                     </div>
                 </div>
+    @if($recoveryAlert && isset($recoveryAlert['items']) && $recoveryAlert['items']->count() > 0)
+    {{-- MODAL RECOVERY ALERT POPUP UNTUK PPC SAAT LOGIN / BUKA DASHBOARD --}}
+    <div id="ppcRecoveryLoginModal" class="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+        <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm transition-opacity" onclick="closePpcRecoveryLoginModal()"></div>
+        <div class="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-100 overflow-hidden transform transition-all duration-300">
+            <!-- Header -->
+            <div class="px-6 py-5 bg-gradient-to-r from-amber-500 to-orange-600 text-white flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/20 flex items-center justify-center shrink-0">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 class="text-base font-black uppercase tracking-wider">Perhatian: Item Recovery Baru Masuk!</h3>
+                        <p class="text-xs text-white/80 font-bold">Item produksi dari line tidak mencapai target dan memerlukan jadwal recovery.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closePpcRecoveryLoginModal()" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 text-white flex items-center justify-center transition focus:outline-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
+
+            <!-- Content List -->
+            <div class="p-6 max-h-[50vh] overflow-y-auto divide-y divide-slate-100">
+                <p class="text-xs text-slate-500 font-medium mb-3">Berikut adalah item yang belum mencapai target produksi dari Input Harian / LKH:</p>
+                @foreach($recoveryAlert['items'] as $item)
+                <div class="py-3 flex items-center justify-between gap-4">
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-slate-100 text-slate-700">{{ $item->press_name ?? $item->line ?? 'Press' }}</span>
+                            <span class="text-xs font-black text-slate-800">{{ $item->job_no }}</span>
+                        </div>
+                        <p class="text-xs text-slate-500 font-bold mt-0.5">{{ $item->job_master ?? $item->job_name }}</p>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-[10px] font-bold text-slate-400 uppercase">Kekurangan</span>
+                        <p class="text-sm font-black text-rose-600">{{ number_format($item->recovery_qty > 0 ? $item->recovery_qty : ($item->plan_qty - $item->ok)) }} PCS</p>
+                    </div>
+                </div>
+                @endforeach
+            </div>
+
+            <!-- Footer Actions -->
+            <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-3">
+                <button type="button" onclick="closePpcRecoveryLoginModal()" class="px-5 py-2.5 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-100 transition">
+                    Nanti Saja
+                </button>
+                <a href="{{ route('ppc.planning.production_plan', ['open_recovery' => 1]) }}" class="px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-black text-xs shadow-md shadow-amber-200 transition uppercase tracking-wider flex items-center gap-1.5">
+                    <span>Jadwalkan Recovery Sekarang</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+                </a>
             </div>
         </div>
     </div>
+    @endif
 </div>
 
 @push('scripts')
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.2.0/dist/chartjs-plugin-zoom.min.js"></script>
 <script>
+function closePpcRecoveryLoginModal() {
+    const m = document.getElementById('ppcRecoveryLoginModal');
+    if (m) m.style.display = 'none';
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     // Live Clock
     function updateClock() {

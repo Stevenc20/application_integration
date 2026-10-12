@@ -711,10 +711,12 @@ class InputHarianController extends Controller
             $finalReject = $request->json('reject_qty');
             $result = $this->productionService->finishJob($id, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject);
             $runtime = is_array($result) ? ($result['runtime'] ?? 0) : $result;
+            $recovery = is_array($result) ? ($result['recovery'] ?? null) : null;
 
             return response()->json([
                 'success' => true,
-                'runtime_seconds' => $runtime
+                'runtime_seconds' => $runtime,
+                'recovery' => $recovery,
             ]);
         } catch (\Throwable $e) {
             Log::error("Failed to finish job $id: " . $e->getMessage(), [

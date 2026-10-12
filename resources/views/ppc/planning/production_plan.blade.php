@@ -1675,6 +1675,14 @@ document.addEventListener('click', function(e) {
     // 2. Planning Engine Initialization
     document.addEventListener('DOMContentLoaded', function() {
         console.log('Production Planning Dashboard Active | Date: {{ $activeFilters['date'] }}');
+        
+        @if(request('open_recovery') || ($pendingRecoveryItems->count() > 0 && !request('date')))
+            setTimeout(function() {
+                if (typeof showRecoveryModal === 'function') {
+                    showRecoveryModal();
+                }
+            }, 400);
+        @endif
     });
 </script>
 @endpush

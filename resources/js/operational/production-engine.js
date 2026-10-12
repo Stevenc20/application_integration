@@ -1983,10 +1983,18 @@ async function submitFinalJob() {
 
         if (res.success) {
             notifyLineStatusChange(jobMasterData[id]?.line);
-            if (jobNo) {
-                localStorage.setItem('lkh_completion_toast', jobNo);
+            const itemName = jobNo || `#${id}`;
+            if (res.recovery && res.recovery.recovery_qty > 0) {
+                localStorage.setItem('lkh_completion_toast', JSON.stringify({
+                    item: itemName,
+                    recovery_qty: res.recovery.recovery_qty,
+                    is_recovery: true
+                }));
             } else {
-                localStorage.setItem('lkh_completion_toast', `#${id}`);
+                localStorage.setItem('lkh_completion_toast', JSON.stringify({
+                    item: itemName,
+                    is_recovery: false
+                }));
             }
             const card = document.getElementById('active-job-card');
             if (card) card.style.display = 'none';
@@ -2891,12 +2899,23 @@ function initProductionEngine() {
         window.freezeTimers = false;
 
         // Check for persistent LKH completion toast on reload
-        const completedItem = localStorage.getItem('lkh_completion_toast');
-        if (completedItem) {
+        const completedRaw = localStorage.getItem('lkh_completion_toast');
+        if (completedRaw) {
             localStorage.removeItem('lkh_completion_toast');
-            setTimeout(() => {
-                showToast(`Data berhasil dimasukkan ke LKH! Baru update data yang masuk: Item ${completedItem}`, 'success');
-            }, 300);
+            try {
+                const data = JSON.parse(completedRaw);
+                setTimeout(() => {
+                    if (data.is_recovery) {
+                        showToast(`Data berhasil dimasukkan ke LKH! Item ${data.item} tidak mencapai target (Kurang ${data.recovery_qty} PCS) dan otomatis masuk ke Recovery PPC.`, 'warning');
+                    } else {
+                        showToast(`Data berhasil dimasukkan ke LKH! Baru update data yang masuk: Item ${data.item}`, 'success');
+                    }
+                }, 300);
+            } catch (e) {
+                setTimeout(() => {
+                    showToast(`Data berhasil dimasukkan ke LKH! Baru update data yang masuk: Item ${completedRaw}`, 'success');
+                }, 300);
+            }
         }
 
         // Temporary shortcut for testing: Ctrl + Shift + F to freeze/unfreeze timers

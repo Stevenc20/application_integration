@@ -603,7 +603,12 @@ class ProductionService
             return [
                 'runtime' => $runtime,
                 'mismatch' => $mismatch,
-                'skipped' => $skippedResult
+                'skipped' => $skippedResult,
+                'recovery' => $autoRecoveryItem ? [
+                    'id' => $autoRecoveryItem->id,
+                    'recovery_qty' => $autoRecoveryItem->recovery_qty,
+                    'job_no' => $autoRecoveryItem->job_no,
+                ] : null
             ];
         });
     }
@@ -926,10 +931,32 @@ class ProductionService
         }
 
         $jobPrefix = count($parts) > 1 ? implode('-', array_slice($parts, 0, -1)) : $job->job_number;
-        $plan = \App\Models\ProductionPlan::whereDate('plan_date', now()->toDateString())
+        
+        // Cek sesi aktif untuk mendapatkan work_date yang sebenarnya
+        $session = \App\Models\ProductionSession::where('job_master_id', $jobId)->orderByDesc('id')->first();
+        $targetDate = $session?->work_date ?: now()->toDateString();
+
+        $plan = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
             ->where('row_type', 'job')
-            ->where('job_no', $jobPrefix)
+            ->where(function ($q) use ($jobPrefix, $job) {
+                $q->where('job_no', $jobPrefix)
+                  ->orWhere('job_no', $job->job_number)
+                  ->orWhere('job_master', $job->job_name);
+            })
             ->first();
+
+        if (!$plan) {
+            // Fallback: cari plan terbaru dengan job_no atau job_master yang sesuai
+            $plan = \App\Models\ProductionPlan::where('row_type', 'job')
+                ->where(function ($q) use ($jobPrefix, $job) {
+                    $q->where('job_no', $jobPrefix)
+                      ->orWhere('job_no', $job->job_number)
+                      ->orWhere('job_master', $job->job_name);
+                })
+                ->orderByDesc('plan_date')
+                ->orderByDesc('id')
+                ->first();
+        }
 
         return $plan?->id;
     }
