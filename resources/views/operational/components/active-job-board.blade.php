@@ -395,8 +395,9 @@
                         <!-- Left: Achievement + Lost Time (stacked) -->
                         <div class="w-[180px] shrink-0 flex flex-col gap-3">
                             @php
-                                $totalActual = ($activeJob->dailyProduction->actual_ok ?? 0) + ($activeJob->dailyProduction->actual_repair ?? 0) + ($activeJob->dailyProduction->actual_reject ?? 0);
-                                $achievementPct = $activeJob->target_qty > 0 ? round(($totalActual / $activeJob->target_qty) * 100) : 0;
+                                $totalActual = $activeJob->dailyProduction->actual_ok ?? 0;
+                                $targetQty = $activeJob->target_qty ?? 0;
+                                $achievementPct = $targetQty > 0 ? min(100, round(($totalActual / $targetQty) * 100)) : 0;
                                 $lostSeconds = $activeJob->downtimes
                                     ->filter(fn($dt) => !in_array(strtolower(trim($dt->jenis_downtime ?? '')), ['dandori', 'break', 'break time']))
                                     ->sum('duration_seconds');
@@ -408,7 +409,7 @@
                                 <div class="flex flex-col">
                                     <span class="text-[9px] sm:text-[10px] text-slate-500 font-black uppercase tracking-wider">Achievement</span>
                                     <span id="active-achievement-display" class="text-2xl sm:text-3xl font-black tracking-tighter tabular-nums leading-none mt-1 {{ $achievementPct >= 100 ? 'text-green-400' : 'text-yellow-400' }}">{{ $achievementPct }}%</span>
-                                    <span id="active-achievement-pcs" class="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight tabular-nums mt-0.5">({{ $totalActual }} / {{ $activeJob->target_qty ?? 0 }} PCS)</span>
+                                    <span id="active-achievement-pcs" class="text-[9px] sm:text-[10px] font-bold text-slate-400 tracking-tight tabular-nums mt-0.5">({{ $totalActual }} / {{ $targetQty }} PCS)</span>
                                 </div>
                                 <div class="w-2 h-2 rounded-full {{ $achievementPct >= 100 ? 'bg-green-400 animate-pulse' : 'bg-yellow-400' }}"></div>
                             </div>

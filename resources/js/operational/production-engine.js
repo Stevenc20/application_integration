@@ -820,11 +820,8 @@ function updateTimeline(forceAll = false) {
 
                 // Update Achievement (Qty Based with PCS details)
                 const liveOk = parseInt(job.actual_ok) || 0;
-                const liveRepair = parseInt(job.actual_repair) || 0;
-                const liveReject = parseInt(job.actual_reject) || 0;
-
-                const liveTotalActual = liveOk + liveRepair + liveReject;
-                const liveAchievementPct = job.target_qty > 0 ? Math.round((liveTotalActual / job.target_qty) * 100) : 0;
+                const liveTarget = parseInt(job.target_qty) || 0;
+                const liveAchievementPct = liveTarget > 0 ? Math.min(100, Math.round((liveOk / liveTarget) * 100)) : 0;
 
                 const achievementEl = document.getElementById('active-achievement-display');
                 if (achievementEl) {
@@ -833,7 +830,7 @@ function updateTimeline(forceAll = false) {
                 }
                 const achievementPcsEl = document.getElementById('active-achievement-pcs');
                 if (achievementPcsEl) {
-                    achievementPcsEl.innerText = `(${liveTotalActual} / ${job.target_qty} PCS)`;
+                    achievementPcsEl.innerText = `(${liveOk} / ${liveTarget} PCS)`;
                 }
 
                 const clock = document.getElementById('timeline-current-time');
