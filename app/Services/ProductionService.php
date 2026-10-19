@@ -285,7 +285,7 @@ class ProductionService
             $incomingOk = (int) ($data['ok_qty'] ?? 0);
             if ($incomingOk > 0 && $maxTarget > 0) {
                 $currentOk = (int) ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())->sum('ok_qty');
+                    ->whereDate('created_at', $workDate)->sum('ok_qty');
                 if (($currentOk + $incomingOk) > $maxTarget) {
                     $sisa = max(0, $maxTarget - $currentOk);
                     throw new \InvalidArgumentException("Target Plan maksimal {$maxTarget} PCS! Total OK tidak boleh melebihi target (Sisa: {$sisa} PCS).");
@@ -305,11 +305,11 @@ class ProductionService
             ]);
             
             $actualQty = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())->sum('ok_qty');
+                ->whereDate('created_at', $workDate)->sum('ok_qty');
             $actualRepair = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())->sum('repair_qty');
+                ->whereDate('created_at', $workDate)->sum('repair_qty');
             $actualReject = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())->sum('reject_qty');
+                ->whereDate('created_at', $workDate)->sum('reject_qty');
 
             $job = JobMaster::find($jobId);
             $targetQty = $job?->capacity ?? 0;
@@ -330,7 +330,7 @@ class ProductionService
                 'actual_reject' => $actualReject,
                 'runtime_seconds' => $runtimeSeconds,
                 'downtime_seconds' => Downtime::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())->sum('duration_seconds'),
+                    ->whereDate('created_at', $workDate)->sum('duration_seconds'),
                 'efficiency' => $efficiency
             ]);
 
@@ -338,17 +338,6 @@ class ProductionService
             $this->syncPlan($jobId, null, $actualQty, $actualRepair, $actualReject);
 
             $this->signalDashboard($jobId);
-
-            // Hanya simpan 5 record log terbaru per job, hapus yang lama
-            $logIds = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())
-                ->orderBy('created_at', 'desc')
-                ->pluck('id')
-                ->take(5);
-            ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', now())
-                ->whereNotIn('id', $logIds)
-                ->delete();
 
             return [
                 'log' => $log,
