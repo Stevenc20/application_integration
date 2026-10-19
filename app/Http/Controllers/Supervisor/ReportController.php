@@ -370,6 +370,7 @@ class ReportController extends Controller
 
         // ── MERGE CONSECUTIVE SAME-JOB PLANS INTO ONE ──
         $mergedPlans = collect();
+        $mergedPlanIdsMap = [];
         $buffer = null;
         foreach ($plans as $plan) {
             if (($plan->row_type ?? 'job') === 'break') {
@@ -381,9 +382,7 @@ class ReportController extends Controller
             if ($buffer && $currentJobNo === trim($buffer->job_no ?? '')) {
                 $buffer->plan = ($buffer->plan ?? 0) + ($plan->plan ?? $plan->target_qty ?? 0);
                 $buffer->target_qty = ($buffer->target_qty ?? 0) + ($plan->target_qty ?? 0);
-                $existingMerged = $buffer->merged_plan_ids ?? [$buffer->id];
-                $existingMerged[] = $plan->id;
-                $buffer->merged_plan_ids = $existingMerged;
+                $mergedPlanIdsMap[$buffer->id][] = $plan->id;
                 if ($plan->start_time && (!$buffer->start_time || $plan->start_time < $buffer->start_time))
                     $buffer->start_time = $plan->start_time;
                 if ($plan->finish_time && (!$buffer->finish_time || $plan->finish_time > $buffer->finish_time))
@@ -395,7 +394,7 @@ class ReportController extends Controller
             } else {
                 if ($buffer) $mergedPlans->push($buffer);
                 $buffer = clone $plan;
-                $buffer->merged_plan_ids = [$plan->id];
+                $mergedPlanIdsMap[$buffer->id] = [$plan->id];
             }
         }
         if ($buffer) $mergedPlans->push($buffer);
@@ -448,7 +447,7 @@ class ReportController extends Controller
             $jobData = $jobMasters->get($identifier);
 
             // If this plan is merged from multiple consecutive plan rows, aggregate production from all their JobMasters
-            $mergedPlanIds = $plan->merged_plan_ids ?? [$plan->id];
+            $mergedPlanIds = $mergedPlanIdsMap[$plan->id] ?? [$plan->id];
             $actualQtySafe = 0;
             $actualRepairSafe = 0;
             $actualRejectSafe = 0;
