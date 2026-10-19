@@ -236,8 +236,14 @@
                             $sigState = $signatureStatus[$roleKey] ?? ['signed' => false, 'available' => false];
                             $isSigned = $sigState['signed'];
 
+                            $userRole = strtolower(auth()->user()?->role ?? '');
+                            $ownsThisRole = in_array($userRole, ['superadmin', 'manager', 'kadiv', 'direktur'])
+                                || ($roleKey === 'teamleader' && (str_starts_with($userRole, 'leader') || in_array($userRole, ['teamleader', 'group leader'])))
+                                || ($roleKey === 'foreman' && $userRole === 'foreman')
+                                || ($roleKey === 'supervisor' && $userRole === 'supervisor');
+
                             $authorizedScope = $authorizedScope ?? false;
-                            $canInteract = $authorizedScope;
+                            $canInteract = $authorizedScope && $ownsThisRole;
                             $clickable = $canInteract && $sigState['available'] && !$isSigned;
                             $showLock = !$isSigned && !$clickable;
                         @endphp

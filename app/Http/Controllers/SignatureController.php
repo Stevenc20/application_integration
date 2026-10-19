@@ -39,39 +39,15 @@ class SignatureController extends Controller
         ];
     }
 
-    private function authorizedForScope(string $lineName, string $shiftName): bool
+    private function authorizedForScope(string $lineName, string $shiftName, ?string $workDate = null): bool
     {
-        if (in_array($this->userRole(), ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
-            return true;
-        }
-
-        $userId = Auth::id();
-        [$standardLine, $standardShift] = $this->canonicalPair($lineName, $shiftName);
-
-        $targetLine = $this->normalizeLine($standardLine);
-        $targetShift = $this->normalizeShift($standardShift);
-
-        $assignments = LineAssignment::where(function ($q) use ($userId) {
-            $q->where('leader_user_id', $userId)
-                ->orWhere('foreman_user_id', $userId)
-                ->orWhere('supervisor_user_id', $userId);
-        })->get();
-
-        foreach ($assignments as $assignment) {
-            $assignLine = $this->normalizeLine($assignment->line_name ?? '');
-            $assignShiftRaw = $assignment->shift_name ?? '';
-            $assignShift = $assignShiftRaw ? $this->normalizeShift($assignShiftRaw) : '';
-
-            if ($assignLine !== $targetLine) {
-                continue;
-            }
-
-            if ($assignShift === '' || $assignShift === $targetShift) {
-                return true;
-            }
-        }
-
-        return false;
+        return SignatureScopeNormalizer::canUserAccessScope(
+            Auth::user(),
+            $lineName,
+            $shiftName,
+            null,
+            $workDate
+        );
     }
 
     private function userRole(): string
@@ -95,38 +71,17 @@ class SignatureController extends Controller
         };
     }
 
-    private function ownsLineAndShift(string $sigRole, string $lineName, string $shiftName): bool
+    private function ownsLineAndShift(string $sigRole, string $lineName, string $shiftName, ?string $workDate = null): bool
     {
-        $userRole = $this->userRole();
-        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
-            return true;
-        }
-        
-        $userId = Auth::id();
-        
-        $assignments = LineAssignment::where(function($q) use ($userId, $sigRole) {
-            if ($sigRole === 'teamleader') $q->where('leader_user_id', $userId);
-            elseif ($sigRole === 'foreman') $q->where('foreman_user_id', $userId);
-            elseif ($sigRole === 'supervisor') $q->where('supervisor_user_id', $userId);
-        })->get();
-
-        $targetLine = $this->normalizeLine($lineName);
-        $targetShift = $this->normalizeShift($shiftName);
-
-        foreach ($assignments as $assignment) {
-            $assignLine = $this->normalizeLine($assignment->line_name ?? '');
-            $assignShiftRaw = $assignment->shift_name ?? '';
-            $assignShift = $assignShiftRaw ? $this->normalizeShift($assignShiftRaw) : '';
-
-            if ($assignLine === $targetLine) {
-                if ($assignShift === '' || $assignShift === $targetShift) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
+        return SignatureScopeNormalizer::canUserAccessScope(
+            Auth::user(),
+            $lineName,
+            $shiftName,
+            $sigRole,
+            $workDate
+        );
     }
+
 
     public function get(Request $request)
     {
@@ -176,7 +131,7 @@ class SignatureController extends Controller
             ], 403);
         }
 
-        if (!$this->ownsLineAndShift($request->role, $standardLine, $standardShift)) {
+        if (!$this->ownsLineAndShift($request->role, $standardLine, $standardShift, $request->work_date)) {
             return response()->json([
                 'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
             ], 403);
@@ -230,7 +185,7 @@ class SignatureController extends Controller
             ], 403);
         }
 
-        if (!$this->ownsLineAndShift($request->role, $standardLine, $standardShift)) {
+        if (!$this->ownsLineAndShift($request->role, $standardLine, $standardShift, $request->work_date)) {
             return response()->json([
                 'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
             ], 403);
@@ -263,7 +218,7 @@ class SignatureController extends Controller
             return response()->json([]);
         }
 
-        if (!$this->authorizedForScope($lineName, $shiftName)) {
+        if (!$this->authorizedForScope($lineName, $shiftName, $workDate)) {
             return response()->json([
                 'error' => 'Anda tidak memiliki otorisasi untuk Line dan Shift ini'
             ], 403);

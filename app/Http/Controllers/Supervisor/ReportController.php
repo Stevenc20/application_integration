@@ -982,33 +982,14 @@ class ReportController extends Controller
         $isLeaderRole = str_starts_with($userRole, 'leader') || in_array($userRole, ['leader', 'teamleader', 'group leader']);
         $canEdit = in_array($userRole, ['foreman', 'superadmin']) || $isLeaderRole;
 
-        $authorizedScope = false;
-        if (in_array($userRole, ['superadmin', 'foreman', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
-            $authorizedScope = true;
-        } else {
-            $authId = auth()->id();
-            $requestedLine = SignatureScopeNormalizer::normalizeLine($scopeLine);
-            $requestedShift = SignatureScopeNormalizer::normalizeShift($scopeShift);
-            $assignments = \App\Models\LineAssignment::where(function ($q) use ($authId) {
-                $q->where('leader_user_id', $authId)
-                    ->orWhere('foreman_user_id', $authId)
-                    ->orWhere('supervisor_user_id', $authId);
-            })->get();
+        $authorizedScope = SignatureScopeNormalizer::canUserAccessScope(
+            auth()->user(),
+            (string) $selectedLineName,
+            (string) $latestShiftName,
+            'teamleader',
+            $date
+        );
 
-            foreach ($assignments as $assignment) {
-                $assignLine = SignatureScopeNormalizer::normalizeLine((string) $assignment->line_name);
-                $assignShiftRaw = $assignment->shift_name ?? '';
-                $assignShift = $assignShiftRaw ? SignatureScopeNormalizer::normalizeShift($assignShiftRaw) : '';
-
-                if ($assignLine !== $requestedLine) {
-                    continue;
-                }
-                if ($assignShift === '' || $assignShift === $requestedShift) {
-                    $authorizedScope = true;
-                    break;
-                }
-            }
-        }
 
         $leaderSigned = in_array('teamleader', $signedRoles);
         $foremanSigned = in_array('foreman', $signedRoles);
