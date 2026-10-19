@@ -381,10 +381,9 @@ class ReportController extends Controller
             if ($buffer && $currentJobNo === trim($buffer->job_no ?? '')) {
                 $buffer->plan = ($buffer->plan ?? 0) + ($plan->plan ?? $plan->target_qty ?? 0);
                 $buffer->target_qty = ($buffer->target_qty ?? 0) + ($plan->target_qty ?? 0);
-                if (!isset($buffer->merged_plan_ids)) {
-                    $buffer->merged_plan_ids = [$buffer->id];
-                }
-                $buffer->merged_plan_ids[] = $plan->id;
+                $existingMerged = $buffer->merged_plan_ids ?? [$buffer->id];
+                $existingMerged[] = $plan->id;
+                $buffer->merged_plan_ids = $existingMerged;
                 if ($plan->start_time && (!$buffer->start_time || $plan->start_time < $buffer->start_time))
                     $buffer->start_time = $plan->start_time;
                 if ($plan->finish_time && (!$buffer->finish_time || $plan->finish_time > $buffer->finish_time))
