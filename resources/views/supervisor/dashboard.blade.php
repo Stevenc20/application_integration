@@ -1424,8 +1424,15 @@ function openKpiFromPressDetail(type, line){
 
     let html = '';
 
+    const resolveLineData = (td, l) => {
+      if (!td) return null;
+      if (td[l]) return td[l];
+      const matchKey = Object.keys(td).find(k => k === l || k === `PRESS ${l}` || `PRESS ${k}` === l || k.endsWith(` ${l}`) || l.endsWith(` ${k}`));
+      return matchKey ? td[matchKey] : null;
+    };
+
     if(typeData.type === 'production'){
-      const lineData = typeData[line];
+      const lineData = resolveLineData(typeData, line);
       if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
       html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
         <thead class="bg-gray-50 text-gray-600"><tr>
@@ -1443,7 +1450,7 @@ function openKpiFromPressDetail(type, line){
           <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
         </tbody></table></div>`;
     } else {
-      const lineData = typeData[line];
+      const lineData = resolveLineData(typeData, line);
       if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
 
       if(typeData.type === 'quality'){
@@ -1581,9 +1588,15 @@ function openKpiDetailModal(type, line){
     }
 
     let html = '';
+    const resolveLineData = (td, l) => {
+      if (!td) return null;
+      if (td[l]) return td[l];
+      const matchKey = Object.keys(td).find(k => k === l || k === `PRESS ${l}` || `PRESS ${k}` === l || k.endsWith(` ${l}`) || l.endsWith(` ${k}`));
+      return matchKey ? td[matchKey] : null;
+    };
 
     if(typeData.type === 'production'){
-      const lineData = typeData[line];
+      const lineData = resolveLineData(typeData, line);
       if(!lineData || !lineData.rows || lineData.rows.length === 0) { showKpiModalEmpty(); return; }
 
       html = `<div class="overflow-x-auto rounded-xl border border-gray-200"><table class="w-full text-sm">
@@ -1605,7 +1618,7 @@ function openKpiDetailModal(type, line){
         </tbody></table></div>`;
 
     } else {
-      const lineData = typeData[line];
+      const lineData = resolveLineData(typeData, line);
       if(!lineData || !lineData.rows || lineData.rows.length === 0) { 
           console.warn(`No rows found for line: ${line} in type: ${type}`);
           showKpiModalEmpty(); return; 
