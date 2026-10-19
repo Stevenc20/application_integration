@@ -82,7 +82,7 @@ class DashboardController extends Controller
             'DIES_T'   => ['type' => 'dt_detail'],
             'MAT_T'    => ['type' => 'dt_detail'],
             'LOG_T'    => ['type' => 'dt_detail'],
-            'PROD_T'   => ['type' => 'runtime'],
+            'PROD_T'   => ['type' => 'dt_detail'],
             'REPAIR'   => ['type' => 'quality'],
             'REJECT'   => ['type' => 'quality'],
         ];
@@ -173,7 +173,7 @@ class DashboardController extends Controller
                         'DIES_T'   => ['type' => 'dt_detail'],
                         'MAT_T'    => ['type' => 'dt_detail'],
                         'LOG_T'    => ['type' => 'dt_detail'],
-                        'PROD_T'   => ['type' => 'runtime'],
+                        'PROD_T'   => ['type' => 'dt_detail'],
                         'REPAIR'   => ['type' => 'quality'],
                         'REJECT'   => ['type' => 'quality'],
                     ];

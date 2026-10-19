@@ -279,6 +279,7 @@ class DashboardRealtimeService
         $currDtDies  = 0;
         $currDtMat   = 0;
         $currDtLog   = 0;
+        $currDtProd  = 0;
         if ($runningRecord) {
             $runningJobId = $runningRecord->job_master_id;
             $runningDt = $allDowntimes->where('job_master_id', $runningJobId);
@@ -287,16 +288,18 @@ class DashboardRealtimeService
                 $dur = $this->downtimeDurationSeconds($dt) / 60;
                 $currDtTotal += $dur;
                 $type = strtoupper($dt->jenis_downtime ?? '');
-                if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH')) $currDtMach += $dur;
+                if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) $currDtMach += $dur;
                 elseif (str_contains($type, 'DIES')) $currDtDies += $dur;
                 elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) $currDtMat += $dur;
                 elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) $currDtLog += $dur;
+                elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) $currDtProd += $dur;
             }
             $currDtTotal = round($currDtTotal, 1);
             $currDtMach  = round($currDtMach, 1);
             $currDtDies  = round($currDtDies, 1);
             $currDtMat   = round($currDtMat, 1);
             $currDtLog   = round($currDtLog, 1);
+            $currDtProd  = round($currDtProd, 1);
         }
 
         $dtRows     = [];
@@ -304,6 +307,7 @@ class DashboardRealtimeService
         $diesRows   = [];
         $matRows    = [];
         $logRows    = [];
+        $prodRows   = [];
         $repairRows = [];
         $rejectRows = [];
 
@@ -324,8 +328,8 @@ class DashboardRealtimeService
             ];
             $dtRows[] = $row;
 
-            $type = strtoupper($dt->jenis_downtime);
-            if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH')) {
+            $type = strtoupper($dt->jenis_downtime ?? '');
+            if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
                 $machRows[] = $row;
             } elseif (str_contains($type, 'DIES')) {
                 $diesRows[] = $row;
@@ -333,6 +337,8 @@ class DashboardRealtimeService
                 $matRows[] = $row;
             } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
                 $logRows[] = $row;
+            } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
+                $prodRows[] = $row;
             }
         }
 
@@ -409,7 +415,7 @@ class DashboardRealtimeService
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
 
-        $prodTLabel = round($runtimeMinutes, 2) . ' m';
+        $dtProdLabel = round($dtProdMinutes, 2) . ' m';
         $dtTotalLabel = round($dtTotalMinutes, 2) . ' m';
         $dtMachLabel = round($dtMachMinutes, 2) . ' m';
         $dtDiesLabel = round($dtDiesMinutes, 2) . ' m';
@@ -419,7 +425,7 @@ class DashboardRealtimeService
         $kpi = [
             ['desc'=>'QTY',      'plan'=>(string)$planQty,           'actual'=>(string)$ok,         'actualLink'=>true, 'current'=>$hasRunning ? (string)$currOk : '-'],
             ['desc'=>'GSPH',     'plan'=>(string)$gsphPlan,          'actual'=>(string)$gsph,       'current'=>$hasRunning ? (string)$currGsph : '-'],
-            ['desc'=>'PROD_T',   'plan'=> round($runtimeMinutes+$dtTotalMinutes).' m', 'actual'=>$prodTLabel, 'current'=>$hasRunning ? $currRuntimeMinutes.' m' : '-', 'popup'=>true],
+            ['desc'=>'PROD_T',   'plan'=>'0 m',                      'actual'=>$dtProdLabel,        'current'=>$hasRunning ? $currDtProd.' m' : '-', 'popup'=>true],
             ['desc'=>'TOTAL_DT', 'plan'=>'0 m',                      'actual'=>$dtTotalLabel,       'current'=>$hasRunning ? $currDtTotal.' m' : '-', 'popup'=>true, 'danger'=>$dtTotalMinutes > 0],
             ['desc'=>'MACH_T',   'plan'=>'0 m',                      'actual'=>$dtMachLabel,        'current'=>$hasRunning ? $currDtMach.' m' : '-', 'popup'=>true],
             ['desc'=>'DIES_T',   'plan'=>'0 m',                      'actual'=>$dtDiesLabel,        'current'=>$hasRunning ? $currDtDies.' m' : '-', 'popup'=>true],
@@ -438,7 +444,7 @@ class DashboardRealtimeService
             'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 2)]],
             'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 2)]],
             'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 2)]],
-            'PROD_T'   => ['type' => 'runtime',  $lineName => ['rows' => $runtimeRows, 'total' => $prodTLabel]],
+            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 2)]],
             'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => $repairRows, 'total' => (string)$repair]],
             'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string)$reject]],
         ];
@@ -643,7 +649,7 @@ class DashboardRealtimeService
             'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
             'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
             'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'PROD_T'   => ['type' => 'runtime',  $lineName => ['rows' => [], 'total' => '0 m']],
+            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
             'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
             'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
         ];
