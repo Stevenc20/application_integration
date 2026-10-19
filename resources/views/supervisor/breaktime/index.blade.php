@@ -240,15 +240,15 @@
 <div id="bt-form-modal" class="fixed inset-0 z-[9998] hidden">
     <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-xs" data-bt-close></div>
     <div class="relative flex min-h-full items-center justify-center p-4">
-        <div class="w-full max-w-lg bg-white rounded-2xl shadow-2xl border border-[#E7C9C9] overflow-hidden animate-in zoom-in-95 duration-150">
-            <div class="px-6 py-4 border-b border-[#E7C9C9] bg-[#FDF4F4] flex justify-between items-center">
+        <div class="w-full max-w-lg max-h-[92vh] flex flex-col bg-white rounded-2xl shadow-2xl border border-[#E7C9C9] overflow-hidden animate-in zoom-in-95 duration-150">
+            <div class="px-6 py-4 border-b border-[#E7C9C9] bg-[#FDF4F4] flex justify-between items-center shrink-0">
                 <h2 id="bt-form-title" class="font-black text-gray-900 uppercase tracking-wider text-sm">Tambah Breaktime</h2>
                 <button type="button" class="w-7 h-7 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-500 inline-flex items-center justify-center" data-bt-close>
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             
-            <form id="bt-form" class="p-6 space-y-4">
+            <form id="bt-form" class="p-6 space-y-4 overflow-y-auto flex-1 min-h-0">
                 <input type="hidden" name="id" id="bt-id">
                 
                 <div>
@@ -318,12 +318,12 @@
                     </div>
                 </div>
 
-                <div class="flex gap-2 pt-2 border-t border-[#F3E6E6]">
-                    <button type="submit" id="bt-form-save" class="flex-1 py-2.5 bg-[#9F1D1D] hover:bg-[#7F1A1A] text-white text-xs font-black rounded-xl shadow-md transition duration-200 uppercase tracking-wider flex items-center justify-center gap-2">
+                <div class="sticky bottom-0 -mx-6 px-6 pt-3 pb-0 mt-1 bg-white border-t border-[#F3E6E6]">
+                    <button type="submit" id="bt-form-save" class="w-full py-2.5 bg-[#9F1D1D] hover:bg-[#7F1A1A] text-white text-xs font-black rounded-xl shadow-md transition duration-200 uppercase tracking-wider flex items-center justify-center gap-2">
                         <span id="bt-save-spinner" class="hidden w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
                         <span id="bt-save-text">Simpan Parameter</span>
                     </button>
-                    <button type="button" class="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition duration-200" data-bt-close>Batal</button>
+                    <button type="button" class="w-full mt-2 px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-bold rounded-xl transition duration-200" data-bt-close>Batal</button>
                 </div>
             </form>
         </div>
