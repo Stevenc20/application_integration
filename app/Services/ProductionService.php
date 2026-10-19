@@ -314,8 +314,15 @@ class ProductionService
             $workDate = $workDate ?: now()->toDateString();
 
             $job = JobMaster::find($jobId);
+            if ($job && in_array(strtolower($job->status), ['complete', 'finished', 'closed', 'done'])) {
+                throw new \InvalidArgumentException("Job sudah selesai/tidak berjalan (Status: {$job->status}). Tidak dapat menambah kuantitas.");
+            }
+
             $planId = $this->resolvePlanId($jobId);
             $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+            if ($plan && in_array(strtolower($plan->status), ['complete', 'finished', 'closed', 'done'])) {
+                throw new \InvalidArgumentException("Plan sudah selesai (Status: {$plan->status}). Tidak dapat menambah kuantitas.");
+            }
             $maxTarget = (int) ($plan?->plan ?? $job?->target_qty ?? 0);
 
             $incomingOk = (int) ($data['ok_qty'] ?? 0);

@@ -154,7 +154,13 @@ class ReportController extends Controller
         }
 
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
-            ->with(['dailyProduction', 'downtimes', 'qChecks'])
+            ->with([
+                'dailyProduction' => function ($q) use ($date) {
+                    $q->where('work_date', $date);
+                },
+                'downtimes',
+                'qChecks'
+            ])
             ->get()
             ->keyBy('job_number');
 
@@ -375,6 +381,10 @@ class ReportController extends Controller
             if ($buffer && $currentJobNo === trim($buffer->job_no ?? '')) {
                 $buffer->plan = ($buffer->plan ?? 0) + ($plan->plan ?? $plan->target_qty ?? 0);
                 $buffer->target_qty = ($buffer->target_qty ?? 0) + ($plan->target_qty ?? 0);
+                if (!isset($buffer->merged_plan_ids)) {
+                    $buffer->merged_plan_ids = [$buffer->id];
+                }
+                $buffer->merged_plan_ids[] = $plan->id;
                 if ($plan->start_time && (!$buffer->start_time || $plan->start_time < $buffer->start_time))
                     $buffer->start_time = $plan->start_time;
                 if ($plan->finish_time && (!$buffer->finish_time || $plan->finish_time > $buffer->finish_time))
@@ -386,6 +396,7 @@ class ReportController extends Controller
             } else {
                 if ($buffer) $mergedPlans->push($buffer);
                 $buffer = clone $plan;
+                $buffer->merged_plan_ids = [$plan->id];
             }
         }
         if ($buffer) $mergedPlans->push($buffer);
@@ -437,9 +448,25 @@ class ReportController extends Controller
             $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
             $jobData = $jobMasters->get($identifier);
 
-            $actualQtySafe = $jobData && $jobData->dailyProduction ? ($jobData->dailyProduction->actual_ok ?? 0) : 0;
-            $actualRepairSafe = $jobData && $jobData->dailyProduction ? ($jobData->dailyProduction->actual_repair ?? 0) : 0;
-            $actualRejectSafe = $jobData && $jobData->dailyProduction ? ($jobData->dailyProduction->actual_reject ?? 0) : 0;
+            // If this plan is merged from multiple consecutive plan rows, aggregate production from all their JobMasters
+            $mergedPlanIds = $plan->merged_plan_ids ?? [$plan->id];
+            $actualQtySafe = 0;
+            $actualRepairSafe = 0;
+            $actualRejectSafe = 0;
+            $seenJmIds = [];
+
+            foreach ($mergedPlanIds as $mPlanId) {
+                $mIdent = $jn ? ($jn . '-' . $mPlanId) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $mPlanId);
+                $mJm = $jobMasters->get($mIdent);
+                if ($mJm && !in_array($mJm->id, $seenJmIds)) {
+                    $seenJmIds[] = $mJm->id;
+                    if ($mJm->dailyProduction) {
+                        $actualQtySafe += (int) ($mJm->dailyProduction->actual_ok ?? 0);
+                        $actualRepairSafe += (int) ($mJm->dailyProduction->actual_repair ?? 0);
+                        $actualRejectSafe += (int) ($mJm->dailyProduction->actual_reject ?? 0);
+                    }
+                }
+            }
             $cycleTimeSafe = floatval($plan->ct_detik ?? 0.0);
             $planQtySafe = intval($plan->plan ?? $plan->target_qty ?? 0);
 
@@ -2261,7 +2288,12 @@ class ReportController extends Controller
         })->toArray();
 
         $jobMasters = \App\Models\JobMaster::whereIn('job_number', $jobNumbers)
-            ->with(['dailyProduction', 'downtimes'])
+            ->with([
+                'dailyProduction' => function ($q) use ($date) {
+                    $q->where('work_date', $date);
+                },
+                'downtimes'
+            ])
             ->get()
             ->keyBy('job_number');
 

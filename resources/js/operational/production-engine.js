@@ -2641,8 +2641,11 @@ function checkSyncStatus() {
 
 function syncActualQty() {
     const config = window.ProductionConfig;
+    if (config?.isLocked) return;
     const id = config.currentActiveId;
     if (!id) return;
+    const currentJob = window.jobMasterData?.[id];
+    if (currentJob && isJobComplete(currentJob)) return;
     if (window.ActionRunner && window.ActionRunner.locked) return;
     const lastInput = config.lastInputAt;
     if (lastInput) {

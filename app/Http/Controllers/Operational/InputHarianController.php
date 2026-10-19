@@ -788,14 +788,35 @@ class InputHarianController extends Controller
         $jm = JobMaster::find($jobMasterId);
         if (!$jm || !$jm->line) return;
 
+        // If job itself is already completed/finished/closed, reject modifications
+        if (in_array(strtolower($jm->status), ['complete', 'finished', 'closed', 'done'])) {
+            throw new \Exception("Job sudah selesai/tidak berjalan (Status: {$jm->status}). Data tidak dapat diubah.");
+        }
+
         $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $jm->line)));
         $lineMaster = LineMaster::whereRaw("
             REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?
         ", ["%{$normalized}%"])->first();
         if (!$lineMaster) return;
 
-        $date = request()->header('X-Date') ?: request('date', now()->toDateString());
-        $shift = $this->getShiftFromRequest();
+        $date = request()->header('X-Date') ?: request('date');
+        $shift = request()->header('X-Shift') ?: request('shift');
+
+        // Resolve from ProductionPlan if not provided in request
+        if (!$date || !$shift) {
+            $parts = explode('-', $jm->job_number);
+            $planId = end($parts);
+            if (is_numeric($planId)) {
+                $plan = \App\Models\ProductionPlan::find($planId);
+                if ($plan) {
+                    $date = $date ?: ($plan->plan_date ? \Carbon\Carbon::parse($plan->plan_date)->toDateString() : null);
+                    $shift = $shift ?: $plan->shift_name;
+                }
+            }
+        }
+
+        $date = $date ?: now()->toDateString();
+        $shift = $shift ?: $this->getShiftFromRequest();
         $shiftVal = str_contains(strtoupper($shift), 'MALAM') ? 2 : 1;
 
         $locked = ShiftSubmission::where([
