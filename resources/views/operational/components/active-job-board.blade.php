@@ -75,8 +75,12 @@
             $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
             $sessionStartTime = \App\Models\ProductionSession::where('job_master_id', $activeJob->id)->whereDate('work_date', $date)->value('start_time');
             $effectiveStartedAt = $activeJob->started_at ?? $sessionStartTime;
-            // $isDandori = true if open dandori or open 1st check or was in first check or (pre-production non-dandori downtime)
-            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null) || $wasInFirstCheck || ($hasActiveNonDandoriDt && !$effectiveStartedAt);
+            // $isDandori = true if open dandori or open 1st check is active
+            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null);
+            if (!$isDandori && !$effectiveStartedAt && $hasActiveNonDandoriDt) {
+                // If never started and has non-dandori DT, only treat as dandori if job is still pending
+                $isDandori = strtolower($activeJob->status) === 'pending';
+            }
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($effectiveStartedAt ?? null);
 
@@ -521,12 +525,12 @@
                     $alertText = 'text-red-500';
                     $alertTitle = 'DOWNTIME';
                     $alertDesc = 'DOWNTIME';
-                    if ($dtType === 'dandori' && $openFirstCheck) {
+                    if ($openFirstCheck) {
                         $alertBg = 'bg-purple-500/10 border-purple-500/30';
-                        $alertText = 'text-purple-400';
+                        $alertText = 'text-purple-600';
                         $alertTitle = '1st Check';
                         $alertDesc = 'PROSES FIRST CHECK (SETTING DIES)';
-                    } elseif ($dtType === 'dandori') {
+                    } elseif ($dtType === 'dandori' || $openDandori) {
                         $alertBg = 'bg-amber-500/10 border-amber-500/30';
                         $alertText = 'text-amber-500';
                         $alertTitle = 'Dandori (Persiapan)';
@@ -581,14 +585,20 @@
                         </div>
                     </div>
 
-                    <div id="active-downtime-alert-box" class="{{ $activeDowntime ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center mb-6 transition-all duration-300">
+                    @php
+                        $alertTimerStart = null;
+                        if ($openFirstCheck && $openFirstCheck->start_time) {
+                            $alertTimerStart = $openFirstCheck->start_time;
+                        } elseif ($activeDowntime && $activeDowntime->start_time) {
+                            $alertTimerStart = $activeDowntime->start_time;
+                        } elseif ($openDandori && $openDandori->start_time) {
+                            $alertTimerStart = $openDandori->start_time;
+                        }
+                        $dtElapsed1 = $alertTimerStart ? max(0, \Carbon\Carbon::parse($alertTimerStart)->diffInSeconds(now())) : 0;
+                        $hasActiveAlert = ($activeDowntime !== null) || ($openFirstCheck !== null) || ($openDandori !== null);
+                    @endphp
+                    <div id="active-downtime-alert-box" class="{{ $hasActiveAlert ? '' : 'hidden' }} {{ $alertBg }} border-2 rounded-2xl p-4 text-center mb-6 transition-all duration-300">
                         <p id="active-downtime-title" class="text-[10px] sm:text-xs font-black {{ $alertText }} uppercase tracking-widest mb-1">{{ $alertTitle }}</p>
-                        @php
-                            $dtElapsed1 = 0;
-                            if ($activeDowntime && $activeDowntime->start_time) {
-                                $dtElapsed1 = max(0, \Carbon\Carbon::parse($activeDowntime->start_time)->diffInSeconds(now()));
-                            }
-                        @endphp
                         <p id="active-downtime-timer-{{ $activeJob->id }}" class="text-2xl font-black text-slate-800 tracking-tighter tabular-nums leading-none">{{ sprintf('%02d:%02d:%02d', intdiv($dtElapsed1, 3600), intdiv($dtElapsed1 % 3600, 60), $dtElapsed1 % 60) }}</p>
                     </div>
 
@@ -603,19 +613,25 @@
                     @endphp
 
                     <div id="control-board-actions" class="mt-3 flex flex-col gap-3">
-                        @if($openFirstCheck || $hasCompletedFirstCheck)
-                            {{-- Jika 1st Check sudah dimulai atau selesai: LANGSUNG berubah jadi Stop & Lanjut Produksi --}}
-                            <button type="button" id="stop-dandori-btn-{{ $activeJob->id }}" onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                        @if($openFirstCheck)
+                            {{-- Jika 1st Check sedang aktif: Tombol Selesai 1st Check --}}
+                            <button type="button" id="firstcheck-btn-{{ $activeJob->id }}" onclick="jsStopFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
-                                Stop &amp; Lanjut Produksi
+                                Selesai 1st Check
                             </button>
-                        @else
-                            {{-- Sebelum 1st Check dimulai: tombol Mulai 1st Check --}}
+                        @elseif(!$hasCompletedFirstCheck)
+                            {{-- Jika 1st Check belum pernah dimulai: Tombol Mulai 1st Check --}}
                             <button type="button" id="firstcheck-btn-{{ $activeJob->id }}" onclick="jsStartFirstCheck({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/></svg>
                                 Mulai 1st Check
                             </button>
                         @endif
+
+                        {{-- Tombol Stop & Lanjut Produksi selalu tersedia untuk melanjutkan ke produksi --}}
+                        <button type="button" id="stop-dandori-btn-{{ $activeJob->id }}" onclick="jsStopDandori({{ $activeJob->id }})" class="w-full py-3.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white font-black text-sm shadow-md transition-all flex items-center justify-center gap-2 active:translate-y-0.5 cursor-pointer">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 fill-current" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"/></svg>
+                            Stop Dandori &amp; Lanjut Produksi
+                        </button>
 
                         {{-- Tombol Downtime (Full width) --}}
                         @if($hasActiveNonDandoriDt)

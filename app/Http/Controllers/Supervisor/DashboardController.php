@@ -599,7 +599,7 @@ class DashboardController extends Controller
         return response()->json(['line_statuses' => $statuses]);
     }
 
-    public function lineStatusSingle($line)
+    public function lineStatusSingle(string $line)
     {
         $time = now()->format('H:i');
         $shift = ($time >= '07:30' && $time < '21:00') ? 1 : 2;

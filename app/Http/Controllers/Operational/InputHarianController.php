@@ -624,18 +624,20 @@ class InputHarianController extends Controller
         }
     }
 
-    public function finishDandori(int|string $jobId)
+    public function finishDandori(Request $request, int|string $jobId)
     {
         $this->guardLockedShift($jobId);
         try {
             // Close any open 1st check before finishing dandori
             $this->productionService->finishFirstCheck($jobId);
 
-            $success = $this->productionService->finishDandori($jobId);
-            if ($success) {
-                return response()->json(['success' => true]);
-            }
-            return response()->json(['success' => false, 'message' => 'Dandori tidak ditemukan atau sudah selesai']);
+            $workDate = $request->get('date') ?: now()->toDateString();
+            $this->productionService->finishDandori($jobId, $workDate);
+
+            // Clear cache was_in_first_check if any exists
+            \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $jobId);
+
+            return response()->json(['success' => true]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
@@ -657,11 +659,8 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($jobId);
         try {
-            $success = $this->productionService->finishFirstCheck($jobId);
-            if ($success) {
-                return response()->json(['success' => true]);
-            }
-            return response()->json(['success' => false, 'message' => '1st Check tidak ditemukan atau sudah selesai']);
+            $this->productionService->finishFirstCheck($jobId);
+            return response()->json(['success' => true]);
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }

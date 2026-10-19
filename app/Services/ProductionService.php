@@ -163,10 +163,11 @@ class ProductionService
     /**
      * Finish Dandori process.
      */
-    public function finishDandori(int $jobId)
+    public function finishDandori(int $jobId, ?string $workDate = null)
     {
-        return DB::transaction(function () use ($jobId) {
+        return DB::transaction(function () use ($jobId, $workDate) {
             $now = now();
+            $targetDate = $workDate ?: now()->toDateString();
             $downtime = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
@@ -204,7 +205,7 @@ class ProductionService
             }
             
             $session = ProductionSession::firstOrCreate(
-                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
+                ['job_master_id' => $jobId, 'work_date' => $targetDate]
             );
             $sessionUpdate = ['status' => 'running'];
             if (!$session->start_time) {
@@ -252,7 +253,10 @@ class ProductionService
     {
         return DB::transaction(function () use ($jobId) {
             $dandori = Dandori::where('next_job_id', $jobId)
-                ->where('jenis_dandori', '1st_check')
+                ->where(function($q) {
+                    $q->where('jenis_dandori', '1st_check')
+                      ->orWhere('activity', '1ST CHECK');
+                })
                 ->whereNull('finish_time')
                 ->first();
 

@@ -1336,9 +1336,14 @@ window.jsStartDandori = async function jsStartDandori(jobId) {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                'X-Shift': window.ProductionConfig.currentShift || '',
+                'X-Date': window.ProductionConfig.currentDate || '',
                 'Accept': 'application/json'
             },
-            body: JSON.stringify({ date: window.ProductionConfig.currentDate })
+            body: JSON.stringify({
+                date: window.ProductionConfig.currentDate,
+                shift: window.ProductionConfig.currentShift
+            })
         }).then(r => r.json());
 
         if (res.success) {
@@ -1406,7 +1411,17 @@ window.jsStopDandori = async function jsStopDandori(jobId) {
     await window.ActionRunner.run('Stop Dandori', async () => {
         const res = await fetch(`/operational/job/${jobId}/dandori/finish`, {
             method: 'POST',
-            headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                'X-Shift': window.ProductionConfig.currentShift || '',
+                'X-Date': window.ProductionConfig.currentDate || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                date: window.ProductionConfig.currentDate,
+                shift: window.ProductionConfig.currentShift
+            })
         }).then(r => r.json());
 
         if (res.success) {
@@ -1483,9 +1498,14 @@ async function jsStartFirstCheck(jobId) {
             headers: {
                 'Content-Type': 'application/json',
                 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                'X-Shift': window.ProductionConfig.currentShift || '',
+                'X-Date': window.ProductionConfig.currentDate || '',
                 'Accept': 'application/json'
             },
-            body: JSON.stringify({ date: window.ProductionConfig.currentDate })
+            body: JSON.stringify({
+                date: window.ProductionConfig.currentDate,
+                shift: window.ProductionConfig.currentShift
+            })
         }).then(r => r.json());
 
         if (res.success) {
@@ -1523,7 +1543,17 @@ window.jsStopFirstCheck = async function jsStopFirstCheck(jobId) {
     await window.ActionRunner.run('Stop 1st Check', async () => {
         const res = await fetch(`/operational/job/${jobId}/dandori/first-check/finish`, {
             method: 'POST',
-            headers: { 'X-CSRF-TOKEN': window.ProductionConfig.csrfToken, 'Accept': 'application/json' }
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                'X-Shift': window.ProductionConfig.currentShift || '',
+                'X-Date': window.ProductionConfig.currentDate || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                date: window.ProductionConfig.currentDate,
+                shift: window.ProductionConfig.currentShift
+            })
         }).then(r => r.json());
 
         if (res.success) {
