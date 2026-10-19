@@ -125,6 +125,7 @@ class ProductionService
 
             // Close any existing open downtime (e.g. auto-idle time) before starting Dandori
             $openDowntime = Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', '!=', 'dandori')
                 ->whereNull('finish_time')
                 ->first();
             if ($openDowntime) {
@@ -134,25 +135,41 @@ class ProductionService
                 ]);
             }
             
-            $downtime = Downtime::create([
-                'job_master_id' => $jobId,
-                'jenis_downtime' => 'dandori',
-                'problem' => 'PERSIAPAN (DANDORI)',
-                'start_time' => $now,
-                'penyebab' => '-',
-                'action' => '-',
-                'pic' => 'OPERATOR'
-            ]);
+            // IDEMPOTENT: Jika sudah ada open downtime dandori, gunakan yang sudah ada
+            $downtime = Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', 'dandori')
+                ->whereNull('finish_time')
+                ->first();
 
-            Dandori::create([
-                'next_job_id' => $jobId,
-                'line'        => $job->line,
-                'shift'       => $this->getShift(),
-                'activity'    => 'DANDORI',
-                'start_time'  => $now,
-                'work_date'   => $workDate,
-                'created_by'  => Auth::id()
-            ]);
+            if (!$downtime) {
+                $downtime = Downtime::create([
+                    'job_master_id' => $jobId,
+                    'jenis_downtime' => 'dandori',
+                    'problem' => 'PERSIAPAN (DANDORI)',
+                    'start_time' => $now,
+                    'penyebab' => '-',
+                    'action' => '-',
+                    'pic' => 'OPERATOR'
+                ]);
+            }
+
+            // IDEMPOTENT: Jika sudah ada open record dandori, jangan duplikasi
+            $existingDandori = Dandori::where('next_job_id', $jobId)
+                ->where('activity', 'DANDORI')
+                ->whereNull('finish_time')
+                ->first();
+
+            if (!$existingDandori) {
+                Dandori::create([
+                    'next_job_id' => $jobId,
+                    'line'        => $job->line,
+                    'shift'       => $this->getShift(),
+                    'activity'    => 'DANDORI',
+                    'start_time'  => $now,
+                    'work_date'   => $workDate,
+                    'created_by'  => Auth::id()
+                ]);
+            }
 
             $this->signalDashboard($jobId);
 
@@ -228,6 +245,19 @@ class ProductionService
             $workDate = $workDate ?: now()->toDateString();
             $job = JobMaster::findOrFail($jobId);
             $now = now();
+
+            // IDEMPOTENT: Jika sudah ada open 1st check, return record tersebut (hindari duplikasi)
+            $existing = Dandori::where('next_job_id', $jobId)
+                ->where(function($q) {
+                    $q->where('jenis_dandori', '1st_check')
+                      ->orWhere('activity', '1ST CHECK');
+                })
+                ->whereNull('finish_time')
+                ->first();
+
+            if ($existing) {
+                return $existing;
+            }
 
             $dandori = Dandori::create([
                 'next_job_id'   => $jobId,
