@@ -999,7 +999,7 @@ class ProductionService
             ['status' => 'waiting_approval']
         );
 
-        return \App\Models\RecoveryItem::create([
+        $attributes = [
             'recovery_schedule_id' => $schedule->id,
             'production_plan_id' => $plan ? $plan->id : null,
             'job_no' => $plan && !empty($plan->job_no) ? $plan->job_no : $job->job_number,
@@ -1022,7 +1022,20 @@ class ProductionService
             'recovery_qty' => $recoveryQty,
             'queued_at' => now(),
             'status' => $status
-        ]);
+        ];
+
+        if ($plan) {
+            $existingItem = \App\Models\RecoveryItem::where('production_plan_id', $plan->id)
+                ->whereIn('status', ['waiting_approval', 'continue', 'approved', 'scheduled', 'in_production'])
+                ->first();
+
+            if ($existingItem) {
+                $existingItem->update($attributes);
+                return $existingItem;
+            }
+        }
+
+        return \App\Models\RecoveryItem::create($attributes);
     }
 
     private function notifyPpcUsers(JobMaster $job, \App\Models\RecoveryItem $recoveryItem)

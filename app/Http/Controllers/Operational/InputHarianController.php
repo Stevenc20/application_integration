@@ -1407,7 +1407,7 @@ class InputHarianController extends Controller
             // All writes in one transaction; if cut-off fails, everything rolls back.
             DB::transaction(function () use ($cutoffAt, $date, $shiftName, $lineMaster, $shiftMasterId, $shiftValue, $existing, $comment, &$cutoffStats) {
                 $cutOffService = app(\App\Services\CutOffService::class);
-                $cutoffStats = $cutOffService->processCutOff($date, $shiftName);
+                $cutoffStats = $cutOffService->processCutOff($date, $shiftName, $lineMaster->line_name);
 
                 if ($existing) {
                     // Resubmit after a previous cancellation: reactivate the same row so the
