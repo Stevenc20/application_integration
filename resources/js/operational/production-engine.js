@@ -1859,12 +1859,14 @@ window.finishJob = function finishJob(id, jobNumber, jobName, explicitTargetQty)
     } else {
         window.currentFinishTargetQty = null;
     }
-    showConfirm('Selesaikan Proses?', 'Apakah Anda yakin item ' + jobNumber + ' sudah selesai?', () => {
+    const cleanNo = (strpos => strpos !== -1 ? jobNumber.substring(0, strpos) : jobNumber)(jobNumber.lastIndexOf('-'));
+    const displayItem = (jobName || cleanNo) + ' (' + cleanNo + ')';
+    showConfirm('Selesaikan Proses?', 'Apakah Anda yakin item ' + displayItem + ' sudah selesai?', () => {
         closeConfirmModal();
         const titleEl = document.getElementById('finishJobTitle');
-        if (titleEl) titleEl.innerText = jobNumber;
+        if (titleEl) titleEl.innerText = cleanNo;
         const nameEl = document.getElementById('finishJobName');
-        if (nameEl) nameEl.innerText = jobNumber + ' - ' + jobName;
+        if (nameEl) nameEl.innerText = displayItem;
 
         const nextSelect = document.getElementById('nextSelect');
         if (nextSelect) {
@@ -1885,7 +1887,9 @@ window.finishJob = function finishJob(id, jobNumber, jobName, explicitTargetQty)
             filtered.forEach(j => {
                 const opt = document.createElement('option');
                 opt.value = j.id;
-                opt.innerText = (j.job_name || '') + ' - ' + (j.job_number || '') + ' (' + (j.target_qty || 0) + ' pcs)';
+                const jCleanNo = (j.job_number && j.job_number.lastIndexOf('-') !== -1) ? j.job_number.substring(0, j.job_number.lastIndexOf('-')) : (j.job_number || '');
+                const jDisplayName = (j.job_name || jCleanNo) + ' (' + jCleanNo + ')';
+                opt.innerText = jDisplayName + ' (' + (j.target_qty || 0) + ' pcs)';
                 nextSelect.appendChild(opt);
             });
         }
@@ -2178,7 +2182,11 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
         window.currentDtJobId = jobId;
         const row = document.getElementById('row-' + jobId);
         const dtJobNumber = document.getElementById('dtJobNumber');
-        if (row && dtJobNumber) dtJobNumber.innerText = row.getAttribute('data-job-number');
+        if (row && dtJobNumber) {
+            const jn = row.getAttribute('data-job-number') || '';
+            const jm = row.getAttribute('data-job-master') || '';
+            dtJobNumber.innerText = jm ? (jm + (jn ? ' (' + jn + ')' : '')) : (jn || '-');
+        }
 
         const dtFormTitle = document.getElementById('dtFormTitle');
         const dtBtnText = document.getElementById('dtBtnText');

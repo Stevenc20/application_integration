@@ -269,9 +269,12 @@
                             </div>
                             <div class="min-w-0">
                                 <span class="text-[10px] sm:text-xs font-black text-red-500 uppercase tracking-widest block leading-none">Running Session</span>
-                                <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5">
-                                    {{ strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number }}
+                                <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5" title="{{ $activeJob->job_name }}">
+                                    {{ $activeJob->job_name ?: (strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number) }}
                                 </h2>
+                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight block mt-0.5">
+                                    {{ strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number }}
+                                </span>
                             </div>
                         </div>
 
@@ -316,9 +319,9 @@
 
                     <div class="space-y-1">
                         <p class="text-[9px] sm:text-xs text-slate-400 font-black uppercase tracking-wider leading-none">Next Item</p>
-                        <p class="text-xs sm:text-sm font-black truncate leading-tight text-slate-700" title="{{ $nextJob ? $nextJob->job_name : 'No pending items' }}">
+                        <p class="text-xs sm:text-sm font-black truncate leading-tight text-slate-700" title="{{ $nextJob ? ($nextJob->job_name . ' (' . $nextJob->job_number . ')') : 'No pending items' }}">
                             @if($nextJob)
-                                {{ strpos($nextJob->job_number, '-') !== false ? substr($nextJob->job_number, 0, strrpos($nextJob->job_number, '-')) : $nextJob->job_number }}
+                                {{ $nextJob->job_name ?: (strpos($nextJob->job_number, '-') !== false ? substr($nextJob->job_number, 0, strrpos($nextJob->job_number, '-')) : $nextJob->job_number) }}
                             @else
                                 <span class="text-slate-500 italic">None</span>
                             @endif
@@ -809,7 +812,7 @@
                         <button type="button" onclick="toggleCustomSelect()" id="custom-select-trigger" class="w-full h-14 bg-slate-50 hover:bg-slate-100 border border-slate-300 rounded-2xl px-6 flex items-center justify-between text-sm text-slate-900 hover:border-red-400 transition-all outline-none shadow-sm group/select font-bold">
                             <span id="custom-select-label" class="truncate text-slate-800 font-extrabold">
                                 @if($firstJob)
-                                    [{{ $firstJob->job_number }}] {{ $firstJob->job_name }}
+                                    {{ $firstJob->job_name ?: (strpos($firstJob->job_number, '-') !== false ? substr($firstJob->job_number, 0, strrpos($firstJob->job_number, '-')) : $firstJob->job_number) }} ({{ strpos($firstJob->job_number, '-') !== false ? substr($firstJob->job_number, 0, strrpos($firstJob->job_number, '-')) : $firstJob->job_number }})
                                 @else
                                     <span class="text-slate-400 font-medium">Tidak ada antrean job</span>
                                 @endif
@@ -824,18 +827,22 @@
                             </div>
                             <div class="p-2 space-y-1">
                                 @forelse($pendingJobs as $index => $pj)
-                                <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all group/item cursor-pointer" onclick="selectCustomItem({{ $pj->id }}, '[{{ $pj->job_number }}] {{ addslashes($pj->job_name) }}')">
+                                @php
+                                    $pjCleanNo = strpos($pj->job_number, '-') !== false ? substr($pj->job_number, 0, strrpos($pj->job_number, '-')) : $pj->job_number;
+                                    $pjDisplayName = ($pj->job_name ?: $pjCleanNo) . ' (' . $pjCleanNo . ')';
+                                @endphp
+                                <div class="flex items-center gap-3 px-4 py-3 rounded-xl bg-slate-50 hover:bg-red-50 border border-transparent hover:border-red-200 transition-all group/item cursor-pointer" onclick="selectCustomItem({{ $pj->id }}, '{{ addslashes($pjDisplayName) }}')">
                                     <div class="w-8 h-8 rounded-lg bg-white border border-slate-200 flex items-center justify-center text-[10px] font-black text-slate-700 group-hover/item:bg-red-600 group-hover/item:text-white group-hover/item:border-red-600 transition-all shadow-sm">
                                         {{ $index + 1 }}
                                     </div>
                                     <div class="flex-1 min-w-0 text-left">
                                         <div class="flex items-center justify-between gap-2">
-                                            <p class="text-[10px] font-black text-slate-500 uppercase leading-none mb-1 group-hover/item:text-red-600">{{ $pj->job_number }}</p>
+                                            <p class="text-[10px] font-black text-slate-500 uppercase leading-none mb-1 group-hover/item:text-red-600">{{ $pjCleanNo }}</p>
                                             @if($index === 0)
                                                 <span class="text-[8px] font-black text-red-600 uppercase bg-red-100 px-1.5 py-0.5 rounded">Item Pertama (Aktif)</span>
                                             @endif
                                         </div>
-                                        <p class="text-xs font-black text-slate-800 group-hover/item:text-slate-900 truncate">{{ $pj->job_name }}</p>
+                                        <p class="text-xs font-black text-slate-800 group-hover/item:text-slate-900 truncate">{{ $pj->job_name ?: $pjCleanNo }}</p>
                                     </div>
                                 </div>
                                 @empty
