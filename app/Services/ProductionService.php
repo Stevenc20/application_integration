@@ -168,12 +168,12 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $workDate) {
             $now = now();
             $targetDate = $workDate ?: now()->toDateString();
-            $downtime = Downtime::where('job_master_id', $jobId)
+            $downtimes = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
-                ->first();
+                ->get();
 
-            if ($downtime) {
+            foreach ($downtimes as $downtime) {
                 $durationSeconds = abs($now->diffInSeconds(Carbon::parse($downtime->start_time)));
                 $downtime->update([
                     'finish_time' => $now,
@@ -181,11 +181,11 @@ class ProductionService
                 ]);
             }
             
-            $dandori = Dandori::where('next_job_id', $jobId)
+            $dandoris = Dandori::where('next_job_id', $jobId)
                 ->whereNull('finish_time')
-                ->first();
+                ->get();
             
-            if ($dandori) {
+            foreach ($dandoris as $dandori) {
                 $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
                 $dandori->update([
                     'finish_time' => $now,
@@ -252,21 +252,23 @@ class ProductionService
     public function finishFirstCheck(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
-            $dandori = Dandori::where('next_job_id', $jobId)
+            $dandoris = Dandori::where('next_job_id', $jobId)
                 ->where(function($q) {
                     $q->where('jenis_dandori', '1st_check')
                       ->orWhere('activity', '1ST CHECK');
                 })
                 ->whereNull('finish_time')
-                ->first();
+                ->get();
 
-            if ($dandori) {
+            if ($dandoris->isNotEmpty()) {
                 $now = now();
-                $duration = Carbon::parse($dandori->start_time)->diffInSeconds($now) / 60;
-                $dandori->update([
-                    'finish_time'     => $now,
-                    'duration_minutes' => round($duration, 2)
-                ]);
+                foreach ($dandoris as $d) {
+                    $duration = Carbon::parse($d->start_time)->diffInSeconds($now) / 60;
+                    $d->update([
+                        'finish_time'     => $now,
+                        'duration_minutes' => round($duration, 2)
+                    ]);
+                }
                 return true;
             }
             return false;
