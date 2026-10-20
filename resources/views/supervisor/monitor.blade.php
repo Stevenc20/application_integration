@@ -186,17 +186,29 @@
         body .large-table td.val-actual, 
         body .large-table td.val-plan {
             max-width: none !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
-            white-space: nowrap !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: normal !important;
+            word-break: break-word !important;
+        }
+
+        #row-JOB td.val-curr, #row-JOB td.val-actual, #row-JOB td.val-plan {
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.15 !important;
+            font-size: 0.95vw !important;
         }
 
         .right-detail-table th, .right-detail-table td {
-            max-width: none !important;
-            overflow: visible !important;
-            text-overflow: clip !important;
             padding: 0.3vw 0.2vw !important;
             font-size: 0.75vw !important;
+        }
+        .right-detail-table td.det-job {
+            white-space: normal !important;
+            word-break: break-word !important;
+            line-height: 1.15 !important;
+            max-width: none !important;
+            overflow: hidden !important;
         }
         .right-detail-table thead th {
             font-size: 0.7vw !important;
@@ -1335,20 +1347,20 @@ function renderTable(){
                                 <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
-                                <th style="border-left:none; white-space:nowrap;">NO</th>
-                                <th style="white-space:nowrap;">JOB NO</th>
-                                <th style="white-space:nowrap;">PLAN QTY</th>
-                                <th class="det-good" style="white-space:nowrap;">GOOD</th>
-                                <th class="det-repair" style="white-space:nowrap;">REP</th>
-                                <th class="det-reject" style="white-space:nowrap;">REJ</th>
-                                <th style="white-space:nowrap;">PRESS TIME</th>
-                                <th style="white-space:nowrap;">DANDORI</th>
-                                <th style="white-space:nowrap;">1ST CHECK</th>
-                                <th style="white-space:nowrap;">DOWNTIME</th>
-                                <th class="det-tpt" style="white-space:nowrap;">TPT</th>
-                                <th style="white-space:nowrap;">PLAN FIN</th>
-                                <th style="white-space:nowrap;">ACT FIN</th>
-                                <th style="white-space:nowrap; border-right:none;">GSPH</th>
+                                <th style="width:4%; border-left:none; white-space:nowrap;">NO</th>
+                                <th style="width:20%; white-space:nowrap;">JOB NO</th>
+                                <th style="width:7%; white-space:nowrap;">PLAN QTY</th>
+                                <th class="det-good" style="width:6%; white-space:nowrap;">GOOD</th>
+                                <th class="det-repair" style="width:5%; white-space:nowrap;">REP</th>
+                                <th class="det-reject" style="width:5%; white-space:nowrap;">REJ</th>
+                                <th style="width:8%; white-space:nowrap;">PRESS TIME</th>
+                                <th style="width:7%; white-space:nowrap;">DANDORI</th>
+                                <th style="width:7%; white-space:nowrap;">1ST CHECK</th>
+                                <th style="width:7%; white-space:nowrap;">DOWNTIME</th>
+                                <th class="det-tpt" style="width:6%; white-space:nowrap;">TPT</th>
+                                <th style="width:6%; white-space:nowrap;">PLAN FIN</th>
+                                <th style="width:6%; white-space:nowrap;">ACT FIN</th>
+                                <th style="width:6%; white-space:nowrap; border-right:none;">GSPH</th>
                             </tr>
                         </thead>
                         <tbody>
