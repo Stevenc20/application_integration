@@ -144,7 +144,7 @@
                             <th class="px-4 py-3 text-center">Aksi</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-violet-100">
+                    <tbody class="bt-break-rows divide-y divide-violet-100">
                         @foreach($cinkorakBreaks as $break)
                         <tr class="transition hover:bg-violet-50/50" data-id="{{ $break->id }}">
                             <td class="px-4 py-3 font-bold text-gray-900">{{ $break->label }}</td>
@@ -453,7 +453,7 @@
         }
 
         // Duplicate name check
-        const dupName = allBreaks.find(b => b.id !== id && b.label.toLowerCase() === payload.label.toLowerCase() && b.hari === payload.hari && (b.shift === payload.shift || !b.shift && !payload.shift));
+        const dupName = allBreaks.find(b => b.id !== id && b.label.toLowerCase() === payload.label.toLowerCase() && b.hari === payload.hari && (b.shift === payload.shift || (!b.shift && !payload.shift)));
         if (dupName) {
             showToast({
                 type: 'error',
@@ -463,10 +463,14 @@
             return;
         }
 
-        // Overlap check
+        // Overlap check (hanya bandingkan dengan break aktif lain yang satu hari dan shift relevan)
         const overlap = allBreaks.find(b => {
             if (b.id === id) return false;
+            // Jika break lain tidak aktif, abaikan
+            if (b.is_active === false) return false;
+            // Cek hari: jika beda hari dan keduanya bukan 'semua', tidak overlap
             if (b.hari !== payload.hari && b.hari !== 'semua' && payload.hari !== 'semua') return false;
+            // Cek shift: jika beda shift dan keduanya ada shift spesifik, tidak overlap
             if (b.shift && payload.shift && b.shift.toLowerCase() !== payload.shift.toLowerCase()) return false;
             
             return (payload.waktu_mulai < b.waktu_selesai && payload.waktu_selesai > b.waktu_mulai);

@@ -259,8 +259,8 @@ Route::middleware(['auth','role:supervisor,ppc,foreman,leader,manager,kadiv,dire
     Route::get('/breaktime', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'index'])->middleware('feature:breaktime')->name('breaktime.index');
     Route::get('/breaktime/create', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'create'])->middleware('feature:breaktime')->name('breaktime.create');
     Route::post('/breaktime', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'store'])->middleware('feature:breaktime')->name('breaktime.store');
-    Route::get('/breaktime/{id}/edit', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'edit'])->middleware('feature:breaktime')->name('breaktime.update');
-    Route::put('/breaktime/{id}', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'update'])->middleware('feature:breaktime');
+    Route::get('/breaktime/{id}/edit', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'edit'])->middleware('feature:breaktime')->name('breaktime.edit');
+    Route::put('/breaktime/{id}', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'update'])->middleware('feature:breaktime')->name('breaktime.update');
     Route::delete('/breaktime/{id}', [\App\Http\Controllers\Supervisor\BreaktimeController::class, 'destroy'])->middleware('feature:breaktime')->name('breaktime.delete');
     Route::get('/breaktime/rekap', function() { return view('supervisor.breaktime.rekap'); })->middleware('feature:breaktime')->name('breaktime.rekap');
 
