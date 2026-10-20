@@ -443,17 +443,41 @@
         };
 
         // PHASE 7: Safety Validation
-        if (payload.waktu_selesai <= payload.waktu_mulai) {
+        // Waktu mulai dan selesai tidak boleh sama persis
+        if (payload.waktu_selesai === payload.waktu_mulai) {
             showToast({
                 type: 'error',
                 title: 'Validasi Gagal',
-                message: 'Waktu selesai harus setelah waktu mulai!'
+                message: 'Waktu selesai tidak boleh sama dengan waktu mulai!'
+            });
+            return;
+        }
+
+        // Jika shift pagi atau shift yang tidak lewat tengah malam, waktu selesai harus > waktu mulai
+        // Kecuali jika Shift Malam atau shift sengaja melintasi 00:00 (misal 23:30 - 00:30)
+        const isLikelyOvernight = payload.shift && payload.shift.toLowerCase().includes('malam');
+        if (!isLikelyOvernight && payload.waktu_selesai < payload.waktu_mulai) {
+            showToast({
+                type: 'error',
+                title: 'Validasi Gagal',
+                message: 'Waktu selesai harus setelah waktu mulai (kecuali shift malam lintas hari)!'
             });
             return;
         }
 
         // Duplicate name check
-        const dupName = allBreaks.find(b => b.id !== id && b.label.toLowerCase() === payload.label.toLowerCase() && b.hari === payload.hari && (b.shift === payload.shift || (!b.shift && !payload.shift)));
+        const dupName = allBreaks.find(b => {
+            if (id && String(b.id) === String(id)) return false;
+            const bLabel = (b.label || '').trim().toLowerCase();
+            const pLabel = (payload.label || '').trim().toLowerCase();
+            const bHari = (b.hari || '').toLowerCase();
+            const pHari = (payload.hari || '').toLowerCase();
+            const bShift = (b.shift || '').trim().toLowerCase();
+            const pShift = (payload.shift || '').trim().toLowerCase();
+
+            return bLabel === pLabel && bHari === pHari && bShift === pShift;
+        });
+
         if (dupName) {
             showToast({
                 type: 'error',
@@ -465,7 +489,7 @@
 
         // Overlap check (hanya bandingkan dengan break aktif lain yang satu hari dan shift relevan)
         const overlap = allBreaks.find(b => {
-            if (b.id === id) return false;
+            if (id && String(b.id) === String(id)) return false;
             // Jika break lain tidak aktif, abaikan
             if (b.is_active === false) return false;
             // Cek hari: jika beda hari dan keduanya bukan 'semua', tidak overlap
