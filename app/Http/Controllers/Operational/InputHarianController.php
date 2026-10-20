@@ -365,6 +365,14 @@ class InputHarianController extends Controller
                     return $q;
                 };
 
+                // Self-healing Dandori: jika job sudah mulai produksi (ada actual_ok/repair/reject atau started_at),
+                // pastikan open dandori yang terbengkalai otomatis tertutup agar job tidak dipaksa ke mode dandori.
+                $hasProductionProgress = function($jm) use ($date) {
+                    $dp = $jm->dailyProduction;
+                    $actualTotal = ($dp?->actual_ok ?? 0) + ($dp?->actual_repair ?? 0) + ($dp?->actual_reject ?? 0);
+                    return $actualTotal > 0 || !empty($jm->started_at);
+                };
+
                 // 1. Coba cari active job yang ada di jadwal $plans saat ini
                 $activeJobs = collect();
                 if (!empty($scheduledJobNumbers)) {
@@ -377,7 +385,18 @@ class InputHarianController extends Controller
                             'downtimes',
                             'dandoris'
                         ])
-                        ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                        ->orderByRaw("CASE 
+                            WHEN EXISTS (
+                                SELECT 1 FROM downtimes 
+                                WHERE downtimes.job_master_id = job_masters.id 
+                                  AND downtimes.jenis_downtime = 'dandori' 
+                                  AND downtimes.finish_time IS NULL
+                            ) AND NOT EXISTS (
+                                SELECT 1 FROM daily_productions 
+                                WHERE daily_productions.job_master_id = job_masters.id 
+                                  AND daily_productions.work_date = '{$date}' 
+                                  AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
+                            ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
                         ->orderByDesc('updated_at')
                         ->orderByDesc('id')
                         ->get();
@@ -394,13 +413,42 @@ class InputHarianController extends Controller
                             'downtimes',
                             'dandoris'
                         ])
-                        ->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+                        ->orderByRaw("CASE 
+                            WHEN EXISTS (
+                                SELECT 1 FROM downtimes 
+                                WHERE downtimes.job_master_id = job_masters.id 
+                                  AND downtimes.jenis_downtime = 'dandori' 
+                                  AND downtimes.finish_time IS NULL
+                            ) AND NOT EXISTS (
+                                SELECT 1 FROM daily_productions 
+                                WHERE daily_productions.job_master_id = job_masters.id 
+                                  AND daily_productions.work_date = '{$date}' 
+                                  AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
+                            ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
                         ->orderByDesc('updated_at')
                         ->orderByDesc('id')
                         ->get();
                 }
 
                 $activeJob = $activeJobs->first();
+
+                // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung
+                if ($activeJob && $hasProductionProgress($activeJob)) {
+                    $openDandoris = \App\Models\Downtime::where('job_master_id', $activeJob->id)
+                        ->where('jenis_downtime', 'dandori')
+                        ->whereNull('finish_time')
+                        ->get();
+                    if ($openDandoris->isNotEmpty()) {
+                        $closeTime = $activeJob->started_at ?: now();
+                        foreach ($openDandoris as $odt) {
+                            $diffSec = abs(\Carbon\Carbon::parse($closeTime)->diffInSeconds(\Carbon\Carbon::parse($odt->start_time)));
+                            $odt->update([
+                                'finish_time' => $closeTime,
+                                'duration_seconds' => $diffSec,
+                            ]);
+                        }
+                    }
+                }
             }
         }
 
@@ -902,7 +950,24 @@ class InputHarianController extends Controller
             });
         }
 
-        $jobMaster = $jmQuery->orderByRaw("CASE WHEN EXISTS (SELECT 1 FROM downtimes WHERE downtimes.job_master_id = job_masters.id AND downtimes.jenis_downtime = 'dandori' AND downtimes.finish_time IS NULL) THEN 0 ELSE 1 END")
+        $hasProductionProgress = function($jm) use ($date) {
+            $dp = $jm->dailyProduction;
+            $actualTotal = ($dp?->actual_ok ?? 0) + ($dp?->actual_repair ?? 0) + ($dp?->actual_reject ?? 0);
+            return $actualTotal > 0 || !empty($jm->started_at);
+        };
+
+        $jobMaster = $jmQuery->orderByRaw("CASE 
+                WHEN EXISTS (
+                    SELECT 1 FROM downtimes 
+                    WHERE downtimes.job_master_id = job_masters.id 
+                      AND downtimes.jenis_downtime = 'dandori' 
+                      AND downtimes.finish_time IS NULL
+                ) AND NOT EXISTS (
+                    SELECT 1 FROM daily_productions 
+                    WHERE daily_productions.job_master_id = job_masters.id 
+                      AND daily_productions.work_date = '{$date}' 
+                      AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
+                ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
             ->orderByDesc('updated_at')
             ->orderByDesc('id')
             ->first();
@@ -918,6 +983,23 @@ class InputHarianController extends Controller
             ->where('jenis_downtime', 'dandori')
             ->whereNull('finish_time')
             ->exists();
+
+        // Self-healing: jika job sudah berproduksi tapi flag dandori masih kebuka, sembuhkan
+        if ($isDandori && $hasProductionProgress($jobMaster)) {
+            $openDandoris = \App\Models\Downtime::where('job_master_id', $jobMaster->id)
+                ->where('jenis_downtime', 'dandori')
+                ->whereNull('finish_time')
+                ->get();
+            $closeTime = $jobMaster->started_at ?: now();
+            foreach ($openDandoris as $odt) {
+                $diffSec = abs(\Carbon\Carbon::parse($closeTime)->diffInSeconds(\Carbon\Carbon::parse($odt->start_time)));
+                $odt->update([
+                    'finish_time' => $closeTime,
+                    'duration_seconds' => $diffSec,
+                ]);
+            }
+            $isDandori = false;
+        }
 
         $activeDowntime = \App\Models\Downtime::where('job_master_id', $jobMaster->id)
             ->whereNull('finish_time')

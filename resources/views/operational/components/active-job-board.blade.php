@@ -75,11 +75,21 @@
             $wasInFirstCheck = \Illuminate\Support\Facades\Cache::has('was_in_first_check_' . $activeJob->id);
             $sessionStartTime = \App\Models\ProductionSession::where('job_master_id', $activeJob->id)->whereDate('work_date', $date)->value('start_time');
             $effectiveStartedAt = $activeJob->started_at ?? $sessionStartTime;
-            // $isDandori = true if open dandori or open 1st check is active
-            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null);
+
+            // Cek apakah job sudah punya progres produksi aktual (part OK/Repair/Reject)
+            $actualProdTotal = (($activeJob->dailyProduction->actual_ok ?? 0) + ($activeJob->dailyProduction->actual_repair ?? 0) + ($activeJob->dailyProduction->actual_reject ?? 0));
+            $hasProduced = ($actualProdTotal > 0) || !empty($activeJob->started_at);
+
+            // $isDandori = true if open dandori or open 1st check is active, KECUALI jika sudah mulai produksi secara riil
+            if ($hasProduced) {
+                $isDandori = false;
+            } else {
+                $isDandori = ($openDandori !== null) || ($openFirstCheck !== null);
+            }
+
             if (!$isDandori && !$effectiveStartedAt && $hasActiveNonDandoriDt) {
                 // If never started and has non-dandori DT, only treat as dandori if job is still pending
-                $isDandori = strtolower($activeJob->status) === 'pending';
+                $isDandori = strtolower($activeJob->status) === 'pending' && !$hasProduced;
             }
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($effectiveStartedAt ?? null);

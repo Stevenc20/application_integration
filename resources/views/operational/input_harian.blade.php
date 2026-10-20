@@ -415,7 +415,7 @@ window.ProductionConfig = {
     isLocked: {{ ($isLocked ?? false) ? 'true' : 'false' }},
     currentActiveId: {{ $activeJob->id ?? 'null' }},
     currentStatus: '{{ $activeJob->status ?? "none" }}',
-    currentIsDandori: {{ isset($activeJob) && $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->count() > 0 ? 'true' : 'false' }},
+    currentIsDandori: {{ isset($activeJob) && ((($activeJob->dailyProduction?->actual_ok ?? 0) + ($activeJob->dailyProduction?->actual_repair ?? 0) + ($activeJob->dailyProduction?->actual_reject ?? 0)) == 0 && empty($activeJob->started_at)) && $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->count() > 0 ? 'true' : 'false' }},
     currentDowntimeCount: {{ isset($activeJob) ? $activeJob->downtimes->whereNull('finish_time')->count() : 0 }},
     totalDowntimeCount: {{ isset($activeJob) ? $activeJob->downtimes->count() : 0 }},
     currentDowntimeType: {!! isset($activeJob) && $activeJob->downtimes->whereNull('finish_time')->first() ? json_encode($activeJob->downtimes->whereNull('finish_time')->first()->jenis_downtime) : "null" !!},

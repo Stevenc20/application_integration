@@ -405,119 +405,65 @@ class ProductionPlanController extends Controller
                 $sheets = array_values($result['sheets'] ?? []);
                 if (empty($sheets)) return;
 
-                // COLLECT UNIQUE SHIFT NAMES FOR CLEANUP
-                $uniqueShifts = [];
-                foreach ($sheets as $s) {
-                    $raw = $s['shift_name'] ?? '';
-                    $shiftName = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $raw);
-                    $shiftName = trim(ucwords(strtolower($shiftName)));
-                    if ($shiftName) $uniqueShifts[$shiftName] = true;
+                // Ambil semua ProductionPlan yang sudah ada di database untuk tanggal ini (source_type = 'ppc')
+                $existingPlans = ProductionPlan::whereDate('plan_date', $parsedDate)
+                    ->where('source_type', 'ppc')
+                    ->get();
+
+                // Cari semua JobMaster yang terhubung ke existing plans
+                $existingPlanIds = $existingPlans->pluck('id')->filter()->unique();
+                $connectedJobs = collect();
+                if ($existingPlanIds->isNotEmpty()) {
+                    foreach ($existingPlanIds->chunk(100) as $pidChunk) {
+                        $chunkJobs = \App\Models\JobMaster::where(function($q) use ($pidChunk) {
+                            foreach ($pidChunk as $pid) {
+                                $q->orWhere('job_number', 'LIKE', "%-{$pid}");
+                            }
+                        })
+                        ->with(['dailyProduction', 'productionSessions', 'downtimes'])
+                        ->get();
+                        $connectedJobs = $connectedJobs->merge($chunkJobs);
+                    }
                 }
 
-                foreach (array_keys($uniqueShifts) as $shiftToDelete) {
-                    // 1. DELETE old PPC baseline rows (source_type = 'ppc')
-                    $ppcPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'ppc')
-                        ->pluck('id');
+                // Helper: Cek apakah suatu job sudah aktif / berjalan di lini
+                $isJobActiveOrCompleted = function($planId) use ($connectedJobs) {
+                    $job = $connectedJobs->first(function($jm) use ($planId) {
+                        return str_ends_with($jm->job_number, "-{$planId}");
+                    });
+                    if (!$job) return false;
 
-                    if ($ppcPlanIds->isNotEmpty()) {
-                        // Disassociate recovery queue items — DON'T delete them
-                        \App\Models\RecoveryItem::whereIn('production_plan_id', $ppcPlanIds)
-                            ->update(['production_plan_id' => null]);
-
-                        // Auto-stop and close any JobMaster, Downtime, and ProductionSession linked to these old plans
-                        // Batch IDs into chunks to keep query fast and avoid massive single-query OR LIKE tree
-                        $oldJobs = collect();
-                        foreach ($ppcPlanIds->chunk(100) as $pidChunk) {
-                            $chunkJobs = \App\Models\JobMaster::where(function($q) use ($pidChunk) {
-                                foreach ($pidChunk as $pid) {
-                                    $q->orWhere('job_number', 'LIKE', "%-{$pid}");
-                                }
-                            })->get();
-                            $oldJobs = $oldJobs->merge($chunkJobs);
-                        }
-
-                        if ($oldJobs->isNotEmpty()) {
-                            $oldJobIds = $oldJobs->pluck('id')->toArray();
-                            $nowTs = now();
-
-                            // Close open downtimes (including break time, trouble, etc.)
-                            \App\Models\Downtime::whereIn('job_master_id', $oldJobIds)
-                                ->whereNull('finish_time')
-                                ->update(['finish_time' => $nowTs]);
-
-                            // Close open dandoris
-                            \App\Models\Dandori::whereIn('next_job_id', $oldJobIds)
-                                ->whereNull('finish_time')
-                                ->update(['finish_time' => $nowTs]);
-
-                            // Close open production sessions
-                            \App\Models\ProductionSession::whereIn('job_master_id', $oldJobIds)
-                                ->where('status', 'running')
-                                ->update(['status' => 'finished', 'finish_time' => $nowTs]);
-
-                            // Mark running or paused jobs as closed
-                            \App\Models\JobMaster::whereIn('id', $oldJobIds)
-                                ->whereIn('status', ['running', 'paused'])
-                                ->update(['status' => 'closed', 'finished_at' => $nowTs]);
-                        }
+                    $status = strtolower($job->status);
+                    if (in_array($status, ['running', 'paused', 'complete', 'completed', 'finished'])) {
+                        return true;
                     }
-
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'ppc')
-                        ->delete();
-
-                    // 2. DELETE recovery-generated timeline rows (source_type = 'recovery')
-                    //    BUT keep plans for items that are already in_production or completed
-                    $recoveryPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'recovery')
-                        ->whereDoesntHave('recoveryItem', function ($q) {
-                            $q->whereIn('status', ['in_production', 'completed']);
-                        })
-                        ->pluck('id');
-
-                    if ($recoveryPlanIds->isNotEmpty()) {
-                        \App\Models\RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
-                            ->update(['production_plan_id' => null]);
+                    $dp = $job->dailyProduction;
+                    $actualPcs = ($dp?->actual_ok ?? 0) + ($dp?->actual_repair ?? 0) + ($dp?->actual_reject ?? 0);
+                    if ($actualPcs > 0 || !empty($job->started_at)) {
+                        return true;
                     }
+                    if ($job->productionSessions->isNotEmpty() || $job->downtimes->isNotEmpty()) {
+                        return true;
+                    }
+                    return false;
+                };
 
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('source_type', 'recovery')
-                        ->whereDoesntHave('recoveryItem', function ($q) {
-                            $q->whereIn('status', ['in_production', 'completed']);
-                        })
-                        ->delete();
-
-                    // 3. DELETE timeline-generated breaks (source_type = null from regenerateSection)
-                    ProductionPlan::whereDate('plan_date', $parsedDate)
-                        ->where('shift_name', $shiftToDelete)
-                        ->where('row_type', 'break')
-                        ->whereNull('source_type')
-                        ->delete();
-
-                    // Revert approved/scheduled RecoveryItems back to waiting_approval queue
-                    // First get the IDs of items to revert (all, not just those with null production_plan_id)
-                    $revertRecoveryIds = \App\Models\RecoveryItem::whereDate('source_date', $parsedDate)
-                        ->where('source_shift', $shiftToDelete)
-                        ->whereIn('status', ['approved', 'scheduled'])
-                        ->pluck('id');
-
-                    if ($revertRecoveryIds->isNotEmpty()) {
-                        // Reset any ProductionPlan rows linked to these RecoveryItems
-                        // This handles orphaned plans on other dates/shifts that weren't deleted above
-                        \App\Models\ProductionPlan::whereIn('recovery_id', $revertRecoveryIds)
-                            ->where('source_type', 'recovery')
-                            ->update(['source_type' => 'ppc', 'recovery_id' => null]);
-
-                        // Revert the RecoveryItems
-                        \App\Models\RecoveryItem::whereIn('id', $revertRecoveryIds)
-                            ->update(['status' => 'waiting_approval']);
+                // Index existing plans by matching key: shift||lineId||job_master||job_no
+                $existingPlansByKey = [];
+                foreach ($existingPlans as $ep) {
+                    $cShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $ep->shift_name))));
+                    if ($ep->row_type === 'break') {
+                        $bKey = $cShift . '||' . $ep->line_master_id . '||break||' . strtoupper(trim($ep->job_no ?? $ep->keterangan ?? '')) . '||' . trim($ep->start_time ?? '') . '||' . trim($ep->finish_time ?? '');
+                        $existingPlansByKey[$bKey] = $ep;
+                    } else {
+                        $jKey = $cShift . '||' . $ep->line_master_id . '||' . strtoupper(trim($ep->job_master ?? '')) . '||' . strtoupper(trim($ep->job_no ?? ''));
+                        if (!isset($existingPlansByKey[$jKey]) || $isJobActiveOrCompleted($ep->id)) {
+                            $existingPlansByKey[$jKey] = $ep;
+                        }
                     }
                 }
+
+                $retainedPlanIds = [];
 
                 // PRE-PASS: deteksi grup (cleanShift||press) yang punya sheet REV
                 $hasRevInGroup = [];
@@ -558,10 +504,11 @@ class ProductionPlanController extends Controller
                     }
                     if (!$lineId) $lineId = array_values($lineMap)[0] ?? 1;
 
-                    // INSERT EXCEL ITEMS
+                    // INSERT / UPDATE EXCEL ITEMS
                     $excelRowNos = [];
                     $totalReceived = count($sheetData['rows']);
                     $skippedMeta = 0;
+                    $sectionCount = 0;
 
                     foreach ($sheetData['rows'] as $item) {
                         // ── SAFETY NET: skip rows that are clearly Excel metadata, not jobs ──
@@ -632,15 +579,15 @@ class ProductionPlanController extends Controller
                             $rowType = 'job';
                         }
 
-                    $jm = $item['job_master'] ?? '';
-                    $jn = $item['job_no'] ?? '';
-                    
-                    // Normalization: only force TOTAL FINISH for break rows (not for legitimate job data)
-                    if ($rowType === 'break' && (str_contains(strtoupper($jm), 'FINISH') || str_contains(strtoupper($jn), 'FINISH') || 
-                        str_contains(strtoupper($jm), 'FNISH') || str_contains(strtoupper($jn), 'FNISH'))) {
-                        $jm = 'TOTAL FINISH';
-                        $jn = 'TOTAL FINISH';
-                    }
+                        $jm = $item['job_master'] ?? '';
+                        $jn = $item['job_no'] ?? '';
+                        
+                        // Normalization: only force TOTAL FINISH for break rows (not for legitimate job data)
+                        if ($rowType === 'break' && (str_contains(strtoupper($jm), 'FINISH') || str_contains(strtoupper($jn), 'FINISH') || 
+                            str_contains(strtoupper($jm), 'FNISH') || str_contains(strtoupper($jn), 'FNISH'))) {
+                            $jm = 'TOTAL FINISH';
+                            $jn = 'TOTAL FINISH';
+                        }
 
                         $planQty = (int) $this->safeVal($item['plan'], 0);
                         $ctDetik = (float) $this->safeVal($item['ct_detik'], 0);
@@ -677,7 +624,7 @@ class ProductionPlanController extends Controller
 
                         $finalRowNo = $this->safeVal($item['row_no']) ?: 0;
 
-                        $rows[] = [
+                        $rowAttributes = [
                             'line_master_id' => $lineId,
                             'plan_date'      => $parsedDate,
                             'shift_name'     => $shiftName,
@@ -725,15 +672,51 @@ class ProductionPlanController extends Controller
                             'dt_menit'       => $this->safeVal($item['dt_menit'], 0),
                             'total_pcs'      => $this->safeVal($item['total_pcs'], 0),
                             'tpt_total'      => $this->safeVal($item['tpt_total'], 0),
-                            'status'         => 'pending',
-                            'created_at'     => now(),
-                            'updated_at'     => now(),
                         ];
-                    }
 
-                    $inserted = count($rows);
-                    foreach (array_chunk($rows, 500) as $chunk) {
-                        ProductionPlan::insert($chunk);
+                        // SMART MATCHING: Cari apakah baris ini sudah ada di DB
+                        $matchKey = ($rowType === 'break')
+                            ? ($shiftName . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
+                            : ($shiftName . '||' . $lineId . '||' . strtoupper(trim($jm)) . '||' . strtoupper(trim($jn)));
+
+                        $matchedExistingPlan = $existingPlansByKey[$matchKey] ?? null;
+
+                        if ($matchedExistingPlan) {
+                            // ITEM SAMA: Lakukan UPDATE in-place tanpa mengubah ID & tanpa mereset sesi
+                            $updatePayload = $rowAttributes;
+                            if (in_array(strtolower($matchedExistingPlan->status ?? ''), ['running', 'paused', 'complete', 'completed', 'finished'])) {
+                                unset($updatePayload['status']);
+                            }
+                            $matchedExistingPlan->update($updatePayload);
+                            $retainedPlanIds[] = $matchedExistingPlan->id;
+
+                            // Update target_qty & sequence di JobMaster terkait tanpa merusak sesi running
+                            $connectedJm = $connectedJobs->first(function($jm) use ($matchedExistingPlan) {
+                                return str_ends_with($jm->job_number, "-{$matchedExistingPlan->id}");
+                            });
+                            if ($connectedJm) {
+                                $jmUpdate = [
+                                    'target_qty'  => (int) ($rowAttributes['plan'] ?? 0),
+                                    'sequence_no' => $finalRowNo ?: $connectedJm->sequence_no,
+                                    'capacity'    => (int) ($rowAttributes['qty_plt'] ?? 0),
+                                ];
+                                if ($rowAttributes['start_time']) {
+                                    $jmUpdate['plan_start'] = Carbon::parse($parsedDate . ' ' . $rowAttributes['start_time'])->startOfMinute();
+                                }
+                                if ($rowAttributes['finish_time']) {
+                                    $jmUpdate['plan_end'] = Carbon::parse($parsedDate . ' ' . $rowAttributes['finish_time'])->startOfMinute();
+                                }
+                                $connectedJm->update($jmUpdate);
+                            }
+                        } else {
+                            // ITEM BARU: Buat baru
+                            $newPlan = ProductionPlan::create(array_merge($rowAttributes, [
+                                'status' => 'pending',
+                            ]));
+                            $retainedPlanIds[] = $newPlan->id;
+                        }
+
+                        $sectionCount++;
                     }
 
                     Log::info('[IMPORT] Section stats', [
@@ -741,11 +724,50 @@ class ProductionPlanController extends Controller
                         'press' => $pressName,
                         'rows_from_python' => $totalReceived,
                         'meta_skipped' => $skippedMeta,
-                        'inserted' => $inserted,
+                        'processed' => $sectionCount,
                     ]);
 
-                    $imported += $inserted;
+                    $imported += $sectionCount;
                 }
+
+                // ── CLEANUP & PROTEKSI ITEM OBSOLETE (Dihapus PPC di revisi baru) ──
+                $obsoletePlans = $existingPlans->whereNotIn('id', $retainedPlanIds);
+                foreach ($obsoletePlans as $obsPlan) {
+                    if ($isJobActiveOrCompleted($obsPlan->id)) {
+                        Log::info("[IMPORT] Retaining obsolete plan because job is active/completed in line", [
+                            'plan_id' => $obsPlan->id,
+                            'job_no' => $obsPlan->job_no,
+                        ]);
+                        continue;
+                    }
+
+                    $pid = $obsPlan->id;
+                    $unusedJobs = \App\Models\JobMaster::where('job_number', 'LIKE', "%-{$pid}")->get();
+                    foreach ($unusedJobs as $uj) {
+                        $uj->delete();
+                    }
+                    $obsPlan->delete();
+                }
+
+                // 2. Recovery-generated timeline rows cleanup (hanya yang belum jalan)
+                $recoveryPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
+                    ->where('source_type', 'recovery')
+                    ->whereDoesntHave('recoveryItem', function ($q) {
+                        $q->whereIn('status', ['in_production', 'completed']);
+                    })
+                    ->pluck('id');
+
+                if ($recoveryPlanIds->isNotEmpty()) {
+                    \App\Models\RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
+                        ->update(['production_plan_id' => null]);
+                    ProductionPlan::whereIn('id', $recoveryPlanIds)->delete();
+                }
+
+                // 3. Delete leftover breaks yang tidak retained
+                ProductionPlan::whereDate('plan_date', $parsedDate)
+                    ->where('row_type', 'break')
+                    ->whereNotIn('id', $retainedPlanIds)
+                    ->delete();
 
                 // Log Python's own row counts if available
                 if (isset($result['log'])) {
