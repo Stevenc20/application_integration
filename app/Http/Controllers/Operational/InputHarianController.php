@@ -936,6 +936,7 @@ class InputHarianController extends Controller
     public function activeJob(Request $request)
     {
         $lineFilter = $request->get('line');
+        $date = $request->get('date') ?: now()->toDateString();
         $normalizedLine = '';
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
