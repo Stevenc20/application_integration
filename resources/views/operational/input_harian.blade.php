@@ -1057,7 +1057,7 @@ function openTarikShiftModal() {
             res.next_shift_plans.forEach(p => {
                 const opt = document.createElement('option');
                 opt.value = p.id;
-                opt.textContent = `${p.job_master || p.job_no} (Tersedia: ${p.available_qty || p.remaining_plan || p.plan} PCS)`;
+                opt.textContent = `${p.job_no || p.job_master} (Tersedia: ${p.available_qty || p.remaining_plan || p.plan} PCS)`;
                 planSelect.appendChild(opt);
             });
 
@@ -1067,7 +1067,7 @@ function openTarikShiftModal() {
                 res.current_shift_plans.forEach(cp => {
                     const opt = document.createElement('option');
                     opt.value = cp.id;
-                    opt.textContent = `Setelah: ${cp.job_master || cp.job_no} (Seq ${cp.row_no})`;
+                    opt.textContent = `Setelah: ${cp.job_no || cp.job_master} (Seq ${cp.row_no})`;
                     seqSelect.appendChild(opt);
                 });
             }
@@ -1076,7 +1076,18 @@ function openTarikShiftModal() {
         } else {
             empty.classList.remove('hidden');
             const msg = empty.querySelector('p');
-            if (msg) msg.textContent = 'Tidak ada item yang dapat ditarik.';
+            const subMsg = empty.querySelectorAll('p')[1];
+            if (res.empty_message) {
+                if (msg) msg.textContent = res.empty_message;
+                if (subMsg) subMsg.textContent = 'Silakan hubungi tim PPC untuk mengunggah jadwal shift tersebut.';
+            } else {
+                if (msg) msg.textContent = 'Tidak ada item yang dapat ditarik.';
+                if (subMsg) subMsg.textContent = 'Pastikan jadwal PPC shift selanjutnya sudah dibuat.';
+            }
+            if (res.next_shift_name) {
+                const dateLabel = res.next_shift_date ? ` (${res.next_shift_date})` : '';
+                document.getElementById('tarikShiftSubtitle').innerText = `Menarik dari ${res.next_shift_name}${dateLabel}`;
+            }
         }
     })
     .catch(err => {
