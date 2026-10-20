@@ -153,10 +153,10 @@
         .val-curr{color:#334155;font-weight:700}
         .val-actual{font-weight:800; color:#1e293b;}
         .bg-green{background:#22c55e!important;color:#fff!important}
-        .bg-yellow{background:#eab308!important;color:#000!important}
+        .bg-yellow{background:#f59e0b!important;color:#000!important;font-weight:900!important}
         .bg-red{background:#ef4444!important;color:#fff!important}
         .status-running{background:#22c55e!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
-        .status-break{background:#eab308!important;color:#000!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
+        .status-break{background:#f59e0b!important;color:#000!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-downtime{background:#ef4444!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-idle{background:#94a3b8!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-not-running{background:#64748b!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
@@ -167,8 +167,64 @@
         @keyframes blink-yellow{0%,100%{opacity:1}50%{opacity:0.3}}
         @keyframes blink-green{0%,100%{opacity:1}50%{opacity:0.3}}
         .bg-red-blink{background:#ef4444!important;color:#fff!important;animation:blink-red .8s ease-in-out infinite!important}
-        .bg-yellow-blink{background:#eab308!important;color:#000!important;animation:blink-yellow .8s ease-in-out infinite!important}
+        .bg-yellow-blink{background:#f59e0b!important;color:#000!important;animation:blink-yellow .8s ease-in-out infinite!important}
         .bg-green-blink{background:#22c55e!important;color:#fff!important;animation:blink-green .8s ease-in-out infinite!important}
+
+        /* Dark mode warning alert (High-contrast vivid amber) */
+        body.dark .bg-yellow,
+        body.dark .bg-yellow-blink,
+        body.dark .status-break {
+            background: #fbbf24 !important;
+            color: #0f172a !important;
+            font-weight: 900 !important;
+        }
+
+        /* ── SEPARATOR VERTIKAL ANTARA PRESS A, B, C, D (Semua View) ── */
+        .line-border-r {
+            border-right: 3px solid #2563eb !important;
+        }
+        body.dark .line-border-r {
+            border-right: 3px solid #3b82f6 !important;
+        }
+
+        /* ── DOWNTIME ROWS (TOTAL_DT s/d OVERTIME) BACKGROUND ── */
+        .dt-section-start td {
+            border-top: 3px solid #0284c7 !important;
+        }
+        body.dark .dt-section-start td {
+            border-top: 3px solid #38bdf8 !important;
+        }
+
+        .dt-row-bg td {
+            background-color: #fefce8 !important; /* Krem lembut */
+        }
+        .dt-row-bg td.desc-cell {
+            background-color: #fef9c3 !important;
+            font-weight: 800 !important;
+        }
+        .dt-row-bg:nth-child(even) td {
+            background-color: #fef08a !important;
+        }
+        .dt-row-bg:nth-child(even) td.desc-cell {
+            background-color: #fde047 !important;
+        }
+
+        /* Dark mode Downtime Rows: Teal Gelap */
+        body.dark .dt-row-bg td {
+            background-color: #134e4a !important; /* Teal gelap */
+            color: #ccfbf1 !important;
+        }
+        body.dark .dt-row-bg td.desc-cell {
+            background-color: #115e59 !important;
+            color: #f0fdfa !important;
+            font-weight: 800 !important;
+        }
+        body.dark .dt-row-bg:nth-child(even) td {
+            background-color: #0f3d3a !important;
+        }
+        body.dark .dt-row-bg:nth-child(even) td.desc-cell {
+            background-color: #134e4a !important;
+        }
 
         .large-table th,.large-table td{
             padding:0.4vw 0.3vw!important;
@@ -1007,23 +1063,37 @@ function renderAllLines(){
         `;
         const thead=document.getElementById('monitorThead');
         let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:16px;text-align:left;padding-left:4px;">DESC</th>';
-        LINES.forEach((l,li)=>{hh+=`<th colspan="3" class="line-header">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`});
+        LINES.forEach((l,li)=>{
+            const isLast = (li === LINES.length - 1);
+            const borderCls = isLast ? '' : ' line-border-r';
+            hh+=`<th colspan="3" class="line-header${borderCls}">${l} <span id="planBadge-${li}" class="plan-badge" style="display:none">NO PLAN</span></th>`;
+        });
         hh+='</tr><tr>';
-        LINES.forEach(()=>{hh+='<th class="th-plan" style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th style="font-size:16px;">ACTUAL</th>'});
+        LINES.forEach((l,li)=>{
+            const isLast = (li === LINES.length - 1);
+            const borderCls = isLast ? '' : ' line-border-r';
+            hh+=`<th class="th-plan" style="font-size:16px;">PLAN</th><th style="font-size:16px;">CURR</th><th class="${borderCls}" style="font-size:16px;">ACTUAL</th>`;
+        });
         hh+='</tr>';
         thead.innerHTML=hh;
 
         const tbody=document.getElementById('monitorTbody');
         let b='';
         const cellMap={};
+        const dtRowsList = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
         KPI_ROWS.forEach(desc=>{
             let descHtml = desc;
-            b+=`<tr id="row-${desc}"><td class="desc-cell">${descHtml}</td>`;
+            const isDt = dtRowsList.includes(desc);
+            const isDtStart = (desc === 'TOTAL_DT');
+            const rowCls = (isDt ? ' dt-row-bg' : '') + (isDtStart ? ' dt-section-start' : '');
+            b+=`<tr id="row-${desc}" class="${rowCls.trim()}"><td class="desc-cell">${descHtml}</td>`;
             LINES.forEach((line,li)=>{
+                const isLast = (li === LINES.length - 1);
                 ['plan','curr','actual'].forEach((col,ci)=>{
                     const id=`cell-${desc}-${li}-${col}`;
                     cellMap[id]=1;
-                    b+=`<td id="${id}" class="val-${col}"></td>`;
+                    const borderCls = (col === 'actual' && !isLast) ? ' line-border-r' : '';
+                    b+=`<td id="${id}" class="val-${col}${borderCls}"></td>`;
                 });
             });
             b+='</tr>';
@@ -1031,7 +1101,9 @@ function renderAllLines(){
         // STATUS row
         b+=`<tr id="row-STATUS"><td class="desc-cell" style="font-size:13px">STATUS</td>`;
         LINES.forEach((line,li)=>{
-            b+=`<td id="status-${li}" colspan="3" class="status-not-running"></td>`;
+            const isLast = (li === LINES.length - 1);
+            const borderCls = isLast ? '' : ' line-border-r';
+            b+=`<td id="status-${li}" colspan="3" class="status-not-running${borderCls}"></td>`;
         });
         b+='</tr>';
         tbody.innerHTML=b;
@@ -1086,8 +1158,10 @@ function updateAllCells(){
                         actValTxt += ` <span style="font-size:0.6vw;">⚠️</span>`;
                     }
                     setText(ac, actValTxt, desc === 'GSPH');
+                    const isLast = (li === LINES.length - 1);
+                    const borderCls = isLast ? '' : ' line-border-r';
                     cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
-                    ac.className = 'val-actual'+(cl.act?' '+cl.act:'');
+                    ac.className = 'val-actual'+(cl.act?' '+cl.act:'') + borderCls;
                     ac.style.cssText = cl.style || '';
                 }else{
                     setText(getCell('plan'),'-');
@@ -1101,15 +1175,18 @@ function updateAllCells(){
     LINES.forEach((line,li)=>{
         const cell=allStatusCells[li];
         if(!cell)return;
+        const isLast = (li === LINES.length - 1);
+        const borderCls = isLast ? '' : ' line-border-r';
         const s=LINE_STATUSES[line];
         if(s){
             const l=(s.label||'NOT RUNNING').toUpperCase();
-            const cls=l==='RUNNING'||l==='PRODUCTION'?'status-running':l==='BREAK'||l==='BREAKTIME'?'status-break':l==='DOWNTIME'||l==='TROUBLE'?'status-downtime':l==='TRYOUT'?'status-tryout':l==='1ST CHECK'?'status-1stcheck':l==='IDLE'?'status-idle':'status-not-running';
+            const cls=(l==='RUNNING'||l==='PRODUCTION'?'status-running':l==='BREAK'||l==='BREAKTIME'?'status-break':l==='DOWNTIME'||l==='TROUBLE'?'status-downtime':l==='TRYOUT'?'status-tryout':l==='1ST CHECK'?'status-1stcheck':l==='IDLE'?'status-idle':'status-not-running') + borderCls;
             if(cell.textContent!==l) cell.textContent=l;
             if(cell.className!==cls) cell.className=cls;
         }else{
             if(cell.textContent!=='—') cell.textContent='—';
-            if(cell.className!=='status-not-running') cell.className='status-not-running';
+            const cls = 'status-not-running' + borderCls;
+            if(cell.className!==cls) cell.className=cls;
         }
     });
     // NO PLAN badge + notice
@@ -1186,8 +1263,12 @@ function renderTable(){
         `;
 
         let b = '';
+        const dtRowsListSingle = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
         leftRows.forEach(desc => {
-            b += `<tr id="row-${desc}">`;
+            const isDt = dtRowsListSingle.includes(desc);
+            const isDtStart = (desc === 'TOTAL_DT');
+            const rowCls = (isDt ? ' dt-row-bg' : '') + (isDtStart ? ' dt-section-start' : '');
+            b += `<tr id="row-${desc}" class="${rowCls.trim()}">`;
             let descHtml = desc;
             if(desc === 'GSPH') {
                 descHtml = `${desc} <span title="⚠️ GSPH bersifat Real-Time dan bisa melompat liar di menit awal" style="cursor:help; color:#f59e0b; font-size:11px;">⚠️</span>`;
@@ -1260,9 +1341,13 @@ function renderTable(){
     // CASE B: Split screen but seamlessly touching (gap: 0px) with matched rowspans
     // Build left side HTML
     let leftBodyHtml = '';
+    const dtRowsListSplit = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
     for (let i = 0; i < leftRows.length; i++) {
         const desc = leftRows[i];
-        leftBodyHtml += `<tr id="row-${desc}">`;
+        const isDt = dtRowsListSplit.includes(desc);
+        const isDtStart = (desc === 'TOTAL_DT');
+        const rowCls = (isDt ? ' dt-row-bg' : '') + (isDtStart ? ' dt-section-start' : '');
+        leftBodyHtml += `<tr id="row-${desc}" class="${rowCls.trim()}">`;
         
         let descHtml = desc;
         leftBodyHtml += `<td class="desc-cell">${descHtml}</td>`;
