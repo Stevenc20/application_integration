@@ -156,14 +156,14 @@
                     </div>
                     <div class="flex items-end gap-2">
                         <button id="dtBtnSave" onclick="saveDowntime()" class="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                             <span id="dtBtnText">Simpan Laporan</span>
                         </button>
                         <button type="button" id="dtBtnCancelEdit" onclick="cancelDowntimeEdit()" class="hidden px-3 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 font-bold text-sm transition-all" title="Batal Edit">
                             Batal
                         </button>
-                        <button type="button" onclick="closeDowntimeModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 font-bold text-sm transition-all">
-                            Tutup
+                        <button type="button" id="dtBtnLater" onclick="submitDowntimeLater()" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all shadow-sm">
+                            Isi Nanti
                         </button>
                     </div>
                 </div>

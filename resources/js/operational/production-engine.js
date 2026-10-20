@@ -2517,20 +2517,141 @@ function filterDowntimeList(type) {
     renderDowntimeTable();
 }
 
+function submitDowntimeLater() {
+    if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
+    
+    let id = document.getElementById('dtEditId')?.value;
+    if (!id && window.currentDowntimesList && window.currentDowntimesList.length > 0) {
+        const candidate = window.currentDowntimesList.find(dt => 
+            !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)') || 
+            !dt.jenis_downtime || dt.jenis_downtime.toLowerCase() === 'downtime'
+        );
+        if (candidate) {
+            id = candidate.id;
+            const dtEditId = document.getElementById('dtEditId');
+            if (dtEditId) dtEditId.value = id;
+        }
+    }
+
+    const jenis = (document.getElementById('dtJenis')?.value || '').trim();
+    if (!jenis) {
+        showToast('Wajib memilih Jenis Downtime terlebih dahulu sebelum Isi Nanti.', 'warning');
+        document.getElementById('dtJenis')?.focus();
+        return;
+    }
+
+    if (!id) {
+        showToast('Pilih downtime dari daftar terlebih dahulu sebelum Isi Nanti.', 'warning');
+        return;
+    }
+
+    let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
+    if (!problemVal) {
+        problemVal = 'Downtime ' + jenis.toUpperCase();
+    }
+
+    const data = {
+        jenis_downtime: jenis,
+        problem: problemVal,
+        penyebab: (document.getElementById('dtPenyebab')?.value || '').trim(),
+        action: (document.getElementById('dtAction')?.value || '').trim(),
+        pic: (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim()
+    };
+
+    const laterBtn = document.getElementById('dtBtnLater');
+    const origText = laterBtn ? laterBtn.innerHTML : 'Isi Nanti';
+    if (laterBtn) {
+        laterBtn.disabled = true;
+        laterBtn.innerHTML = 'Menyimpan...';
+    }
+
+    fetch(`/operational/downtime/${id}/update`, {
+        method: 'PUT',
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': window.ProductionConfig.csrfToken
+        },
+        body: JSON.stringify(data)
+    })
+    .then(res => {
+        if (!res.ok) {
+            return res.json().then(err => { throw new Error(err.message || 'Gagal menyimpan jenis downtime'); });
+        }
+        return res.json();
+    })
+    .then(res => {
+        if (res.success === false) {
+            showToast(res.message || 'Gagal menyimpan jenis downtime', 'danger');
+            return;
+        }
+
+        showToast('Jenis downtime berhasil disimpan! Detail dapat dilengkapi nanti.', 'success');
+
+        // Optimistically update list
+        if (window.currentDowntimesList) {
+            const idx = window.currentDowntimesList.findIndex(d => d.id == id);
+            if (idx !== -1) {
+                window.currentDowntimesList[idx] = {
+                    ...window.currentDowntimesList[idx],
+                    ...data
+                };
+                renderDowntimeTable();
+            }
+        }
+
+        if (window.currentDtJobId) {
+            loadDowntimes(window.currentDtJobId);
+        }
+
+        cancelDowntimeEdit();
+
+        const modal = document.getElementById('downtimeModal');
+        if (modal) {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        const line = jobMasterData?.[window.currentDtJobId]?.line || window.ProductionConfig?.currentLine;
+        if (line) notifyLineStatusChange(line);
+    })
+    .catch(err => {
+        console.error('submitDowntimeLater error:', err);
+        showToast(err.message || 'Terjadi kesalahan saat menyimpan', 'danger');
+    })
+    .finally(() => {
+        if (laterBtn) {
+            laterBtn.disabled = false;
+            laterBtn.innerHTML = origText;
+        }
+    });
+}
+
 function closeDowntimeModal() {
     try {
-        const id = document.getElementById('dtEditId')?.value;
+        let id = document.getElementById('dtEditId')?.value;
         const jenis = (document.getElementById('dtJenis')?.value || '').trim();
 
-        // Jika form sedang terbuka untuk pengisian downtime (ada id)
-        if (id) {
+        // Cari calon downtime jika id tidak ada tapi list memiliki downtime yang belum lengkap
+        if (!id && window.currentDowntimesList && window.currentDowntimesList.length > 0) {
+            const candidate = window.currentDowntimesList.find(dt => 
+                !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)') || 
+                !dt.jenis_downtime || dt.jenis_downtime.toLowerCase() === 'downtime'
+            );
+            if (candidate) {
+                id = candidate.id;
+            }
+        }
+
+        // Jika ada id atau ada jenis yang sedang dipilih
+        if (id || jenis) {
             if (!jenis) {
                 showToast('Wajib memilih Jenis Downtime terlebih dahulu sebelum menutup.', 'warning');
                 document.getElementById('dtJenis')?.focus();
                 return;
             }
-            // Jika jenis sudah dipilih, simpan dulu baru tutup modalnya
-            saveDowntime(true);
+            // Jika jenis sudah dipilih, simpan via submitDowntimeLater
+            submitDowntimeLater();
             return;
         }
 
@@ -2937,6 +3058,7 @@ window.cancelDowntimeEdit = cancelDowntimeEdit;
 window.deleteDowntime = deleteDowntime;
 window.loadDowntimes = loadDowntimes;
 window.editDowntimeFromIndex = editDowntimeFromIndex;
+window.submitDowntimeLater = submitDowntimeLater;
 window.closeDowntimeModal = closeDowntimeModal;
 window.filterDowntimeList = filterDowntimeList;
 window.saveJob = saveJob;
