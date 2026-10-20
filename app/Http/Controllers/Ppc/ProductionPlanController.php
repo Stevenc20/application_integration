@@ -426,12 +426,19 @@ class ProductionPlanController extends Controller
                     }
                 }
 
-                // Helper: Cek apakah suatu job sudah aktif / berjalan di lini
+                // Helper: Cek apakah suatu job sudah aktif / berjalan / memiliki data produksi di lini
                 $isJobActiveOrCompleted = function($planId) use ($connectedJobs) {
                     $job = $connectedJobs->first(function($jm) use ($planId) {
                         return str_ends_with($jm->job_number, "-{$planId}");
                     });
-                    if (!$job) return false;
+                    if (!$job) {
+                        // Double check langsung ke database demi keamanan permanen
+                        $directJob = \App\Models\JobMaster::where('job_number', 'LIKE', "%-{$planId}")
+                            ->with(['dailyProduction', 'productionSessions', 'downtimes'])
+                            ->first();
+                        if (!$directJob) return false;
+                        $job = $directJob;
+                    }
 
                     $status = strtolower($job->status);
                     if (in_array($status, ['running', 'paused', 'complete', 'completed', 'finished'])) {
@@ -450,15 +457,39 @@ class ProductionPlanController extends Controller
 
                 // Index existing plans by matching key: shift||lineId||job_master||job_no
                 $existingPlansByKey = [];
+                $existingPlansByJobNo = [];
+                $existingPlansByJobMaster = [];
+
                 foreach ($existingPlans as $ep) {
                     $cShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $ep->shift_name))));
+                    $epLineId = $ep->line_master_id;
+                    $epJm = strtoupper(trim($ep->job_master ?? ''));
+                    $epJn = strtoupper(trim($ep->job_no ?? ''));
+
                     if ($ep->row_type === 'break') {
-                        $bKey = $cShift . '||' . $ep->line_master_id . '||break||' . strtoupper(trim($ep->job_no ?? $ep->keterangan ?? '')) . '||' . trim($ep->start_time ?? '') . '||' . trim($ep->finish_time ?? '');
+                        $bKey = $cShift . '||' . $epLineId . '||break||' . strtoupper(trim($ep->job_no ?? $ep->keterangan ?? '')) . '||' . trim($ep->start_time ?? '') . '||' . trim($ep->finish_time ?? '');
                         $existingPlansByKey[$bKey] = $ep;
                     } else {
-                        $jKey = $cShift . '||' . $ep->line_master_id . '||' . strtoupper(trim($ep->job_master ?? '')) . '||' . strtoupper(trim($ep->job_no ?? ''));
+                        // Primary key: CleanShift + Line + JobMaster + JobNo
+                        $jKey = $cShift . '||' . $epLineId . '||' . $epJm . '||' . $epJn;
                         if (!isset($existingPlansByKey[$jKey]) || $isJobActiveOrCompleted($ep->id)) {
                             $existingPlansByKey[$jKey] = $ep;
+                        }
+
+                        // Secondary key: CleanShift + Line + JobNo (jika job_no terisi dan spesifik)
+                        if ($epJn && !in_array($epJn, ['-', 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) {
+                            $noKey = $cShift . '||' . $epLineId . '||' . $epJn;
+                            if (!isset($existingPlansByJobNo[$noKey]) || $isJobActiveOrCompleted($ep->id)) {
+                                $existingPlansByJobNo[$noKey] = $ep;
+                            }
+                        }
+
+                        // Tertiary key: CleanShift + Line + JobMaster (jika tanpa job_no)
+                        if ($epJm) {
+                            $jmKey = $cShift . '||' . $epLineId . '||' . $epJm;
+                            if (!isset($existingPlansByJobMaster[$jmKey]) || $isJobActiveOrCompleted($ep->id)) {
+                                $existingPlansByJobMaster[$jmKey] = $ep;
+                            }
                         }
                     }
                 }
@@ -688,11 +719,31 @@ class ProductionPlanController extends Controller
                         ];
 
                         // SMART MATCHING: Cari apakah baris ini sudah ada di DB
+                        $cleanImportShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $shiftName))));
+                        $cleanJm = strtoupper(trim($jm));
+                        $cleanJn = strtoupper(trim($jn));
+
                         $matchKey = ($rowType === 'break')
-                            ? ($shiftName . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
-                            : ($shiftName . '||' . $lineId . '||' . strtoupper(trim($jm)) . '||' . strtoupper(trim($jn)));
+                            ? ($cleanImportShift . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
+                            : ($cleanImportShift . '||' . $lineId . '||' . $cleanJm . '||' . $cleanJn);
 
                         $matchedExistingPlan = $existingPlansByKey[$matchKey] ?? null;
+
+                        // Fallback matching 1: by Job No (jika ada dan unik di shift+line ini)
+                        if (!$matchedExistingPlan && $rowType === 'job' && $cleanJn && !in_array($cleanJn, ['-', 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) {
+                            $noKey = $cleanImportShift . '||' . $lineId . '||' . $cleanJn;
+                            if (isset($existingPlansByJobNo[$noKey])) {
+                                $matchedExistingPlan = $existingPlansByJobNo[$noKey];
+                            }
+                        }
+
+                        // Fallback matching 2: by Job Master jika Job No kosong di salah satu sisi
+                        if (!$matchedExistingPlan && $rowType === 'job' && $cleanJm && (!$cleanJn || $cleanJn === '-')) {
+                            $jmKey = $cleanImportShift . '||' . $lineId . '||' . $cleanJm;
+                            if (isset($existingPlansByJobMaster[$jmKey])) {
+                                $matchedExistingPlan = $existingPlansByJobMaster[$jmKey];
+                            }
+                        }
 
                         if ($matchedExistingPlan) {
                             // ITEM SAMA: Lakukan UPDATE in-place tanpa mengubah ID & tanpa mereset sesi
@@ -744,8 +795,27 @@ class ProductionPlanController extends Controller
                 }
 
                 // ── CLEANUP & PROTEKSI ITEM OBSOLETE (Dihapus PPC di revisi baru) ──
+                // SCOPE PENTING: Hanya bersihkan item obsolete pada Shift & Press yang MEMANG DIUNGGAH dalam sheet file revisi ini!
+                // Shift / Press lain yang tidak ada dalam file unggahan TIDAK BOLEH disentuh.
+                $importedSectionKeys = [];
+                foreach ($sheets as $s) {
+                    $cShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $s['shift_name'] ?? ''))));
+                    $pName = strtoupper(str_replace([' ', '-'], '', $s['press_name'] ?? ''));
+                    $importedSectionKeys[$cShift . '||' . $pName] = true;
+                }
+
                 $obsoletePlans = $existingPlans->whereNotIn('id', $retainedPlanIds);
                 foreach ($obsoletePlans as $obsPlan) {
+                    $obsCleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $obsPlan->shift_name))));
+                    $obsPress = strtoupper(str_replace([' ', '-'], '', $obsPlan->press_name ?? ''));
+                    $sectionScopeKey = $obsCleanShift . '||' . $obsPress;
+
+                    // Jika item ini berada di shift/press yang TIDAK diimpor pada file ini, jangan hapus!
+                    if (!isset($importedSectionKeys[$sectionScopeKey])) {
+                        continue;
+                    }
+
+                    // Pengecekan riil: jika job sudah aktif / berjalan / memiliki data di lini, PERTAHANKAN
                     if ($isJobActiveOrCompleted($obsPlan->id)) {
                         Log::info("[IMPORT] Retaining obsolete plan because job is active/completed in line", [
                             'plan_id' => $obsPlan->id,
@@ -756,6 +826,32 @@ class ProductionPlanController extends Controller
 
                     $pid = $obsPlan->id;
                     $unusedJobs = \App\Models\JobMaster::where('job_number', 'LIKE', "%-{$pid}")->get();
+                    
+                    // Safety net tambahan: cek apakah unusedJobs memiliki data produksi
+                    $canDelete = true;
+                    foreach ($unusedJobs as $uj) {
+                        $hasProdData = \App\Models\DailyProduction::where('job_master_id', $uj->id)
+                            ->where(function($q) {
+                                $q->where('actual_ok', '>', 0)
+                                  ->orWhere('actual_repair', '>', 0)
+                                  ->orWhere('actual_reject', '>', 0);
+                            })->exists();
+                        $hasDt = \App\Models\Downtime::where('job_master_id', $uj->id)->exists();
+                        $hasSess = \App\Models\ProductionSession::where('job_master_id', $uj->id)->exists();
+                        if ($hasProdData || $hasDt || $hasSess || !empty($uj->started_at)) {
+                            $canDelete = false;
+                            break;
+                        }
+                    }
+
+                    if (!$canDelete) {
+                        Log::info("[IMPORT] Retaining obsolete plan because JobMaster has existing production data", [
+                            'plan_id' => $obsPlan->id,
+                            'job_no' => $obsPlan->job_no,
+                        ]);
+                        continue;
+                    }
+
                     foreach ($unusedJobs as $uj) {
                         $uj->delete();
                     }
@@ -776,11 +872,18 @@ class ProductionPlanController extends Controller
                     ProductionPlan::whereIn('id', $recoveryPlanIds)->delete();
                 }
 
-                // 3. Delete leftover breaks yang tidak retained
-                ProductionPlan::whereDate('plan_date', $parsedDate)
+                // 3. Delete leftover breaks yang tidak retained hanya pada section yang diimpor
+                $leftoverBreaks = ProductionPlan::whereDate('plan_date', $parsedDate)
                     ->where('row_type', 'break')
                     ->whereNotIn('id', $retainedPlanIds)
-                    ->delete();
+                    ->get();
+                foreach ($leftoverBreaks as $lb) {
+                    $lbCleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $lb->shift_name))));
+                    $lbPress = strtoupper(str_replace([' ', '-'], '', $lb->press_name ?? ''));
+                    if (isset($importedSectionKeys[$lbCleanShift . '||' . $lbPress])) {
+                        $lb->delete();
+                    }
+                }
 
                 // Log Python's own row counts if available
                 if (isset($result['log'])) {
