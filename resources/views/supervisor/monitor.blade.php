@@ -272,14 +272,15 @@
         .table-scroll{position:relative}
         .table-scroll table{border-collapse:collapse}
 
-        /* ── THEME TOGGLE BTN ── */
-        .theme-btn{
+        /* ── ICON BUTTONS (THEME & FULLSCREEN) ── */
+        .icon-btn{
             display:inline-flex;align-items:center;justify-content:center;
             width:32px;height:32px;border-radius:6px;
             background:#f1f5f9;border:1px solid #e2e8f0;
             color:#475569;cursor:pointer;transition:all 0.12s;
         }
-        .theme-btn:hover{background:#e2e8f0;color:#1e293b;}
+        .icon-btn:hover{background:#e2e8f0;color:#1e293b;}
+        .icon-btn.active{background:#1d4ed8;color:#fff;border-color:#1d4ed8;}
 
         /* ── DARK MODE ── */
         body.dark{background:#0f172a;color:#f8fafc}
@@ -312,8 +313,9 @@
         body.dark .val-plan{color:#94a3b8}
         body.dark .val-curr{color:#cbd5e1}
         body.dark .val-actual{color:#f8fafc}
-        body.dark .theme-btn{background:#334155;color:#fbbf24;border-color:#475569;}
-        body.dark .theme-btn:hover{background:#475569;}
+        body.dark .icon-btn{background:#334155;color:#cbd5e1;border-color:#475569;}
+        body.dark .icon-btn:hover{background:#475569;color:#f8fafc;}
+        body.dark .icon-btn.active{background:#3b82f6;color:#fff;border-color:#3b82f6;}
         body.dark .sep-row td{background:#334155!important}
         body.dark .sep-row .desc-cell{background:#334155!important}
         body.dark .detail-header td{background:#1e3a8a!important;color:#93c5fd!important}
@@ -538,9 +540,14 @@
                 <button onclick="setShift(1,true)" data-shift="1" class="active">Shift Pagi</button>
                 <button onclick="setShift(2,true)" data-shift="2" class="">Shift Malam</button>
             </div>
-            <button class="theme-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode" id="themeBtn" style="margin-left: 4px; margin-right: 8px;">
+            <button class="icon-btn" onclick="toggleTheme()" title="Toggle Dark/Light Mode" id="themeBtn" style="margin-left: 4px; margin-right: 4px;">
                 <svg id="themeIcon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>
+                </svg>
+            </button>
+            <button class="icon-btn" onclick="toggleFullscreen()" title="Fullscreen Mode (TV Auto-Fit)" id="fullscreenBtn" style="margin-right: 8px;">
+                <svg id="fullscreenIcon" width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
                 </svg>
             </button>
             <div class="clock" id="liveClock" style="margin-right: 12px;">--:--:--</div>
@@ -618,6 +625,62 @@ function updateThemeIcon(isDark) {
         icon.innerHTML = '<path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>';
     }
 }
+
+// ── FULLSCREEN TOGGLE & AUTO-FIT ──
+function toggleFullscreen() {
+    if (!document.fullscreenElement && !document.webkitFullscreenElement && !document.mozFullScreenElement && !document.msFullscreenElement) {
+        const docEl = document.documentElement;
+        if (docEl.requestFullscreen) {
+            docEl.requestFullscreen().catch(err => console.error("Fullscreen error:", err));
+        } else if (docEl.webkitRequestFullscreen) {
+            docEl.webkitRequestFullscreen();
+        } else if (docEl.mozRequestFullScreen) {
+            docEl.mozRequestFullScreen();
+        } else if (docEl.msRequestFullscreen) {
+            docEl.msRequestFullscreen();
+        }
+    } else {
+        if (document.exitFullscreen) {
+            document.exitFullscreen().catch(err => console.error("Exit fullscreen error:", err));
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+    }
+}
+
+function updateFullscreenIcon() {
+    const isFS = !!(document.fullscreenElement || document.webkitFullscreenElement || document.mozFullScreenElement || document.msFullscreenElement);
+    const icon = document.getElementById('fullscreenIcon');
+    const btn = document.getElementById('fullscreenBtn');
+    if (btn) {
+        btn.classList.toggle('active', isFS);
+        btn.title = isFS ? "Exit Fullscreen" : "Fullscreen Mode (TV Auto-Fit)";
+    }
+    if (icon) {
+        if (isFS) {
+            // Exit fullscreen icon (arrows pointing inward)
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M9 4v4H5m0 0l5-5M15 4v4h4m0 0l-5-5M9 20v-4H5m0 0l5 5M15 20v-4h4m0 0l-5 5" />';
+        } else {
+            // Enter fullscreen icon (arrows pointing outward)
+            icon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />';
+        }
+    }
+    // Auto refit and re-render components on fullscreen change
+    setTimeout(() => {
+        renderTable();
+        refitRoot();
+    }, 150);
+}
+
+document.addEventListener('fullscreenchange', updateFullscreenIcon);
+document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
+document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
+document.addEventListener('MSFullscreenChange', updateFullscreenIcon);
+
 document.addEventListener('DOMContentLoaded', () => {
     updateThemeIcon(document.body.classList.contains('dark'));
 });
@@ -1244,11 +1307,11 @@ function renderTable(){
         const body = buildRightBody(rows, matchLeft ? Math.max(leftRows.length, rows.length) : rows.length, overallPlan);
         const pageTag = pageInfo ? ` <span style="display:inline-flex;align-items:center;background:rgba(255,255,255,0.2);border-radius:99px;padding:1px 10px;font-size:11px;letter-spacing:0.1em;vertical-align:middle;">${pageInfo.page}/${pageInfo.pages}</span>` : '';
         scrollEl.innerHTML = `
-        <div style="display:flex; flex-direction:column; width:100%; min-height:100%;">
-            <div style="display:flex; gap:0px; width:100%; flex:1; align-items:stretch;">
+        <div style="display:flex; flex-direction:column; width:100%; height:100%; justify-content:space-between; overflow:hidden;">
+            <div style="display:flex; gap:0px; width:100%; flex:1; min-height:0; align-items:stretch; overflow:hidden;">
                 <!-- Left KPI Table -->
-                <div class="card-bg" style="width:28%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink: 0;">
-                    <table class="large-table left-kpi-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-right:none;">
+                <div class="card-bg" style="width:28%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink:0; overflow:hidden;">
+                    <table class="large-table left-kpi-table" style="width:100%; height:100%; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
                             <tr class="single-top-header">
                                 <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
@@ -1267,7 +1330,7 @@ function renderTable(){
                 </div>
                 <!-- Right Detail Table -->
                 <div style="width:72%; display:flex; flex-direction:column; overflow:hidden;">
-                    <table class="large-table right-detail-table" style="width:100%; flex:1; table-layout:fixed; border-collapse:collapse; border-left:none;">
+                    <table class="large-table right-detail-table" style="width:100%; height:100%; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
                                 <th colspan="15" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
@@ -1297,7 +1360,7 @@ function renderTable(){
                 </div>
             </div>
             <!-- Shared Footer Status & Progress -->
-            <div class="card-bg border-divider" style="width:100%; border-top-width:2px; border-top-style:solid; margin-top:8px; position:sticky; left:0; z-index:11;">
+            <div class="card-bg border-divider" style="width:100%; border-top-width:2px; border-top-style:solid; margin-top:4px; flex-shrink:0; position:sticky; left:0; z-index:11;">
                 <table class="large-table" style="width:100%; border-collapse:collapse; table-layout:fixed;">
                     <tbody>
                         <tr>
@@ -1305,8 +1368,8 @@ function renderTable(){
                             <td class="${statusClass}" style="text-align:left; padding-left:20px; font-weight:900; border-bottom:none;">${statusVal}</td>
                         </tr>
                         <tr class="progress-row">
-                            <td colspan="2" class="card-bg border-divider" style="padding:8px 12px; text-align:left; border-top-width:1px; border-top-style:solid; border-bottom:none;">
-                                <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:4px;">PROGRESS PRODUKSI</div>
+                            <td colspan="2" class="card-bg border-divider" style="padding:6px 12px; text-align:left; border-top-width:1px; border-top-style:solid; border-bottom:none;">
+                                <div style="font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:0.1em; color:#64748b; margin-bottom:3px;">PROGRESS PRODUKSI</div>
                                 <div style="display:flex; align-items:center; gap:8px; width:100%; min-width:0;">
                                     <div style="flex:1; min-width:0; background:#e2e8f0; height:10px; border-radius:9999px; overflow:hidden; border:1px solid #cbd5e1; padding:2px;">
                                         <div style="background:${barColor}; width:${Math.min(progressPct,100)}%; height:100%; border-radius:9999px; transition:width 0.5s ease-in-out;"></div>
