@@ -268,7 +268,8 @@ class DashboardRealtimeService
 
         $dtTotalMinutes = 0;
         foreach ($allDowntimes as $dt) {
-            if (str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori')) continue;
+            $type = strtoupper(trim($dt->jenis_downtime ?? ''));
+            if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
             $dtTotalMinutes += $this->downtimeDurationSeconds($dt) / 60;
         }
         $dtTotalMinutes = round($dtTotalMinutes, 1);
@@ -292,10 +293,10 @@ class DashboardRealtimeService
             $runningJobId = $runningRecord->job_master_id;
             $runningDt = $allDowntimes->where('job_master_id', $runningJobId);
             foreach ($runningDt as $dt) {
-                if (str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori')) continue;
+                $type = strtoupper(trim($dt->jenis_downtime ?? ''));
+                if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
                 $dur = $this->downtimeDurationSeconds($dt) / 60;
                 $currDtTotal += $dur;
-                $type = strtoupper($dt->jenis_downtime ?? '');
                 if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) $currDtMach += $dur;
                 elseif (str_contains($type, 'DIES')) $currDtDies += $dur;
                 elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) $currDtMat += $dur;
@@ -320,7 +321,8 @@ class DashboardRealtimeService
         $rejectRows = [];
 
         foreach ($allDowntimes as $dt) {
-            if (str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori')) continue;
+            $type = strtoupper(trim($dt->jenis_downtime ?? ''));
+            if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
             $dur = round($this->downtimeDurationSeconds($dt) / 60, 1);
             $rawJob = $dt->jobMaster?->job_name ?? '-';
             $jobName = $shortJob($rawJob);
@@ -336,7 +338,6 @@ class DashboardRealtimeService
             ];
             $dtRows[] = $row;
 
-            $type = strtoupper($dt->jenis_downtime ?? '');
             if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
                 $machRows[] = $row;
             } elseif (str_contains($type, 'DIES')) {
