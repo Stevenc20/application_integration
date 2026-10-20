@@ -209,22 +209,22 @@
             background-color: #fde047 !important;
         }
 
-        /* Dark mode Downtime Rows: Abu sedang (medium muted slate/gray) - tidak terlalu terang dan tidak terlalu gelap */
+        /* Dark mode Downtime Rows: Nuansa gelap tegas/pekat (dark slate-charcoal) */
         body.dark .dt-row-bg td:not([class*="bg-"]) {
-            background-color: #334155 !important; /* Abu slate sedang (Slate-700) */
-            color: #f1f5f9 !important; /* Teks putih terang jelas */
+            background-color: #0b1120 !important; /* Gelap pekat (sangat kontras dengan cell merah alert) */
+            color: #94a3b8 !important; /* Muted slate text agar angka/label non-downtime tidak menusuk mata */
             font-weight: 700 !important;
         }
         body.dark .dt-row-bg td.desc-cell {
-            background-color: #475569 !important; /* Slate-600 */
-            color: #ffffff !important;
-            font-weight: 900 !important;
+            background-color: #0f172a !important; /* Deep dark slate-900 */
+            color: #cbd5e1 !important;
+            font-weight: 800 !important;
         }
         body.dark .dt-row-bg:nth-child(even) td:not([class*="bg-"]) {
-            background-color: #293548 !important; /* Sedikit beda striping */
+            background-color: #080d1a !important; /* Striping gelap pekat */
         }
         body.dark .dt-row-bg:nth-child(even) td.desc-cell {
-            background-color: #3e4c5e !important;
+            background-color: #0c1322 !important;
         }
 
         /* Saat ada downtime (cell merah), buat merah menyala terang berbingkai kontras tinggi */
