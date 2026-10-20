@@ -209,21 +209,22 @@
             background-color: #fde047 !important;
         }
 
-        /* Dark mode Downtime Rows: Slate/Navy Redup agar cell merah kontras menyala */
+        /* Dark mode Downtime Rows: Abu sedang (medium muted slate/gray) - tidak terlalu terang dan tidak terlalu gelap */
         body.dark .dt-row-bg td:not([class*="bg-"]) {
-            background-color: #1a2234 !important; /* Slate navy gelap dan tenang */
-            color: #94a3b8 !important;
+            background-color: #334155 !important; /* Abu slate sedang (Slate-700) */
+            color: #f1f5f9 !important; /* Teks putih terang jelas */
+            font-weight: 700 !important;
         }
         body.dark .dt-row-bg td.desc-cell {
-            background-color: #1e293b !important;
-            color: #e2e8f0 !important;
-            font-weight: 800 !important;
+            background-color: #475569 !important; /* Slate-600 */
+            color: #ffffff !important;
+            font-weight: 900 !important;
         }
         body.dark .dt-row-bg:nth-child(even) td:not([class*="bg-"]) {
-            background-color: #141b2b !important;
+            background-color: #293548 !important; /* Sedikit beda striping */
         }
         body.dark .dt-row-bg:nth-child(even) td.desc-cell {
-            background-color: #172033 !important;
+            background-color: #3e4c5e !important;
         }
 
         /* Saat ada downtime (cell merah), buat merah menyala terang berbingkai kontras tinggi */
