@@ -89,20 +89,34 @@ class DashboardDetailService
                 ->keyBy('job_master_id');
         }
 
-        $dandoriMinutes = Dandori::whereIn('next_job_id', $jobIds)
-            ->whereNotNull('finish_time')
-            ->selectRaw('next_job_id, COALESCE(SUM(duration_minutes), 0) as total')
-            ->groupBy('next_job_id')
-            ->pluck('total', 'next_job_id');
+        $dandoriModels = Dandori::whereIn('next_job_id', $jobIds)->get();
+
+        $dandoriMinutes = [];
+        $firstCheckMinutes = [];
+        foreach ($dandoriModels as $d) {
+            $jId = $d->next_job_id;
+            $dur = (float) ($d->duration_minutes ?? 0);
+            if ($dur <= 0 && $d->start_time) {
+                $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+                $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
+            }
+            $jenis = strtolower(trim($d->jenis_dandori ?? ''));
+            $act = strtoupper(trim($d->activity ?? ''));
+
+            if ($jenis === '1st_check' || $jenis === '1st check' || $act === '1ST CHECK') {
+                $firstCheckMinutes[$jId] = ($firstCheckMinutes[$jId] ?? 0) + $dur;
+            } else {
+                $dandoriMinutes[$jId] = ($dandoriMinutes[$jId] ?? 0) + $dur;
+            }
+        }
 
         $qcheckModels = QCheck::whereIn('job_master_id', $jobIds)
             ->whereNotNull('start_time')
             ->whereNotNull('finish_time')
             ->get();
 
-        $qcheckMinutes = [];
         foreach ($qcheckModels as $qc) {
-            $qcheckMinutes[$qc->job_master_id] = ($qcheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
+            $firstCheckMinutes[$qc->job_master_id] = ($firstCheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
         }
 
         $downtimeData = Downtime::whereIn('job_master_id', $jobIds)
@@ -139,8 +153,8 @@ class DashboardDetailService
             $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 1) : 0;
 
             $jobId = $job?->id;
-            $dandori = $jobId ? (float) ($dandoriMinutes->get($jobId, 0)) : 0;
-            $iqCheck = $jobId ? round($qcheckMinutes[$jobId] ?? 0, 1) : 0;
+            $dandori = $jobId ? round($dandoriMinutes[$jobId] ?? 0, 1) : 0;
+            $iqCheck = $jobId ? round($firstCheckMinutes[$jobId] ?? 0, 1) : 0;
             $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 1) : 0;
 
             $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
