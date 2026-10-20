@@ -397,7 +397,7 @@
                                 @endphp
                                 <tr>
                                     <td class="text-center font-bold text-gray-500">{{ $job['display_no'] ?? $loop->iteration }}</td>
-                                    <td class="text-center font-semibold text-gray-800" title="{{ $job['job_no'] ?? '' }}">{{ $job['job_master'] ?? '-' }}</td>
+                                    <td class="text-center font-semibold text-gray-800" title="{{ $job['job_master'] ?? '' }}">{{ !empty($job['job_no']) ? $job['job_no'] : ($job['job_master'] ?? '-') }}</td>
                                     <td class="cell-qty">{{ number_format($planQty) }}</td>
                                     <td class="text-center">{{ $job['total_mesin'] ?? 1 }}</td>
                                     <td class="text-center font-semibold">{{ number_format($ctPlan,1) }}</td>

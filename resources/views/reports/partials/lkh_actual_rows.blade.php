@@ -87,7 +87,7 @@
         @endphp
         <tr>
             <td class="text-center font-bold text-gray-500">{{ $job['display_no'] ?? $loop->iteration }}</td>
-            <td class="text-center font-semibold text-gray-800">{{ $job['job_master'] ?? '-' }}</td>
+            <td class="text-center font-semibold text-gray-800" title="{{ $job['job_master'] ?? '' }}">{{ !empty($job['job_no']) ? $job['job_no'] : ($job['job_master'] ?? '-') }}</td>
             <td class="cell-qty">{{ number_format($job['plan_qty'] ?? 0) }}</td>
             <td class="cell-qty font-bold">{{ number_format($totalStroke) }}</td>
             {!! $editTd($planId, 'actual_good', 'qty', $actGood, number_format($actGood), 'cell-qty text-emerald-700 font-bold') !!}

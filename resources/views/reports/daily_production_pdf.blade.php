@@ -343,7 +343,7 @@
                 @else
                 <tr>
                     <td>{{ $job['display_no'] ?? $rowNo }}</td>
-                    <td class="l b">{{ $job['job_master'] ?? '-' }}</td>
+                    <td class="l b">{{ !empty($job['job_no']) ? $job['job_no'] : ($job['job_master'] ?? '-') }}</td>
                     <td class="r">{{ number_format($planQty,0) }}</td>
                     <td>{{ $job['total_mesin'] ?? 1 }}</td>
                     <td>{{ number_format($job['plan_ct'] ?? 0, 1) }}</td>
@@ -692,7 +692,7 @@
                 @else
                 <tr>
                     <td>{{ $job['display_no'] ?? $actIdx }}</td>
-                    <td class="l b">{{ $job['job_master'] ?? '-' }}</td>
+                    <td class="l b">{{ !empty($job['job_no']) ? $job['job_no'] : ($job['job_master'] ?? '-') }}</td>
                     <td class="r">{{ number_format($planQ,0) }}</td>
                     <td class="r b">{{ number_format($totalS,0) }}</td>
                     <td class="r b green">{{ number_format($actGood,0) }}</td>

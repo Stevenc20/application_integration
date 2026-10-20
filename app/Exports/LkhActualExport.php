@@ -273,7 +273,7 @@ class LkhActualExport
 
             $values = [
                 1 => $job['display_no'] ?? ($idx + 1),
-                2 => $job['job_master'] ?? '-',
+                2 => !empty($job['job_no']) ? $job['job_no'] : ($job['job_master'] ?? '-'),
                 3 => $job['plan_qty'] ?? 0,
                 4 => $totalStroke,
                 5 => $actGood,
