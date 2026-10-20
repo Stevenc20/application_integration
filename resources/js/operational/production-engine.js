@@ -2872,13 +2872,19 @@ window.manualStep = function (id, inputId, jobId) {
         const raw = input.value.trim();
         const value = parseInt(raw, 10);
         if (!isNaN(value) && value > 0) {
-            const targetJobId = jobId || id.split('-').pop();
-            const current = Math.max(0, parseInt(jobMasterData[targetJobId]?.actual_ok, 10) || 0);
-            const targetMax = parseInt(jobMasterData[targetJobId]?.target_qty, 10) || 0;
-            if (targetMax > 0 && (current + value) > targetMax) {
-                const sisa = Math.max(0, targetMax - current);
-                showToast(`Target Plan maksimal ${targetMax} PCS! Input ${value} melebihi target (Sisa: ${sisa} PCS).`, 'danger');
-                return;
+            const isRepair = id.includes('repair');
+            const isReject = id.includes('reject');
+
+            // Hanya validasi batasan target plan jika input adalah OK (bukan repair / reject)
+            if (!isRepair && !isReject) {
+                const targetJobId = jobId || id.split('-').pop();
+                const current = Math.max(0, parseInt(jobMasterData[targetJobId]?.actual_ok, 10) || 0);
+                const targetMax = parseInt(jobMasterData[targetJobId]?.target_qty, 10) || 0;
+                if (targetMax > 0 && (current + value) > targetMax) {
+                    const sisa = Math.max(0, targetMax - current);
+                    showToast(`Target Plan maksimal ${targetMax} PCS! Input ${value} melebihi target (Sisa: ${sisa} PCS).`, 'danger');
+                    return;
+                }
             }
             stepInput(id, value, jobId);
             input.value = '';
