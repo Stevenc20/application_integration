@@ -2182,19 +2182,29 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
         window.currentDtJobId = jobId;
         const row = document.getElementById('row-' + jobId);
         const dtJobNumber = document.getElementById('dtJobNumber');
-        if (row && dtJobNumber) {
-            const jn = row.getAttribute('data-job-number') || '';
-            const jm = row.getAttribute('data-job-master') || '';
-            dtJobNumber.innerText = jm ? (jm + (jn ? ' (' + jn + ')' : '')) : (jn || '-');
+        if (dtJobNumber) {
+            if (row) {
+                const jn = row.getAttribute('data-job-number') || '';
+                const jm = row.getAttribute('data-job-master') || '';
+                dtJobNumber.innerText = jm ? (jm + (jn ? ' (' + jn + ')' : '')) : (jn || '-');
+            } else if (window.jobMasterData?.[jobId]) {
+                const j = window.jobMasterData[jobId];
+                dtJobNumber.innerText = j.job_name ? (j.job_name + (j.job_number ? ' (' + j.job_number + ')' : '')) : (j.job_number || '-');
+            } else {
+                dtJobNumber.innerText = '-';
+            }
         }
 
         const dtFormTitle = document.getElementById('dtFormTitle');
         const dtBtnText = document.getElementById('dtBtnText');
-        if (dtFormTitle) dtFormTitle.innerText = 'Lengkapi Detail Masalah';
-        if (dtBtnText) dtBtnText.innerText = 'Simpan Laporan';
-
+        const dtBtnCancelEdit = document.getElementById('dtBtnCancelEdit');
         const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
+
         if (dt && dt.id) {
+            if (dtFormTitle) dtFormTitle.innerText = 'Lengkapi Detail Masalah';
+            if (dtBtnText) dtBtnText.innerText = 'Simpan Laporan';
+            if (dtBtnCancelEdit) dtBtnCancelEdit.classList.add('hidden');
+
             const dtEditId = document.getElementById('dtEditId');
             const dtJenis = document.getElementById('dtJenis');
             const dtProblem = document.getElementById('dtProblem');
@@ -2202,7 +2212,11 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
             const dtAction = document.getElementById('dtAction');
             const dtPIC = document.getElementById('dtPIC');
             if (dtEditId) dtEditId.value = dt.id;
-            if (dtJenis) dtJenis.value = dt.jenis_downtime;
+            if (dtJenis) {
+                const rawType = (dt.jenis_downtime || '').toLowerCase().trim();
+                // If generic 'downtime', force empty so operator selects specific category
+                dtJenis.value = rawType === 'downtime' ? '' : (dt.jenis_downtime || '');
+            }
             if (dtProblem) {
                 let problemVal = dt.problem || '';
                 if (problemVal.trim() === '-' || problemVal.includes('(Shortcut)')) {
@@ -2214,6 +2228,9 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
             if (dtAction) dtAction.value = dt.action || '';
             if (dtPIC) dtPIC.value = dt.pic || window.ProductionConfig.userName || '';
             if (formArea) formArea.classList.remove('hidden');
+        } else {
+            // Opened directly (e.g. from "Cek List Downtime" button)
+            cancelDowntimeEdit();
         }
 
         const modal = document.getElementById('downtimeModal');
@@ -2227,49 +2244,121 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
     }
 }
 
+function cancelDowntimeEdit() {
+    const dtEditId = document.getElementById('dtEditId');
+    const dtJenis = document.getElementById('dtJenis');
+    const dtProblem = document.getElementById('dtProblem');
+    const dtPenyebab = document.getElementById('dtPenyebab');
+    const dtAction = document.getElementById('dtAction');
+    const dtPIC = document.getElementById('dtPIC');
+    const dtFormTitle = document.getElementById('dtFormTitle');
+    const dtBtnText = document.getElementById('dtBtnText');
+    const dtBtnCancelEdit = document.getElementById('dtBtnCancelEdit');
+    const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
+
+    if (dtEditId) dtEditId.value = '';
+    if (dtJenis) dtJenis.value = '';
+    if (dtProblem) dtProblem.value = '';
+    if (dtPenyebab) dtPenyebab.value = '';
+    if (dtAction) dtAction.value = '';
+    if (dtPIC) dtPIC.value = window.ProductionConfig?.userName || '';
+    if (dtFormTitle) dtFormTitle.innerText = 'Lengkapi Detail Masalah';
+    if (dtBtnText) dtBtnText.innerText = 'Simpan Laporan';
+    if (dtBtnCancelEdit) dtBtnCancelEdit.classList.add('hidden');
+    if (formArea) formArea.classList.add('hidden');
+}
+
 function editDowntimeFromIndex(index) {
     const dt = window.currentDowntimesList[index];
     if (dt) {
         // Load the data into form inputs
-        document.getElementById('dtEditId').value = dt.id;
-        document.getElementById('dtJenis').value = dt.jenis_downtime;
+        const dtEditId = document.getElementById('dtEditId');
+        const dtJenis = document.getElementById('dtJenis');
+        const dtProblem = document.getElementById('dtProblem');
+        const dtPenyebab = document.getElementById('dtPenyebab');
+        const dtAction = document.getElementById('dtAction');
+        const dtPIC = document.getElementById('dtPIC');
+        const dtBtnCancelEdit = document.getElementById('dtBtnCancelEdit');
+
+        if (dtEditId) dtEditId.value = dt.id;
+        if (dtJenis) {
+            const rawType = (dt.jenis_downtime || '').toLowerCase().trim();
+            dtJenis.value = rawType === 'downtime' ? '' : (dt.jenis_downtime || '');
+        }
 
         let problemVal = dt.problem || '';
         if (problemVal.trim() === '-' || problemVal.includes('(Shortcut)')) {
             problemVal = '';
         }
-        document.getElementById('dtProblem').value = problemVal;
-        document.getElementById('dtPenyebab').value = dt.penyebab || '';
-        document.getElementById('dtAction').value = dt.action || '';
-        document.getElementById('dtPIC').value = dt.pic || window.ProductionConfig.userName || '';
+        if (dtProblem) dtProblem.value = problemVal;
+        if (dtPenyebab) dtPenyebab.value = dt.penyebab || '';
+        if (dtAction) dtAction.value = dt.action || '';
+        if (dtPIC) dtPIC.value = dt.pic || window.ProductionConfig?.userName || '';
+        if (dtBtnCancelEdit) dtBtnCancelEdit.classList.remove('hidden');
 
         // Show the form area
-        const formArea = document.getElementById('dtFormTitle').closest('.bg-gray-50');
-        if (formArea) formArea.classList.remove('hidden');
+        const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
+        if (formArea) {
+            formArea.classList.remove('hidden');
+            formArea.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
 
-        // Change button text to "Update Laporan" or similar
-        document.getElementById('dtFormTitle').innerText = 'Edit Detail Masalah';
-        document.getElementById('dtBtnText').innerText = 'Simpan Perubahan';
+        // Change button text
+        const dtFormTitle = document.getElementById('dtFormTitle');
+        const dtBtnText = document.getElementById('dtBtnText');
+        if (dtFormTitle) dtFormTitle.innerText = 'Edit Detail Masalah';
+        if (dtBtnText) dtBtnText.innerText = 'Simpan Perubahan';
     }
 }
 
 function saveDowntime() {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
-    const id = document.getElementById('dtEditId').value;
-    const jenis = (document.getElementById('dtJenis').value || '').trim();
+    let id = document.getElementById('dtEditId')?.value;
+    
+    // Fallback: If id is missing, check if there is an uncompleted downtime in the loaded list
+    if (!id && window.currentDowntimesList && window.currentDowntimesList.length > 0) {
+        const candidate = window.currentDowntimesList.find(dt => 
+            !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)') || 
+            !dt.jenis_downtime || dt.jenis_downtime.toLowerCase() === 'downtime'
+        );
+        if (candidate) {
+            id = candidate.id;
+            const dtEditId = document.getElementById('dtEditId');
+            if (dtEditId) dtEditId.value = id;
+        }
+    }
+
+    if (!id) {
+        showToast('Pilih downtime dari daftar terlebih dahulu dengan menekan ikon pensil/edit.', 'warning');
+        return;
+    }
+
+    const jenis = (document.getElementById('dtJenis')?.value || '').trim();
     if (!jenis) {
         showToast('Pilih jenis downtime terlebih dahulu.', 'warning');
-        document.getElementById('dtJenis').focus();
+        document.getElementById('dtJenis')?.focus();
         return;
+    }
+
+    let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
+    if (!problemVal) {
+        // Fallback default so it doesn't stay as missing or '-'
+        problemVal = 'Downtime ' + jenis.toUpperCase();
     }
 
     let data = {
         jenis_downtime: jenis,
-        problem: document.getElementById('dtProblem').value,
-        penyebab: document.getElementById('dtPenyebab').value,
-        action: document.getElementById('dtAction').value,
-        pic: document.getElementById('dtPIC').value
+        problem: problemVal,
+        penyebab: (document.getElementById('dtPenyebab')?.value || '').trim(),
+        action: (document.getElementById('dtAction')?.value || '').trim(),
+        pic: (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim()
     };
+
+    const saveBtn = document.getElementById('dtBtnSave');
+    if (saveBtn) {
+        saveBtn.disabled = true;
+        saveBtn.classList.add('opacity-50', 'cursor-not-allowed');
+    }
 
     fetch(`/operational/downtime/${id}/update`, {
         method: 'PUT',
@@ -2292,15 +2381,38 @@ function saveDowntime() {
             return;
         }
         showToast('Laporan downtime berhasil disimpan', 'success');
-        loadDowntimes(window.currentDtJobId);
-        const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
-        if (formArea) formArea.classList.add('hidden');
+
+        // Optimistically update currentDowntimesList
+        if (window.currentDowntimesList) {
+            const idx = window.currentDowntimesList.findIndex(d => d.id == id);
+            if (idx !== -1) {
+                window.currentDowntimesList[idx] = {
+                    ...window.currentDowntimesList[idx],
+                    ...data
+                };
+                renderDowntimeTable();
+            }
+        }
+
+        // Refresh list from server to ensure complete sync
+        if (window.currentDtJobId) {
+            loadDowntimes(window.currentDtJobId);
+        }
+
+        cancelDowntimeEdit();
+
         const line = jobMasterData?.[window.currentDtJobId]?.line || window.ProductionConfig?.currentLine;
         if (line) notifyLineStatusChange(line);
     })
     .catch(err => {
         console.error('saveDowntime error:', err);
         showToast(err.message || 'Terjadi kesalahan saat menyimpan', 'danger');
+    })
+    .finally(() => {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+        }
     });
 }
 
@@ -2792,6 +2904,7 @@ window.finishQuickDowntime = finishQuickDowntime;
 window.resetDowntimeButtons = resetDowntimeButtons;
 window.openDowntimeReport = openDowntimeReport;
 window.saveDowntime = saveDowntime;
+window.cancelDowntimeEdit = cancelDowntimeEdit;
 window.deleteDowntime = deleteDowntime;
 window.loadDowntimes = loadDowntimes;
 window.editDowntimeFromIndex = editDowntimeFromIndex;
