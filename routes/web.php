@@ -380,12 +380,7 @@ Route::prefix('monitoring')
     });
 
 // logout
-Route::get('/logout', function () {
-    auth()->logout();
-    session()->invalidate();
-    session()->regenerateToken();
-    return redirect('/login');
-})->name('logout');
+Route::match(['get', 'post'], '/logout', [AuthController::class, 'logout'])->name('logout');
 
 /*
 |--------------------------------------------------------------------------

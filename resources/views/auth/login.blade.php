@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <title>Login - Production System</title>
 
     @vite('resources/css/app.css')
@@ -865,7 +868,12 @@
         } catch (err) {
             console.error(err);
         }
-    }
+    // Pastikan jika halaman dimuat dari cache browser (BFCache / back button), halaman selalu fresh
+    window.addEventListener('pageshow', function (event) {
+        if (event.persisted) {
+            window.location.reload();
+        }
+    });
 </script>
 
 </body>

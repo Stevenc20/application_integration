@@ -14,7 +14,10 @@ class AuthController extends Controller
     // ======================
     public function login()
     {
-        return view('auth.login');
+        $response = response()->view('auth.login');
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0');
+        $response->headers->set('Pragma', 'no-cache');
+        return $response;
     }
 
     // ======================
@@ -93,6 +96,9 @@ class AuthController extends Controller
         $request->session()->invalidate();
         $request->session()->regenerateToken();
 
-        return redirect('/login');
+        $response = redirect('/login');
+        $response->headers->set('Cache-Control', 'no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0');
+        $response->headers->set('Pragma', 'no-cache');
+        return $response;
     }
 }
