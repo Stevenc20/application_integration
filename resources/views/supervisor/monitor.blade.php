@@ -905,7 +905,6 @@ function buildRightBody(rows, maxRows, overallPlan){
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
                 ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
-                ${dtCell(`<div class="process-cell">${chkP(j.p1,'P1')}${chkP(j.p2,'P2')}${chkP(j.p3,'P3')}${chkP(j.p4,'P4')}</div>`, '', 'det-process')}
                 ${dtCell(j.plan_qty, '', 'det-qty')}
                 ${dtCell(j.good, 'font-weight:600;', 'det-good')}
                 ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
@@ -922,7 +921,7 @@ function buildRightBody(rows, maxRows, overallPlan){
         } else {
             if (!renderedRightRowspan) {
                 const remainingRight = maxRows - rows.length;
-                h += `<td rowspan="${remainingRight}" colspan="15" class="card-bg" style="border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600; height:100%;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
+                h += `<td rowspan="${remainingRight}" colspan="14" class="card-bg" style="border-left:none; vertical-align:middle; text-align:center; color:#94a3b8; font-size:11px; font-weight:600; height:100%;">TIDAK ADA JADWAL PRODUKSI TAMBAHAN</td>`;
                 renderedRightRowspan = true;
             }
         }
@@ -1333,12 +1332,11 @@ function renderTable(){
                     <table class="large-table right-detail-table" style="width:100%; height:100%; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
                             <tr class="single-top-header">
-                                <th colspan="15" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
+                                <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
                             </tr>
                             <tr style="height:25px;">
                                 <th style="border-left:none; white-space:nowrap;">NO</th>
                                 <th style="white-space:nowrap;">JOB NO</th>
-                                <th style="white-space:nowrap;">PROCESS</th>
                                 <th style="white-space:nowrap;">PLAN QTY</th>
                                 <th class="det-good" style="white-space:nowrap;">GOOD</th>
                                 <th class="det-repair" style="white-space:nowrap;">REP</th>
