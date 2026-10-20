@@ -463,7 +463,10 @@
             const bShift = (b.shift || '').trim().toLowerCase();
             const pShift = (payload.shift || '').trim().toLowerCase();
 
-            return bLabel === pLabel && bHari === pHari && bShift === pShift;
+            // Hanya duplikat jika nama sama, hari sama (atau keduanya 'semua'), dan shift sama
+            const sameDay = (bHari === pHari);
+            const sameShift = (bShift === pShift);
+            return bLabel === pLabel && sameDay && sameShift;
         });
 
         if (dupName) {
