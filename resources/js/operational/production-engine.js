@@ -2311,7 +2311,7 @@ function editDowntimeFromIndex(index) {
     }
 }
 
-function saveDowntime() {
+function saveDowntime(andCloseModal = false) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     let id = document.getElementById('dtEditId')?.value;
     
@@ -2400,6 +2400,14 @@ function saveDowntime() {
         }
 
         cancelDowntimeEdit();
+
+        if (andCloseModal) {
+            const modal = document.getElementById('downtimeModal');
+            if (modal) {
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            }
+        }
 
         const line = jobMasterData?.[window.currentDtJobId]?.line || window.ProductionConfig?.currentLine;
         if (line) notifyLineStatusChange(line);
@@ -2511,6 +2519,21 @@ function filterDowntimeList(type) {
 
 function closeDowntimeModal() {
     try {
+        const id = document.getElementById('dtEditId')?.value;
+        const jenis = (document.getElementById('dtJenis')?.value || '').trim();
+
+        // Jika form sedang terbuka untuk pengisian downtime (ada id)
+        if (id) {
+            if (!jenis) {
+                showToast('Wajib memilih Jenis Downtime terlebih dahulu sebelum menutup.', 'warning');
+                document.getElementById('dtJenis')?.focus();
+                return;
+            }
+            // Jika jenis sudah dipilih, simpan dulu baru tutup modalnya
+            saveDowntime(true);
+            return;
+        }
+
         const modal = document.getElementById('downtimeModal');
         if (modal) {
             modal.classList.add('hidden');

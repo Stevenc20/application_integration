@@ -162,8 +162,8 @@
                         <button type="button" id="dtBtnCancelEdit" onclick="cancelDowntimeEdit()" class="hidden px-3 py-2.5 rounded-xl border border-gray-300 text-gray-600 hover:bg-gray-100 font-bold text-sm transition-all" title="Batal Edit">
                             Batal
                         </button>
-                        <button onclick="closeDowntimeModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 font-bold text-sm transition-all">
-                            Isi Nanti
+                        <button type="button" onclick="closeDowntimeModal()" class="px-4 py-2.5 rounded-xl border border-gray-200 text-gray-500 hover:bg-gray-100 font-bold text-sm transition-all">
+                            Tutup
                         </button>
                     </div>
                 </div>
