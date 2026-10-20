@@ -548,7 +548,24 @@
                 <div id="shiftLabel">Shift A</div>
                 <div id="dateLabel">--</div>
             </div>
-            <a href="{{ parse_url(route('supervisor.dashboard'), PHP_URL_PATH) }}" class="exit-btn">
+            @php
+                $userRole = strtolower(trim(auth()->user()->role ?? ''));
+                $exitUrl = match(true) {
+                    str_starts_with($userRole, 'leader') || $userRole === 'foreman' => route('operational.input_harian'),
+                    $userRole === 'operator' => route('operator.dashboard'),
+                    $userRole === 'admin' => route('admin.dashboard'),
+                    $userRole === 'superadmin' => route('super-admin.dashboard'),
+                    $userRole === 'ppc' => route('ppc.dashboard'),
+                    $userRole === 'quality' => route('quality.dashboard'),
+                    $userRole === 'manager' => route('manager.dashboard'),
+                    $userRole === 'kadiv' => route('kadiv.dashboard'),
+                    $userRole === 'direktur' => route('direktur.dashboard'),
+                    $userRole === 'presdir' => route('presdir.dashboard'),
+                    in_array($userRole, ['dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan']) => route('hambatan-jalur.index'),
+                    default => route('supervisor.dashboard')
+                };
+            @endphp
+            <a href="javascript:void(0);" onclick="handleMonitorExit('{{ parse_url($exitUrl, PHP_URL_PATH) }}')" class="exit-btn">
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path d="M6 18L18 6M6 6l12 12"/></svg>
                 Exit
             </a>
@@ -570,6 +587,14 @@
 </div>
 
 <script>
+function handleMonitorExit(fallbackUrl) {
+    if (window.history.length > 1) {
+        window.history.back();
+    } else {
+        window.location.href = fallbackUrl;
+    }
+}
+
 // Init theme early to prevent flash
 (function(){
     if(localStorage.getItem('monitor-theme')==='dark'){
