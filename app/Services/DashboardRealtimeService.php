@@ -52,6 +52,14 @@ class DashboardRealtimeService
             return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
         })->toArray();
 
+        $plansByIdentifier = [];
+        foreach ($plans as $p) {
+            $jn = trim($p->job_no ?? '');
+            $jm = trim($p->job_master ?? '');
+            $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            $plansByIdentifier[$identifier] = $p;
+        }
+
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
             ->get()
             ->keyBy('job_number');
@@ -451,8 +459,14 @@ class DashboardRealtimeService
 
         $jobName = '-';
         if ($hasRunning && $runningRecord?->jobMaster) {
-            $raw = $runningRecord->jobMaster->job_name ?? $runningRecord->jobMaster->job_number ?? '';
-            $jobName = $shortJob($raw);
+            $jmObj = $runningRecord->jobMaster;
+            $matchedPlan = $plansByIdentifier[$jmObj->job_number ?? ''] ?? null;
+            if ($matchedPlan && !empty(trim($matchedPlan->job_no ?? ''))) {
+                $jobName = trim($matchedPlan->job_no);
+            } else {
+                $raw = $jmObj->job_name ?? $jmObj->job_number ?? '';
+                $jobName = $shortJob($raw);
+            }
         }
 
         $totalJobs = $plans->count();
