@@ -17,6 +17,18 @@ class RecoveryController extends Controller
     {
         $tab = $request->get('tab', 'queue');
         $query = RecoveryItem::with(['schedule', 'rejector', 'productionPlan'])
+            ->where(function ($q) {
+                // Jangan tampilkan data uji coba sebelum 19 Oktober 2026
+                $q->where(function ($sub) {
+                    $sub->whereNotNull('source_date')->whereDate('source_date', '>=', '2026-10-19');
+                })
+                ->orWhere(function ($sub) {
+                    $sub->whereNull('source_date')->whereNotNull('original_date')->whereDate('original_date', '>=', '2026-10-19');
+                })
+                ->orWhere(function ($sub) {
+                    $sub->whereNull('source_date')->whereNull('original_date')->whereDate('created_at', '>=', '2026-10-19');
+                });
+            })
             ->orderBy('created_at', 'desc');
 
         if ($tab === 'queue') {

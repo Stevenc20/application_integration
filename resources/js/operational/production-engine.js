@@ -2343,7 +2343,7 @@ function saveDowntime(andCloseModal = false) {
     let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
     if (!problemVal) {
         // Fallback default so it doesn't stay as missing or '-'
-        problemVal = 'Downtime ' + jenis.toUpperCase();
+        problemVal = jenis ? jenis.toUpperCase() : '-';
     }
 
     let data = {
@@ -2475,11 +2475,16 @@ function renderDowntimeTable() {
             ? `<span class="px-2 py-0.5 rounded bg-amber-100 text-amber-800 text-[9px] font-bold">PILIH JENIS</span>`
             : `<span class="font-bold uppercase text-[10px] text-slate-700">${dt.jenis_downtime}</span>`;
 
+        let rawProblem = dt.problem || '-';
+        if (rawProblem.toLowerCase().startsWith('downtime ')) {
+            rawProblem = rawProblem.substring(9).trim();
+        }
+
         return `<tr class="hover:bg-slate-50 transition-colors ${isMissingDetail ? 'bg-red-50/50' : ''}">
                 <td class="px-4 py-3">${jenisBadge}</td>
                 <td class="px-4 py-3 text-xs">
                     <div class="flex items-center gap-2">
-                        <div class="font-bold ${isMissingDetail ? 'text-red-600' : 'text-slate-800'}">${dt.problem || '-'}</div>
+                        <div class="font-bold ${isMissingDetail ? 'text-red-600' : 'text-slate-800'}">${rawProblem}</div>
                         ${isMissingDetail ? `<span class="px-1.5 py-0.5 rounded bg-red-100 text-red-600 font-black text-[8px] uppercase tracking-wider animate-pulse flex items-center gap-0.5">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                             Belum Lengkap
@@ -2547,7 +2552,7 @@ function submitDowntimeLater() {
 
     let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
     if (!problemVal) {
-        problemVal = 'Downtime ' + jenis.toUpperCase();
+        problemVal = jenis ? jenis.toUpperCase() : '-';
     }
 
     const data = {
