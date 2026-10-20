@@ -208,7 +208,7 @@ Route::middleware(['auth','role:admin,ppc,supervisor,foreman,leader,manager,kadi
 });
 
 // SHARED SUPERVISOR ROUTES FOR DASHBOARDS, DOWNTIME, AND REPORTS
-Route::middleware(['auth','role:supervisor,ppc,leader,foreman,manager,kadiv,direktur,presdir'])
+Route::middleware(['auth','role:supervisor,ppc,leader,foreman,manager,kadiv,direktur,presdir,operator,admin,superadmin,production,irm,logistik'])
 ->prefix('supervisor')
 ->name('supervisor.')
 ->group(function(){
@@ -217,7 +217,7 @@ Route::middleware(['auth','role:supervisor,ppc,leader,foreman,manager,kadiv,dire
     Route::get('/dashboard/api-data', [SupervisorDashboard::class, 'getApiData'])->middleware('feature:dashboard')->name('dashboard.api');
     Route::get('/dashboard/detail', [SupervisorDashboard::class, 'getDetailData'])->middleware('feature:dashboard')->name('dashboard.detail');
     Route::get('/dashboard/stream', [SupervisorDashboard::class, 'stream'])->middleware('feature:dashboard')->name('dashboard.stream');
-    Route::get('/monitor', [SupervisorDashboard::class, 'monitor'])->middleware('feature:dashboard')->name('monitor');
+    Route::get('/monitor', [SupervisorDashboard::class, 'monitor'])->name('monitor');
     Route::get('/overview', [SupervisorDashboard::class, 'overview'])->middleware('feature:dashboard')->name('overview');
     Route::get('/overview/data', [SupervisorDashboard::class, 'overviewData'])->middleware('feature:dashboard')->name('overview.data');
     Route::get('/overview/all-logs', [SupervisorDashboard::class, 'allProductionLogs'])->middleware('feature:dashboard')->name('overview.allLogs');
