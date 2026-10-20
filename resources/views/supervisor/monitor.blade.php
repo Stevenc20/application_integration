@@ -163,12 +163,27 @@
         .status-tryout{background:#3b82f6!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-1stcheck{background:#a855f7!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
 
-        @keyframes blink-red{0%,100%{opacity:1}50%{opacity:0.3}}
-        @keyframes blink-yellow{0%,100%{opacity:1}50%{opacity:0.3}}
-        @keyframes blink-green{0%,100%{opacity:1}50%{opacity:0.3}}
+        @keyframes blink-red{0%,100%{opacity:1}50%{opacity:0.45}}
+        @keyframes blink-yellow{0%,100%{opacity:1}50%{opacity:0.45}}
+        @keyframes blink-green{0%,100%{opacity:1}50%{opacity:0.45}}
         .bg-red-blink{background:#ef4444!important;color:#fff!important;animation:blink-red .8s ease-in-out infinite!important}
         .bg-yellow-blink{background:#f59e0b!important;color:#000!important;animation:blink-yellow .8s ease-in-out infinite!important}
         .bg-green-blink{background:#22c55e!important;color:#fff!important;animation:blink-green .8s ease-in-out infinite!important}
+
+        /* Pastikan cell alert downtime merah (bg-red & bg-red-blink) selalu merah tegas di light mode */
+        .dt-row-bg td.bg-red,
+        td.bg-red,
+        .status-downtime {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+        }
+        .dt-row-bg td.bg-red-blink,
+        td.bg-red-blink {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+        }
 
         /* Dark mode warning alert (High-contrast vivid amber) */
         body.dark .bg-yellow,
@@ -195,14 +210,14 @@
             border-top: 3px solid #38bdf8 !important;
         }
 
-        .dt-row-bg td {
+        .dt-row-bg td:not([class*="bg-"]) {
             background-color: #fefce8 !important; /* Krem lembut */
         }
         .dt-row-bg td.desc-cell {
             background-color: #fef9c3 !important;
             font-weight: 800 !important;
         }
-        .dt-row-bg:nth-child(even) td {
+        .dt-row-bg:nth-child(even) td:not([class*="bg-"]) {
             background-color: #fef08a !important;
         }
         .dt-row-bg:nth-child(even) td.desc-cell {
