@@ -162,7 +162,7 @@
             <div class="grid grid-cols-1 gap-4">
                 <div>
                     <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1">Jenis Downtime</label>
-                    <select id="editJenis" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition bg-gray-50" disabled>
+                    <select id="editJenis" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition bg-white">
                         <option value="produksi">Produksi</option>
                         <option value="mesin">Mesin</option>
                         <option value="dies">Dies (Daise)</option>
@@ -170,6 +170,7 @@
                         <option value="material">Material</option>
                         <option value="try out">Try Out</option>
                         <option value="break time">Break Time</option>
+                        <option value="ubp">UBP</option>
                     </select>
                 </div>
                 <div>

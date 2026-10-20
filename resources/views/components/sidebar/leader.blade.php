@@ -1,6 +1,7 @@
 @php
     $inputHarianActive = request()->routeIs('operational.input_harian');
     $lkhActive = request()->routeIs('supervisor.reports.daily_production');
+    $downtimeHistoryActive = request()->routeIs('downtime.history') || (request()->routeIs('monitoring.history') && request('type') == 'downtime');
 @endphp
 
 <ul class="list-none space-y-1 m-0 p-0">
@@ -35,6 +36,18 @@
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0112 19V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414A1 1 0 0121 13v6a2 2 0 01-2 2z"/>
             </svg>
             <span class="font-semibold tracking-wide">LKH</span>
+        </a>
+    </li>
+    @endif
+
+    <!-- History Downtime -->
+    @if(auth()->user()->hasFeature('trouble_history'))
+    <li class="menu-item">
+        <a href="{{ route('downtime.history') }}" class="flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 {{ $downtimeHistoryActive ? 'bg-primary-red text-white shadow-md shadow-red-200' : 'text-gray-600 hover:bg-red-50 hover:text-primary-red' }}">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 {{ $downtimeHistoryActive ? 'text-white' : 'text-gray-400' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+            </svg>
+            <span class="font-semibold tracking-wide">History Downtime</span>
         </a>
     </li>
     @endif
