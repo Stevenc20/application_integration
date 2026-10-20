@@ -1007,7 +1007,7 @@ function buildRightBody(rows, maxRows, overallPlan){
 
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
-                ${dtCell(j.job_number, 'text-align:left;font-weight:600;', 'det-job')}
+                ${dtCell(j.job_number, 'text-align:left;font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;', 'det-job')}
                 ${dtCell(j.plan_qty, '', 'det-qty')}
                 ${dtCell(j.good, 'font-weight:600;', 'det-good')}
                 ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
