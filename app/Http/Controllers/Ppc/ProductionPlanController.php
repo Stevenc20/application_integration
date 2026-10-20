@@ -858,18 +858,27 @@ class ProductionPlanController extends Controller
                     $obsPlan->delete();
                 }
 
-                // 2. Recovery-generated timeline rows cleanup (hanya yang belum jalan)
-                $recoveryPlanIds = ProductionPlan::whereDate('plan_date', $parsedDate)
+                // 2. Recovery-generated timeline rows cleanup (hanya yang belum jalan pada shift & press yang diimpor)
+                $recoveryPlansToClean = ProductionPlan::whereDate('plan_date', $parsedDate)
                     ->where('source_type', 'recovery')
                     ->whereDoesntHave('recoveryItem', function ($q) {
                         $q->whereIn('status', ['in_production', 'completed']);
                     })
-                    ->pluck('id');
+                    ->get();
 
-                if ($recoveryPlanIds->isNotEmpty()) {
-                    \App\Models\RecoveryItem::whereIn('production_plan_id', $recoveryPlanIds)
+                $filteredRecoveryPlanIds = [];
+                foreach ($recoveryPlansToClean as $rp) {
+                    $rpCleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $rp->shift_name))));
+                    $rpPress = strtoupper(str_replace([' ', '-'], '', $rp->press_name ?? ''));
+                    if (isset($importedSectionKeys[$rpCleanShift . '||' . $rpPress])) {
+                        $filteredRecoveryPlanIds[] = $rp->id;
+                    }
+                }
+
+                if (!empty($filteredRecoveryPlanIds)) {
+                    \App\Models\RecoveryItem::whereIn('production_plan_id', $filteredRecoveryPlanIds)
                         ->update(['production_plan_id' => null]);
-                    ProductionPlan::whereIn('id', $recoveryPlanIds)->delete();
+                    ProductionPlan::whereIn('id', $filteredRecoveryPlanIds)->delete();
                 }
 
                 // 3. Delete leftover breaks yang tidak retained hanya pada section yang diimpor
@@ -1160,13 +1169,10 @@ class ProductionPlanController extends Controller
             return response()->json(['success' => false, 'message' => 'Tidak ada item yang dipilih.']);
         }
 
-        if (empty($targetDate) || empty($targetShift) || empty($targetPress)) {
-            return response()->json(['success' => false, 'message' => 'Context planning tidak ditemukan. Silakan refresh halaman.']);
-        }
-
         $processedCount = 0;
+        $affectedSections = [];
 
-        DB::transaction(function () use ($itemIds, $targetDate, $targetShift, $targetPress, &$processedCount) {
+        DB::transaction(function () use ($itemIds, $targetDate, $targetShift, $targetPress, &$processedCount, &$affectedSections) {
             // Fetch and lock items to prevent race conditions (Duplicate protection)
             $items = RecoveryItem::whereIn('id', $itemIds)
                 ->where('status', 'waiting_approval')
@@ -1179,35 +1185,59 @@ class ProductionPlanController extends Controller
             if ($items->isEmpty()) {
                 return;
             }
-            
-            $processedCount = $items->count();
 
-            // Dapatkan hari untuk targetDate
-            $hari = Carbon::parse($targetDate)->locale('id')->isoFormat('dddd');
-            
-            // Dapatkan line_master_id dari jadwal yang ada di hari tersebut, atau fallback
-            $existingPlan = ProductionPlan::whereDate('plan_date', $targetDate)
-                ->where('press_name', $targetPress)
-                ->first();
-            $lineMasterId = $existingPlan ? $existingPlan->line_master_id : 1;
+            $lineMap = LineMaster::pluck('id', 'line_name')->toArray();
 
-            foreach ($items as $index => $item) {
+            foreach ($items as $item) {
+                // Tentukan Press/Line target: Selalu di Line yang sama dengan asalnya
+                $effectivePress = $item->press_name ?: ($targetPress ?: 'PRESS A');
 
-                $processTime = (int)ceil((($item->ct_detik ?? 0) * $item->recovery_qty) / 60.0);
+                // Tentukan Shift & Date target:
+                // Jika dari Shift Pagi -> Next Shift adalah Shift Malam di tgl yang sama
+                // Jika dari Shift Malam -> Next Shift adalah Shift Pagi di H+1
+                $srcDate = $item->source_date ? $item->source_date->format('Y-m-d') : ($item->original_date ? Carbon::parse($item->original_date)->format('Y-m-d') : ($targetDate ?: now()->toDateString()));
+                $srcShift = $item->source_shift ?: ($item->original_shift_name ?: ($targetShift ?: 'Shift Pagi'));
+
+                if (stripos($srcShift, 'malam') !== false) {
+                    $itemTargetShift = 'Shift Pagi';
+                    $itemTargetDate = Carbon::parse($srcDate)->addDay()->toDateString();
+                } else {
+                    $itemTargetShift = 'Shift Malam';
+                    $itemTargetDate = $srcDate;
+                }
+
+                // Dapatkan line_master_id dari nama press
+                $lineMasterId = null;
+                foreach ($lineMap as $name => $id) {
+                    if (strcasecmp($name, $effectivePress) === 0 || stripos($name, $effectivePress) !== false || stripos($effectivePress, $name) !== false) {
+                        $lineMasterId = $id;
+                        break;
+                    }
+                }
+                if (!$lineMasterId) {
+                    $existingPlan = ProductionPlan::whereDate('plan_date', $itemTargetDate)
+                        ->where('press_name', $effectivePress)
+                        ->first();
+                    $lineMasterId = $existingPlan ? $existingPlan->line_master_id : 1;
+                }
+
+                $hari = Carbon::parse($itemTargetDate)->locale('id')->isoFormat('dddd');
+                $recoveryQty = $item->recovery_qty > 0 ? (float)$item->recovery_qty : (float)($item->plan_qty ?? 0);
+                $processTime = (int)ceil(((float)($item->ct_detik ?? 0) * $recoveryQty) / 60.0);
 
                 ProductionPlan::create([
-                    'plan_date'      => $targetDate,
-                    'shift_name'     => $targetShift,
-                    'press_name'     => $targetPress,
+                    'plan_date'      => $itemTargetDate,
+                    'shift_name'     => $itemTargetShift,
+                    'press_name'     => $effectivePress,
                     'line_master_id' => $lineMasterId,
                     'hari'           => $hari,
                     'row_type'       => 'job',
                     'row_no'         => 0,
                     'job_no'         => $item->job_no,
                     'job_master'     => $item->job_master,
-                    'plan'           => $item->recovery_qty,
+                    'plan'           => $recoveryQty,
                     'original_plan'  => $item->plan_qty,
-                    'remaining_plan' => $item->recovery_qty,
+                    'remaining_plan' => $recoveryQty,
                     'ct_detik'       => $item->ct_detik,
                     'dct'            => $item->dct,
                     'total_mesin'    => (int)($item->total_mesin ?? 1),
@@ -1221,6 +1251,15 @@ class ProductionPlanController extends Controller
                     'status' => 'scheduled',
                     'updated_at' => now(),
                 ]);
+
+                $processedCount++;
+
+                $secKey = "{$itemTargetDate}||{$itemTargetShift}||{$effectivePress}";
+                $affectedSections[$secKey] = [
+                    'date'  => $itemTargetDate,
+                    'shift' => $itemTargetShift,
+                    'press' => $effectivePress,
+                ];
             }
         });
 
@@ -1228,17 +1267,19 @@ class ProductionPlanController extends Controller
             return response()->json(['success' => false, 'message' => 'Item tidak ditemukan atau sudah diproses oleh user lain.']);
         }
 
-        // Regenerate sections using the target context
+        // Regenerate sections yang terdampak agar urutan jam (start/finish) terhitung otomatis
         try {
             $timelineGenerator = app(TimelineGenerationService::class);
-            $timelineGenerator->regenerateSection($targetDate, $targetShift, $targetPress);
+            foreach ($affectedSections as $sec) {
+                $timelineGenerator->regenerateSection($sec['date'], $sec['shift'], $sec['press']);
+            }
         } catch (\Throwable $e) {
             Log::warning('Resimulation after approve failed: ' . $e->getMessage());
         }
 
         return response()->json([
             'success' => true,
-            'message' => $processedCount . ' item berhasil di-approve.',
+            'message' => $processedCount . ' item berhasil di-approve ke next shift di line yang sama.',
         ]);
     }
 
