@@ -896,15 +896,59 @@ class ProductionService
     {
         return DB::transaction(function () use ($jobId, $data) {
             $runtime = $this->calculateRuntime($jobId);
-            $session = ProductionSession::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
-                ->first();
-
-            $downtime = (int) ($session->downtime_seconds ?? 0);
             $job = JobMaster::find($jobId);
 
+            // Resolve work_date & shift from request/session/plan to avoid jumping to today/current shift
+            $workDate = $data['work_date'] ?? request()->header('X-Date') ?? request('date');
+            $shiftName = $data['shift'] ?? request()->header('X-Shift') ?? request('shift');
+
+            if (!$workDate || !$shiftName) {
+                $sessionCtx = ProductionSession::where('job_master_id', $jobId)->orderByDesc('id')->first();
+                if ($sessionCtx) {
+                    $workDate = $workDate ?: $sessionCtx->work_date;
+                    $shiftName = $shiftName ?: $sessionCtx->shift;
+                }
+            }
+
+            if (!$workDate) {
+                $parts = explode('-', $job?->job_number ?? '');
+                $planId = end($parts);
+                if (is_numeric($planId)) {
+                    $plan = \App\Models\ProductionPlan::find($planId);
+                    if ($plan) {
+                        $workDate = $workDate ?: ($plan->plan_date ? \Carbon\Carbon::parse($plan->plan_date)->toDateString() : null);
+                        $shiftName = $shiftName ?: $plan->shift_name;
+                    }
+                }
+            }
+
+            $workDate = $workDate ?: now()->toDateString();
+            $shiftName = $shiftName ?: $this->getShift();
+
+            $sessionForDowntime = ProductionSession::where('job_master_id', $jobId)
+                ->whereDate('work_date', $workDate)
+                ->first() ?: ProductionSession::where('job_master_id', $jobId)->orderByDesc('id')->first();
+
+            $downtime = (int) ($sessionForDowntime->downtime_seconds ?? 0);
+
             $targetQty = $job?->capacity ?? 0;
-            $actualQty = (int) ($data['actual_qty'] ?? 0);
+
+            // Load existing to prevent zeroing on partial/manual saves
+            $existing = DailyProduction::where('job_master_id', $jobId)
+                ->where('work_date', $workDate)
+                ->first();
+
+            $actualQty = array_key_exists('actual_qty', $data)
+                ? (int) ($data['actual_qty'] ?? 0)
+                : ($existing->actual_ok ?? $existing->actual_qty ?? 0);
+
+            $repairQty = array_key_exists('repair_qty', $data)
+                ? (int) ($data['repair_qty'] ?? 0)
+                : ($existing->actual_repair ?? $existing->repair_qty ?? 0);
+
+            $rejectQty = array_key_exists('reject_qty', $data)
+                ? (int) ($data['reject_qty'] ?? 0)
+                : ($existing->actual_reject ?? $existing->reject_qty ?? 0);
 
             $efficiency = 0;
             if ($targetQty > 0) {
@@ -914,29 +958,29 @@ class ProductionService
             DailyProduction::updateOrCreate(
                 [
                     'job_master_id' => $jobId,
-                    'work_date'     => now()->toDateString()
+                    'work_date'     => $workDate,
                 ],
                 [
                     'line'              => $job?->line,
-                    'shift'             => $this->getShift(),
+                    'shift'             => $shiftName,
                     'target_qty'        => $targetQty,
                     'actual_qty'        => $actualQty,
                     'actual_ok'         => $actualQty,
-                    'actual_repair'     => (int) ($data['repair_qty'] ?? 0),
-                    'actual_reject'     => (int) ($data['reject_qty'] ?? 0),
-                    'reject_qty'        => (int) ($data['reject_qty'] ?? 0),
-                    'repair_qty'        => (int) ($data['repair_qty'] ?? 0),
+                    'actual_repair'     => $repairQty,
+                    'actual_reject'     => $rejectQty,
+                    'reject_qty'        => $rejectQty,
+                    'repair_qty'        => $repairQty,
                     'runtime_seconds'   => $runtime,
                     'downtime_seconds'  => $downtime,
                     'efficiency'        => $efficiency,
-                    'remarks'           => $data['remarks'] ?? null,
+                    'remarks'           => $data['remarks'] ?? $existing->remarks ?? null,
                     'saved_by'          => Auth::id(),
                     'status'            => 'complete',
                 ]
             );
 
             // Sync status and quantities to PPC Production Plan
-            $this->syncPlan($jobId, 'complete', $actualQty, (int) ($data['repair_qty'] ?? 0), (int) ($data['reject_qty'] ?? 0));
+            $this->syncPlan($jobId, 'complete', $actualQty, $repairQty, $rejectQty);
 
             $this->signalDashboard($jobId);
 
@@ -946,6 +990,7 @@ class ProductionService
             ];
         });
     }
+
 
     private function resolvePlanId(int $jobId): ?int
     {
