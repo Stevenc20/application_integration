@@ -476,6 +476,14 @@ class ProductionPlanController extends Controller
                     }
                 }
 
+                // Sort sheets so Rev sheets are processed FIRST before non-Rev sheets
+                // This ensures Rev sheets register items first in $importedJobKeys
+                usort($sheets, function ($a, $b) {
+                    $aRev = (int) preg_match('/REV|REVISI/i', $a['shift_name'] ?? '');
+                    $bRev = (int) preg_match('/REV|REVISI/i', $b['shift_name'] ?? '');
+                    return $bRev <=> $aRev; // Rev sheets first
+                });
+
                 $importedJobKeys = [];
                 $importedBreakKeys = [];
                 foreach ($sheets as $sheetData) {
@@ -484,8 +492,13 @@ class ProductionPlanController extends Controller
                     $groupKey = $cleanShift . '||' . ($sheetData['press_name'] ?? '');
                     $isRevSheet = (bool) preg_match('/REV|REVISI/i', $originalShift);
 
-                    // Non-Rev sheet: process but skip rows already imported from Rev
-                    // Rev sheet tetap diproses normal
+                    // Jika grup (Shift + Press) ini memiliki sheet REV, skip seluruh sheet non-REV
+                    // karena sheet REV sudah merupakan revisi final yang menggantikan sheet non-REV
+                    if (!$isRevSheet && !empty($hasRevInGroup[$groupKey])) {
+                        Log::info("[IMPORT] Skipping non-Rev sheet because Rev sheet exists for group", ['group' => $groupKey, 'sheet' => $originalShift]);
+                        continue;
+                    }
+
                     $rows = [];
                     $shiftName = $sheetData['shift_name'];
                     $shiftName = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $shiftName);
