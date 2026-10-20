@@ -930,7 +930,29 @@ class ReportController extends Controller
             ->first();
 
         // 1. Team Leader
-        if ($assignment && $assignment->leaderUser) {
+        $authUser = auth()->user();
+        $authRole = strtolower($authUser?->role ?? '');
+        $isLeaderUser = str_starts_with($authRole, 'leader') || in_array($authRole, ['teamleader', 'group leader']);
+
+        // Check if shift submission (lock shift) has a recorded submitter
+        $targetLineNorm = SignatureScopeNormalizer::normalizeLine((string) $selectedLineName);
+        $targetShiftNorm = (int) SignatureScopeNormalizer::normalizeShift((string) $latestShiftName);
+        $lineMasterIds = \App\Models\LineMaster::all()->filter(function ($lm) use ($targetLineNorm) {
+            return SignatureScopeNormalizer::normalizeLine((string) $lm->line_name) === $targetLineNorm;
+        })->pluck('id');
+
+        $shiftSubmitterUser = \App\Models\ShiftSubmission::whereIn('line_id', $lineMasterIds)
+            ->whereDate('work_date', $date)
+            ->when($targetShiftNorm > 0, fn($q) => $q->where('shift', $targetShiftNorm))
+            ->whereNull('cancelled_at')
+            ->latest()
+            ->first()?->submitter;
+
+        if ($isLeaderUser) {
+            $leaderName = $authUser->name;
+        } elseif ($shiftSubmitterUser) {
+            $leaderName = $shiftSubmitterUser->name;
+        } elseif ($assignment && $assignment->leaderUser) {
             $leaderName = $assignment->leaderUser->name;
         } else {
             $lineLower = strtolower($selectedLineName);
@@ -954,27 +976,23 @@ class ReportController extends Controller
         }
 
         // 2. Foreman
-        if ($assignment && $assignment->foremanUser) {
+        if (auth()->check() && $authRole === 'foreman') {
+            $foremanName = $authUser->name;
+        } elseif ($assignment && $assignment->foremanUser) {
             $foremanName = $assignment->foremanUser->name;
         } else {
-            if (auth()->check() && strtolower(auth()->user()->role) === 'foreman') {
-                $foremanName = auth()->user()->name;
-            } else {
-                $foremanUser = \App\Models\User::where('role', 'foreman')->first();
-                $foremanName = $foremanUser ? $foremanUser->name : '';
-            }
+            $foremanUser = \App\Models\User::where('role', 'foreman')->first();
+            $foremanName = $foremanUser ? $foremanUser->name : '';
         }
 
         // 3. Supervisor
-        if ($assignment && $assignment->supervisorUser) {
+        if (auth()->check() && in_array($authRole, ['supervisor', 'spv'])) {
+            $supervisorName = $authUser->name;
+        } elseif ($assignment && $assignment->supervisorUser) {
             $supervisorName = $assignment->supervisorUser->name;
         } else {
-            if (auth()->check() && strtolower(auth()->user()->role) === 'supervisor') {
-                $supervisorName = auth()->user()->name;
-            } else {
-                $supervisorUser = \App\Models\User::where('role', 'supervisor')->first();
-                $supervisorName = $supervisorUser ? $supervisorUser->name : '';
-            }
+            $supervisorUser = \App\Models\User::where('role', 'supervisor')->first();
+            $supervisorName = $supervisorUser ? $supervisorUser->name : '';
         }
 
         $assignedNames = [
