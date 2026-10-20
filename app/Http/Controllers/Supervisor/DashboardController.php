@@ -615,21 +615,27 @@ class DashboardController extends Controller
         $search = request('search');
 
         $query = \App\Models\Downtime::with('jobMaster')
-            ->whereDate('created_at', $date);
+            ->whereDate('start_time', $date)
+            ->where(function ($q) {
+                $q->whereNull('jenis_downtime')
+                  ->orWhereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenis_downtime))'), ['dandori', 'idle', 'idle time', 'break time', 'qcheck', 'q check', 'quality']);
+            });
 
         if ($search) {
             $query->where(function($q) use ($search) {
                 $q->where('problem', 'like', "%{$search}%")
                   ->orWhere('penyebab', 'like', "%{$search}%")
                   ->orWhere('pic', 'like', "%{$search}%")
+                  ->orWhere('jenis_downtime', 'like', "%{$search}%")
                   ->orWhereHas('jobMaster', function($jq) use ($search) {
                       $jq->where('job_number', 'like', "%{$search}%");
                   });
             });
         }
 
-        $downtimes = $query->orderBy('created_at', 'desc')->paginate(20);
+        $downtimes = $query->orderBy('start_time', 'desc')->paginate(20)->withQueryString();
 
         return view('downtime.trouble_history', compact('downtimes', 'date', 'search'));
     }
+
 }
