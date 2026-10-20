@@ -345,8 +345,8 @@ Route::prefix('monitoring')
 ->middleware(['auth'])
 ->group(function(){
 
-    // Supervisor, PPC & Management
-        Route::middleware('role:supervisor,foreman,ppc,manager,kadiv,direktur,presdir,quality')->group(function(){
+    // All authenticated users can access monitoring
+        Route::middleware('role:supervisor,foreman,ppc,manager,kadiv,direktur,presdir,quality,leader,operator,admin,superadmin,production,irm,logistik')->group(function(){
             Route::get('/line', 'line')->middleware('feature:line_monitoring')->name('line');
             Route::get('/line/api-data', 'lineApiData')->middleware('feature:line_monitoring')->name('line.api');
             Route::get('/machine-status', 'machine_status')->middleware('feature:line_monitoring')->name('machine_status');

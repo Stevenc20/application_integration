@@ -27,6 +27,58 @@
         <div class="flex items-center space-x-4">
             <span class="text-sm text-gray-500 max-sm:hidden sm:block font-medium" id="liveClockTopbar"></span>
 
+            {{-- MONITORING MENU --}}
+            @php
+                $isMonitoringActive = request()->routeIs('monitoring.*') || request()->routeIs('supervisor.grafik.*') || request()->routeIs('grafik.quality');
+            @endphp
+            <div class="relative" id="navbarMonitoringWrapper">
+                <button type="button" id="navbarMonitoringBtn" class="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all {{ $isMonitoringActive ? 'bg-red-600 text-white shadow-sm' : 'text-gray-600 hover:text-red-600 hover:bg-red-50' }}" title="Menu Monitoring">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 {{ $isMonitoringActive ? 'text-white' : 'text-gray-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
+                    </svg>
+                    <span class="max-sm:hidden">Monitoring</span>
+                    <i class="bx bx-chevron-down text-base transition-transform duration-200" id="navbarMonitoringArrow"></i>
+                </button>
+                <div id="navbarMonitoringDropdown" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-gray-100 opacity-0 invisible scale-95 transition-all duration-200 origin-top-right z-50 overflow-hidden">
+                    <div class="px-4 py-2.5 bg-gray-50/80 border-b border-gray-100">
+                        <p class="text-[10px] font-black tracking-wider uppercase text-gray-400">Monitoring & History</p>
+                    </div>
+                    <div class="p-1.5 space-y-0.5">
+                        <a href="{{ route('monitoring.line') }}" class="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors {{ request()->routeIs('monitoring.line') ? 'bg-red-50 text-red-600 font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-red-600' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            <span>Line Monitoring</span>
+                        </a>
+                        <a href="{{ route('monitoring.machine_status') }}" class="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors {{ request()->routeIs('monitoring.machine_status') ? 'bg-red-50 text-red-600 font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-red-600' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+                            </svg>
+                            <span>Machine Status</span>
+                        </a>
+                        <a href="{{ route('monitoring.history', ['type' => 'downtime']) }}" class="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors {{ request()->routeIs('monitoring.history') && request('type') == 'downtime' ? 'bg-red-50 text-red-600 font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-red-600' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                            </svg>
+                            <span>History Downtime</span>
+                        </a>
+                        <a href="{{ route('monitoring.history', ['type' => 'break']) }}" class="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors {{ request()->routeIs('monitoring.history') && request('type') == 'break' ? 'bg-red-50 text-red-600 font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-red-600' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                            <span>History Break Time</span>
+                        </a>
+                        <a href="{{ route('monitoring.tryout') }}" class="flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-lg transition-colors {{ request()->routeIs('monitoring.tryout') ? 'bg-red-50 text-red-600 font-bold' : 'text-gray-700 hover:bg-gray-50 hover:text-red-600' }}">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                            </svg>
+                            <span>History Tryout</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             {{-- LHJ PENDING SIGN --}}
             @if(str_starts_with($pendingSignRole, 'leader') || $pendingSignRole === 'foreman')
             <div class="relative" id="lhjSignWrapper">
@@ -317,6 +369,48 @@
 
         fetchPendingLhj();
         setInterval(fetchPendingLhj, 15000);
+
+        // === MONITORING DROPDOWN ===
+        const monitoringBtn = document.getElementById('navbarMonitoringBtn');
+        const monitoringDropdown = document.getElementById('navbarMonitoringDropdown');
+        const monitoringArrow = document.getElementById('navbarMonitoringArrow');
+
+        if (monitoringBtn && monitoringDropdown) {
+            monitoringBtn.addEventListener('click', function(e) {
+                e.stopPropagation();
+                // Close other dropdowns
+                closeDropdown();
+                if (typeof closeNotifDropdown === 'function') closeNotifDropdown();
+                const lhjDropdown = document.getElementById('lhjSignDropdown');
+                if (lhjDropdown) {
+                    lhjDropdown.classList.add('opacity-0', 'invisible', 'scale-95');
+                    lhjDropdown.classList.remove('opacity-100', 'visible', 'scale-100');
+                }
+
+                const isHidden = monitoringDropdown.classList.contains('opacity-0');
+                if (isHidden) {
+                    monitoringDropdown.classList.remove('opacity-0', 'invisible', 'scale-95');
+                    monitoringDropdown.classList.add('opacity-100', 'visible', 'scale-100');
+                    if (monitoringArrow) monitoringArrow.classList.add('rotate-180');
+                } else {
+                    closeMonitoringDropdown();
+                }
+            });
+
+            document.addEventListener('click', function(e) {
+                if (!monitoringBtn.contains(e.target) && !monitoringDropdown.contains(e.target)) {
+                    closeMonitoringDropdown();
+                }
+            });
+        }
+
+        function closeMonitoringDropdown() {
+            if (monitoringDropdown && !monitoringDropdown.classList.contains('opacity-0')) {
+                monitoringDropdown.classList.add('opacity-0', 'invisible', 'scale-95');
+                monitoringDropdown.classList.remove('opacity-100', 'visible', 'scale-100');
+                if (monitoringArrow) monitoringArrow.classList.remove('rotate-180');
+            }
+        }
 
         // === USER DROPDOWN ===
         const btn = document.getElementById('userDropdownBtn');
