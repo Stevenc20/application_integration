@@ -453,18 +453,6 @@
             return;
         }
 
-        // Jika shift pagi atau shift yang tidak lewat tengah malam, waktu selesai harus > waktu mulai
-        // Kecuali jika Shift Malam atau shift sengaja melintasi 00:00 (misal 23:30 - 00:30)
-        const isLikelyOvernight = payload.shift && payload.shift.toLowerCase().includes('malam');
-        if (!isLikelyOvernight && payload.waktu_selesai < payload.waktu_mulai) {
-            showToast({
-                type: 'error',
-                title: 'Validasi Gagal',
-                message: 'Waktu selesai harus setelah waktu mulai (kecuali shift malam lintas hari)!'
-            });
-            return;
-        }
-
         // Duplicate name check
         const dupName = allBreaks.find(b => {
             if (id && String(b.id) === String(id)) return false;
