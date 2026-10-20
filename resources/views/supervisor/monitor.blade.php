@@ -209,21 +209,40 @@
             background-color: #fde047 !important;
         }
 
-        /* Dark mode Downtime Rows: Teal Gelap */
-        body.dark .dt-row-bg td {
-            background-color: #134e4a !important; /* Teal gelap */
-            color: #ccfbf1 !important;
+        /* Dark mode Downtime Rows: Slate/Navy Redup agar cell merah kontras menyala */
+        body.dark .dt-row-bg td:not([class*="bg-"]) {
+            background-color: #1a2234 !important; /* Slate navy gelap dan tenang */
+            color: #94a3b8 !important;
         }
         body.dark .dt-row-bg td.desc-cell {
-            background-color: #115e59 !important;
-            color: #f0fdfa !important;
+            background-color: #1e293b !important;
+            color: #e2e8f0 !important;
             font-weight: 800 !important;
         }
-        body.dark .dt-row-bg:nth-child(even) td {
-            background-color: #0f3d3a !important;
+        body.dark .dt-row-bg:nth-child(even) td:not([class*="bg-"]) {
+            background-color: #141b2b !important;
         }
         body.dark .dt-row-bg:nth-child(even) td.desc-cell {
-            background-color: #134e4a !important;
+            background-color: #172033 !important;
+        }
+
+        /* Saat ada downtime (cell merah), buat merah menyala terang berbingkai kontras tinggi */
+        body.dark .dt-row-bg td.bg-red,
+        body.dark td.bg-red,
+        body.dark .status-downtime {
+            background-color: #dc2626 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            box-shadow: inset 0 0 0 1px rgba(254, 202, 202, 0.4) !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
+        }
+        body.dark .dt-row-bg td.bg-red-blink,
+        body.dark td.bg-red-blink {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            box-shadow: 0 0 8px rgba(239, 68, 68, 0.8), inset 0 0 0 1px #fca5a5 !important;
+            text-shadow: 0 1px 2px rgba(0,0,0,0.8);
         }
 
         .large-table th,.large-table td{
