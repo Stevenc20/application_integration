@@ -65,7 +65,7 @@ class BreaktimeController extends Controller
                 'shift' => $data['shift'] ?: null,
                 'is_active' => $request->boolean('is_active', true),
             ]);
-            app(TimelineGenerationService::class)->regenerateAllSections(true);
+            $this->regenerateRecentSections();
         } else {
             $break = new BreakTime();
             $break->nama_istirahat = $request->nama_istirahat;
@@ -113,7 +113,7 @@ class BreaktimeController extends Controller
                 'shift' => $data['shift'] ?: null,
                 'is_active' => $request->boolean('is_active', true),
             ]);
-            app(TimelineGenerationService::class)->regenerateAllSections(true);
+            $this->regenerateRecentSections();
         } else {
             $break = BreakTime::findOrFail($id);
             $break->nama_istirahat = $request->nama_istirahat;
@@ -131,12 +131,32 @@ class BreaktimeController extends Controller
     {
         if (Schema::hasTable('master_break_times')) {
             MasterBreakTime::findOrFail($id)->delete();
-            app(TimelineGenerationService::class)->regenerateAllSections(true);
+            $this->regenerateRecentSections();
         } else {
             BreakTime::findOrFail($id)->delete();
         }
 
         return redirect()->route('supervisor.breaktime.index')->with('success', 'Break time berhasil dihapus.');
+    }
+
+    private function regenerateRecentSections(): void
+    {
+        if (!Schema::hasTable('master_break_times')) {
+            return;
+        }
+
+        $recentDates = \App\Models\ProductionPlan::select('plan_date', 'shift_name', 'press_name')
+            ->whereNotNull('plan_date')
+            ->whereNotNull('shift_name')
+            ->where('plan_date', '>=', now()->subDays(3)->toDateString())
+            ->distinct()
+            ->get();
+
+        $service = app(TimelineGenerationService::class);
+        foreach ($recentDates as $sec) {
+            $dateStr = $sec->plan_date instanceof \Carbon\Carbon ? $sec->plan_date->toDateString() : (string)$sec->plan_date;
+            $service->regenerateSection($dateStr, (string)$sec->shift_name, $sec->press_name ? (string)$sec->press_name : null, true);
+        }
     }
 
     private function hariChoices(): array

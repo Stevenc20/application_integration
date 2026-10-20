@@ -113,7 +113,20 @@ class BreakTimeParameterController extends Controller
             return;
         }
 
-        app(TimelineGenerationService::class)->regenerateAllSections(true);
+        // Jalankan regenerasi timeline hanya untuk tanggal hari ini dan yang akan datang (atau 7 hari terakhir)
+        // agar tidak looping meregenerate seluruh riwayat historis masa lalu yang membuat request freeze/timeout
+        $recentDates = \App\Models\ProductionPlan::select('plan_date', 'shift_name', 'press_name')
+            ->whereNotNull('plan_date')
+            ->whereNotNull('shift_name')
+            ->where('plan_date', '>=', now()->subDays(3)->toDateString())
+            ->distinct()
+            ->get();
+
+        $service = app(TimelineGenerationService::class);
+        foreach ($recentDates as $sec) {
+            $dateStr = $sec->plan_date instanceof \Carbon\Carbon ? $sec->plan_date->toDateString() : (string)$sec->plan_date;
+            $service->regenerateSection($dateStr, (string)$sec->shift_name, $sec->press_name ? (string)$sec->press_name : null, true);
+        }
     }
 
     private function formatRow(MasterBreakTime $b): array
