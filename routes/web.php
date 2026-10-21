@@ -478,6 +478,10 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'startDandori']
     )->name('job.dandori.start');
 
+    Route::post('/job/{id}/dandori/cancel',
+        [InputHarianController::class, 'cancelDandori']
+    )->name('job.dandori.cancel');
+
     Route::post('/job/{id}/dandori/finish',
         [InputHarianController::class, 'finishDandori']
     )->name('job.dandori.finish');

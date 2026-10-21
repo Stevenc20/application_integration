@@ -676,6 +676,18 @@ class InputHarianController extends Controller
         }
     }
 
+    public function cancelDandori(Request $request, int|string $jobId)
+    {
+        $this->guardLockedShift($jobId);
+        try {
+            $workDate = $request->get('date') ?: now()->toDateString();
+            $this->productionService->cancelDandori($jobId, $workDate);
+            return response()->json(['success' => true, 'message' => 'Dandori berhasil dibatalkan dan job kembali standby.']);
+        } catch (\Throwable $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
     public function finishDandori(Request $request, int|string $jobId)
     {
         $this->guardLockedShift($jobId);

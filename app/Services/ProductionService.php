@@ -180,6 +180,53 @@ class ProductionService
     /**
      * Finish Dandori process.
      */
+    public function cancelDandori(int $jobId, ?string $workDate = null)
+    {
+        return DB::transaction(function () use ($jobId, $workDate) {
+            $job = JobMaster::findOrFail($jobId);
+            $workDate = $workDate ?: now()->toDateString();
+
+            // 1. Hapus downtime dandori yang masih berjalan (finish_time is null)
+            Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', 'dandori')
+                ->whereNull('finish_time')
+                ->delete();
+
+            // 2. Hapus first check dandori yang masih berjalan
+            Dandori::where('next_job_id', $jobId)
+                ->whereNull('finish_time')
+                ->delete();
+
+            // 3. Jika belum ada output produksi sama sekali, kembalikan status Job ke pending
+            $dp = DailyProduction::where('job_master_id', $jobId)
+                ->whereDate('work_date', $workDate)
+                ->first();
+
+            $totalActual = ($dp?->actual_ok ?? 0) + ($dp?->actual_repair ?? 0) + ($dp?->actual_reject ?? 0);
+            if ($totalActual == 0) {
+                $job->update([
+                    'status' => 'pending',
+                    'started_at' => null
+                ]);
+                $this->syncPlanStatus($jobId, 'pending');
+
+                // Bersihkan session yang baru dibuat jika belum ada durasi
+                ProductionSession::where('job_master_id', $jobId)
+                    ->whereDate('work_date', $workDate)
+                    ->where(function($q) {
+                        $q->whereNull('total_seconds')->orWhere('total_seconds', 0);
+                    })
+                    ->whereNull('finish_time')
+                    ->delete();
+            }
+
+            \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $jobId);
+            $this->signalDashboard($jobId);
+
+            return true;
+        });
+    }
+
     public function finishDandori(int $jobId, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $workDate) {

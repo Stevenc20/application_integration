@@ -1501,6 +1501,35 @@ window.jsStopDandori = async function jsStopDandori(jobId) {
     });
 }
 
+window.jsCancelDandori = async function jsCancelDandori(jobId) {
+    if (!confirm('Yakin ingin membatalkan Dandori untuk item ini dan mengembalikannya ke status Standby?')) {
+        return;
+    }
+    await window.ActionRunner.run('Batal Dandori', async () => {
+        const res = await fetch(`/operational/job/${jobId}/dandori/cancel`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                'X-Shift': window.ProductionConfig.currentShift || '',
+                'X-Date': window.ProductionConfig.currentDate || '',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({
+                date: window.ProductionConfig.currentDate,
+                shift: window.ProductionConfig.currentShift
+            })
+        }).then(r => r.json());
+
+        if (res.success) {
+            showToast('Dandori dibatalkan!', 'success');
+            setTimeout(() => location.reload(), 300);
+        } else {
+            showToast(res.message || 'Gagal membatalkan dandori', 'danger');
+        }
+    });
+}
+
 window.jsToggleFirstCheck = function jsToggleFirstCheck(jobId) {
     if (window.runningDowntimes?.[`${jobId}_firstcheck`]) {
         jsStopFirstCheck(jobId);
