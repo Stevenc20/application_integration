@@ -829,11 +829,13 @@ class InputHarianController extends Controller
 
     private function getShift()
     {
-        $hour = (int) now()->format('H');
+        $h = (int) now()->format('H');
+        $m = (int) now()->format('i');
+        $timeInMin = $h * 60 + $m;
 
-        // Shift Pagi: 07:00 - 19:00
-        // Shift Malam: 19:00 - 07:00
-        if ($hour >= 7 && $hour < 19) {
+        // Shift Pagi: 07:30 - 21:00
+        // Shift Malam: 21:00 - 07:30
+        if ($timeInMin >= 450 && $timeInMin < 1260) {
             return 'Shift Pagi';
         }
 
