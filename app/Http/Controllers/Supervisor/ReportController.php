@@ -368,7 +368,38 @@ class ReportController extends Controller
             return $finishTime;
         };
 
-        // LKH Schedule mirrors PPC upload 1-to-1: No merging of split jobs so each line matches PPC exactly
+        // ── MERGE CONSECUTIVE SAME-JOB PLANS INTO ONE ──
+        $mergedPlans = collect();
+        $mergedPlanIdsMap = [];
+        $buffer = null;
+        foreach ($plans as $plan) {
+            if (($plan->row_type ?? 'job') === 'break') {
+                if ($buffer) { $mergedPlans->push($buffer); $buffer = null; }
+                $mergedPlans->push($plan);
+                continue;
+            }
+            $currentJobNo = trim($plan->job_no ?? '');
+            if ($buffer && $currentJobNo === trim($buffer->job_no ?? '')) {
+                $buffer->plan = ($buffer->plan ?? 0) + ($plan->plan ?? $plan->target_qty ?? 0);
+                $buffer->target_qty = ($buffer->target_qty ?? 0) + ($plan->target_qty ?? 0);
+                $mergedPlanIdsMap[$buffer->id][] = $plan->id;
+                if ($plan->start_time && (!$buffer->start_time || $plan->start_time < $buffer->start_time))
+                    $buffer->start_time = $plan->start_time;
+                if ($plan->finish_time && (!$buffer->finish_time || $plan->finish_time > $buffer->finish_time))
+                    $buffer->finish_time = $plan->finish_time;
+                if ($plan->act_start && (!$buffer->act_start || $plan->act_start < $buffer->act_start))
+                    $buffer->act_start = $plan->act_start;
+                if ($plan->act_finish && (!$buffer->act_finish || $plan->act_finish > $buffer->act_finish))
+                    $buffer->act_finish = $plan->act_finish;
+            } else {
+                if ($buffer) $mergedPlans->push($buffer);
+                $buffer = clone $plan;
+                $mergedPlanIdsMap[$buffer->id] = [$plan->id];
+            }
+        }
+        if ($buffer) $mergedPlans->push($buffer);
+        $plans = $mergedPlans;
+
         $jobDisplayNo = 0;
         $previousActFinish = null;
 
