@@ -1631,21 +1631,21 @@ window.openKpiModalFromMonitor = function(type, line) {
         rows.forEach((r, idx) => {
             html += `
                 <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 10px 14px; font-weight: 700; color: #1e293b; text-align: center;">${r.no || (idx + 1)}</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #b91c1c; text-align: center;">
-                        <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${r.jenis || type}</span>
+                    <td style="padding: 14px 14px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
+                    <td style="padding: 14px 14px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
+                        <span style="background: #fee2e2; padding: 5px 10px; border-radius: 6px; font-size: 12px; display:inline-block; letter-spacing:0.02em;">${r.jenis || type}</span>
                     </td>
-                    <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">
-                        <div>${r.problem || '-'}</div>
-                        <div style="font-size:11px; color:#3b82f6; margin-top:2px;">Job: ${r.job || '-'}</div>
+                    <td style="padding: 14px 16px; font-weight: 700; color: #0f172a; vertical-align:top;">
+                        <div style="font-size:14px; line-height:1.4;">${r.problem || '-'}</div>
+                        <div style="font-size:12px; color:#2563eb; margin-top:6px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 8px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || '-'}</div>
                     </td>
-                    <td style="padding: 10px 14px; color: #475569; font-size: 12px;">
-                        <div><b>Penyebab:</b> ${r.penyebab || '-'}</div>
-                        <div style="margin-top: 3px;"><b>Tindakan:</b> ${r.action || '-'}</div>
+                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
+                        <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${r.penyebab || '-'}</span></div>
+                        <div><span style="color:#16a34a; font-weight:700;">Tindakan:</span> <span style="font-weight:600;">${r.action || '-'}</span></div>
                     </td>
-                    <td style="padding: 10px 14px; text-align: center; color: #334155; font-weight: 600;">-</td>
-                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; color: #b91c1c;">
-                        <div>${r.durasi || 0} m</div>
+                    <td style="padding: 14px 14px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${r.pic || '-'}</td>
+                    <td style="padding: 14px 14px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
+                        <div style="font-size:15px;">${r.durasi || 0} m</div>
                     </td>
                 </tr>
             `;
@@ -1680,19 +1680,21 @@ window.openDtDetailModal = function(rowIndex) {
         list.forEach((dt, idx) => {
             html += `
                 <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 10px 14px; font-weight: 700; color: #1e293b; text-align: center;">${idx + 1}</td>
-                    <td style="padding: 10px 14px; font-weight: 800; color: #b91c1c; text-align: center;">
-                        <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${dt.jenis_downtime}</span>
+                    <td style="padding: 14px 14px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
+                    <td style="padding: 14px 14px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
+                        <span style="background: #fee2e2; padding: 5px 10px; border-radius: 6px; font-size: 12px; display:inline-block; letter-spacing:0.02em;">${dt.jenis_downtime}</span>
                     </td>
-                    <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">${dt.problem}</td>
-                    <td style="padding: 10px 14px; color: #475569; font-size: 12px;">
-                        <div><b>Penyebab:</b> ${dt.penyebab}</div>
-                        <div style="margin-top: 3px;"><b>Tindakan:</b> ${dt.tindakan}</div>
+                    <td style="padding: 14px 16px; font-weight: 700; color: #0f172a; vertical-align:top;">
+                        <div style="font-size:14px; line-height:1.4;">${dt.problem}</div>
                     </td>
-                    <td style="padding: 10px 14px; text-align: center; color: #334155; font-weight: 600;">${dt.pic}</td>
-                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; color: #b91c1c;">
-                        <div>${dt.duration_minute} m</div>
-                        <div style="font-size: 10px; color: #94a3b8; font-weight: 500;">${dt.start_time} - ${dt.finish_time}</div>
+                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
+                        <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${dt.penyebab}</span></div>
+                        <div><span style="color:#16a34a; font-weight:700;">Tindakan:</span> <span style="font-weight:600;">${dt.tindakan}</span></div>
+                    </td>
+                    <td style="padding: 14px 14px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${dt.pic}</td>
+                    <td style="padding: 14px 14px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
+                        <div style="font-size:15px;">${dt.duration_minute} m</div>
+                        <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-top:3px;">${dt.start_time} - ${dt.finish_time}</div>
                     </td>
                 </tr>
             `;
@@ -1721,11 +1723,11 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <!-- Downtime Detail Modal Popup -->
-<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:24px;">
-    <div style="background:#fff; border-radius:20px; width:100%; max-width:960px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 30px 60px -15px rgba(0,0,0,0.5); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:18px; width:95vw; max-width:1250px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 30px 60px -15px rgba(0,0,0,0.5); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
         
         <!-- Header -->
-        <div style="padding:18px 24px; background:#f8fafc; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+        <div style="padding:16px 24px; background:#f8fafc; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
             <div style="display:flex; flex-direction:column; gap:4px;">
                 <div style="display:flex; align-items:center; gap:12px;">
                     <span style="font-size:18px; font-weight:900; color:#0f172a; letter-spacing:0.02em;" id="dtModalJobNumber">-</span>
@@ -1742,28 +1744,29 @@ document.addEventListener('keydown', function(e) {
             </div>
         </div>
 
-        <!-- Body / Table -->
-        <div style="padding:18px 24px; overflow-y:auto; flex:1; background:#ffffff;">
-            <table style="width:100%; border-collapse:separate; border-spacing:0; text-align:left;">
+        <!-- Body / Table with Horizontal Scroll -->
+        <div style="padding:16px 20px; overflow-x:auto; overflow-y:auto; flex:1; background:#ffffff;">
+            <table style="width:100%; min-width:950px; border-collapse:separate; border-spacing:0; text-align:left;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
                         <th style="padding:12px 14px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
-                        <th style="padding:12px 14px; text-align:center; width:120px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
-                        <th style="padding:12px 16px; width:250px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
-                        <th style="padding:12px 16px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
-                        <th style="padding:12px 14px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
-                        <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Durasi</th>
+                        <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
+                        <th style="padding:12px 16px; width:280px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
+                        <th style="padding:12px 16px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; min-width:300px;">Penyebab & Tindakan</th>
+                        <th style="padding:12px 14px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
+                        <th style="padding:12px 14px; text-align:center; width:120px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Durasi</th>
                     </tr>
                 </thead>
-                <tbody id="dtModalTableBody" style="line-height:1.45;">
+                <tbody id="dtModalTableBody" style="line-height:1.5;">
                     <!-- Populated dynamically via JS -->
                 </tbody>
             </table>
         </div>
 
         <!-- Footer -->
-        <div style="padding:14px 24px; background:#f8fafc; border-top:2px solid #e2e8f0; display:flex; justify-content:flex-end; flex-shrink:0;">
-            <button type="button" onclick="closeDtDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:10px 24px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; transition:all 0.15s; letter-spacing:0.02em;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
+        <div style="padding:12px 24px; background:#f8fafc; border-top:2px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <span style="font-size:11px; color:#94a3b8; font-weight:600;">* Geser tabel ke kanan jika layar sempit. Tekan ESC untuk menutup.</span>
+            <button type="button" onclick="closeDtDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:9px 24px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; transition:all 0.15s; letter-spacing:0.02em;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
         </div>
     </div>
 </div>
