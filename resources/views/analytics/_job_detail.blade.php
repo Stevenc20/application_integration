@@ -175,6 +175,18 @@
         $downtimeSec = $dp ? (int)$dp->downtime_seconds : 0;
 
         $actualTotal = $actualOk + $actualRepair + $actualReject;
+        $jobDowntime = $job ? (int)$job->downtimes->sum('duration_seconds') : 0;
+        $jobDandoriSum = $job ? (int)($job->dandoris->sum('duration_minutes') * 60) : 0;
+
+        // Fallback: If runtime is 0 but job started/has output, compute runtime from started_at to finished_at (or now)
+        if ($runtime <= 0 && $job && $job->started_at) {
+            $jStart = \Carbon\Carbon::parse($job->started_at);
+            $jEnd = $job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : now();
+            if ($jEnd > $jStart) {
+                $totalSpan = (int)$jEnd->diffInSeconds($jStart);
+                $runtime = max(0, $totalSpan - $jobDowntime - $jobDandoriSum);
+            }
+        }
         $denom = max($target, $actualTotal, 1);
         $okPct = ($actualOk / $denom) * 100;
         $repairPct = ($actualRepair / $denom) * 100;
@@ -407,7 +419,102 @@
                     }
                 }
 
-                // 4. Fallback: if no events, use runtime to estimate
+                // 4. Fill gaps with continuous Production (matching Input Harian behavior)
+                // If the job ran/completed or has output or explicit sessions/events:
+                $hasExplicitProd = collect($segments)->contains(fn($sg) => in_array($sg['type'], ['production', 'overtime']));
+                $isJobActiveOrDone = in_array(strtolower($job->status ?? ''), ['running', 'complete', 'finished']) || $actualTotal > 0 || $job->started_at;
+
+                if (!$hasExplicitProd && $isJobActiveOrDone) {
+                    // Determine anchor start & end
+                    $jobStart = $job->started_at ? \Carbon\Carbon::parse($job->started_at) : ($earliest ?: \Carbon\Carbon::parse($jobWorkDate.' 07:30:00'));
+                    $jobEnd = $job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : ($latest ?: now());
+                    if ($jobEnd <= $jobStart) {
+                        $jobEnd = $jobStart->copy()->addSeconds(max((int)$runtime, 300));
+                    }
+
+                    // Sort non-production events (dandori, downtimes)
+                    usort($segments, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp);
+
+                    $filledSegments = [];
+                    $lastPos = $jobStart->copy();
+
+                    // Relative deadline for overtime calculation
+                    $prodDeadline = null;
+                    if ($thePlan && $thePlan->start_time && $thePlan->finish_time) {
+                        $pStart = str_contains($thePlan->start_time, '-')
+                            ? \Carbon\Carbon::parse($thePlan->start_time)
+                            : \Carbon\Carbon::parse($jobStart->format('Y-m-d').' '.$thePlan->start_time);
+                        $pFinish = str_contains($thePlan->finish_time, '-')
+                            ? \Carbon\Carbon::parse($thePlan->finish_time)
+                            : \Carbon\Carbon::parse($jobStart->format('Y-m-d').' '.$thePlan->finish_time);
+                        $durationSec = (int) max(abs($pFinish->diffInSeconds($pStart)), 1);
+                        $prodDeadline = $jobStart->copy()->addSeconds($durationSec);
+                    }
+
+                    $appendProdBlock = function($start, $end) use (&$filledSegments, $prodDeadline) {
+                        if ($end <= $start) return;
+                        if ($prodDeadline && $end > $prodDeadline && $start < $prodDeadline) {
+                            $filledSegments[] = [
+                                'type' => 'production',
+                                'label' => 'Production',
+                                'color' => 'bg-blue-600',
+                                'start' => $start,
+                                'end' => $prodDeadline,
+                                'detail' => 'Actual Production Time',
+                                'link' => null
+                            ];
+                            $filledSegments[] = [
+                                'type' => 'overtime',
+                                'label' => 'Overtime',
+                                'color' => 'bg-red-600',
+                                'start' => $prodDeadline,
+                                'end' => $end,
+                                'detail' => 'Outside Scheduled Shift',
+                                'link' => null
+                            ];
+                        } elseif ($prodDeadline && $start >= $prodDeadline) {
+                            $filledSegments[] = [
+                                'type' => 'overtime',
+                                'label' => 'Overtime',
+                                'color' => 'bg-red-600',
+                                'start' => $start,
+                                'end' => $end,
+                                'detail' => 'Outside Scheduled Shift',
+                                'link' => null
+                            ];
+                        } else {
+                            $filledSegments[] = [
+                                'type' => 'production',
+                                'label' => 'Production',
+                                'color' => 'bg-blue-600',
+                                'start' => $start,
+                                'end' => $end,
+                                'detail' => 'Actual Production Time',
+                                'link' => null
+                            ];
+                        }
+                    };
+
+                    foreach ($segments as $ev) {
+                        if ($ev['start'] > $lastPos) {
+                            $appendProdBlock($lastPos, $ev['start']);
+                        }
+                        $filledSegments[] = $ev;
+                        if ($ev['end'] > $lastPos) {
+                            $lastPos = $ev['end']->copy();
+                        }
+                    }
+
+                    if ($jobEnd > $lastPos) {
+                        $appendProdBlock($lastPos, $jobEnd);
+                    }
+
+                    $segments = $filledSegments;
+                    if (!$earliest || $jobStart < $earliest) $earliest = $jobStart;
+                    if (!$latest || $jobEnd > $latest) $latest = $jobEnd;
+                }
+
+                // 5. Fallback: if no events at all, use runtime to estimate
                 if (!$earliest && ($runtime ?? 0) > 0) {
                     $earliest = \Carbon\Carbon::parse($jobWorkDate.' 07:30:00');
                     $latest = $earliest->copy()->addSeconds((int)$runtime);
