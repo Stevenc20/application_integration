@@ -333,8 +333,12 @@ class DashboardRealtimeService
                 'item'     => $dt->problem ?? '-',
                 'problem'  => $dt->problem ?? '-',
                 'penyebab' => $dt->penyebab ?? '-',
-                'action'   => $dt->action ?? '-',
+                'action'   => $dt->action ?? ($dt->tindakan ?? '-'),
+                'tindakan' => $dt->tindakan ?? ($dt->action ?? '-'),
+                'pic'      => $dt->pic ?? '-',
                 'durasi'   => $dur,
+                'start_time'  => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
+                'finish_time' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang',
             ];
             $dtRows[] = $row;
 
