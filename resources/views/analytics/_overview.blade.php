@@ -408,19 +408,24 @@
                 }
 
                 // 4. Fill gaps with continuous Production (matching Input Harian behavior)
-                // If the job ran/completed or has output or explicit sessions/events:
-                $hasExplicitProd = collect($segments)->contains(fn($sg) => in_array($sg['type'], ['production', 'overtime']));
-                $isJobActiveOrDone = $job && (in_array(strtolower($job->status ?? ''), ['running', 'complete', 'finished']) || $actualTotal > 0 || $job->started_at);
+                $isJobActiveOrDone = ($job && (in_array(strtolower($job->status ?? ''), ['running', 'complete', 'finished']) || $actualTotal > 0 || $job->started_at))
+                    || ($actualTotal > 0);
 
-                if (!$hasExplicitProd && $isJobActiveOrDone) {
+                if ($isJobActiveOrDone || !empty($segments)) {
                     // Determine anchor start & end
-                    $jobStart = $job->started_at ? \Carbon\Carbon::parse($job->started_at) : ($earliest ?: \Carbon\Carbon::parse($planDate.' 07:30:00'));
-                    $jobEnd = $job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : ($latest ?: now());
+                    $jobStart = ($job && $job->started_at)
+                        ? \Carbon\Carbon::parse($job->started_at)
+                        : ($earliest ?: ($plan->start_time ? \Carbon\Carbon::parse($planDate.' '.substr($plan->start_time, 0, 5)) : \Carbon\Carbon::parse($planDate.' 07:30:00')));
+
+                    $jobEnd = ($job && $job->finished_at)
+                        ? \Carbon\Carbon::parse($job->finished_at)
+                        : ($latest ?: ($plan->finish_time ? \Carbon\Carbon::parse($planDate.' '.substr($plan->finish_time, 0, 5)) : now()));
+
                     if ($jobEnd <= $jobStart) {
                         $jobEnd = $jobStart->copy()->addSeconds(max((int)$runtime, 300));
                     }
 
-                    // Sort non-production events (dandori, downtimes)
+                    // Sort all existing event segments (dandori, downtimes, explicit sessions)
                     usort($segments, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp);
 
                     $filledSegments = [];
@@ -498,21 +503,30 @@
                     }
 
                     $segments = $filledSegments;
-                    if (!$earliest || $jobStart < $earliest) $earliest = $jobStart;
-                    if (!$latest || $jobEnd > $latest) $latest = $jobEnd;
+                    $earliest = $jobStart;
+                    $latest = $jobEnd;
                 }
 
-                // 5. Fallback: if no events at all, use runtime to estimate
-                if (!$earliest && ($runtime ?? 0) > 0) {
-                    $earliest = \Carbon\Carbon::parse($planDate.' 07:30:00');
-                    $latest = $earliest->copy()->addSeconds((int)$runtime);
+                // 5. Fallback for scheduled/planned jobs that haven't started yet:
+                // Show planned schedule bar so it is never an empty black void ("bolong")
+                if (empty($segments)) {
+                    $schedStart = $plan->start_time
+                        ? \Carbon\Carbon::parse($planDate.' '.substr($plan->start_time, 0, 5))
+                        : \Carbon\Carbon::parse($planDate.' 07:30:00');
+                    $schedFinish = $plan->finish_time
+                        ? \Carbon\Carbon::parse($planDate.' '.substr($plan->finish_time, 0, 5))
+                        : $schedStart->copy()->addMinutes(60);
+                    if ($schedFinish <= $schedStart) $schedFinish = $schedStart->copy()->addMinutes(60);
+
+                    $earliest = $schedStart;
+                    $latest = $schedFinish;
                     $segments[] = [
-                        'type' => 'production',
-                        'label' => 'Production',
-                        'color' => 'bg-blue-600',
-                        'start' => $earliest,
-                        'end' => $latest,
-                        'detail' => 'Actual Production Time',
+                        'type' => 'planned',
+                        'label' => 'Planned Schedule',
+                        'color' => 'bg-slate-700/60 border border-dashed border-slate-500/50',
+                        'start' => $schedStart,
+                        'end' => $schedFinish,
+                        'detail' => 'Scheduled: '.$schedStart->format('H:i').' - '.$schedFinish->format('H:i'),
                         'link' => null
                     ];
                 }
