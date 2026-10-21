@@ -413,16 +413,6 @@ class ReportController extends Controller
                     $breakDuration = abs($planFinish->diffInMinutes($planStart));
                 }
 
-                $jobsData[] = [
-                    'row_type' => 'break',
-                    'break_label' => $this->resolveBreakLabel($plan),
-                    'job_master' => $plan->job_master ?: $this->resolveBreakLabel($plan),
-                    'job_no' => $plan->job_no ?? '',
-                    'schedule_start' => $planStart,
-                    'schedule_finish' => $planFinish,
-                    'keterangan' => $plan->keterangan ?? '',
-                ];
-
                 if ($planFinish) {
                     // Advance plan running time to schedule finish of the break
                     if ($planRunningTime->lt($planFinish)) {
