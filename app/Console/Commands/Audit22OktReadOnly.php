@@ -21,10 +21,10 @@ class Audit22OktReadOnly extends Command
         $dump = json_decode(file_get_contents($dumpPath), true);
         $data = $dump['data'] ?? [];
         $sheets = $data['sheets'] ?? [];
-        $uploadDate = $data['upload_date'] ?? '2026-10-22';
+        $uploadDate = '2026-10-22'; // Format ISO tanggal di DB production_plans
 
         $dbPlans = DB::table('production_plans')
-            ->whereDate('plan_date', $uploadDate)
+            ->whereDate('plan_date', '2026-10-22')
             ->get();
 
         $this->info("====================================================================================================");
