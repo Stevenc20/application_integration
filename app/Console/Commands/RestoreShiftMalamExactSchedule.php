@@ -45,11 +45,9 @@ class RestoreShiftMalamExactSchedule extends Command
                 'status' => 'finished'
             ]);
 
-        // 2. SHIFT MALAM: Aktifkan 4 Line masing-masing 1 Job Utama sebagai RUNNING sesuai jadwal
-        // Line A: PVS-003B1 (id plan: 17040, JM id: 6696)
-        // Line B: PB-062    (id plan: 17059, JM id: 6697)
-        // Line C: PV-005BA1 (id plan: 17066, JM id: 6698)
-        // Line D: AAS-054   (id plan: 17069, JM id: 6699)
+        // 2. SHIFT MALAM: Aktifkan 4 Line masing-masing 1 Job Utama sesuai jadwal
+        // Catatan: production_plans.status enum adalah: 'pending', 'approved', 'completed'
+        // JobMaster.status enum mendukung: 'running', 'pending', 'complete'
         $malamRunningJobs = [
             'PRESS A' => ['plan_id' => 17040, 'jm_id' => 6696, 'job_no' => 'PVS-003B1', 'start' => '21:05', 'finish' => '22:00'],
             'PRESS B' => ['plan_id' => 17059, 'jm_id' => 6697, 'job_no' => 'PB-062', 'start' => '21:05', 'finish' => '22:00'],
@@ -58,19 +56,19 @@ class RestoreShiftMalamExactSchedule extends Command
         ];
 
         foreach ($malamRunningJobs as $line => $dt) {
-            // Update / insert ProductionPlan Shift Malam
+            // Update ProductionPlan Shift Malam menjadi 'approved'
             DB::table('production_plans')
                 ->where('id', $dt['plan_id'])
                 ->update([
                     'shift_name' => 'Shift Malam',
                     'press_name' => $line,
-                    'status' => 'running',
+                    'status' => 'approved',
                     'row_type' => 'job',
                     'start_time' => $dt['start'],
                     'finish_time' => $dt['finish'],
                 ]);
 
-            // Update JobMaster agar aktif di Input Harian
+            // Update JobMaster agar RUNNING aktif di Input Harian
             DB::table('job_masters')
                 ->where('id', $dt['jm_id'])
                 ->update([
@@ -79,7 +77,7 @@ class RestoreShiftMalamExactSchedule extends Command
                     'finished_at' => null,
                 ]);
 
-            $this->line("[SHIFT MALAM - {$line}] Job {$dt['job_no']} di-set RUNNING aktif.");
+            $this->line("[SHIFT MALAM - {$line}] Job {$dt['job_no']} di-set aktif RUNNING.");
         }
 
         // Job antrean lainnya di Shift Malam di-set PENDING (agar tidak menumpuk di console)
