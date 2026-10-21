@@ -16,6 +16,8 @@ class RestoreTodayPlans extends Command
     {
         $this->info('Mencari job history hari ini 2026-10-21...');
 
+        $lineMap = \App\Models\LineMaster::pluck('id', 'line_name')->toArray();
+
         $jobs = JobMaster::whereHas('dailyProduction', function($q) {
             $q->where('work_date', '2026-10-21');
         })->orWhereHas('downtimes', function($q) {
@@ -28,13 +30,18 @@ class RestoreTodayPlans extends Command
                 $jobNo = $m[1];
                 $planId = (int)$m[2];
 
+                $pressName = $j->line ?: 'PRESS A';
+                $lineId = $lineMap[$pressName] ?? 1;
+
                 $exists = ProductionPlan::find($planId);
                 if (!$exists) {
                     DB::table('production_plans')->insert([
                         'id' => $planId,
+                        'line_master_id' => $lineId,
+                        'shift_master_id' => 1,
                         'job_no' => $jobNo,
                         'job_master' => $j->job_name ?: $jobNo,
-                        'press_name' => $j->line ?: 'PRESS A',
+                        'press_name' => $pressName,
                         'shift_name' => 'Shift Pagi',
                         'plan_date' => '2026-10-21',
                         'row_type' => 'job',
