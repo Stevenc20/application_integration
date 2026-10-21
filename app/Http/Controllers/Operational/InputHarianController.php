@@ -180,19 +180,7 @@ class InputHarianController extends Controller
                         ''
                     ) LIKE ?
                 ", ["%{$normalized}%"])
-                ->orWhereRaw("
-                    REPLACE(
-                        REPLACE(
-                            UPPER(TRIM(COALESCE(line, ''))),
-                            'PRESS ',
-                            ''
-                        ),
-                        'LINE ',
-                        ''
-                    ) LIKE ?
-                ", ["%{$normalized}%"])
-                ->orWhere('press_name', 'LIKE', "%{$lineFilter}%")
-                ->orWhere('line', 'LIKE', "%{$lineFilter}%");
+                ->orWhere('press_name', 'LIKE', "%{$lineFilter}%");
             });
         }
 
