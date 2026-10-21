@@ -228,6 +228,9 @@ class DashboardDetailService
             $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 1) : 0;
             $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
 
+            // GSPH Actual: Total QTY Good / TPT * 60
+            $gsphActual = $tpt > 0 ? (int) round(($actualOk / $tpt) * 60) : 0;
+
             // Plan Finish: Ambil jam selesai terakhir dari interval (termasuk interval setelah istirahat)
             $planFinish = $plan->finish_time;
             if ($children->isNotEmpty()) {
@@ -260,7 +263,7 @@ class DashboardDetailService
                 'plan_finish'      => $planFinish ?: '-',
                 'actual_finish'    => $actualFinish,
                 'gsph_plan'        => (float) ($plan->gsph_item ?? 0),
-                'gsph_actual'      => $pressTime > 0 ? round($actualOk / ($pressTime / 60)) : 0,
+                'gsph_actual'      => $gsphActual,
             ];
         }
 

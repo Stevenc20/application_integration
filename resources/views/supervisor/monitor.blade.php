@@ -991,10 +991,9 @@ function buildRightBody(rows, maxRows, overallPlan){
             const planToUse = gPln > 0 ? gPln : (overallPlan || 0);
             
             if (planToUse > 0) {
-                const pct = (gAct / planToUse) * 100;
-                if (pct >= 100) {
+                if (gAct >= planToUse) {
                     gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
-                } else if (gAct > 0) {
+                } else {
                     const blinkClass = j.is_running ? 'animation:blink-red .8s ease-in-out infinite;' : '';
                     gsphSt = `background-color:#ef4444!important; color:#fff!important; font-weight:900; ${blinkClass}`;
                     gsphTxt = `${gAct} <span style="font-size:0.6vw;">⚠️</span>`;
