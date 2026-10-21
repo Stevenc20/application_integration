@@ -119,7 +119,7 @@ class DashboardDetailService
             $firstCheckMinutes[$qc->job_master_id] = ($firstCheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
         }
 
-        $downtimeData = Downtime::whereIn('job_master_id', $jobIds)
+        $downtimeData = Downtime::with('hambatanJalur')->whereIn('job_master_id', $jobIds)
             ->whereNotNull('duration_seconds')
             ->get();
 
@@ -144,6 +144,8 @@ class DashboardDetailService
                 'start_time'      => $startTimeFormatted,
                 'finish_time'     => $finishTimeFormatted,
                 'duration_minute' => round($dt->duration_seconds / 60, 1),
+                'lhj_id'          => $dt->hambatanJalur?->id,
+                'lhj_status'      => $dt->hambatanJalur?->status,
             ];
         }
 

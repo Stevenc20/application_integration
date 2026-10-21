@@ -251,7 +251,7 @@ class DashboardRealtimeService
                 ->sum('target_qty');
         }
 
-        $allDowntimes = Downtime::with('jobMaster')->whereIn('job_master_id', $jobIds)
+        $allDowntimes = Downtime::with(['jobMaster', 'hambatanJalur'])->whereIn('job_master_id', $jobIds)
             ->where('start_time', '>=', $shiftStartDt)
             ->where('start_time', '<', $shiftEndDt)
             ->get();
@@ -328,6 +328,7 @@ class DashboardRealtimeService
             $rawJob = $dt->jobMaster?->job_name ?? '-';
             $jobName = $shortJob($rawJob);
             $row = [
+                'id'       => $dt->id,
                 'no'       => count($dtRows) + 1,
                 'jenis'    => $dt->jenis_downtime,
                 'job'      => $jobName,
@@ -340,6 +341,8 @@ class DashboardRealtimeService
                 'durasi'   => $dur,
                 'start_time'  => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
                 'finish_time' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang',
+                'lhj_id'      => $dt->hambatanJalur?->id,
+                'lhj_status'  => $dt->hambatanJalur?->status,
             ];
             $dtRows[] = $row;
 

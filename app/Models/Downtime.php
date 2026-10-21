@@ -22,4 +22,9 @@ class Downtime extends Model
     {
         return $this->belongsTo(JobMaster::class);
     }
+
+    public function hambatanJalur()
+    {
+        return $this->hasOne(HambatanJalur::class, 'downtime_id');
+    }
 }

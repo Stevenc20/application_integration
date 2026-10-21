@@ -900,6 +900,17 @@ document.getElementById('filterBar').addEventListener('click',function(e){
 const MON_API_DATA   = @json(parse_url(route('supervisor.dashboard.api'), PHP_URL_PATH));
 const MON_API_DETAIL = @json(parse_url(route('supervisor.dashboard.detail'), PHP_URL_PATH));
 const MON_API_STATUS = @json(parse_url(route('supervisor.overview.lineStatus'), PHP_URL_PATH));
+const LKH_URL_BASE   = @json(parse_url(route('supervisor.reports.daily_production'), PHP_URL_PATH));
+
+let CURRENT_MON_DATE = '';
+function getMonDate() {
+    if (CURRENT_MON_DATE) return CURRENT_MON_DATE;
+    const n = new Date();
+    if (n.getHours() < 7 || (n.getHours() === 7 && n.getMinutes() < 30)) {
+        n.setDate(n.getDate() - 1);
+    }
+    return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+}
 
 function fetchData(){
     const n=new Date();
@@ -907,6 +918,7 @@ function fetchData(){
         n.setDate(n.getDate() - 1);
     }
     const date=`${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
+    CURRENT_MON_DATE = date;
     const shift=selectedShift;
 
     Promise.all([
@@ -1662,27 +1674,44 @@ window.openKpiModalFromMonitor = function(type, line) {
     const rows = lineData?.rows || [];
 
     if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian kendala untuk ${type} di ${line}.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian kendala untuk ${type} di ${line}.</td></tr>`;
     } else {
         let html = '';
         rows.forEach((r, idx) => {
+            let lhjBtn = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
+            if (r.lhj_id) {
+                const statusColor = r.lhj_status === 'foreman_signed' ? '#16a34a' : '#ea580c';
+                const statusBg = r.lhj_status === 'foreman_signed' ? '#f0fdf4' : '#fff7ed';
+                const statusBorder = r.lhj_status === 'foreman_signed' ? '#bbf7d0' : '#ffedd5';
+                const statusText = r.lhj_status === 'foreman_signed' ? 'SELESAI' : 'PROSES';
+                lhjBtn = `
+                    <a href="/hambatan-jalur/${r.lhj_id}" target="_blank" style="display:inline-flex; align-items:center; gap:4px; padding:4px 9px; border-radius:6px; font-size:11px; font-weight:800; background:${statusBg}; color:${statusColor}; border:1px solid ${statusBorder}; text-decoration:none; transition:all 0.15s;" title="Buka Dokumen LHJ #${r.lhj_id}">
+                        <span>LHJ #${r.lhj_id}</span>
+                        <span style="font-size:9px; opacity:0.85;">(${statusText})</span>
+                        <span style="font-size:10px;">↗</span>
+                    </a>
+                `;
+            }
             html += `
                 <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 14px 14px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
-                    <td style="padding: 14px 14px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
-                        <span style="background: #fee2e2; padding: 5px 10px; border-radius: 6px; font-size: 12px; display:inline-block; letter-spacing:0.02em;">${r.jenis || type}</span>
+                    <td style="padding: 12px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
+                    <td style="padding: 12px 12px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
+                        <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em;">${r.jenis || type}</span>
                     </td>
-                    <td style="padding: 14px 16px; font-weight: 700; color: #0f172a; vertical-align:top;">
-                        <div style="font-size:14px; line-height:1.4;">${r.problem || '-'}</div>
-                        <div style="font-size:12px; color:#2563eb; margin-top:6px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 8px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || '-'}</div>
+                    <td style="padding: 12px 14px; font-weight: 700; color: #0f172a; vertical-align:top;">
+                        <div style="font-size:13px; line-height:1.4;">${r.problem || '-'}</div>
+                        <div style="font-size:11px; color:#2563eb; margin-top:4px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 7px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || '-'}</div>
                     </td>
-                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
-                        <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${r.penyebab || '-'}</span></div>
+                    <td style="padding: 12px 14px; color: #334155; font-size: 12px; vertical-align:top;">
+                        <div style="margin-bottom:4px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${r.penyebab || '-'}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan:</span> <span style="font-weight:600;">${r.action || '-'}</span></div>
                     </td>
-                    <td style="padding: 14px 14px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${r.pic || '-'}</td>
-                    <td style="padding: 14px 14px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
-                        <div style="font-size:15px;">${r.durasi || 0} m</div>
+                    <td style="padding: 12px 10px; text-align: center; color: #334155; font-weight: 700; font-size: 12px; vertical-align:top;">${r.pic || '-'}</td>
+                    <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
+                        <div style="font-size:13px;">${r.durasi || 0} m</div>
+                    </td>
+                    <td style="padding: 12px 10px; text-align: center; vertical-align:top;">
+                        ${lhjBtn}
                     </td>
                 </tr>
             `;
@@ -1723,27 +1752,44 @@ window.openDtDetailModal = function(rowIndex) {
     const list = item.downtime_list || [];
 
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada rincian downtime khusus untuk item ini.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada rincian downtime khusus untuk item ini.</td></tr>`;
     } else {
         let html = '';
         list.forEach((dt, idx) => {
+            let lhjBtn = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
+            if (dt.lhj_id) {
+                const statusColor = dt.lhj_status === 'foreman_signed' ? '#16a34a' : '#ea580c';
+                const statusBg = dt.lhj_status === 'foreman_signed' ? '#f0fdf4' : '#fff7ed';
+                const statusBorder = dt.lhj_status === 'foreman_signed' ? '#bbf7d0' : '#ffedd5';
+                const statusText = dt.lhj_status === 'foreman_signed' ? 'SELESAI' : 'PROSES';
+                lhjBtn = `
+                    <a href="/hambatan-jalur/${dt.lhj_id}" target="_blank" style="display:inline-flex; align-items:center; gap:4px; padding:4px 9px; border-radius:6px; font-size:11px; font-weight:800; background:${statusBg}; color:${statusColor}; border:1px solid ${statusBorder}; text-decoration:none; transition:all 0.15s;" title="Buka Dokumen LHJ #${dt.lhj_id}">
+                        <span>LHJ #${dt.lhj_id}</span>
+                        <span style="font-size:9px; opacity:0.85;">(${statusText})</span>
+                        <span style="font-size:10px;">↗</span>
+                    </a>
+                `;
+            }
             html += `
                 <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 14px 14px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
-                    <td style="padding: 14px 14px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
-                        <span style="background: #fee2e2; padding: 5px 10px; border-radius: 6px; font-size: 12px; display:inline-block; letter-spacing:0.02em;">${dt.jenis_downtime}</span>
+                    <td style="padding: 12px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
+                    <td style="padding: 12px 12px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
+                        <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em;">${dt.jenis_downtime}</span>
                     </td>
-                    <td style="padding: 14px 16px; font-weight: 700; color: #0f172a; vertical-align:top;">
-                        <div style="font-size:14px; line-height:1.4;">${dt.problem}</div>
+                    <td style="padding: 12px 14px; font-weight: 700; color: #0f172a; vertical-align:top;">
+                        <div style="font-size:13px; line-height:1.4;">${dt.problem}</div>
                     </td>
-                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
-                        <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${dt.penyebab}</span></div>
+                    <td style="padding: 12px 14px; color: #334155; font-size: 12px; vertical-align:top;">
+                        <div style="margin-bottom:4px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${dt.penyebab}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan:</span> <span style="font-weight:600;">${dt.tindakan}</span></div>
                     </td>
-                    <td style="padding: 14px 14px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${dt.pic}</td>
-                    <td style="padding: 14px 14px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
-                        <div style="font-size:15px;">${dt.duration_minute} m</div>
-                        <div style="font-size: 11px; color: #64748b; font-weight: 600; margin-top:3px;">${dt.start_time} - ${dt.finish_time}</div>
+                    <td style="padding: 12px 10px; text-align: center; color: #334155; font-weight: 700; font-size: 12px; vertical-align:top;">${dt.pic}</td>
+                    <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
+                        <div style="font-size:13px;">${dt.duration_minute} m</div>
+                        <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">${dt.start_time} - ${dt.finish_time}</div>
+                    </td>
+                    <td style="padding: 12px 10px; text-align: center; vertical-align:top;">
+                        ${lhjBtn}
                     </td>
                 </tr>
             `;
@@ -1946,12 +1992,13 @@ document.addEventListener('keydown', function(e) {
             <table class="modal-table" style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
-                        <th style="padding:12px 10px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
-                        <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
-                        <th style="padding:12px 16px; width:280px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
-                        <th style="padding:12px 16px; width:410px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
-                        <th style="padding:12px 14px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
-                        <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Durasi</th>
+                        <th style="padding:12px 10px; text-align:center; width:45px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
+                        <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
+                        <th style="padding:12px 14px; width:260px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
+                        <th style="padding:12px 14px; width:360px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
+                        <th style="padding:12px 12px; text-align:center; width:95px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
+                        <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Durasi</th>
+                        <th style="padding:12px 12px; text-align:center; width:120px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">LHJ</th>
                     </tr>
                 </thead>
                 <tbody id="dtModalTableBody" style="line-height:1.5;">
@@ -2028,7 +2075,7 @@ document.addEventListener('keydown', function(e) {
     box-shadow: inset 0 0 0 2px #fff;
 }
 
-/* ── MODAL TABLE EXPLICIT STYLING (mencegah bentrok dengan style global table monitor) ── */
+/* ── MODAL TABLE EXPLICIT STYLING (mencegah bentrok dengan style global table monitor & TV screen besar) ── */
 .modal-table {
     border-collapse: collapse !important;
     border-spacing: 0 !important;
@@ -2038,6 +2085,8 @@ document.addEventListener('keydown', function(e) {
 }
 .modal-table th,
 .modal-table td {
+    font-size: clamp(12px, 0.95vw, 16px) !important;
+    padding: clamp(8px, 0.7vw, 14px) clamp(8px, 0.8vw, 16px) !important;
     white-space: normal !important;
     overflow: visible !important;
     text-overflow: clip !important;
@@ -2048,8 +2097,11 @@ document.addEventListener('keydown', function(e) {
 }
 .modal-table th {
     background: #f1f5f9 !important;
+    font-size: clamp(11px, 0.85vw, 14px) !important;
     font-weight: 900 !important;
     color: #334155 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.04em !important;
 }
 .modal-table td {
     vertical-align: top !important;
