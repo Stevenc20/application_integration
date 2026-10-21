@@ -733,6 +733,7 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(func
         Route::get('/recovery-history',                [\App\Http\Controllers\Ppc\RecoveryController::class, 'index'])->name('recovery.history'); // backward compat
         Route::post('/recovery/reject-item/{id}',      [\App\Http\Controllers\Ppc\RecoveryController::class, 'rejectItem'])->name('recovery.reject_item');
         Route::post('/recovery/reject-items',          [\App\Http\Controllers\Ppc\RecoveryController::class, 'rejectItems'])->name('recovery.reject_items');
+        Route::delete('/recovery/delete-item/{id}',     [\App\Http\Controllers\Ppc\RecoveryController::class, 'deleteItem'])->name('recovery.delete_item');
 
         // Cut-off & Scheduler manual trigger
         Route::post('/recovery/run-cutoff',            [\App\Http\Controllers\Ppc\RecoveryController::class, 'runCutOff'])->name('recovery.run_cutoff');

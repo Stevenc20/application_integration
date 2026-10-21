@@ -163,6 +163,38 @@ class RecoveryController extends Controller
     }
 
     /**
+     * Delete / Hapus permanen recovery item yang tidak diinginkan (misal salah klik finish).
+     */
+    public function deleteItem(int|string $id)
+    {
+        $item = RecoveryItem::findOrFail($id);
+        $press = $item->press_name;
+        
+        // Lepaskan referensi recovery_id dari production_plans jika ada
+        \App\Models\ProductionPlan::where('recovery_id', $item->id)->update([
+            'recovery_id' => null,
+            'source_type' => 'ppc'
+        ]);
+
+        $item->delete();
+
+        // Resimulate schedule
+        try {
+            $today = now()->format('Y-m-d');
+            $timelineGenerator = app(\App\Services\TimelineGenerationService::class);
+            $timelineGenerator->regenerateSection($today, 'Shift Pagi', $press);
+            $timelineGenerator->regenerateSection($today, 'Shift Malam', $press);
+        } catch (\Throwable $e) {
+            Log::warning('Resimulation after recovery delete failed: ' . $e->getMessage());
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Item recovery berhasil dihapus permanen.'
+        ]);
+    }
+
+    /**
      * Run cut-off for a specific date and shift (manual trigger).
      */
     public function runCutOff(Request $request)

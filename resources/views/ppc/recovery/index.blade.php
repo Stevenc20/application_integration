@@ -160,8 +160,13 @@
                                             class="px-2 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-700 rounded-lg text-[10px] font-bold transition-all"
                                             title="Approve">&#10003;</button>
                                     <button onclick="rejectItem({{ $item->id }})"
-                                            class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-[10px] font-bold transition-all"
+                                            class="px-2 py-1 bg-amber-100 hover:bg-amber-200 text-amber-700 rounded-lg text-[10px] font-bold transition-all"
                                             title="Reject">&#10007;</button>
+                                    <button onclick="deleteRecoveryItem({{ $item->id }})"
+                                            class="px-2 py-1 bg-rose-100 hover:bg-rose-200 text-rose-700 rounded-lg text-[10px] font-bold transition-all"
+                                            title="Hapus Permanen">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 inline-block" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                                    </button>
                                 </div>
                             </td>
                         </tr>
@@ -403,6 +408,22 @@
         .then(data => {
             if (data.success) { location.reload(); }
             else { showToast(data.message || 'Gagal reject.', 'error'); }
+        })
+        .catch(() => showToast('Error.', 'error'));
+    }
+
+    function deleteRecoveryItem(id) {
+        if (!confirm('Yakin ingin MENGHAPUS item recovery ini secara permanen?')) {
+            return;
+        }
+        fetch('{{ route("ppc.planning.recovery.delete_item", ["id" => "__ID__"]) }}'.replace('__ID__', id), {
+            method: 'DELETE',
+            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}', 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+            if (data.success) { location.reload(); }
+            else { showToast(data.message || 'Gagal menghapus.', 'error'); }
         })
         .catch(() => showToast('Error.', 'error'));
     }
