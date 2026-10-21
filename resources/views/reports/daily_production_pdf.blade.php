@@ -323,7 +323,7 @@
                         $tptPlan = (float)($job['tpt_plan'] ?? 0);
                         $breakTime = (float)($job['break_time_duration'] ?? 0);
                         $workTime = max(0, ($tptPlan + $breakTime));
-                        $gsphVal = intval($job['plan_gsph'] ?? $job['gsph'] ?? 0);
+                        $gsphVal = (int) round($job['plan_gsph'] ?? $job['gsph'] ?? 0);
                         
                         $schPlan += $planQty; 
                         $schDan += $dandori; 
