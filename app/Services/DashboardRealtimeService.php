@@ -535,10 +535,28 @@ class DashboardRealtimeService
             : 0;
 
         $currRuntimeMinutes = round($currRuntime / 60, 1);
-        $currActualTpt = round($currRuntimeMinutes + $currDandoriMinutes + $currDtTotal, 1);
-        $currGsph = ($hasRunning && $currOk > 0 && $currActualTpt > 0)
-            ? (int) round(($currOk / $currActualTpt) * 60)
-            : 0;
+        // GSPH Curr: hanya untuk item yang sedang running, dihitung berdasarkan PCS yang sudah di-input leader / TPT kumulatif sampai qty tersebut
+        $currGsph = 0;
+        if ($hasRunning && $currOk > 0 && $runningRecord && $runningRecord->jobMaster) {
+            $rjn = trim($runningRecord->jobMaster->job_number ?? '');
+            $runningPlan = $plans->first(function ($p) use ($rjn) {
+                return trim($p->job_no ?? '') === $rjn && ($p->row_type ?? 'job') === 'job';
+            });
+            $runningCt = $runningPlan ? (float) ($runningPlan->ct_detik ?? 0) : 0;
+            if ($runningCt > 0) {
+                // GSPH Curr = (PCS yang sudah di-input / ((PCS yang di-input * CT) / 60)) * 60 = 3600 / CT
+                $tptCumMins = ($currOk * $runningCt) / 60;
+                if ($tptCumMins > 0) {
+                    $currGsph = (int) round(($currOk / $tptCumMins) * 60);
+                }
+            } else {
+                // Fallback jika CT tidak ditemukan
+                $currActualTpt = round($currRuntimeMinutes + $currDandoriMinutes + $currDtTotal, 1);
+                if ($currActualTpt > 0) {
+                    $currGsph = (int) round(($currOk / $currActualTpt) * 60);
+                }
+            }
+        }
 
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
