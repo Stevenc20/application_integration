@@ -1723,8 +1723,8 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <!-- Downtime Detail Modal Popup -->
-<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:20px;">
-    <div style="background:#fff; border-radius:18px; width:95vw; max-width:1250px; max-height:90vh; display:flex; flex-direction:column; box-shadow:0 30px 60px -15px rgba(0,0,0,0.5); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:1.5vw;">
+    <div style="background:#fff; border-radius:18px; width:94vw; max-width:1300px; height:88vh; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 30px 60px -15px rgba(0,0,0,0.5); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
         
         <!-- Header -->
         <div style="padding:16px 24px; background:#f8fafc; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
@@ -1745,16 +1745,16 @@ document.addEventListener('keydown', function(e) {
         </div>
 
         <!-- Body / Table with Horizontal Scroll -->
-        <div style="padding:16px 20px; overflow-x:auto; overflow-y:auto; flex:1; background:#ffffff;">
-            <table style="width:100%; min-width:950px; border-collapse:separate; border-spacing:0; text-align:left;">
+        <div style="padding:16px 20px; overflow-x:auto; overflow-y:auto; flex:1; background:#ffffff; min-height:0;">
+            <table style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
-                        <th style="padding:12px 14px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
+                        <th style="padding:12px 10px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
                         <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
                         <th style="padding:12px 16px; width:280px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
-                        <th style="padding:12px 16px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; min-width:300px;">Penyebab & Tindakan</th>
-                        <th style="padding:12px 14px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
-                        <th style="padding:12px 14px; text-align:center; width:120px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Durasi</th>
+                        <th style="padding:12px 16px; width:410px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
+                        <th style="padding:12px 14px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
+                        <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Durasi</th>
                     </tr>
                 </thead>
                 <tbody id="dtModalTableBody" style="line-height:1.5;">
