@@ -224,6 +224,30 @@
             background-color: #fde047 !important;
         }
 
+        /* Hover & Pointer indicator for clickable downtime cells */
+        .dt-clickable-kpi {
+            cursor: pointer !important;
+            transition: all 0.15s ease !important;
+            position: relative;
+        }
+        .dt-clickable-kpi:hover {
+            filter: brightness(0.92) contrast(1.1) !important;
+            outline: 2px solid #ef4444 !important;
+            outline-offset: -2px !important;
+            box-shadow: inset 0 0 6px rgba(239, 68, 68, 0.4) !important;
+        }
+        .dt-clickable-kpi::after {
+            content: ' 👆';
+            font-size: 0.7vw;
+            display: inline-block;
+            vertical-align: middle;
+            animation: bounceFinger 0.8s infinite alternate;
+        }
+        @keyframes bounceFinger {
+            from { transform: translateY(0); }
+            to { transform: translateY(-2px); }
+        }
+
         /* Dark mode Downtime Rows: Nuansa gelap tegas/pekat (dark slate-charcoal) */
         body.dark .dt-row-bg td:not([class*="bg-"]) {
             background-color: #0b1120 !important; /* Gelap pekat (sangat kontras dengan cell merah alert) */
@@ -1212,13 +1236,11 @@ function updateAllCells(){
                     const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
                     const valNum = parseFloat(k.actual);
                     if (isDt && !isNaN(valNum) && valNum > 0) {
-                        ac.style.cursor = 'pointer';
-                        ac.style.textDecoration = 'underline';
+                        ac.classList.add('dt-clickable-kpi');
                         ac.title = `Klik untuk rincian ${desc} — ${line}`;
                         ac.onclick = () => openKpiModalFromMonitor(desc, line);
                     } else if (isDt) {
-                        ac.style.cursor = 'default';
-                        ac.style.textDecoration = 'none';
+                        ac.classList.remove('dt-clickable-kpi');
                         ac.onclick = null;
                     }
                 }else{
@@ -1349,15 +1371,15 @@ function renderTable(){
                     const pct = k.actualPct ? ` ${k.actualPct}` : '';
                     const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
                     const valNum = parseFloat(k.actual);
-                    let clickStyle = '';
+                    let clickCls = '';
                     let clickAttr = '';
                     if (isDt && !isNaN(valNum) && valNum > 0) {
-                        clickStyle = 'cursor:pointer; text-decoration:underline;';
+                        clickCls = ' dt-clickable-kpi';
                         clickAttr = `onclick="openKpiModalFromMonitor('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
                     }
                     b += `<td class="val-plan">${k.plan||'-'}</td>`;
                     b += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
-                    b += `<td class="val-actual ${cl.act}" style="${cl.style};${clickStyle}" ${clickAttr}>${k.actual||'-'}${pct}</td>`;
+                    b += `<td class="val-actual ${cl.act}${clickCls}" style="${cl.style}" ${clickAttr}>${k.actual||'-'}${pct}</td>`;
                 } else {
                     b += `<td>-</td><td>-</td><td>-</td>`;
                 }
@@ -1438,15 +1460,15 @@ function renderTable(){
                 }
                 const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
                 const valNum = parseFloat(k.actual);
-                let clickStyle = '';
+                let clickCls = '';
                 let clickAttr = '';
                 if (isDt && !isNaN(valNum) && valNum > 0) {
-                    clickStyle = 'cursor:pointer; text-decoration:underline;';
+                    clickCls = ' dt-clickable-kpi';
                     clickAttr = `onclick="openKpiModalFromMonitor('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
                 }
                 leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
                 leftBodyHtml += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
-                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style};${clickStyle}" ${clickAttr}>${actValTxt}</td>`;
+                leftBodyHtml += `<td class="val-actual ${cl.act}${clickCls}" style="border-right:none;${cl.style}" ${clickAttr}>${actValTxt}</td>`;
             } else {
                 leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
@@ -1699,49 +1721,49 @@ document.addEventListener('keydown', function(e) {
 </script>
 
 <!-- Downtime Detail Modal Popup -->
-<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:20px;">
-    <div style="background:#fff; border-radius:16px; width:100%; max-width:850px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s ease-out;">
+<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:24px;">
+    <div style="background:#fff; border-radius:20px; width:100%; max-width:960px; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 30px 60px -15px rgba(0,0,0,0.5); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
         
         <!-- Header -->
-        <div style="padding:16px 22px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:between;">
-            <div>
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:16px; font-weight:900; color:#0f172a;" id="dtModalJobNumber">-</span>
-                    <span style="background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:3px 8px; border-radius:6px; letter-spacing:0.04em;">DOWNTIME DETAIL</span>
+        <div style="padding:18px 24px; background:#f8fafc; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px; font-weight:900; color:#0f172a; letter-spacing:0.02em;" id="dtModalJobNumber">-</span>
+                    <span style="background:#dc2626; color:#fff; font-size:11px; font-weight:900; padding:4px 10px; border-radius:8px; letter-spacing:0.05em; text-transform:uppercase;">DOWNTIME DETAIL</span>
                 </div>
-                <div style="font-size:12px; color:#64748b; font-weight:600; margin-top:2px;" id="dtModalPartName">-</div>
+                <div style="font-size:13px; color:#64748b; font-weight:700;" id="dtModalPartName">-</div>
             </div>
-            <div style="display:flex; align-items:center; gap:16px; margin-left:auto;">
+            <div style="display:flex; align-items:center; gap:20px;">
                 <div style="text-align:right;">
-                    <div style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase;">Total Downtime</div>
-                    <div style="font-size:18px; font-weight:900; color:#b91c1c;" id="dtModalTotalDuration">0 Menit</div>
+                    <div style="font-size:10px; color:#64748b; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;">Total Downtime</div>
+                    <div style="font-size:22px; font-weight:900; color:#dc2626; line-height:1.2;" id="dtModalTotalDuration">0 Menit</div>
                 </div>
-                <button type="button" onclick="closeDtDetailModal()" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#64748b; width:34px; height:34px; border-radius:10px; font-size:18px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f1f5f9'; this.style.color='#64748b'">&times;</button>
+                <button type="button" onclick="closeDtDetailModal()" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#475569; width:38px; height:38px; border-radius:12px; font-size:22px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; line-height:1;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f1f5f9'; this.style.color='#475569'">&times;</button>
             </div>
         </div>
 
         <!-- Body / Table -->
-        <div style="padding:16px 22px; overflow-y:auto; flex:1;">
-            <table style="width:100%; border-collapse:collapse; text-align:left;">
+        <div style="padding:18px 24px; overflow-y:auto; flex:1; background:#ffffff;">
+            <table style="width:100%; border-collapse:separate; border-spacing:0; text-align:left;">
                 <thead>
-                    <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1; font-size:11px; font-weight:900; color:#475569; text-transform:uppercase;">
-                        <th style="padding:10px 14px; text-align:center; width:40px;">No</th>
-                        <th style="padding:10px 14px; text-align:center; width:110px;">Kategori</th>
-                        <th style="padding:10px 14px; width:220px;">Problem / Kendala</th>
-                        <th style="padding:10px 14px;">Penyebab & Tindakan</th>
-                        <th style="padding:10px 14px; text-align:center; width:100px;">PIC</th>
-                        <th style="padding:10px 14px; text-align:center; width:110px;">Durasi</th>
+                    <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
+                        <th style="padding:12px 14px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
+                        <th style="padding:12px 14px; text-align:center; width:120px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
+                        <th style="padding:12px 16px; width:250px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
+                        <th style="padding:12px 16px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
+                        <th style="padding:12px 14px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
+                        <th style="padding:12px 14px; text-align:center; width:130px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Durasi</th>
                     </tr>
                 </thead>
-                <tbody id="dtModalTableBody">
+                <tbody id="dtModalTableBody" style="line-height:1.45;">
                     <!-- Populated dynamically via JS -->
                 </tbody>
             </table>
         </div>
 
         <!-- Footer -->
-        <div style="padding:12px 22px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
-            <button type="button" onclick="closeDtDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:8px 20px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
+        <div style="padding:14px 24px; background:#f8fafc; border-top:2px solid #e2e8f0; display:flex; justify-content:flex-end; flex-shrink:0;">
+            <button type="button" onclick="closeDtDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:10px 24px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; transition:all 0.15s; letter-spacing:0.02em;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
         </div>
     </div>
 </div>
