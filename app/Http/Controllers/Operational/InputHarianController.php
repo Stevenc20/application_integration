@@ -80,13 +80,15 @@ class InputHarianController extends Controller
             }
         }
 
-        // LOGIKA TANGGAL PRODUKSI (Work Date)
-        $hour = (int) now()->format('H');
-        $date = $request->get('date') ?: (($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString());
+        // LOGIKA TANGGAL PRODUKSI (Work Date) - Shift 07:30-21:00 / 21:00-07:30
+        $h = (int) now()->format('H');
+        $m = (int) now()->format('i');
+        $timeInMin = $h * 60 + $m;
+        $hour = $h;
+        $date = $request->get('date') ?: (($timeInMin < 450) ? now()->subDay()->toDateString() : now()->toDateString());
 
         // Smart fallback: jika auto-detected Malam+kemarin kosong, cek Pagi+hari ini
-        // (supaya PPC pre-load jam 5 pagi langsung muncul tanpa ganti filter manual)
-        if ($hour < 7 && !$request->has('shift')) {
+        if ($timeInMin < 450 && !$request->has('shift')) {
             $autoShift = $this->getShift();
             $hasData = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $autoShift)
@@ -101,6 +103,9 @@ class InputHarianController extends Controller
                     $currentShift = 'Shift Pagi';
                 }
             }
+        } elseif (!$request->has('shift')) {
+            $autoShift = $this->getShift();
+            $currentShift = $autoShift;
         }
 
         // SAFEGUARD: hanya izinkan akses ke tanggal produksi aktif (hari ini atau kemarin jika sebelum jam 7)
