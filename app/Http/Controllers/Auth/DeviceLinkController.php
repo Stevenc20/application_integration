@@ -44,11 +44,10 @@ class DeviceLinkController extends Controller
     public function status(Request $request, string $tokenHash)
     {
         $this->service->expirePairingRequests();
-        $sessionHash = hash('sha256', $request->session()->getId());
 
         $deviceLink = DeviceLinkRequest::where('token_hash', $tokenHash)->first();
 
-        if (!$deviceLink || $deviceLink->client_session_id_hash !== $sessionHash) {
+        if (!$deviceLink) {
             return response()->json(['success' => false, 'message' => 'Pairing request tidak ditemukan.'], 404);
         }
 
@@ -73,9 +72,11 @@ class DeviceLinkController extends Controller
             $redirectUrl = match($roleStr) {
                 'admin' => route('admin.dashboard'),
                 'superadmin' => route('super-admin.dashboard'),
-                'supervisor', 'foreman', 'spv' => route('supervisor.dashboard'),
+                'supervisor', 'spv' => route('supervisor.dashboard'),
+                'foreman' => route('operational.input_harian'),
                 'operator', 'tim member' => route('operator.dashboard'),
-                'leader a', 'leader b', 'leader c', 'leader d', 'leader', 'shearing', 'handwork' => route('supervisor.dashboard'),
+                'leader a', 'leader b', 'leader c', 'leader d', 'leader' => route('operational.input_harian'),
+                'shearing', 'handwork' => route('supervisor.dashboard'),
                 'ppc' => route('ppc.dashboard'),
                 'quality' => route('quality.dashboard'),
                 'production' => route('production.dashboard'),
@@ -84,7 +85,7 @@ class DeviceLinkController extends Controller
                 'direktur' => route('direktur.dashboard'),
                 'presdir' => route('presdir.dashboard'),
                 'dies_shop', 'plant_service', 'irm', 'logistik', 'produksi', 'hambatan', 'mesin' => route('hambatan-jalur.index'),
-                default => url('/')
+                default => route('supervisor.monitor')
             };
 
             return response()->json([

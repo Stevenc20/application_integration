@@ -868,6 +868,8 @@
         } catch (err) {
             console.error(err);
         }
+    }
+
     // Pastikan jika halaman dimuat dari cache browser (BFCache / back button), halaman selalu fresh
     window.addEventListener('pageshow', function (event) {
         if (event.persisted) {

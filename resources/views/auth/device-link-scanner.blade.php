@@ -47,7 +47,21 @@
             
             function onScanSuccess(decodedText, decodedResult) {
                 html5QrCode.stop().then((ignore) => {
-                    if(decodedText.includes('/auth/device-link/scan?token=')) {
+                    let targetUrl = null;
+                    if (decodedText.includes('/auth/device-link/scan?token=')) {
+                        targetUrl = decodedText;
+                    } else if (decodedText.includes('token=')) {
+                        // In case URL format or host differs (e.g. localhost vs IP)
+                        const tokenParam = decodedText.split('token=')[1]?.split('&')[0];
+                        if (tokenParam) {
+                            targetUrl = `{{ url('/auth/device-link/scan') }}?token=${encodeURIComponent(tokenParam)}`;
+                        }
+                    } else if (decodedText.length >= 32 && !decodedText.includes('/')) {
+                        // Raw token string
+                        targetUrl = `{{ url('/auth/device-link/scan') }}?token=${encodeURIComponent(decodedText.trim())}`;
+                    }
+
+                    if (targetUrl) {
                         document.getElementById('reader').innerHTML = `
                             <div style="padding: 40px 0; color: #27ae60;">
                                 <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 auto 15px;">
@@ -57,7 +71,7 @@
                                 <p style="font-weight: 600; margin: 0;">Berhasil scan! Mengalihkan...</p>
                             </div>
                         `;
-                        window.location.href = decodedText;
+                        window.location.href = targetUrl;
                     } else {
                         alert("Kode QR tidak valid untuk sistem ini.");
                         setTimeout(() => {

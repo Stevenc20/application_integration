@@ -686,6 +686,7 @@
             @php
                 $userRole = strtolower(trim(auth()->user()->role ?? ''));
                 $exitUrl = match(true) {
+                    !auth()->check() => route('login'),
                     str_starts_with($userRole, 'leader') || $userRole === 'foreman' => route('operational.input_harian'),
                     $userRole === 'operator' => route('operator.dashboard'),
                     $userRole === 'admin' => route('admin.dashboard'),
