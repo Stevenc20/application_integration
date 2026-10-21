@@ -34,13 +34,15 @@ class RestoreShiftMalamExactSchedule extends Command
                 'duration_seconds' => DB::raw("TIMESTAMPDIFF(SECOND, start_time, '2026-10-21 16:30:00')")
             ]);
 
+        // production_sessions menggunakan 'total_seconds' dan status 'finished'
         DB::table('production_sessions')
             ->whereNull('finish_time')
             ->whereDate('start_time', '2026-10-21')
             ->where('start_time', '<', '2026-10-21 17:00:00')
             ->update([
                 'finish_time' => '2026-10-21 16:30:00',
-                'duration_seconds' => DB::raw("TIMESTAMPDIFF(SECOND, start_time, '2026-10-21 16:30:00')")
+                'total_seconds' => DB::raw("TIMESTAMPDIFF(SECOND, start_time, '2026-10-21 16:30:00')"),
+                'status' => 'finished'
             ]);
 
         // 2. SHIFT MALAM: Aktifkan 4 Line masing-masing 1 Job Utama sebagai RUNNING sesuai jadwal
