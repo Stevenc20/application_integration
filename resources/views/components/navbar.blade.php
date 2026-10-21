@@ -17,38 +17,38 @@
     }
 @endphp
 <header class="bg-white shadow-sm z-30 shrink-0 relative">
-    <div class="flex items-center justify-between px-3 py-2.5 sm:px-4 sm:py-3 md:px-6 gap-2">
-        <div class="flex items-center min-w-0 mr-1 sm:mr-3">
-            <button id="openSidebar" class="mr-2 sm:mr-4 text-gray-500 hover:text-primary-red focus:outline-none md:hidden shrink-0">
+    <div class="flex items-center justify-between px-4 py-3 md:px-6">
+        <div class="flex items-center">
+            <button id="openSidebar" class="mr-4 text-gray-500 hover:text-primary-red focus:outline-none md:hidden">
                 <i class="bx bx-menu text-2xl"></i>
             </button>
-            <h2 class="text-base sm:text-xl font-semibold text-gray-800 truncate">@yield('header_title', 'Application')</h2>
+            <h2 class="text-xl font-semibold text-gray-800">@yield('header_title', 'Application')</h2>
         </div>
-        <div class="flex items-center space-x-1 sm:space-x-3 shrink-0">
+        <div class="flex items-center space-x-4">
             <span class="text-sm text-gray-500 max-sm:hidden sm:block font-medium" id="liveClockTopbar"></span>
 
             {{-- SCANNER QR BUTTON (Tautkan Layar Monitor) --}}
-            <a href="{{ route('device_link.scanner') }}" class="inline-flex items-center justify-center gap-1.5 p-2 sm:px-3 sm:py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-black transition-all shadow-sm shrink-0" title="Scan QR Code untuk login di layar Monitor TV / PC">
-                <svg class="w-4 h-4 text-emerald-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <a href="{{ route('device_link.scanner') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 text-xs font-black transition-all shadow-sm" title="Scan QR Code untuk login di layar Monitor TV / PC">
+                <svg class="w-4 h-4 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                 </svg>
-                <span class="hidden sm:inline">Scan QR</span>
+                <span class="max-sm:hidden">Scan QR</span>
             </a>
 
-            {{-- MONITOR TV BUTTON (Disembunyikan di HP karena Monitor TV untuk layar besar/PC) --}}
-            <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" class="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-black transition-all shadow-sm shrink-0" title="Buka Monitor TV (Production Press Achievement)">
-                <svg class="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            {{-- MONITOR TV BUTTON --}}
+            <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-black transition-all shadow-sm" title="Buka Monitor TV (Production Press Achievement)">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
-                <span>Monitor TV</span>
+                <span class="max-sm:hidden">Monitor TV</span>
             </a>
 
             {{-- LHJ PENDING SIGN --}}
             @if(str_starts_with($pendingSignRole, 'leader') || $pendingSignRole === 'foreman')
-            <div class="relative shrink-0" id="lhjSignWrapper">
-                <button id="lhjSignBtn" class="relative flex items-center gap-1.5 p-1.5 sm:p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none" title="LHJ menunggu tanda tangan Anda">
+            <div class="relative" id="lhjSignWrapper">
+                <button id="lhjSignBtn" class="relative flex items-center gap-2 p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors focus:outline-none" title="LHJ menunggu tanda tangan Anda">
                     <i class="bx bxs-edit-alt text-xl"></i>
-                    <span id="lhjSignBadge" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} text-xs font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-full border border-red-200">{{ $pendingSignItems->count() }}</span>
+                    <span id="lhjSignBadge" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">{{ $pendingSignItems->count() }}</span>
                     <span id="lhjSignDot" class="{{ $pendingSignItems->isNotEmpty() ? '' : 'hidden' }} absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full" style="animation: notifPulse 1.5s ease-in-out infinite"></span>
                 </button>
                 <div id="lhjSignDropdown" class="absolute right-0 mt-2 w-[min(420px,calc(100vw-2.5rem))] max-w-[420px] bg-white rounded-xl shadow-lg border border-gray-100 opacity-0 invisible scale-95 transition-all duration-200 origin-top-right z-50 max-h-[36rem] overflow-y-auto">
@@ -84,8 +84,8 @@
             @endif
 
             {{-- NOTIFICATION BELL --}}
-            <div class="relative shrink-0" id="notificationBellWrapper">
-                <button id="notificationBellBtn" class="relative flex items-center gap-1.5 p-1.5 sm:p-2 text-gray-500 hover:text-primary-red hover:bg-gray-50 rounded-lg transition-colors focus:outline-none">
+            <div class="relative" id="notificationBellWrapper">
+                <button id="notificationBellBtn" class="relative flex items-center gap-2 p-2 text-gray-500 hover:text-primary-red hover:bg-gray-50 rounded-lg transition-colors focus:outline-none">
                     <i class="bx bx-bell text-xl"></i>
                     <span id="notificationBadgeText" class="hidden text-xs font-bold text-red-600 bg-red-50 px-2 py-0.5 rounded-full border border-red-200">0 Notifikasi</span>
                     <span id="notificationDot" class="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full hidden" style="animation: notifPulse 1.5s ease-in-out infinite"></span>
@@ -106,13 +106,12 @@
                 </div>
             </div>
 
-            {{-- USER PROFILE DROPDOWN --}}
-            <div class="relative shrink-0">
-                <button id="userDropdownBtn" class="flex items-center focus:outline-none hover:bg-gray-50 p-1 rounded-lg transition-colors shrink-0">
+            <div class="relative">
+                <button id="userDropdownBtn" class="flex items-center focus:outline-none hover:bg-gray-50 p-1 rounded-lg transition-colors">
                     @if(auth()->user()->avatar)
-                        <img src="{{ asset('uploads/'.auth()->user()->avatar) }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover sm:mr-2 ring-2 ring-transparent hover:ring-red-200 transition shrink-0">
+                        <img src="{{ asset('uploads/'.auth()->user()->avatar) }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover mr-2 ring-2 ring-transparent hover:ring-red-200 transition">
                     @else
-                        <div class="w-8 h-8 rounded-full bg-red-100 text-primary-red flex items-center justify-center font-bold sm:mr-2 ring-2 ring-transparent hover:ring-red-200 transition shrink-0">
+                        <div class="w-8 h-8 rounded-full bg-red-100 text-primary-red flex items-center justify-center font-bold mr-2 ring-2 ring-transparent hover:ring-red-200 transition">
                             {{ substr(auth()->user()->name ?? 'U', 0, 1) }}
                         </div>
                     @endif
@@ -138,12 +137,12 @@
                             </svg>
                             My Profile
                         </a>
-                        {{-- Shortlink Monitor TV di dalam dropdown untuk mobile --}}
-                        <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" class="flex sm:hidden items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-3 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        <div class="border-t border-gray-100 my-1"></div>
+                        <a href="{{ route('device_link.scanner') }}" class="flex items-center px-3 py-2 text-sm text-gray-700 rounded-lg hover:bg-gray-50 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm14 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
                             </svg>
-                            Monitor TV
+                            Tautkan Perangkat (QR)
                         </a>
                         <div class="border-t border-gray-100 my-1"></div>
                         <a href="{{ route('logout') }}" class="flex items-center px-3 py-2 text-sm font-medium text-red-600 rounded-lg hover:bg-red-50 transition-colors">
