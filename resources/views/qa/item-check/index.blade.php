@@ -698,7 +698,7 @@
                 schedFilter: 'semua',
                 searchQuery: '',
                 schedLine: '',
-                filterDate: new URLSearchParams(window.location.search).get('date') || '{{ \Carbon\Carbon::today()->format("Y-m-d") }}',
+                filterDate: new URLSearchParams(window.location.search).get('date') || '{{ (isset($targetDate) ? $targetDate : \Carbon\Carbon::today())->format("Y-m-d") }}',
                 
                 updateDate() {
                     const url = new URL(window.location.href);

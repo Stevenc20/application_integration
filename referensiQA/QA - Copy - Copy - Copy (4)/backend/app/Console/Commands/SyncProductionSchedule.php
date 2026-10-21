@@ -15,7 +15,7 @@ class SyncProductionSchedule extends Command
      *
      * @var string
      */
-    protected $signature = 'qa:sync-schedule';
+    protected $signature = 'qa:sync-schedule {date? : The production plan date to sync (YYYY-MM-DD)}';
 
     /**
      * The console command description.
@@ -29,101 +29,123 @@ class SyncProductionSchedule extends Command
      */
     public function handle()
     {
-        $this->info('Starting production schedule sync...');
-        $date = Carbon::today();
+        $dateParam = $this->argument('date');
+        $datesToSync = [];
+
+        if ($dateParam) {
+            $datesToSync[] = Carbon::parse($dateParam);
+        } else {
+            $today = Carbon::today();
+            $datesToSync[] = $today;
+
+            // Jika masih dalam jam kerja Shift Malam (00:00 - 08:00 pagi),
+            // sertakan juga tanggal kemarin agar schedule shift malam & aktualnya tetap sinkron dan tidak hilang
+            if (now()->hour < 8) {
+                $datesToSync[] = Carbon::yesterday();
+            }
+        }
 
         try {
-            // Hapus data dummy lama (yang SAP order no formatnya SPK-YYYYMMDD-0X)
-            ProductionSchedule::whereDate('tanggal_produksi', $date)
-                ->where('sap_order_no', 'like', 'SPK-%')
-                ->delete();
+            $totalSynced = 0;
 
-            // Ambil semua job dari PPC untuk tanggal ini (hanya row_type = job, bukan break/note)
-            $plans = \App\Models\Integration\ProductionPlan::whereDate('plan_date', $date)
-                        ->where('row_type', 'job')
-                        ->whereNotNull('job_master')
-                        ->where('job_master', '!=', '')
-                        ->whereNotIn(DB::connection('mysql_integration')->raw('UPPER(TRIM(job_master))'), [
-                            'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN',
-                            'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT',
-                            'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
-                        ])
-                        ->get();
+            foreach ($datesToSync as $targetDate) {
+                $this->info("Starting production schedule sync for {$targetDate->toDateString()}...");
 
-            $syncedCount = 0;
+                // Hapus data dummy lama (yang SAP order no formatnya SPK-YYYYMMDD-0X)
+                ProductionSchedule::whereDate('tanggal_produksi', $targetDate)
+                    ->where('sap_order_no', 'like', 'SPK-%')
+                    ->delete();
 
-            foreach ($plans as $plan) {
-                if (empty($plan->job_no) && empty($plan->job_master)) continue;
+                // Ambil semua job dari PPC untuk tanggal ini (hanya row_type = job, bukan break/note)
+                $plans = \App\Models\Integration\ProductionPlan::whereDate('plan_date', $targetDate)
+                            ->where('row_type', 'job')
+                            ->whereNotNull('job_master')
+                            ->where('job_master', '!=', '')
+                            ->whereNotIn(DB::connection('mysql_integration')->raw('UPPER(TRIM(job_master))'), [
+                                'TOTAL FINISH', 'TOTAL FNISH', 'FINISH', 'PLAN',
+                                'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT',
+                                'TARGET GSPH', 'GSPH', 'TOTAL PCS', 'DELETE PLAN SHIFT 1', 'TOTAL'
+                            ])
+                            ->get();
 
-                $job_no    = $plan->job_no     ?? $plan->job_master;
-                $ok        = (int) ($plan->ok     ?? 0);
-                $repair    = (int) ($plan->repair  ?? 0);
-                $reject    = (int) ($plan->reject  ?? 0);
-                $actual    = $ok + $repair + $reject;
+                $syncedCount = 0;
 
-                // Ambil keterangan detail repair/reject dari PPC via job_number match
-                $repairNotes = [];
-                $rejectNotes = [];
+                foreach ($plans as $plan) {
+                    if (empty($plan->job_no) && empty($plan->job_master)) continue;
 
-                // Cari job_master di db_integration berdasarkan job_number = job_no
-                $jobMaster = DB::connection('mysql_integration')
-                    ->table('job_masters')
-                    ->where('job_number', $job_no)
-                    ->first();
+                    $job_no    = $plan->job_no     ?? $plan->job_master;
+                    $ok        = (int) ($plan->ok     ?? 0);
+                    $repair    = (int) ($plan->repair  ?? 0);
+                    $reject    = (int) ($plan->reject  ?? 0);
+                    $actual    = $ok + $repair + $reject;
 
-                if ($jobMaster) {
-                    $rrLogs = DB::connection('mysql_integration')
-                        ->table('repair_reject_logs')
-                        ->where('job_master_id', $jobMaster->id)
-                        ->get(['type', 'defect_name', 'qty_a', 'qty_b', 'area_problem', 'root_cause', 'countermeasure', 'repair_category']);
+                    // Ambil keterangan detail repair/reject dari PPC via job_number match
+                    $repairNotes = [];
+                    $rejectNotes = [];
 
-                    foreach ($rrLogs as $log) {
-                        $entry = [
-                            'defect'          => $log->defect_name,
-                            'qty'             => ($log->qty_a ?? 0) + ($log->qty_b ?? 0),
-                            'area'            => $log->area_problem,
-                            'root_cause'      => $log->root_cause,
-                            'countermeasure'  => $log->countermeasure,
-                        ];
-                        if ($log->type === 'repair') {
-                            $entry['category'] = $log->repair_category;
-                            $repairNotes[] = $entry;
-                        } else {
-                            $rejectNotes[] = $entry;
+                    // Cari job_master di db_integration berdasarkan job_number = job_no
+                    $jobMaster = DB::connection('mysql_integration')
+                        ->table('job_masters')
+                        ->where('job_number', $job_no)
+                        ->first();
+
+                    if ($jobMaster) {
+                        $rrLogs = DB::connection('mysql_integration')
+                            ->table('repair_reject_logs')
+                            ->where('job_master_id', $jobMaster->id)
+                            ->get(['type', 'defect_name', 'qty_a', 'qty_b', 'area_problem', 'root_cause', 'countermeasure', 'repair_category']);
+
+                        foreach ($rrLogs as $log) {
+                            $entry = [
+                                'defect'          => $log->defect_name,
+                                'qty'             => ($log->qty_a ?? 0) + ($log->qty_b ?? 0),
+                                'area'            => $log->area_problem,
+                                'root_cause'      => $log->root_cause,
+                                'countermeasure'  => $log->countermeasure,
+                            ];
+                            if ($log->type === 'repair') {
+                                $entry['category'] = $log->repair_category;
+                                $repairNotes[] = $entry;
+                            } else {
+                                $rejectNotes[] = $entry;
+                            }
                         }
                     }
+
+                    ProductionSchedule::updateOrCreate(
+                        [
+                            'sap_order_no'     => $job_no,
+                            'tanggal_produksi' => $targetDate,
+                            'press_name'       => $plan->press_name ?? 'UNKNOWN',
+                            'shift_name'       => $plan->shift_name ?? 'Shift Pagi',
+                        ],
+                        [
+                            'job_no'                   => $job_no,
+                            'part_no'                  => $plan->job_master,
+                            'part_name'                => $plan->job_master,
+                            'line'                     => $plan->press_name ?? 'Line Unknown',
+                            'target_qty'               => (int) ($plan->plan ?? 0),
+                            'actual_qty'               => $actual,
+                            'ok_qty'                   => $ok,
+                            'ng_qty'                   => $reject,
+                            'repair_qty'               => $repair,
+                            'ppc_plan_id'              => $plan->id,
+                            'row_no'                   => $plan->row_no,
+                            'production_repair_notes'  => !empty($repairNotes) ? $repairNotes : null,
+                            'production_reject_notes'  => !empty($rejectNotes) ? $rejectNotes : null,
+                            'status'                   => 'scheduled',
+                        ]
+                    );
+                    
+                    $syncedCount++;
                 }
 
-                ProductionSchedule::updateOrCreate(
-                    [
-                        'sap_order_no'     => $job_no,
-                        'tanggal_produksi' => $date,
-                        'press_name'       => $plan->press_name ?? 'UNKNOWN',
-                        'shift_name'       => $plan->shift_name ?? 'Shift Pagi',
-                    ],
-                    [
-                        'job_no'                   => $job_no,
-                        'part_no'                  => $plan->job_master,
-                        'part_name'                => $plan->job_master,
-                        'line'                     => $plan->press_name ?? 'Line Unknown',
-                        'target_qty'               => (int) ($plan->plan ?? 0),
-                        'actual_qty'               => $actual,
-                        'ok_qty'                   => $ok,
-                        'ng_qty'                   => $reject,
-                        'repair_qty'               => $repair,
-                        'ppc_plan_id'              => $plan->id,
-                        'row_no'                   => $plan->row_no,
-                        'production_repair_notes'  => !empty($repairNotes) ? $repairNotes : null,
-                        'production_reject_notes'  => !empty($rejectNotes) ? $rejectNotes : null,
-                        'status'                   => 'scheduled',
-                    ]
-                );
-                
-                $syncedCount++;
+                $totalSynced += $syncedCount;
+                $this->info("Synced {$syncedCount} schedules for {$targetDate->toDateString()}.");
             }
 
-            $this->info("Sync completed successfully. Synced {$syncedCount} schedules for today.");
-            Log::info("Production Schedule Cron executed successfully. {$syncedCount} records synced.");
+            $this->info("Sync completed successfully. Total {$totalSynced} schedules synced.");
+            Log::info("Production Schedule Cron executed successfully. {$totalSynced} records synced.");
 
         } catch (\Exception $e) {
             $this->error('Failed to sync production data: ' . $e->getMessage());
