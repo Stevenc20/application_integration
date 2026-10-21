@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\DailyProduction;
+use App\Models\Dandori;
 use App\Models\Downtime;
 use App\Models\JobMaster;
 use App\Models\LineMaster;
@@ -483,9 +484,43 @@ class DashboardRealtimeService
 
         $runtimeMinutes = round(array_sum(array_map(fn($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 1);
 
-        $gsph = ProductionMetricsService::gsph($ok, max($runtimeMinutes, 30));
+        // Ambil data Dandori (Dies/Variant changeover & 1st-Q check)
+        $dandoriModels = Dandori::whereIn('next_job_id', $jobIds)
+            ->where(function ($q) use ($shiftStartDt, $shiftEndDt, $workDate) {
+                $q->whereBetween('start_time', [$shiftStartDt, $shiftEndDt])
+                  ->orWhere('work_date', $workDate);
+            })
+            ->get();
+
+        $dandoriTotalMinutes = 0.0;
+        $currDandoriMinutes = 0.0;
+        foreach ($dandoriModels as $d) {
+            $dur = (float) ($d->duration_minutes ?? 0);
+            if ($dur <= 0 && $d->start_time) {
+                $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+                $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
+            }
+            $dandoriTotalMinutes += $dur;
+            if ($runningRecord && $d->next_job_id === $runningRecord->job_master_id) {
+                $currDandoriMinutes += $dur;
+            }
+        }
+        $dandoriTotalMinutes = round($dandoriTotalMinutes, 1);
+        $currDandoriMinutes = round($currDandoriMinutes, 1);
+
+        // TPT Aktual = Runtime (Press Time) + Dandori + Total Downtime
+        $actualTptMinutes = round($runtimeMinutes + $dandoriTotalMinutes + $dtTotalMinutes, 1);
+
+        // GSPH Aktual = Total Pcs OK / TPT Aktual * 60
+        $gsph = ($ok > 0 && $actualTptMinutes > 0)
+            ? (int) round(($ok / $actualTptMinutes) * 60)
+            : 0;
+
         $currRuntimeMinutes = round($currRuntime / 60, 1);
-        $currGsph = $hasRunning ? ProductionMetricsService::gsph($currOk, max($currRuntimeMinutes, 30)) : 0;
+        $currActualTpt = round($currRuntimeMinutes + $currDandoriMinutes + $currDtTotal, 1);
+        $currGsph = ($hasRunning && $currOk > 0 && $currActualTpt > 0)
+            ? (int) round(($currOk / $currActualTpt) * 60)
+            : 0;
 
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));

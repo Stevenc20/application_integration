@@ -961,7 +961,7 @@ function getClasses(desc, k){
             const currVal = parseFloat(k.current);
             if(!isNaN(currVal) && !isNaN(planVal) && planVal>0){
                 const currPct = (currVal/planVal)*100;
-                curr = currPct>=100?'bg-green':'bg-red';
+                curr = currPct>=100?'bg-green':'bg-red-blink';
             } else if(currVal>0) curr = 'bg-green';
         }
     }else if(desc==='REPAIR'||desc==='REJECT'){
@@ -1406,9 +1406,13 @@ function renderTable(){
                         clickCls = ' dt-clickable-kpi';
                         clickAttr = `onclick="openDefectKpiModal('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
                     }
+                    let actValTxt = (k.actual||'-')+pct;
+                    if (desc === 'GSPH' && cl.act === 'bg-red') {
+                        actValTxt += ` <span style="font-size:0.6vw;">⚠️</span>`;
+                    }
                     b += `<td class="val-plan">${k.plan||'-'}</td>`;
                     b += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
-                    b += `<td class="val-actual ${cl.act}${clickCls}" style="${cl.style}" ${clickAttr}>${k.actual||'-'}${pct}</td>`;
+                    b += `<td class="val-actual ${cl.act}${clickCls}" style="${cl.style}" ${clickAttr}>${actValTxt}</td>`;
                 } else {
                     b += `<td>-</td><td>-</td><td>-</td>`;
                 }
