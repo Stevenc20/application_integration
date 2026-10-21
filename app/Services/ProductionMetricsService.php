@@ -56,11 +56,11 @@ class ProductionMetricsService
     }
 
     /**
-     * Plan GSPH — render ONLY stored PPC value (no recalculation).
+     * Plan GSPH — render ONLY stored PPC value (rounded cleanly, no truncating floor).
      */
     public static function planGsphStored(ProductionPlan $plan): int
     {
-        return (int) ($plan->gsph_item ?? 0);
+        return (int) round((float) ($plan->gsph_item ?? 0));
     }
 
     /**

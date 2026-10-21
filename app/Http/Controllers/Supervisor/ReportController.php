@@ -571,8 +571,9 @@ class ReportController extends Controller
                 $planTpt = (float) $plan->tpt;
             }
 
-            // GSPH Rencana: 100% membaca nilai tersimpan dari PPC (gsph_item), jika kosong hitung dengan round()
-            $planGsph = (int) ($plan->gsph_item ?? 0);
+            // GSPH Rencana: 100% membaca nilai tersimpan dari PPC (gsph_item), dibulatkan dengan round() bukan pemotongan floor
+            $rawGsph = (float) ($plan->gsph_item ?? 0);
+            $planGsph = (int) round($rawGsph);
             if ($planGsph <= 0 && $planTpt > 0 && $planQtySafe > 0) {
                 $planGsph = (int) round($planQtySafe / ($planTpt / 60.0));
             }
