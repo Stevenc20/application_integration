@@ -17,22 +17,22 @@
     }
 @endphp
 <header class="bg-white shadow-sm z-30 shrink-0 relative">
-    <div class="flex items-center justify-between px-3 py-2.5 md:px-6">
-        <div class="flex items-center min-w-0 mr-2">
-            <button id="openSidebar" class="mr-3 text-gray-500 hover:text-primary-red focus:outline-none md:hidden shrink-0">
+    <div class="flex items-center justify-between px-4 py-3 md:px-6">
+        <div class="flex items-center">
+            <button id="openSidebar" class="mr-4 text-gray-500 hover:text-primary-red focus:outline-none md:hidden">
                 <i class="bx bx-menu text-2xl"></i>
             </button>
-            <h2 class="text-base sm:text-xl font-semibold text-gray-800 truncate">@yield('header_title', 'Application')</h2>
+            <h2 class="text-xl font-semibold text-gray-800">@yield('header_title', 'Application')</h2>
         </div>
-        <div class="flex items-center space-x-2 sm:space-x-4 shrink-0">
-            <span class="text-sm text-gray-500 hidden sm:block font-medium" id="liveClockTopbar"></span>
+        <div class="flex items-center space-x-4">
+            <span class="text-sm text-gray-500 max-sm:hidden sm:block font-medium" id="liveClockTopbar"></span>
 
             {{-- MONITOR TV BUTTON --}}
-            <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" class="inline-flex items-center gap-1.5 px-2.5 py-1.5 sm:px-3 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-black transition-all shadow-sm shrink-0" title="Buka Monitor TV (Production Press Achievement)">
-                <svg class="w-4 h-4 text-indigo-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" target="_blank" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-700 text-xs font-black transition-all shadow-sm" title="Buka Monitor TV Fullscreen (Production Press Achievement)">
+                <svg class="w-4 h-4 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
                 </svg>
-                <span class="hidden sm:inline">Monitor TV</span>
+                <span class="max-sm:hidden">Monitor TV</span>
             </a>
 
             {{-- LHJ PENDING SIGN --}}
@@ -98,20 +98,20 @@
                 </div>
             </div>
 
-            <div class="relative shrink-0">
-                <button id="userDropdownBtn" class="flex items-center focus:outline-none hover:bg-gray-50 p-1 rounded-lg transition-colors shrink-0">
+            <div class="relative">
+                <button id="userDropdownBtn" class="flex items-center focus:outline-none hover:bg-gray-50 p-1 rounded-lg transition-colors">
                     @if(auth()->user()->avatar)
-                        <img src="{{ asset('uploads/'.auth()->user()->avatar) }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover shrink-0 ring-2 ring-transparent hover:ring-red-200 transition" style="margin-right: 8px;">
+                        <img src="{{ asset('uploads/'.auth()->user()->avatar) }}" alt="Avatar" class="w-8 h-8 rounded-full object-cover mr-2 ring-2 ring-transparent hover:ring-red-200 transition">
                     @else
-                        <div class="w-8 h-8 rounded-full bg-red-100 text-primary-red flex items-center justify-center font-bold shrink-0 ring-2 ring-transparent hover:ring-red-200 transition" style="margin-right: 8px;">
+                        <div class="w-8 h-8 rounded-full bg-red-100 text-primary-red flex items-center justify-center font-bold mr-2 ring-2 ring-transparent hover:ring-red-200 transition">
                             {{ substr(auth()->user()->name ?? 'U', 0, 1) }}
                         </div>
                     @endif
-                    <div class="hidden sm:block text-left mr-1">
+                    <div class="max-sm:hidden sm:block text-left mr-1">
                         <p class="text-sm font-semibold text-gray-800 leading-tight">{{ auth()->user()->name ?? 'User' }}</p>
                         <p class="text-xs text-gray-500 capitalize leading-tight">{{ auth()->user()->role ?? 'Role' }}</p>
                     </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 hidden sm:block transition-transform duration-200" id="userDropdownArrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-gray-400 max-sm:hidden sm:block transition-transform duration-200" id="userDropdownArrow" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
                     </svg>
                 </button>
