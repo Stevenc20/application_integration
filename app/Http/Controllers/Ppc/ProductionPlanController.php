@@ -470,7 +470,10 @@ class ProductionPlanController extends Controller
                         $bKey = $cShift . '||' . $epLineId . '||break||' . strtoupper(trim($ep->job_no ?? $ep->keterangan ?? '')) . '||' . trim($ep->start_time ?? '') . '||' . trim($ep->finish_time ?? '');
                         $existingPlansByKey[$bKey] = $ep;
                     } else {
-                        // Primary key: CleanShift + Line + JobMaster + JobNo
+                        // Primary key: CleanShift + Line + JobMaster + JobNo + RowNo (Preserve every split part row)
+                        $jKeyWithRow = $cShift . '||' . $epLineId . '||' . $epJm . '||' . $epJn . '||' . (int)$ep->row_no;
+                        $existingPlansByKey[$jKeyWithRow] = $ep;
+
                         $jKey = $cShift . '||' . $epLineId . '||' . $epJm . '||' . $epJn;
                         if (!isset($existingPlansByKey[$jKey]) || $isJobActiveOrCompleted($ep->id)) {
                             $existingPlansByKey[$jKey] = $ep;
@@ -723,11 +726,15 @@ class ProductionPlanController extends Controller
                         $cleanJm = strtoupper(trim($jm));
                         $cleanJn = strtoupper(trim($jn));
 
+                        $matchKeyWithRow = ($rowType === 'break')
+                            ? ($cleanImportShift . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
+                            : ($cleanImportShift . '||' . $lineId . '||' . $cleanJm . '||' . $cleanJn . '||' . (int)$finalRowNo);
+
                         $matchKey = ($rowType === 'break')
                             ? ($cleanImportShift . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
                             : ($cleanImportShift . '||' . $lineId . '||' . $cleanJm . '||' . $cleanJn);
 
-                        $matchedExistingPlan = $existingPlansByKey[$matchKey] ?? null;
+                        $matchedExistingPlan = $existingPlansByKey[$matchKeyWithRow] ?? ($existingPlansByKey[$matchKey] ?? null);
 
                         // Fallback matching 1: by Job No (jika ada dan unik di shift+line ini)
                         if (!$matchedExistingPlan && $rowType === 'job' && $cleanJn && !in_array($cleanJn, ['-', 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) {
