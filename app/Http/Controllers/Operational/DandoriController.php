@@ -221,11 +221,38 @@ class DandoriController extends Controller
         }
 
         if ($request->line) {
-            $q->where('line', $request->line);
+            $normalizedLine = str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $request->line);
+            $q->where(function($lq) use ($request, $normalizedLine) {
+                $lq->where('line', $request->line)
+                   ->orWhere('line', $normalizedLine)
+                   ->orWhere('line', 'Line ' . $normalizedLine)
+                   ->orWhere('line', 'PRESS ' . $normalizedLine);
+            });
         }
 
-        if ($request->jenis) {
-            $q->where('jenis_dandori', $request->jenis);
+        $jenis = strtolower(trim($request->jenis ?? ''));
+        if ($jenis !== '') {
+            if ($jenis === '1st_check' || $jenis === '1st check' || $jenis === 'first_check') {
+                $q->where(function($sub) {
+                    $sub->where('jenis_dandori', '1st_check')
+                        ->orWhere('jenis_dandori', '1st check')
+                        ->orWhere('activity', '1ST CHECK')
+                        ->orWhere('activity', 'like', '%1ST CHECK%');
+                });
+            } elseif ($jenis === 'dandori') {
+                $q->where(function($sub) {
+                    $sub->where(function($d) {
+                        $d->where('jenis_dandori', 'dandori')
+                          ->orWhereNull('jenis_dandori');
+                    })->where(function($act) {
+                        $act->where('activity', '!=', '1ST CHECK')
+                            ->where('activity', 'not like', '%1ST CHECK%')
+                            ->orWhereNull('activity');
+                    });
+                });
+            } else {
+                $q->where('jenis_dandori', $jenis);
+            }
         }
 
         // Group by job, date, line, and shift
@@ -242,14 +269,36 @@ class DandoriController extends Controller
             ->orderBy('dandoris.work_date', 'desc')
             ->paginate(10);
 
-        $paginated->getCollection()->transform(function ($group) {
+        $paginated->getCollection()->transform(function ($group) use ($jenis) {
             // Fetch all activities belonging to this group
-            $activities = Dandori::where('next_job_id', $group->next_job_id)
+            $actQuery = Dandori::where('next_job_id', $group->next_job_id)
                 ->whereDate('work_date', $group->work_date)
                 ->where('line', $group->line)
-                ->where('shift', $group->shift)
-                ->orderBy('created_at', 'asc')
-                ->get();
+                ->where('shift', $group->shift);
+
+            if ($jenis !== '') {
+                if ($jenis === '1st_check' || $jenis === '1st check' || $jenis === 'first_check') {
+                    $actQuery->where(function($sub) {
+                        $sub->where('jenis_dandori', '1st_check')
+                            ->orWhere('jenis_dandori', '1st check')
+                            ->orWhere('activity', '1ST CHECK')
+                            ->orWhere('activity', 'like', '%1ST CHECK%');
+                    });
+                } elseif ($jenis === 'dandori') {
+                    $actQuery->where(function($sub) {
+                        $sub->where(function($d) {
+                            $d->where('jenis_dandori', 'dandori')
+                              ->orWhereNull('jenis_dandori');
+                        })->where(function($act) {
+                            $act->where('activity', '!=', '1ST CHECK')
+                                ->where('activity', 'not like', '%1ST CHECK%')
+                                ->orWhereNull('activity');
+                        });
+                    });
+                }
+            }
+
+            $activities = $actQuery->orderBy('created_at', 'asc')->get();
 
             return [
                 'job_id'         => $group->next_job_id,
@@ -260,9 +309,13 @@ class DandoriController extends Controller
                 'date'           => Carbon::parse($group->work_date)->format('d M Y'),
                 'total_duration' => round($activities->sum('duration_minutes'), 2),
                 'activities'     => $activities->map(function ($a) {
+                    $isFirstCheck = strtolower(trim($a->jenis_dandori ?? '')) === '1st_check' 
+                        || strtolower(trim($a->jenis_dandori ?? '')) === '1st check' 
+                        || strtoupper(trim($a->activity ?? '')) === '1ST CHECK';
+
                     return [
                         'type'          => $a->activity,
-                        'jenis_dandori' => $a->jenis_dandori ?? 'dandori',
+                        'jenis_dandori' => $isFirstCheck ? '1st_check' : 'dandori',
                         'start'         => $a->start_time ? Carbon::parse($a->start_time)->format('H:i') : '-',
                         'finish'        => $a->finish_time ? Carbon::parse($a->finish_time)->format('H:i') : '-',
                         'duration'      => round($a->duration_minutes, 2),
