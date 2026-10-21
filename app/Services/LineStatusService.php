@@ -52,7 +52,6 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $activeDowntimeJobIds = Downtime::whereIn('job_master_id', $allJobIds)
                 ->whereNull('finish_time')
-                ->whereDate('start_time', $today)
                 ->whereNotIn('jenis_downtime', ['dandori', 'try out', 'tryout', 'break time'])
                 ->pluck('job_master_id')
                 ->toArray();
@@ -63,7 +62,6 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $activeBreakJobIds = Downtime::whereIn('job_master_id', $allJobIds)
                 ->whereNull('finish_time')
-                ->whereDate('start_time', $today)
                 ->where('jenis_downtime', 'break time')
                 ->pluck('job_master_id')
                 ->toArray();
@@ -74,7 +72,6 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $activeTryoutJobIds = Downtime::whereIn('job_master_id', $allJobIds)
                 ->whereNull('finish_time')
-                ->whereDate('start_time', $today)
                 ->whereIn('jenis_downtime', ['try out', 'tryout'])
                 ->pluck('job_master_id')
                 ->toArray();
