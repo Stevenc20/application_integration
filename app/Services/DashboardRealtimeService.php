@@ -367,7 +367,14 @@ class DashboardRealtimeService
 
         foreach ($repairRejectLogs as $rr) {
             $logType = strtolower(trim($rr->type ?? ''));
-            $picName = $rr->creator?->name ?? '-';
+            $picName = $rr->creator?->name;
+            if (!$picName && !empty($rr->created_by)) {
+                $userRec = \App\Models\User::find($rr->created_by);
+                $picName = $userRec?->name;
+            }
+            if (!$picName) {
+                $picName = '-';
+            }
             $timeFormatted = $rr->created_at ? \Carbon\Carbon::parse($rr->created_at)->format('H:i') : '-';
             $job = $rr->jobMaster;
             $itemData = [
@@ -400,6 +407,10 @@ class DashboardRealtimeService
             foreach ($dailyRecords as $dp) {
                 if ($dp->actual_repair > 0) {
                     $job = $dp->jobMaster;
+                    $fallbackPic = '-';
+                    if (!empty($dp->saved_by)) {
+                        $fallbackPic = \App\Models\User::find($dp->saved_by)?->name ?? '-';
+                    }
                     $repairRows[] = [
                         'no'              => count($repairRows) + 1,
                         'type'            => 'REPAIR',
@@ -412,7 +423,7 @@ class DashboardRealtimeService
                         'area_problem'    => '-',
                         'root_cause'      => '-',
                         'countermeasure'  => '-',
-                        'pic'             => '-',
+                        'pic'             => $fallbackPic,
                         'time'            => '-',
                     ];
                 }
@@ -423,6 +434,10 @@ class DashboardRealtimeService
             foreach ($dailyRecords as $dp) {
                 if ($dp->actual_reject > 0) {
                     $job = $dp->jobMaster;
+                    $fallbackPic = '-';
+                    if (!empty($dp->saved_by)) {
+                        $fallbackPic = \App\Models\User::find($dp->saved_by)?->name ?? '-';
+                    }
                     $rejectRows[] = [
                         'no'              => count($rejectRows) + 1,
                         'type'            => 'REJECT',
@@ -435,7 +450,7 @@ class DashboardRealtimeService
                         'area_problem'    => '-',
                         'root_cause'      => '-',
                         'countermeasure'  => '-',
-                        'pic'             => '-',
+                        'pic'             => $fallbackPic,
                         'time'            => '-',
                     ];
                 }

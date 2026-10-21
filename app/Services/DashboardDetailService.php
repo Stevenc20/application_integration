@@ -158,7 +158,15 @@ class DashboardDetailService
         $rejectItems = [];
         foreach ($repairRejectLogs as $rr) {
             $logType = strtolower(trim($rr->type ?? ''));
-            $picName = $rr->creator?->name ?? '-';
+            $picName = $rr->creator?->name;
+            if (!$picName && !empty($rr->created_by)) {
+                $userRec = \App\Models\User::find($rr->created_by);
+                $picName = $userRec?->name;
+            }
+            if (!$picName) {
+                $picName = '-';
+            }
+
             $timeFormatted = $rr->created_at ? Carbon::parse($rr->created_at)->format('H:i') : '-';
             $itemData = [
                 'id'              => $rr->id,

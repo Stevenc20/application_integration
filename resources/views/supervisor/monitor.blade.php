@@ -1844,26 +1844,27 @@ window.openDefectDetailModal = function(rowIndex, type) {
         list.forEach((rr, idx) => {
             const rowBadgeBg = isReject ? '#fee2e2' : '#fef3c7';
             const rowBadgeColor = isReject ? '#b91c1c' : '#b45309';
+            const picDisplay = rr.pic || rr.operator || rr.created_by_name || '-';
             html += `
-                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 14px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
-                    <td style="padding: 14px 12px; font-weight: 800; text-align: center; vertical-align:top;">
-                        <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 5px 10px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em; font-weight:900;">${rr.type}</span>
+                <tr style="border-bottom: 1px solid #cbd5e1;">
+                    <td style="text-align: center;">${idx + 1}</td>
+                    <td style="text-align: center;">
+                        <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 4px 8px; border-radius: 6px; font-size: clamp(10px, 0.75vw, 12px); display:inline-block; letter-spacing:0.02em; font-weight:900;">${rr.type}</span>
                     </td>
-                    <td style="padding: 14px 16px; font-weight: 800; color: #0f172a; vertical-align:top;">
-                        <div style="font-size:14px; line-height:1.4;">${rr.defect_name}</div>
-                        ${rr.area_problem && rr.area_problem !== '-' ? `<div style="font-size:11px; color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${rr.area_problem}</span></div>` : ''}
+                    <td>
+                        <div style="font-weight: 800; color: #0f172a; line-height:1.4;">${rr.defect_name}</div>
+                        ${rr.area_problem && rr.area_problem !== '-' ? `<div style="font-size:clamp(10px, 0.75vw, 12px); color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${rr.area_problem}</span></div>` : ''}
                     </td>
-                    <td style="padding: 14px 12px; text-align: center; font-weight: 900; color: ${totalColor}; vertical-align:top;">
-                        <div style="font-size:15px;">${rr.qty}</div>
-                        <div style="font-size:11px; color:#64748b; font-weight:600;">pcs</div>
+                    <td style="text-align: center; font-weight: 900; color: ${totalColor};">
+                        <div style="font-size:clamp(13px, 1vw, 17px);">${rr.qty}</div>
+                        <div style="font-size:clamp(10px, 0.7vw, 12px); color:#64748b; font-weight:600;">pcs</div>
                     </td>
-                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
+                    <td style="color: #334155;">
                         <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Root Cause:</span> <span style="font-weight:600;">${rr.root_cause || '-'}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan / Action:</span> <span style="font-weight:600;">${rr.countermeasure || '-'}</span></div>
                     </td>
-                    <td style="padding: 14px 12px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${rr.pic || '-'}</td>
-                    <td style="padding: 14px 12px; text-align: center; color: #64748b; font-weight: 700; vertical-align:top;">${rr.time || '-'}</td>
+                    <td style="text-align: center; color: #0f172a; font-weight: 800; word-break: break-word;">${picDisplay}</td>
+                    <td style="text-align: center; color: #64748b; font-weight: 700;">${rr.time || '-'}</td>
                 </tr>
             `;
         });
@@ -1917,27 +1918,28 @@ window.openDefectKpiModal = function(type, line) {
         rows.forEach((r, idx) => {
             const rowBadgeBg = isReject ? '#fee2e2' : '#fef3c7';
             const rowBadgeColor = isReject ? '#b91c1c' : '#b45309';
+            const picDisplay = r.pic || r.operator || r.created_by_name || '-';
             html += `
-                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 14px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
-                    <td style="padding: 14px 12px; font-weight: 800; text-align: center; vertical-align:top;">
-                        <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 5px 10px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em; font-weight:900;">${r.type || typeUpper}</span>
+                <tr style="border-bottom: 1px solid #cbd5e1;">
+                    <td style="text-align: center;">${r.no || (idx + 1)}</td>
+                    <td style="text-align: center;">
+                        <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 4px 8px; border-radius: 6px; font-size: clamp(10px, 0.75vw, 12px); display:inline-block; letter-spacing:0.02em; font-weight:900;">${r.type || typeUpper}</span>
                     </td>
-                    <td style="padding: 14px 16px; font-weight: 800; color: #0f172a; vertical-align:top;">
-                        <div style="font-size:14px; line-height:1.4;">${r.defect_name || r.problem || '-'}</div>
-                        <div style="font-size:12px; color:#2563eb; margin-top:4px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 8px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || r.item || '-'}</div>
-                        ${r.area_problem && r.area_problem !== '-' ? `<div style="font-size:11px; color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${r.area_problem}</span></div>` : ''}
+                    <td>
+                        <div style="font-weight: 800; color: #0f172a; line-height:1.4;">${r.defect_name || r.problem || '-'}</div>
+                        <div style="font-size:clamp(10px, 0.75vw, 12px); color:#2563eb; margin-top:4px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 8px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || r.item || '-'}</div>
+                        ${r.area_problem && r.area_problem !== '-' ? `<div style="font-size:clamp(10px, 0.75vw, 12px); color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${r.area_problem}</span></div>` : ''}
                     </td>
-                    <td style="padding: 14px 12px; text-align: center; font-weight: 900; color: ${totalColor}; vertical-align:top;">
-                        <div style="font-size:15px;">${r.qty || 0}</div>
-                        <div style="font-size:11px; color:#64748b; font-weight:600;">pcs</div>
+                    <td style="text-align: center; font-weight: 900; color: ${totalColor};">
+                        <div style="font-size:clamp(13px, 1vw, 17px);">${r.qty || 0}</div>
+                        <div style="font-size:clamp(10px, 0.7vw, 12px); color:#64748b; font-weight:600;">pcs</div>
                     </td>
-                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
+                    <td style="color: #334155;">
                         <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Root Cause:</span> <span style="font-weight:600;">${r.root_cause || '-'}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan / Action:</span> <span style="font-weight:600;">${r.countermeasure || '-'}</span></div>
                     </td>
-                    <td style="padding: 14px 12px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${r.pic || '-'}</td>
-                    <td style="padding: 14px 12px; text-align: center; color: #64748b; font-weight: 700; vertical-align:top;">${r.time || '-'}</td>
+                    <td style="text-align: center; color: #0f172a; font-weight: 800; word-break: break-word;">${picDisplay}</td>
+                    <td style="text-align: center; color: #64748b; font-weight: 700;">${r.time || '-'}</td>
                 </tr>
             `;
         });
@@ -2042,13 +2044,13 @@ document.addEventListener('keydown', function(e) {
             <table class="modal-table" style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
-                        <th style="padding:12px 10px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
-                        <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Tipe</th>
-                        <th style="padding:12px 16px; width:260px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Jenis Defect & Area</th>
-                        <th style="padding:12px 12px; text-align:center; width:90px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Qty</th>
-                        <th style="padding:12px 16px; width:410px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Root Cause & Countermeasure</th>
-                        <th style="padding:12px 12px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC / Input</th>
-                        <th style="padding:12px 12px; text-align:center; width:90px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Waktu</th>
+                        <th style="padding:12px 10px; text-align:center; width:45px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
+                        <th style="padding:12px 12px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Tipe</th>
+                        <th style="padding:12px 14px; width:260px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Jenis Defect & Area</th>
+                        <th style="padding:12px 12px; text-align:center; width:80px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Qty</th>
+                        <th style="padding:12px 14px; width:380px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Root Cause & Countermeasure</th>
+                        <th style="padding:12px 12px; text-align:center; width:135px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC / Input</th>
+                        <th style="padding:12px 12px; text-align:center; width:95px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Waktu</th>
                     </tr>
                 </thead>
                 <tbody id="defectModalTableBody" style="line-height:1.5;">
