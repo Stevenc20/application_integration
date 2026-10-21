@@ -110,7 +110,7 @@
                 <input type="hidden" name="line" value="{{ request('line') }}">
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Tanggal</label>
-                    <input type="date" name="date" value="{{ request('date') }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 focus:border-primary-red outline-none transition bg-white">
+                    <input type="date" name="date" value="{{ request()->has('date') ? request('date') : ($filterDate ?? now()->toDateString()) }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 focus:border-primary-red outline-none transition bg-white">
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Tipe</label>

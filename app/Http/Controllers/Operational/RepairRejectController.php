@@ -65,9 +65,28 @@ class RepairRejectController extends Controller
         if ($request->filled('defect')) {
             $query->where('defect_name', 'like', '%' . $request->defect . '%');
         }
-        if ($request->filled('date')) {
-            $query->whereDate('created_at', $request->date);
+
+        // Default tanggal: jika request tidak menyertakan 'date' dan user tidak sedang menekan 'Semua Tanggal' (date='')
+        // maka otomatis arahkan / filter ke hari ini (atau tanggal data terbaru jika hari ini kosong)
+        $filterDate = null;
+        if ($request->has('date')) {
+            if ($request->filled('date')) {
+                $filterDate = $request->date;
+                $query->whereDate('created_at', $filterDate);
+            }
+        } else {
+            // Default pertama kali buka: utamakan hari ini, jika hari ini belum ada data maka pakai tanggal terbaru yang ada
+            $today = now()->toDateString();
+            $hasTodayData = RepairRejectLog::whereDate('created_at', $today)->exists();
+            if ($hasTodayData) {
+                $filterDate = $today;
+            } else {
+                $latestLog = RepairRejectLog::latest('created_at')->first();
+                $filterDate = $latestLog ? $latestLog->created_at->toDateString() : $today;
+            }
+            $query->whereDate('created_at', $filterDate);
         }
+
         if ($request->filled('line')) {
             $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $request->line)));
             $query->whereHas('jobMaster', function ($q) use ($normalized) {
@@ -84,7 +103,7 @@ class RepairRejectController extends Controller
         $todayReject = RepairRejectLog::where('type', 'reject')->whereDate('created_at', today())->sum('qty_a');
 
         return view('operational.repair_reject_history', compact(
-            'logs', 'totalRepair', 'totalReject', 'todayRepair', 'todayReject'
+            'logs', 'totalRepair', 'totalReject', 'todayRepair', 'todayReject', 'filterDate'
         ));
     }
 
