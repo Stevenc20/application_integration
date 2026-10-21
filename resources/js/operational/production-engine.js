@@ -22,6 +22,26 @@ window.addEventListener('error', function (event) {
     }
 });
 
+// Auto Session / CSRF Token Expired (419 & 401) Recovery Interceptor
+(function() {
+    const originalFetch = window.fetch;
+    let isReloadingForAuth = false;
+    window.fetch = async function(...args) {
+        const response = await originalFetch.apply(this, args);
+        if ((response.status === 419 || response.status === 401) && !isReloadingForAuth) {
+            isReloadingForAuth = true;
+            console.warn('[Session Recovery] Detected HTTP ' + response.status + ' (Session expired / CSRF mismatch). Reloading page to refresh authentication...');
+            if (typeof showToast === 'function') {
+                showToast('Sesi kerja/istirahat telah berakhir. Menyegarkan halaman secara otomatis...', 'warning');
+            }
+            setTimeout(() => {
+                window.location.reload();
+            }, 1200);
+        }
+        return response;
+    };
+})();
+
 /**
  * ActionRunner — Robust async action lock with safety timeout.
  * Guarantees the lock is always released via try/finally.

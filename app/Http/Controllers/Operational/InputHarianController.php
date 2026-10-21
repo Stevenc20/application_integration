@@ -168,17 +168,32 @@ class InputHarianController extends Controller
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
             
-            $planQuery->whereRaw("
-                REPLACE(
+            $planQuery->where(function($q) use ($normalized, $lineFilter) {
+                $q->whereRaw("
                     REPLACE(
-                        UPPER(TRIM(press_name)),
-                        'PRESS ',
+                        REPLACE(
+                            UPPER(TRIM(COALESCE(press_name, ''))),
+                            'PRESS ',
+                            ''
+                        ),
+                        'LINE ',
                         ''
-                    ),
-                    'LINE ',
-                    ''
-                ) LIKE ?
-            ", ["%{$normalized}%"]);
+                    ) LIKE ?
+                ", ["%{$normalized}%"])
+                ->orWhereRaw("
+                    REPLACE(
+                        REPLACE(
+                            UPPER(TRIM(COALESCE(line, ''))),
+                            'PRESS ',
+                            ''
+                        ),
+                        'LINE ',
+                        ''
+                    ) LIKE ?
+                ", ["%{$normalized}%"])
+                ->orWhere('press_name', 'LIKE', "%{$lineFilter}%")
+                ->orWhere('line', 'LIKE', "%{$lineFilter}%");
+            });
         }
 
         // Filter Search
@@ -599,9 +614,10 @@ class InputHarianController extends Controller
 
             $existing = $existingJobMasters->get($identifier);
 
+            $lineName = $plan->press_name ?: ($plan->line ?: 'PRESS A');
             $data = [
                 'job_name'    => $plan->job_master ?: ($plan->job_no ?: 'UNKNOWN JOB'),
-                'line'        => $plan->press_name ?? 'PRESS A',
+                'line'        => $lineName,
                 'target_qty'  => (int) ($plan->plan ?? 0),
                 'sequence_no' => $plan->row_no ?? ($seq + 1), // Gunakan row_no asli dari Excel
                 'plan_start'  => $plan->start_time ? (str_contains($plan->start_time, '-') ? Carbon::parse($plan->start_time)->startOfMinute() : Carbon::parse($date . ' ' . $plan->start_time)->startOfMinute()) : null,
