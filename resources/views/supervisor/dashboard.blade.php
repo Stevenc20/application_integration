@@ -28,10 +28,6 @@
             <button id="s2btn" onclick="setShift(2)" class="filter-btn px-4 py-1.5 text-xs sm:text-sm font-bold rounded-lg transition-all text-gray-500 hover:text-gray-700">Shift 2</button>
         </div>
         <div class="flex items-center gap-2 ml-auto">
-            <a href="{{ parse_url(route('supervisor.monitor'), PHP_URL_PATH) }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold hover:bg-indigo-100 transition-colors">
-                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
-                Monitor
-            </a>
             <span class="live-badge inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-green-50 border border-green-200 text-green-700 text-xs font-bold">
                 <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse inline-block"></span>LIVE
             </span>
