@@ -567,31 +567,21 @@ class ReportController extends Controller
             $planTpt = 0.0;
             if ($planStart && $planFinish && $planFinish->gt($planStart)) {
                 $planTpt = abs($planFinish->diffInMinutes($planStart));
+            } elseif ($plan->tpt > 0) {
+                $planTpt = (float) $plan->tpt;
             }
-            $planGsph = ProductionMetricsService::planGsphStored($plan);
+
+            // GSPH Rencana: 100% membaca nilai tersimpan dari PPC (gsph_item), jika kosong hitung dengan round()
+            $planGsph = (int) ($plan->gsph_item ?? 0);
+            if ($planGsph <= 0 && $planTpt > 0 && $planQtySafe > 0) {
+                $planGsph = (int) round($planQtySafe / ($planTpt / 60.0));
+            }
+
             $planCt = ProductionMetricsService::planCt($cycleTimeSafe, $planTpt, $planQtySafe);
             $effectivePlanCt = $cycleTimeSafe > 0 ? $cycleTimeSafe : $planCt;
-            $storedProcessTime = (float) ($plan->process_time ?? 0);
-            $engineProcessTime = ProductionMetricsService::calculateProcessTime($effectivePlanCt, $planQtySafe);
-            $planProcessTime = $engineProcessTime > 0 ? $engineProcessTime : $storedProcessTime;
-
-            if ($engineProcessTime > 0 && abs($storedProcessTime - $engineProcessTime) > 0.001) {
-                if ($cycleTimeSafe <= 0 && $effectivePlanCt > 0) {
-                    $plan->ct_detik = $effectivePlanCt;
-                }
-                $plan->process_time = $engineProcessTime;
-                $plan->tpt = ProductionMetricsService::planTptMinutes($plan);
-                $plan->gsph_item = ProductionMetricsService::gsph($planQtySafe, (float) $plan->tpt);
-                $plan->save();
-
-                $plan->refresh();
-                $planTpt = 0.0;
-                if ($planStart && $planFinish && $planFinish->gt($planStart)) {
-                    $planTpt = abs($planFinish->diffInMinutes($planStart));
-                }
-                $planGsph = ProductionMetricsService::planGsphStored($plan);
-                $planCt = ProductionMetricsService::planCt((float) ($plan->ct_detik ?? 0), $planTpt, $planQtySafe);
-                $planProcessTime = (float) $plan->process_time;
+            $planProcessTime = (float) ($plan->process_time ?? 0);
+            if ($planProcessTime <= 0 && $effectivePlanCt > 0 && $planQtySafe > 0) {
+                $planProcessTime = ProductionMetricsService::calculateProcessTime($effectivePlanCt, $planQtySafe);
             }
 
             if ($planCt > 0) {
