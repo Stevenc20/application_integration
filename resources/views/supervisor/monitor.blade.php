@@ -110,8 +110,9 @@
         .table-scroll::-webkit-scrollbar-thumb:hover{background:#94a3b8}
 
         /* ── BASE TABLE ── */
-        table{width:100%;min-width:100%;border-collapse:collapse;table-layout:fixed}
-        th,td{
+        table:not(.modal-table){width:100%;min-width:100%;border-collapse:collapse;table-layout:fixed}
+        table:not(.modal-table) th,
+        table:not(.modal-table) td{
             border:1px solid #e2e8f0;
             text-align:center;
             padding:2px 2px;
@@ -1937,7 +1938,7 @@ document.addEventListener('keydown', function(e) {
 
         <!-- Body / Table with Horizontal Scroll -->
         <div style="padding:16px 20px; overflow-x:auto; overflow-y:auto; flex:1; background:#ffffff; min-height:0;">
-            <table style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
+            <table class="modal-table" style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
                         <th style="padding:12px 10px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
@@ -1986,7 +1987,7 @@ document.addEventListener('keydown', function(e) {
 
         <!-- Body / Table with Horizontal Scroll -->
         <div style="padding:16px 20px; overflow-x:auto; overflow-y:auto; flex:1; background:#ffffff; min-height:0;">
-            <table style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
+            <table class="modal-table" style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
                         <th style="padding:12px 10px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
@@ -2020,6 +2021,25 @@ document.addEventListener('keydown', function(e) {
 .dt-clickable-cell:hover {
     filter: brightness(1.15);
     box-shadow: inset 0 0 0 2px #fff;
+}
+
+/* ── MODAL TABLE EXPLICIT STYLING (mencegah bentrok dengan style global table monitor) ── */
+.modal-table {
+    border-collapse: separate !important;
+    border-spacing: 0 !important;
+    table-layout: fixed !important;
+}
+.modal-table th,
+.modal-table td {
+    white-space: normal !important;
+    overflow: visible !important;
+    text-overflow: clip !important;
+    max-width: none !important;
+    box-sizing: border-box !important;
+    line-height: 1.45 !important;
+}
+.modal-table td {
+    vertical-align: top !important;
 }
 </style>
 
