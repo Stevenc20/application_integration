@@ -132,10 +132,21 @@ class DashboardDetailService
             $downtimeMinutes[$dt->job_master_id] = ($downtimeMinutes[$dt->job_master_id] ?? 0) + ($dt->duration_seconds / 60);
         }
 
+        // ── MERGE BREAK SPLITS / CONSECUTIVE SAME JOB INTERVALS ──
+        // Menggabungkan baris yang terpecah karena jeda istirahat menjadi 1 baris produksi
+        $parentIds = $plans->pluck('id')->filter()->toArray();
+        $childPlansMap = ProductionPlan::whereIn('parent_job_id', $parentIds)
+            ->whereDate('plan_date', $date)
+            ->get()
+            ->groupBy('parent_job_id');
+
+        // Filter out child plans agar hanya parent (atau non-child) yang menjadi baris utama
+        $displayPlans = $plans->filter(fn ($p) => empty($p->parent_job_id))->values();
+
         $rows = [];
         $no = 0;
 
-        foreach ($plans as $plan) {
+        foreach ($displayPlans as $plan) {
             $no++;
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
@@ -144,34 +155,100 @@ class DashboardDetailService
             $job = $jobMasters->get($identifier);
             $daily = $job ? ($dailyRecords->get($job->id) ?? null) : null;
 
+            // Kumpulkan anak-anak dari parent_job_id
+            $children = collect();
+            if ($childPlansMap->has($plan->id)) {
+                $children = $children->merge($childPlansMap->get($plan->id));
+            }
+
+            // Juga deteksi jika ada split item yang memiliki split_group sama
+            if (!empty($plan->split_group)) {
+                $siblingSplits = $plans->filter(fn($p) => $p->id !== $plan->id && $p->split_group === $plan->split_group);
+                $children = $children->merge($siblingSplits);
+            }
+
+            // Atau jika ada baris berurutan dengan JOB NO & JOB MASTER yang sama persis di line & shift ini
+            $sameJobs = $plans->filter(fn($p) => $p->id !== $plan->id && !empty($p->parent_job_id) && $p->parent_job_id === $plan->id);
+            $children = $children->merge($sameJobs)->unique('id');
+
+            // Akumulasi Plan Qty
+            $planQty = (int) ($plan->plan ?? 0);
+            foreach ($children as $c) {
+                $planQty += (int) ($c->plan ?? 0);
+            }
+            if ($plan->original_plan && $plan->original_plan > $planQty) {
+                $planQty = (int) $plan->original_plan;
+            }
+
+            // Akumulasi Actual Qty dari parent & children
             $actualQty = $daily ? (int) $daily->actual_qty : 0;
             $actualOk = $daily ? (int) $daily->actual_ok : 0;
             $actualRepair = $daily ? (int) ($daily->actual_repair ?? 0) : 0;
             $actualReject = $daily ? (int) ($daily->actual_reject ?? 0) : 0;
-
-            $ctDetik = (float) ($plan->ct_detik ?? 0);
-            $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 1) : 0;
 
             $jobId = $job?->id;
             $dandori = $jobId ? round($dandoriMinutes[$jobId] ?? 0, 1) : 0;
             $iqCheck = $jobId ? round($firstCheckMinutes[$jobId] ?? 0, 1) : 0;
             $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 1) : 0;
 
+            $isRunning = $job && in_array(strtolower($job->status), ['running', 'paused']);
+            $latestFinishedAt = $job?->finished_at ? Carbon::parse($job->finished_at) : null;
+
+            foreach ($children as $c) {
+                $cjn = trim($c->job_no ?? '');
+                $cjm = trim($c->job_master ?? '');
+                $cIdent = $cjn ? ($cjn . '-' . $c->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cjm) . '-' . $c->id);
+                $cJob = $jobMasters->get($cIdent);
+                if ($cJob) {
+                    $cDaily = $dailyRecords->get($cJob->id);
+                    if ($cDaily) {
+                        $actualQty += (int) $cDaily->actual_qty;
+                        $actualOk += (int) $cDaily->actual_ok;
+                        $actualRepair += (int) ($cDaily->actual_repair ?? 0);
+                        $actualReject += (int) ($cDaily->actual_reject ?? 0);
+                    }
+                    $cJobId = $cJob->id;
+                    $dandori += round($dandoriMinutes[$cJobId] ?? 0, 1);
+                    $iqCheck += round($firstCheckMinutes[$cJobId] ?? 0, 1);
+                    $downtime += round($downtimeMinutes[$cJobId] ?? 0, 1);
+
+                    if (in_array(strtolower($cJob->status), ['running', 'paused'])) {
+                        $isRunning = true;
+                    }
+                    if ($cJob->finished_at) {
+                        $cFin = Carbon::parse($cJob->finished_at);
+                        if (!$latestFinishedAt || $cFin->gt($latestFinishedAt)) {
+                            $latestFinishedAt = $cFin;
+                        }
+                    }
+                }
+            }
+
+            $ctDetik = (float) ($plan->ct_detik ?? 0);
+            $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 1) : 0;
             $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
 
+            // Plan Finish: Ambil jam selesai terakhir dari interval (termasuk interval setelah istirahat)
             $planFinish = $plan->finish_time;
-            $actualFinish = $job?->finished_at ? Carbon::parse($job->finished_at)->format('H:i') : '-';
+            if ($children->isNotEmpty()) {
+                $lastChildFinish = $children->sortByDesc('finish_time')->first()?->finish_time;
+                if ($lastChildFinish && strcmp($lastChildFinish, $planFinish) > 0) {
+                    $planFinish = $lastChildFinish;
+                }
+            }
+
+            $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : '-';
 
             $rows[] = [
                 'no'               => $no,
                 'job_master_id'    => $jobId,
-                'is_running'       => $job && in_array(strtolower($job->status), ['running', 'paused']),
+                'is_running'       => $isRunning,
                 'job_number'       => $plan->job_no ?? '-',
                 'p1'               => (bool) (($plan->p1 ?? false) ?: ($plan->a1 > 0) ?: ($plan->total_mesin >= 1)),
                 'p2'               => (bool) (($plan->p2 ?? false) ?: ($plan->a2 > 0) ?: ($plan->total_mesin >= 2)),
                 'p3'               => (bool) (($plan->p3 ?? false) ?: ($plan->a3 > 0) ?: ($plan->total_mesin >= 3)),
                 'p4'               => (bool) (($plan->p4 ?? false) ?: ($plan->a4 > 0) ?: ($plan->total_mesin >= 4)),
-                'plan_qty'         => (int) ($plan->plan ?? 0),
+                'plan_qty'         => $planQty,
                 'good'             => $actualOk,
                 'repair'           => $actualRepair,
                 'reject'           => $actualReject,

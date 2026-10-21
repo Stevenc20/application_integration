@@ -470,8 +470,15 @@ class DashboardRealtimeService
             }
         }
 
-        $totalJobs = $plans->count();
-        $finishedJobs = $dailyRecords->filter(fn($dp) => $dp->jobMaster && in_array($dp->jobMaster->status, ['finished', 'complete', 'closed']))->count();
+        $uniqueBasePlans = $plans->filter(fn($p) => empty($p->parent_job_id));
+        $totalJobs = $uniqueBasePlans->count();
+        $parentJobIds = $uniqueBasePlans->pluck('id')->filter()->toArray();
+
+        // Finished jobs: count unique base plans whose parent or child jobs are finished
+        $finishedJobs = $dailyRecords->filter(fn($dp) => $dp->jobMaster && in_array(strtolower($dp->jobMaster->status), ['finished', 'complete', 'closed']))->count();
+        if ($totalJobs > 0 && $finishedJobs > $totalJobs) {
+            $finishedJobs = $totalJobs;
+        }
         $jobActual = $finishedJobs . '/' . $totalJobs;
 
         $totalStroke = $ok + $repair + $reject;
