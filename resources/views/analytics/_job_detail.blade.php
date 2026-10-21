@@ -578,12 +578,18 @@
     </div>
     @endif
 
-    {{-- Downtime Events --}}
-    @if($job->downtimes->isNotEmpty())
+    {{-- Downtime Events (Hanya Downtime murni: Bukan Dandori, Break Time, atau Idle) --}}
+    @php
+        $actualDowntimes = $job->downtimes->filter(function($dt) {
+            $t = strtoupper(trim($dt->jenis_downtime ?? ''));
+            return !in_array($t, ['DANDORI', 'BREAK', 'BREAK TIME', 'BREAKTIME', 'IDLE', 'IDLE TIME']);
+        });
+    @endphp
+    @if($actualDowntimes->isNotEmpty())
     <div class="section-card">
         <div class="section-header flex items-center justify-between">
             <h3 class="text-xs font-bold text-slate-700">Downtime Events</h3>
-            <span class="text-[10px] font-bold text-slate-400">{{ $job->downtimes->count() }} events</span>
+            <span class="text-[10px] font-bold text-slate-400">{{ $actualDowntimes->count() }} events</span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -598,7 +604,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    @foreach($job->downtimes as $dt)
+                    @foreach($actualDowntimes as $dt)
                     <tr class="hover:bg-slate-50">
                         <td class="px-5 py-3 text-xs text-slate-500 font-mono">{{ $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('d M H:i') : '-' }}</td>
                         <td class="px-5 py-3">

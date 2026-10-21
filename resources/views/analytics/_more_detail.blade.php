@@ -108,11 +108,17 @@
 </div>
 
 {{-- DOWNTIME TABLE --}}
-@if($allDowntimes->isNotEmpty())
+@php
+    $filteredDtList = $allDowntimes->filter(function($d) {
+        $t = strtoupper(trim($d->jenis_downtime ?? ''));
+        return !in_array($t, ['DANDORI', 'BREAK', 'BREAK TIME', 'BREAKTIME', 'IDLE', 'IDLE TIME']);
+    });
+@endphp
+@if($filteredDtList->isNotEmpty())
 <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm mb-6">
     <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
         <h3 class="text-sm font-bold text-slate-700">Downtime Events</h3>
-        <span class="text-[10px] font-bold text-slate-400">{{ $allDowntimes->count() }} events</span>
+        <span class="text-[10px] font-bold text-slate-400">{{ $filteredDtList->count() }} events</span>
     </div>
     <div class="overflow-x-auto">
         <table class="w-full text-sm">
@@ -127,7 +133,7 @@
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
-                @foreach($allDowntimes as $d)
+                @foreach($filteredDtList as $d)
                 <tr class="hover:bg-slate-50">
                     <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ \Carbon\Carbon::parse($d->start_time)->format('d M H:i') }}</td>
                     <td class="px-4 py-3">

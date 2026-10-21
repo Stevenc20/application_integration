@@ -6,12 +6,18 @@
         <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-emerald-500"></span> Finish</span>
     </div>
 
-    {{-- DOWNTIME EVENTS --}}
-    @if($downtimes->isNotEmpty())
+    {{-- DOWNTIME EVENTS (Hanya Downtime murni: Bukan Dandori / Break / Idle) --}}
+    @php
+        $filteredTimelineDts = $downtimes->filter(function($dt) {
+            $t = strtoupper(trim($dt->jenis_downtime ?? ''));
+            return !in_array($t, ['DANDORI', 'BREAK', 'BREAK TIME', 'BREAKTIME', 'IDLE', 'IDLE TIME']);
+        });
+    @endphp
+    @if($filteredTimelineDts->isNotEmpty())
     <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
             <h3 class="text-sm font-bold text-slate-700">Downtime Events</h3>
-            <span class="text-[10px] font-bold text-slate-400">{{ $downtimes->count() }} events</span>
+            <span class="text-[10px] font-bold text-slate-400">{{ $filteredTimelineDts->count() }} events</span>
         </div>
         <div class="overflow-x-auto">
             <table class="w-full text-sm">
@@ -25,7 +31,7 @@
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
-                    @foreach($downtimes as $dt)
+                    @foreach($filteredTimelineDts as $dt)
                     <tr class="hover:bg-slate-50">
                         <td class="px-5 py-3 text-xs text-slate-500 font-mono">{{ $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('d M H:i') : '-' }}</td>
                         <td class="px-5 py-3 font-medium text-slate-700">{{ $dt->jobMaster?->line ?? '-' }}</td>
