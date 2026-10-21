@@ -147,6 +147,37 @@ class DashboardDetailService
             ];
         }
 
+        // ── REPAIR & REJECT LOGS ──
+        $repairRejectLogs = \App\Models\RepairRejectLog::with('creator')
+            ->whereIn('job_master_id', $jobIds)
+            ->get();
+
+        $repairItems = [];
+        $rejectItems = [];
+        foreach ($repairRejectLogs as $rr) {
+            $logType = strtolower(trim($rr->type ?? ''));
+            $picName = $rr->creator?->name ?? '-';
+            $timeFormatted = $rr->created_at ? Carbon::parse($rr->created_at)->format('H:i') : '-';
+            $itemData = [
+                'id'              => $rr->id,
+                'type'            => strtoupper($logType),
+                'defect_name'     => $rr->defect_name ?: '-',
+                'qty'             => (int) ($rr->qty_a ?: 1),
+                'repair_category' => $rr->repair_category ?: '-',
+                'area_problem'    => $rr->area_problem ?: '-',
+                'root_cause'      => $rr->root_cause ?: '-',
+                'countermeasure'  => $rr->countermeasure ?: '-',
+                'pic'             => $picName,
+                'time'            => $timeFormatted,
+            ];
+
+            if ($logType === 'repair') {
+                $repairItems[$rr->job_master_id][] = $itemData;
+            } elseif ($logType === 'reject') {
+                $rejectItems[$rr->job_master_id][] = $itemData;
+            }
+        }
+
         // ── MERGE BREAK SPLITS / CONSECUTIVE SAME JOB INTERVALS ──
         // Menggabungkan baris yang terpecah karena jeda istirahat menjadi 1 baris produksi
         $parentIds = $plans->pluck('id')->filter()->toArray();
@@ -258,8 +289,19 @@ class DashboardDetailService
             $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : '-';
 
             $allDtList = [];
-            if ($jobId && isset($downtimeItems[$jobId])) {
-                $allDtList = array_merge($allDtList, $downtimeItems[$jobId]);
+            $allRepairList = [];
+            $allRejectList = [];
+
+            if ($jobId) {
+                if (isset($downtimeItems[$jobId])) {
+                    $allDtList = array_merge($allDtList, $downtimeItems[$jobId]);
+                }
+                if (isset($repairItems[$jobId])) {
+                    $allRepairList = array_merge($allRepairList, $repairItems[$jobId]);
+                }
+                if (isset($rejectItems[$jobId])) {
+                    $allRejectList = array_merge($allRejectList, $rejectItems[$jobId]);
+                }
             }
             foreach ($children as $c) {
                 $cjn = trim($c->job_no ?? '');
@@ -270,6 +312,12 @@ class DashboardDetailService
                     $cJobId = $cJob->id;
                     if (isset($downtimeItems[$cJobId])) {
                         $allDtList = array_merge($allDtList, $downtimeItems[$cJobId]);
+                    }
+                    if (isset($repairItems[$cJobId])) {
+                        $allRepairList = array_merge($allRepairList, $repairItems[$cJobId]);
+                    }
+                    if (isset($rejectItems[$cJobId])) {
+                        $allRejectList = array_merge($allRejectList, $rejectItems[$cJobId]);
                     }
                 }
             }
@@ -287,7 +335,9 @@ class DashboardDetailService
                 'plan_qty'         => $planQty,
                 'good'             => $actualOk,
                 'repair'           => $actualRepair,
+                'repair_list'      => $allRepairList,
                 'reject'           => $actualReject,
+                'reject_list'      => $allRejectList,
                 'press_time'       => $pressTime,
                 'dandori'          => $dandori,
                 'iq_check'         => $iqCheck,

@@ -1038,13 +1038,31 @@ function buildRightBody(rows, maxRows, overallPlan){
                 dtContent = `${dw} <span style="font-size:0.6vw;">🔍</span>`;
             }
 
+            let repairSt = 'font-weight:600;';
+            let repairAttr = '';
+            let repairContent = j.repair;
+            if (Number(j.repair) > 0) {
+                repairSt = 'font-weight:900; color:#d97706!important; background:#fef3c7; cursor:pointer; text-decoration:underline;';
+                repairAttr = `onclick="openDefectDetailModal(${i}, 'repair')" title="Klik untuk lihat rincian Repair (${j.repair} pcs)"`;
+                repairContent = `${j.repair} <span style="font-size:0.6vw;">🔍</span>`;
+            }
+
+            let rejectSt = 'font-weight:600;';
+            let rejectAttr = '';
+            let rejectContent = j.reject;
+            if (Number(j.reject) > 0) {
+                rejectSt = 'font-weight:900; color:#dc2626!important; background:#fee2e2; cursor:pointer; text-decoration:underline;';
+                rejectAttr = `onclick="openDefectDetailModal(${i}, 'reject')" title="Klik untuk lihat rincian Reject (${j.reject} pcs)"`;
+                rejectContent = `${j.reject} <span style="font-size:0.6vw;">🔍</span>`;
+            }
+
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
                 ${dtCell(j.job_number, 'text-align:left;font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:0;', 'det-job')}
                 ${dtCell(j.plan_qty, '', 'det-qty')}
                 ${dtCell(j.good, 'font-weight:600;', 'det-good')}
-                ${dtCell(j.repair, 'font-weight:600;', 'det-repair')}
-                ${dtCell(j.reject, 'font-weight:600;', 'det-reject')}
+                ${dtCell(repairContent, repairSt, 'det-repair dt-clickable-cell', repairAttr)}
+                ${dtCell(rejectContent, rejectSt, 'det-reject dt-clickable-cell', rejectAttr)}
                 ${dtCell(pt)}
                 ${dtCell(dn)}
                 ${dtCell(iq)}
@@ -1715,9 +1733,84 @@ window.closeDtDetailModal = function() {
     }
 };
 
+// ── Repair / Reject Detail Modal Logic ──
+window.openDefectDetailModal = function(rowIndex, type) {
+    const activeLine = selectedLine === 'ALL' ? 'Line A' : selectedLine;
+    const detailList = (LINE_DETAIL[activeLine] && LINE_DETAIL[activeLine].right) ? LINE_DETAIL[activeLine].right : [];
+    const item = detailList[rowIndex];
+    if (!item) return;
+
+    const isReject = (type === 'reject');
+    const badgeText = isReject ? 'REJECT DETAIL' : 'REPAIR DETAIL';
+    const badgeBg = isReject ? '#dc2626' : '#d97706';
+    const totalColor = isReject ? '#dc2626' : '#d97706';
+    const totalQty = isReject ? (item.reject || 0) : (item.repair || 0);
+    const list = isReject ? (item.reject_list || []) : (item.repair_list || []);
+
+    document.getElementById('defectModalJobNumber').textContent = item.job_number || '-';
+    document.getElementById('defectModalPartName').textContent = item.job_name || '-';
+    
+    const badgeEl = document.getElementById('defectModalBadge');
+    badgeEl.textContent = badgeText;
+    badgeEl.style.background = badgeBg;
+
+    const totalEl = document.getElementById('defectModalTotalQty');
+    totalEl.textContent = totalQty + ' Pcs';
+    totalEl.style.color = totalColor;
+
+    document.getElementById('defectModalTotalLabel').textContent = isReject ? 'Total Reject' : 'Total Repair';
+
+    const tbody = document.getElementById('defectModalTableBody');
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px; font-weight:600;">Belum ada rincian log defect ${type.toUpperCase()} yang dicatat untuk item ini.</td></tr>`;
+    } else {
+        let html = '';
+        list.forEach((rr, idx) => {
+            const rowBadgeBg = isReject ? '#fee2e2' : '#fef3c7';
+            const rowBadgeColor = isReject ? '#b91c1c' : '#b45309';
+            html += `
+                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                    <td style="padding: 14px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
+                    <td style="padding: 14px 12px; font-weight: 800; text-align: center; vertical-align:top;">
+                        <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 5px 10px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em; font-weight:900;">${rr.type}</span>
+                    </td>
+                    <td style="padding: 14px 16px; font-weight: 800; color: #0f172a; vertical-align:top;">
+                        <div style="font-size:14px; line-height:1.4;">${rr.defect_name}</div>
+                        ${rr.area_problem && rr.area_problem !== '-' ? `<div style="font-size:11px; color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${rr.area_problem}</span></div>` : ''}
+                    </td>
+                    <td style="padding: 14px 12px; text-align: center; font-weight: 900; color: ${totalColor}; vertical-align:top;">
+                        <div style="font-size:15px;">${rr.qty}</div>
+                        <div style="font-size:11px; color:#64748b; font-weight:600;">pcs</div>
+                    </td>
+                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
+                        <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Root Cause:</span> <span style="font-weight:600;">${rr.root_cause || '-'}</span></div>
+                        <div><span style="color:#16a34a; font-weight:700;">Tindakan / Action:</span> <span style="font-weight:600;">${rr.countermeasure || '-'}</span></div>
+                    </td>
+                    <td style="padding: 14px 12px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${rr.pic || '-'}</td>
+                    <td style="padding: 14px 12px; text-align: center; color: #64748b; font-weight: 700; vertical-align:top;">${rr.time || '-'}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    const modal = document.getElementById('defectDetailModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDefectDetailModal = function() {
+    const modal = document.getElementById('defectDetailModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
 document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
         window.closeDtDetailModal();
+        window.closeDefectDetailModal();
     }
 });
 </script>
@@ -1767,6 +1860,56 @@ document.addEventListener('keydown', function(e) {
         <div style="padding:12px 24px; background:#f8fafc; border-top:2px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
             <span style="font-size:11px; color:#94a3b8; font-weight:600;">* Geser tabel ke kanan jika layar sempit. Tekan ESC untuk menutup.</span>
             <button type="button" onclick="closeDtDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:9px 24px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; transition:all 0.15s; letter-spacing:0.02em;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<!-- Defect (Repair & Reject) Detail Modal Popup -->
+<div id="defectDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.8); backdrop-filter:blur(6px); align-items:center; justify-content:center; padding:1.5vw;">
+    <div style="background:#fff; border-radius:18px; width:94vw; max-width:1300px; height:88vh; max-height:88vh; display:flex; flex-direction:column; box-shadow:0 30px 60px -15px rgba(0,0,0,0.5); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s cubic-bezier(0.16, 1, 0.3, 1);">
+        
+        <!-- Header -->
+        <div style="padding:16px 24px; background:#f8fafc; border-bottom:2px solid #e2e8f0; display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+            <div style="display:flex; flex-direction:column; gap:4px;">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <span style="font-size:18px; font-weight:900; color:#0f172a; letter-spacing:0.02em;" id="defectModalJobNumber">-</span>
+                    <span style="background:#dc2626; color:#fff; font-size:11px; font-weight:900; padding:4px 10px; border-radius:8px; letter-spacing:0.05em; text-transform:uppercase;" id="defectModalBadge">DEFECT DETAIL</span>
+                </div>
+                <div style="font-size:13px; color:#64748b; font-weight:700;" id="defectModalPartName">-</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:20px;">
+                <div style="text-align:right;">
+                    <div style="font-size:10px; color:#64748b; font-weight:800; text-transform:uppercase; letter-spacing:0.05em;" id="defectModalTotalLabel">Total Qty</div>
+                    <div style="font-size:22px; font-weight:900; color:#dc2626; line-height:1.2;" id="defectModalTotalQty">0 Pcs</div>
+                </div>
+                <button type="button" onclick="closeDefectDetailModal()" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#475569; width:38px; height:38px; border-radius:12px; font-size:22px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s; line-height:1;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f1f5f9'; this.style.color='#475569'">&times;</button>
+            </div>
+        </div>
+
+        <!-- Body / Table with Horizontal Scroll -->
+        <div style="padding:16px 20px; overflow-x:auto; overflow-y:auto; flex:1; background:#ffffff; min-height:0;">
+            <table style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
+                <thead>
+                    <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
+                        <th style="padding:12px 10px; text-align:center; width:50px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
+                        <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Tipe</th>
+                        <th style="padding:12px 16px; width:260px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Jenis Defect & Area</th>
+                        <th style="padding:12px 12px; text-align:center; width:90px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Qty</th>
+                        <th style="padding:12px 16px; width:410px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Root Cause & Countermeasure</th>
+                        <th style="padding:12px 12px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC / Input</th>
+                        <th style="padding:12px 12px; text-align:center; width:90px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Waktu</th>
+                    </tr>
+                </thead>
+                <tbody id="defectModalTableBody" style="line-height:1.5;">
+                    <!-- Populated dynamically via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:12px 24px; background:#f8fafc; border-top:2px solid #e2e8f0; display:flex; justify-content:space-between; align-items:center; flex-shrink:0;">
+            <span style="font-size:11px; color:#94a3b8; font-weight:600;">* Geser tabel ke kanan jika layar sempit. Tekan ESC untuk menutup.</span>
+            <button type="button" onclick="closeDefectDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:9px 24px; border-radius:10px; font-size:13px; font-weight:800; cursor:pointer; transition:all 0.15s; letter-spacing:0.02em;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
         </div>
     </div>
 </div>
