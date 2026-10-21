@@ -793,6 +793,7 @@ let LINE_KPI = {};
 let LINE_META = {};
 let LINE_DETAIL = {};
 let LINE_STATUSES = {};
+let DETAIL_DATA = {};
 let LAST_HASH = '';
 let selectedLine = null;
 const _initTime = new Date();
@@ -892,6 +893,7 @@ function fetchData(){
         LAST_HASH=h;
         LINE_KPI=kpi.line_kpi||{};
         LINE_META=kpi.line_meta||{};
+        DETAIL_DATA=kpi.detail_data||{};
         LINE_DETAIL=det.detail||{};
         LINE_STATUSES=sts.line_statuses||{};
         renderTable();
@@ -1205,6 +1207,20 @@ function updateAllCells(){
                     cu.className = 'val-curr'+(cl.curr?' '+cl.curr:'');
                     ac.className = 'val-actual'+(cl.act?' '+cl.act:'') + borderCls;
                     ac.style.cssText = cl.style || '';
+
+                    // Klik untuk downtime rows di mode ALL
+                    const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
+                    const valNum = parseFloat(k.actual);
+                    if (isDt && !isNaN(valNum) && valNum > 0) {
+                        ac.style.cursor = 'pointer';
+                        ac.style.textDecoration = 'underline';
+                        ac.title = `Klik untuk rincian ${desc} — ${line}`;
+                        ac.onclick = () => openKpiModalFromMonitor(desc, line);
+                    } else if (isDt) {
+                        ac.style.cursor = 'default';
+                        ac.style.textDecoration = 'none';
+                        ac.onclick = null;
+                    }
                 }else{
                     setText(getCell('plan'),'-');
                     setText(getCell('curr'),'-');
@@ -1331,9 +1347,17 @@ function renderTable(){
                 if (k) {
                     const cl = getClasses(desc, k);
                     const pct = k.actualPct ? ` ${k.actualPct}` : '';
+                    const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
+                    const valNum = parseFloat(k.actual);
+                    let clickStyle = '';
+                    let clickAttr = '';
+                    if (isDt && !isNaN(valNum) && valNum > 0) {
+                        clickStyle = 'cursor:pointer; text-decoration:underline;';
+                        clickAttr = `onclick="openKpiModalFromMonitor('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
+                    }
                     b += `<td class="val-plan">${k.plan||'-'}</td>`;
                     b += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
-                    b += `<td class="val-actual ${cl.act}" style="${cl.style}">${k.actual||'-'}${pct}</td>`;
+                    b += `<td class="val-actual ${cl.act}" style="${cl.style};${clickStyle}" ${clickAttr}>${k.actual||'-'}${pct}</td>`;
                 } else {
                     b += `<td>-</td><td>-</td><td>-</td>`;
                 }
@@ -1412,9 +1436,17 @@ function renderTable(){
                 if (desc === 'GSPH' && cl.act === 'bg-red') {
                     actValTxt += ` <span style="font-size:0.8vw;">⚠️</span>`;
                 }
+                const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
+                const valNum = parseFloat(k.actual);
+                let clickStyle = '';
+                let clickAttr = '';
+                if (isDt && !isNaN(valNum) && valNum > 0) {
+                    clickStyle = 'cursor:pointer; text-decoration:underline;';
+                    clickAttr = `onclick="openKpiModalFromMonitor('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
+                }
                 leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
                 leftBodyHtml += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
-                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style}">${actValTxt}</td>`;
+                leftBodyHtml += `<td class="val-actual ${cl.act}" style="border-right:none;${cl.style};${clickStyle}" ${clickAttr}>${actValTxt}</td>`;
             } else {
                 leftBodyHtml += `<td>-</td><td>-</td><td style="border-right:none;">-</td>`;
             }
@@ -1551,6 +1583,59 @@ window.addEventListener('resize', function(){
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(refitRoot, 150);
 });
+
+window.openKpiModalFromMonitor = function(type, line) {
+    const typeData = DETAIL_DATA[type];
+    const resolveLineData = (td, l) => {
+        if (!td) return null;
+        if (td[l]) return td[l];
+        const matchKey = Object.keys(td).find(k => k === l || k === `PRESS ${l}` || `PRESS ${k}` === l || k.endsWith(` ${l}`) || l.endsWith(` ${k}`));
+        return matchKey ? td[matchKey] : null;
+    };
+
+    const lineData = resolveLineData(typeData, line);
+
+    document.getElementById('dtModalJobNumber').textContent = `RINCIAN ${type}`;
+    document.getElementById('dtModalPartName').textContent = `LINE: ${line}`;
+    document.getElementById('dtModalTotalDuration').textContent = (lineData?.total || '0') + ' Menit';
+
+    const tbody = document.getElementById('dtModalTableBody');
+    const rows = lineData?.rows || [];
+
+    if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian kendala untuk ${type} di ${line}.</td></tr>`;
+    } else {
+        let html = '';
+        rows.forEach((r, idx) => {
+            html += `
+                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                    <td style="padding: 10px 14px; font-weight: 700; color: #1e293b; text-align: center;">${r.no || (idx + 1)}</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #b91c1c; text-align: center;">
+                        <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${r.jenis || type}</span>
+                    </td>
+                    <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">
+                        <div>${r.problem || '-'}</div>
+                        <div style="font-size:11px; color:#3b82f6; margin-top:2px;">Job: ${r.job || '-'}</div>
+                    </td>
+                    <td style="padding: 10px 14px; color: #475569; font-size: 12px;">
+                        <div><b>Penyebab:</b> ${r.penyebab || '-'}</div>
+                        <div style="margin-top: 3px;"><b>Tindakan:</b> ${r.action || '-'}</div>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; color: #334155; font-weight: 600;">-</td>
+                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; color: #b91c1c;">
+                        <div>${r.durasi || 0} m</div>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    const modal = document.getElementById('dtDetailModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+};
 
 // ── Downtime Detail Modal Logic ──
 window.openDtDetailModal = function(rowIndex) {
