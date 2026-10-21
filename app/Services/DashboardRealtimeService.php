@@ -525,12 +525,12 @@ class DashboardRealtimeService
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
 
-        $dtProdLabel = round($dtProdMinutes, 2) . ' m';
-        $dtTotalLabel = round($dtTotalMinutes, 2) . ' m';
-        $dtMachLabel = round($dtMachMinutes, 2) . ' m';
-        $dtDiesLabel = round($dtDiesMinutes, 2) . ' m';
-        $dtMatLabel  = round($dtMatMinutes, 2) . ' m';
-        $dtLogLabel  = round($dtLogMinutes, 2) . ' m';
+        $dtProdLabel = round($dtProdMinutes, 1) . ' m';
+        $dtTotalLabel = round($dtTotalMinutes, 1) . ' m';
+        $dtMachLabel = round($dtMachMinutes, 1) . ' m';
+        $dtDiesLabel = round($dtDiesMinutes, 1) . ' m';
+        $dtMatLabel  = round($dtMatMinutes, 1) . ' m';
+        $dtLogLabel  = round($dtLogMinutes, 1) . ' m';
 
         $kpi = [
             ['desc'=>'QTY',      'plan'=>(string)$planQty,           'actual'=>(string)$ok,         'actualLink'=>true, 'current'=>$hasRunning ? (string)$currOk : '-'],
@@ -549,12 +549,12 @@ class DashboardRealtimeService
 
         $detailData = [
             'QTY'      => ['type' => 'production', $lineName => ['rows' => $qtyRows, 'total' => (string)$ok]],
-            'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($dtTotalMinutes, 2)]],
-            'MACH_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $machRows, 'total' => (string)round($dtMachMinutes, 2)]],
-            'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 2)]],
-            'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 2)]],
-            'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 2)]],
-            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 2)]],
+            'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($dtTotalMinutes, 1)]],
+            'MACH_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $machRows, 'total' => (string)round($dtMachMinutes, 1)]],
+            'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 1)]],
+            'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 1)]],
+            'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 1)]],
+            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 1)]],
             'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => $repairRows, 'total' => (string)$repair]],
             'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string)$reject]],
         ];
