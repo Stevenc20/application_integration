@@ -26,6 +26,12 @@
                 $buildCssUrl = asset('build/' . $manifest['resources/css/supervisor.css']['file']);
             }
         }
+        if (!$buildCssUrl) {
+            $cssFiles = glob(public_path('build/assets/supervisor-*.css'));
+            if (!empty($cssFiles)) {
+                $buildCssUrl = asset('build/assets/' . basename($cssFiles[0]));
+            }
+        }
         
         $polyfillsFiles = glob(public_path('build/assets/polyfills-legacy-*.js'));
         if (!empty($polyfillsFiles)) {
