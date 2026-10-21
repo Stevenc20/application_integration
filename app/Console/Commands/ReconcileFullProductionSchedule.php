@@ -84,7 +84,7 @@ class ReconcileFullProductionSchedule extends Command
                             'tpt' => $tpt,
                             'gsph_item' => $gsph,
                             'process_time' => $pt,
-                            'ct' => $ct,
+                            'ct_detik' => $ct,
                             'total_mesin' => $totalMesin,
                             'updated_at' => now(),
                         ]);
@@ -107,7 +107,7 @@ class ReconcileFullProductionSchedule extends Command
                         'start_time' => $startTime,
                         'finish_time' => $finishTime,
                         'total_mesin' => $totalMesin,
-                        'ct' => $ct,
+                        'ct_detik' => $ct,
                         'tpt' => $tpt,
                         'gsph_item' => $gsph,
                         'process_time' => $pt,
