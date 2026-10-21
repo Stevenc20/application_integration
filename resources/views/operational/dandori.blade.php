@@ -281,8 +281,23 @@ let dandoriIntervals = {};
 let confirmCallback = null;
 
 document.addEventListener('DOMContentLoaded', function () {
+    let urlParams = new URLSearchParams(window.location.search);
+    let urlJobId = urlParams.get('job_id') || "{{ $jobId ?? '' }}";
+    let urlLine = urlParams.get('line') || "{{ $line ?? '' }}";
+    let urlDate = urlParams.get('date');
+
+    if (urlDate) {
+        document.getElementById('historyDate').value = urlDate;
+    }
+    if (urlLine) {
+        let historyLineEl = document.getElementById('historyLine');
+        if (historyLineEl) {
+            historyLineEl.value = urlLine;
+        }
+    }
+
     loadHistory();
-    let autoJob = "{{ $jobId ?? '' }}";
+    let autoJob = urlJobId;
     
     // Auto-load jobs if line and shift are pre-filled
     let line = document.getElementById('line').value;
@@ -577,9 +592,16 @@ function loadHistory(page = 1) {
     let date = document.getElementById('historyDate').value;
     let line = document.getElementById('historyLine').value;
     let jenis = document.getElementById('historyJenis').value;
+    let urlParams = new URLSearchParams(window.location.search);
+    let jobId = urlParams.get('job_id') || "{{ $jobId ?? '' }}";
     document.getElementById('historyBody').innerHTML = `<tr><td colspan="6" class="py-16 text-center"><div class="flex flex-col items-center gap-2 text-gray-400"><svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 animate-spin text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg><span class="text-sm">Memuat history...</span></div></td></tr>`;
 
-    fetch(`{{ route('operational.dandori.history') }}?date=${date}&line=${line}&jenis=${jenis}&page=${page}`)
+    let queryUrl = `{{ route('operational.dandori.history') }}?date=${date}&line=${line}&jenis=${jenis}&page=${page}`;
+    if (jobId) {
+        queryUrl += `&job_id=${encodeURIComponent(jobId)}`;
+    }
+
+    fetch(queryUrl)
     .then(res => res.json())
     .then(data => {
         let body = '';

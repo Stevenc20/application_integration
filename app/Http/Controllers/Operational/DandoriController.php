@@ -216,6 +216,10 @@ class DandoriController extends Controller
     {
         $q = Dandori::query();
 
+        if ($request->job_id) {
+            $q->where('next_job_id', $request->job_id);
+        }
+
         if ($request->date) {
             $q->whereDate('work_date', $request->date);
         }

@@ -154,8 +154,8 @@ class ProductionAnalyticsController extends Controller
                     $q->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])->orderBy('start_time');
                 },
                 'dandoris' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->where('jenis_dandori', '1st_check')
-                      ->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59']);
+                    $q->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
+                      ->orderBy('start_time');
                 },
             ])
             ->get()
@@ -342,7 +342,6 @@ class ProductionAnalyticsController extends Controller
             ->get();
 
         $dandoris = \App\Models\Dandori::where('next_job_id', $id)
-            ->where('jenis_dandori', '1st_check')
             ->orderBy('start_time')
             ->get();
 

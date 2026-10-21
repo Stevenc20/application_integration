@@ -174,30 +174,6 @@
                 : 0);
         $downtimeSec = $dp ? (int)$dp->downtime_seconds : 0;
 
-        $jRepair = $job->downtimes->where('jenis_downtime','repair')->sum('duration_seconds');
-        $jProd = $runtime;
-        $jFirstCheck = 0;
-        if (isset($dandoris)) {
-            foreach ($dandoris as $fc) {
-                if ($fc->start_time) {
-                    $s = \Carbon\Carbon::parse($fc->start_time);
-                    $e = $fc->finish_time ? \Carbon\Carbon::parse($fc->finish_time) : now();
-                    $jFirstCheck += $s->diffInSeconds($e);
-                }
-            }
-        }
-        $jTryOut = $job->downtimes->whereIn('jenis_downtime', ['try out','tryout'])->sum('duration_seconds');
-        $jBreakTime = $job->downtimes->whereIn('jenis_downtime', ['break time','break'])->sum('duration_seconds');
-        $jDandoriSec = 0;
-        foreach ($dandoriSessions as $ds) {
-            if ($ds->start_time && $ds->finish_time) {
-                $jDandoriSec += \Carbon\Carbon::parse($ds->start_time)->diffInSeconds(\Carbon\Carbon::parse($ds->finish_time));
-            }
-        }
-        $jTotal = max($jRepair + $jProd, 1);
-        $jRepairPct = ($jRepair / $jTotal) * 100;
-        $jProdPct = ($jProd / $jTotal) * 100;
-
         $actualTotal = $actualOk + $actualRepair + $actualReject;
         $denom = max($target, $actualTotal, 1);
         $okPct = ($actualOk / $denom) * 100;
@@ -276,13 +252,18 @@
                 $latest = null;
 
                 $thePlan = $job->productionPlan;
+                $jobWorkDate = $job->started_at ? \Carbon\Carbon::parse($job->started_at)->format('Y-m-d') : ($thePlan?->plan_date ? \Carbon\Carbon::parse($thePlan->plan_date)->format('Y-m-d') : now()->toDateString());
+                $jobLine = $job->line ? trim(str_replace(['PRESS ', 'Press ', 'LINE ', 'Line '], '', $job->line)) : ($thePlan?->press_name ? trim(str_replace(['PRESS ', 'Press ', 'LINE ', 'Line '], '', $thePlan->press_name)) : '');
+                $jobShift = $thePlan?->shift_name ?? 'Shift 1';
 
+                // 1. Production sessions (with overtime split)
                 foreach ($sessions as $ps) {
                     $s = $ps->start_time ? \Carbon\Carbon::parse($ps->start_time) : null;
                     $e = $ps->status === 'running' 
                         ? ($job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : now()) 
                         : ($ps->finish_time ? \Carbon\Carbon::parse($ps->finish_time) : ($s && ($ps->total_seconds ?? 0) > 0 ? $s->copy()->addSeconds((int) $ps->total_seconds) : ($job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : now())));
                     if ($s) {
+                        if (!$e || $e < $s) $e = $s->copy();
                         $sessionDeadline = null;
                         if ($thePlan && $thePlan->start_time && $thePlan->finish_time) {
                             $pStart = str_contains($thePlan->start_time, '-')
@@ -303,73 +284,190 @@
                         }
 
                         if ($sessionDeadline && $e > $sessionDeadline && $s < $sessionDeadline) {
-                            $segments[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$s,'end'=>$sessionDeadline];
-                            $segments[] = ['type'=>'overtime','label'=>'Overtime','color'=>'bg-red-600','start'=>$sessionDeadline,'end'=>$e];
+                            $segments[] = [
+                                'type' => 'production',
+                                'label' => 'Production',
+                                'color' => 'bg-blue-600',
+                                'start' => $s,
+                                'end' => $sessionDeadline,
+                                'detail' => 'Actual Production Time',
+                                'link' => null
+                            ];
+                            $segments[] = [
+                                'type' => 'overtime',
+                                'label' => 'Overtime',
+                                'color' => 'bg-red-600',
+                                'start' => $sessionDeadline,
+                                'end' => $e,
+                                'detail' => 'Outside Scheduled Shift',
+                                'link' => null
+                            ];
                         } else {
-                            $segments[] = ['type'=>'production','label'=>'Production','color'=>'bg-blue-600','start'=>$s,'end'=>$e ?? $s];
+                            $segments[] = [
+                                'type' => 'production',
+                                'label' => 'Production',
+                                'color' => 'bg-blue-600',
+                                'start' => $s,
+                                'end' => $e,
+                                'detail' => 'Actual Production Time',
+                                'link' => null
+                            ];
                         }
                         if (!$earliest || $s < $earliest) $earliest = $s;
-                        if ($e && (!$latest || $e > $latest)) $latest = $e;
+                        if (!$latest || $e > $latest) $latest = $e;
                     }
                 }
 
+                // 2. Dandori sessions (from DandoriSession)
                 foreach ($dandoriSessions as $ds) {
                     $s = $ds->start_time ? \Carbon\Carbon::parse($ds->start_time) : null;
                     $e = $ds->finish_time ? \Carbon\Carbon::parse($ds->finish_time) : ($s ? $s->copy()->addMinutes(5) : null);
                     if ($s) {
-                        $segments[] = ['type'=>'dandori','label'=>'Dandori','color'=>'bg-amber-400','start'=>$s,'end'=>$e ?? $s];
+                        if (!$e || $e < $s) $e = $s->copy();
+                        $dandoriLink = route('operational.dandori', array_filter(['job_id' => $job->id, 'line' => $jobLine, 'shift' => $jobShift, 'date' => $s->format('Y-m-d')]));
+                        $segments[] = [
+                            'type' => 'dandori',
+                            'label' => 'Dandori',
+                            'color' => 'bg-amber-400',
+                            'start' => $s,
+                            'end' => $e,
+                            'detail' => 'Changeover / Setup Session',
+                            'link' => $dandoriLink
+                        ];
                         if (!$earliest || $s < $earliest) $earliest = $s;
-                        if ($e && (!$latest || $e > $latest)) $latest = $e;
+                        if (!$latest || $e > $latest) $latest = $e;
                     }
                 }
 
+                // 2b. Dandori & 1st Check from dandoris table (\App\Models\Dandori)
                 if (isset($dandoris)) {
-                    foreach ($dandoris as $fc) {
-                        $s = $fc->start_time ? \Carbon\Carbon::parse($fc->start_time) : null;
-                        $e = $fc->finish_time ? \Carbon\Carbon::parse($fc->finish_time) : ($s ? $s->copy()->addMinutes(5) : null);
+                    foreach ($dandoris as $dRec) {
+                        $s = $dRec->start_time ? \Carbon\Carbon::parse($dRec->start_time) : null;
+                        $e = $dRec->finish_time ? \Carbon\Carbon::parse($dRec->finish_time) : ($s && ($dRec->duration_minutes ?? 0) > 0 ? $s->copy()->addSeconds((int)($dRec->duration_minutes * 60)) : ($s ? $s->copy()->addMinutes(5) : null));
                         if ($s) {
-                            $segments[] = ['type'=>'1st_check','label'=>'1st Check','color'=>'bg-purple-500','start'=>$s,'end'=>$e ?? $s];
+                            if (!$e || $e < $s) $e = $s->copy();
+                            $isFC = strtolower(trim($dRec->jenis_dandori ?? '')) === '1st_check' 
+                                || strtolower(trim($dRec->jenis_dandori ?? '')) === '1st check' 
+                                || strtoupper(trim($dRec->activity ?? '')) === '1ST CHECK';
+                            
+                            $dandoriLink = route('operational.dandori', array_filter(['job_id' => $job->id, 'line' => $jobLine, 'shift' => $jobShift, 'date' => $s->format('Y-m-d')]));
+                            $segments[] = [
+                                'type' => $isFC ? '1st_check' : 'dandori',
+                                'label' => $isFC ? '1st Check' : 'Dandori',
+                                'color' => $isFC ? 'bg-purple-500' : 'bg-amber-400',
+                                'start' => $s,
+                                'end' => $e,
+                                'detail' => $dRec->activity ?? ($isFC ? '1st Check' : 'Dandori Setup'),
+                                'link' => $dandoriLink
+                            ];
                             if (!$earliest || $s < $earliest) $earliest = $s;
-                            if ($e && (!$latest || $e > $latest)) $latest = $e;
+                            if (!$latest || $e > $latest) $latest = $e;
                         }
                     }
                 }
 
+                // 3. Downtimes (Dandori, Try Out, Break, pure Downtime)
                 foreach ($job->downtimes as $dt) {
                     $s = $dt->start_time ? \Carbon\Carbon::parse($dt->start_time) : null;
                     $dur = (int)($dt->duration_seconds ?? 0);
                     $e = $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : ($s && $dur > 0 ? $s->copy()->addSeconds($dur) : null);
-                    if ($s && $dur > 0) {
-                        $dtType = strtolower($dt->jenis_downtime ?? '');
-                        $isDandori = $dtType === 'dandori';
-                        $isTryOut = in_array($dtType, ['try out','tryout']);
-                        $isBreak = in_array($dtType, ['break time','break']);
+                    if ($s && ($dur > 0 || $dt->finish_time)) {
+                        if (!$e || $e < $s) $e = $s->copy()->addSeconds(max($dur, 1));
+                        $dtType = strtolower(trim($dt->jenis_downtime ?? ''));
+                        $isDandori = ($dtType === 'dandori');
+                        $isTryOut = in_array($dtType, ['try out', 'tryout']);
+                        $isBreak = in_array($dtType, ['break time', 'break']);
+
+                        $segType = $isDandori ? 'dandori' : ($isTryOut ? 'tryout' : ($isBreak ? 'break' : 'downtime'));
                         $segmentColor = $isDandori ? 'bg-amber-400' : ($isTryOut ? 'bg-orange-500' : ($isBreak ? 'bg-indigo-500' : 'bg-red-600'));
+                        $segLabel = $isDandori ? 'Dandori' : ($isTryOut ? 'Try Out' : ($isBreak ? 'Break Time' : ($dt->jenis_downtime ?? 'Downtime')));
+
+                        $link = null;
+                        if ($isDandori) {
+                            $link = route('operational.dandori', array_filter(['job_id' => $job->id, 'line' => $jobLine, 'shift' => $jobShift, 'date' => $s->format('Y-m-d')]));
+                        } elseif ($isTryOut) {
+                            $link = route('monitoring.history', array_filter(['type' => 'downtime', 'job_id' => $job->id, 'plan_id' => $thePlan?->id, 'jenis' => 'try out', 'line' => $jobLine, 'date' => $s->format('Y-m-d')]));
+                        } elseif ($isBreak) {
+                            $link = route('monitoring.history', array_filter(['type' => 'break', 'job_id' => $job->id, 'plan_id' => $thePlan?->id, 'line' => $jobLine, 'date' => $s->format('Y-m-d')]));
+                        } else {
+                            $link = route('monitoring.history', array_filter(['type' => 'downtime', 'job_id' => $job->id, 'plan_id' => $thePlan?->id, 'line' => $jobLine, 'date' => $s->format('Y-m-d')]));
+                        }
+
                         $segments[] = [
-                            'type' => $isDandori ? 'dandori' : ($isTryOut ? 'tryout' : ($isBreak ? 'break' : 'downtime')),
-                            'label' => $isDandori ? 'Dandori' : ($isTryOut ? 'Try Out' : ($isBreak ? 'Break Time' : ($dt->jenis_downtime ?? 'Downtime'))),
+                            'type' => $segType,
+                            'label' => $segLabel,
                             'color' => $segmentColor,
                             'start' => $s,
-                            'end' => $e ?? $s,
-                            'detail' => $dt->problem ?? ''
+                            'end' => $e,
+                            'detail' => $dt->problem ?: ($dt->penyebab ?: $segLabel),
+                            'link' => $link
                         ];
                         if (!$earliest || $s < $earliest) $earliest = $s;
-                        if ($e && (!$latest || $e > $latest)) $latest = $e;
+                        if (!$latest || $e > $latest) $latest = $e;
                     }
                 }
 
-                if (!$earliest && $jProd > 0) {
-                    $earliest = now()->subSeconds((int)($jProd + $jRepair));
+                // 4. Fallback: if no events, use runtime to estimate
+                if (!$earliest && ($runtime ?? 0) > 0) {
+                    $earliest = \Carbon\Carbon::parse($jobWorkDate.' 07:30:00');
+                    $latest = $earliest->copy()->addSeconds((int)$runtime);
+                    $segments[] = [
+                        'type' => 'production',
+                        'label' => 'Production',
+                        'color' => 'bg-blue-600',
+                        'start' => $earliest,
+                        'end' => $latest,
+                        'detail' => 'Actual Production Time',
+                        'link' => null
+                    ];
                 }
-                if (!$earliest) $earliest = now()->subHour();
+                if (!$earliest) $earliest = \Carbon\Carbon::now()->subHour();
                 if (!$latest) $latest = $earliest->copy()->addHour();
 
+                // Sort segments by start time
                 usort($segments, function($a, $b) {
                     return $a['start']->timestamp <=> $b['start']->timestamp;
                 });
 
                 $totalDur = $latest && $earliest ? max(1, $latest->timestamp - $earliest->timestamp) : 1;
                 $segIdx = 0;
+
+                // Calculate cumulative durations directly from actual segments!
+                $jProdAdjusted = 0;
+                $jOvertime = 0;
+                $jRepair = 0;
+                $jDandoriSec = 0;
+                $jFirstCheck = 0;
+                $jTryOut = 0;
+                $jBreakTime = 0;
+
+                foreach ($segments as $seg) {
+                    $sDur = max(0, $seg['end']->timestamp - $seg['start']->timestamp);
+                    switch ($seg['type']) {
+                        case 'production':
+                            $jProdAdjusted += $sDur;
+                            break;
+                        case 'overtime':
+                            $jOvertime += $sDur;
+                            break;
+                        case 'downtime':
+                            $jRepair += $sDur;
+                            break;
+                        case 'dandori':
+                            $jDandoriSec += $sDur;
+                            break;
+                        case '1st_check':
+                            $jFirstCheck += $sDur;
+                            break;
+                        case 'tryout':
+                            $jTryOut += $sDur;
+                            break;
+                        case 'break':
+                            $jBreakTime += $sDur;
+                            break;
+                    }
+                }
+                $jProdTotal = $jProdAdjusted + $jOvertime;
             @endphp
             @php
                 // Generate tick marks
@@ -400,16 +498,6 @@
                         }
                         $currTick->addMinutes($intervalMinutes);
                     }
-                    $jOvertime = 0;
-                    foreach ($segments as $seg) {
-                        if ($seg['type'] === 'overtime') {
-                            $jOvertime += $seg['end']->timestamp - $seg['start']->timestamp;
-                        }
-                    }
-                    $jProdAdjusted = max(0, $jProd - $jOvertime);
-                } else {
-                    $jOvertime = 0;
-                    $jProdAdjusted = $jProd;
                 }
             @endphp
             <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
@@ -438,9 +526,12 @@
                                 $to = $seg['end']->format('H:i:s');
                                 $duration = $seg['start']->diffAsCarbonInterval($seg['end'])->forHumans(['short'=>true,'parts'=>2]);
                                 if (!$duration || $duration === '0 seconds') $duration = round($seg['end']->timestamp - $seg['start']->timestamp).'s';
+                                $cursorClass = !empty($seg['link']) ? 'cursor-pointer' : 'cursor-default';
+                                $clickHandler = !empty($seg['link']) ? "window.location.href='".$seg['link']."'" : "void(0)";
                             @endphp
-                            <div class="absolute h-full {{ $seg['color'] }} cursor-pointer border-r border-white/20 hover:brightness-110 transition-all"
+                            <div class="absolute h-full {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all"
                                  style="left: {{ $left }}%; width: {{ $widthP }}%;"
+                                 onclick="{{ $clickHandler }}"
                                  onmouseover="showTimelineTooltip(event, '{{ $seg['label'] }}', '{{ $from }}', '{{ $to }}', '{{ $duration }}', '{{ $seg['detail'] ?? '' }}')"
                                  onmouseout="hideTimelineTooltip()"
                                  title="{{ $seg['label'] }}: {{ $from }} - {{ $to }} ({{ $duration }})">
@@ -463,7 +554,11 @@
             <div class="flex flex-wrap gap-x-4 text-[10px] text-slate-500 mt-1">
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-blue-600"></span>Prod {{ gmdate('H:i', $jProdAdjusted) }}</span>
                 <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-red-600"></span>Down {{ gmdate('H:i', $jRepair) }}</span>
-                <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Dandori</span>
+                @if($jDandoriSec > 0)
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Dandori {{ gmdate('H:i', $jDandoriSec) }}</span>
+                @else
+                    <span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-amber-400"></span>Dandori 00:00</span>
+                @endif
                 @if($jFirstCheck > 0)<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-purple-500"></span>1st Check {{ gmdate('H:i', $jFirstCheck) }}</span>@endif
                 @if($jTryOut > 0)<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-orange-500"></span>Try Out {{ gmdate('H:i', $jTryOut) }}</span>@endif
                 @if($jBreakTime > 0)<span class="flex items-center gap-1"><span class="w-2 h-2 rounded-full bg-indigo-500"></span>Break {{ gmdate('H:i', $jBreakTime) }}</span>@endif
@@ -472,9 +567,10 @@
 
             {{-- DONUT + OUTSIDE SHIFT + HISTORY LINKS --}}
             @php
-            $jTotalTime = max($jProd + $jRepair + $jDandoriSec + $jFirstCheck + $jTryOut + $jBreakTime, 1);
-            $donutSecs  = [$jProd, $jRepair, $jDandoriSec, $jFirstCheck, $jTryOut, $jBreakTime];
+            $jTotalTime = max($jProdTotal + $jRepair + $jDandoriSec + $jFirstCheck + $jTryOut + $jBreakTime, 1);
+            $donutSecs  = [$jProdTotal, $jRepair, $jDandoriSec, $jFirstCheck, $jTryOut, $jBreakTime];
             $donutColors = ['#2563eb','#dc2626','#f59e0b','#a855f7','#f97316','#6366f1'];
+            $donutLabels= ['Prod','Downtime','Dandori','1st Check','Try Out','Break'];
             $gradParts = []; $acc = 0;
             for ($di=0; $di<6; $di++) {
                 $pct = ($donutSecs[$di] / $jTotalTime) * 100;
@@ -484,6 +580,18 @@
                 }
             }
             $gradient = implode(', ', $gradParts);
+
+            // Build specific navigation targets with item & context identity
+            $navJobId = $job->id;
+            $navPlanId = $thePlan?->id;
+            $navDate = $jobWorkDate;
+            $navLine = $jobLine;
+            $navShift = $jobShift;
+
+            $dandoriUrl = route('operational.dandori', array_filter(['job_id' => $navJobId, 'line' => $navLine, 'shift' => $navShift, 'date' => $navDate]));
+            $dtUrl = route('monitoring.history', array_filter(['type' => 'downtime', 'job_id' => $navJobId, 'plan_id' => $navPlanId, 'line' => $navLine, 'date' => $navDate]));
+            $tryoutUrl = route('monitoring.history', array_filter(['type' => 'downtime', 'job_id' => $navJobId, 'plan_id' => $navPlanId, 'jenis' => 'try out', 'line' => $navLine, 'date' => $navDate]));
+            $breakUrl = route('monitoring.history', array_filter(['type' => 'break', 'job_id' => $navJobId, 'plan_id' => $navPlanId, 'line' => $navLine, 'date' => $navDate]));
             @endphp
             <div class="flex items-center gap-4 pt-3 mt-3 border-t border-slate-100">
                 <div class="flex items-center gap-2.5">
@@ -500,10 +608,10 @@
                 </div>
                 @endif
                 <div class="flex items-center gap-1 ml-auto">
-                    <a href="{{ route('operational.dandori', ['job_id' => $job->id]) }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all" title="History Dandori">Dandori</a>
-                    <a href="{{ route('monitoring.history', ['type' => 'downtime', 'plan_id' => $job->productionPlan?->id]) }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-red-100 text-red-700 hover:bg-red-200 transition-all" title="History Downtime">DT</a>
-                    <a href="{{ route('monitoring.history', ['type' => 'downtime', 'plan_id' => $job->productionPlan?->id, 'jenis' => 'try+out']) }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 hover:bg-orange-200 transition-all" title="History Try Out">Try Out</a>
-                    <a href="{{ route('monitoring.history', ['type' => 'break', 'plan_id' => $job->productionPlan?->id]) }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-all" title="History Break Time">Break</a>
+                    <a href="{{ $dandoriUrl }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-amber-100 text-amber-700 hover:bg-amber-200 transition-all" title="Detail & Histori Dandori Item Ini">Dandori</a>
+                    <a href="{{ $dtUrl }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-red-100 text-red-700 hover:bg-red-200 transition-all" title="Detail & Histori Downtime Item Ini">DT</a>
+                    <a href="{{ $tryoutUrl }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-orange-100 text-orange-700 hover:bg-orange-200 transition-all" title="Detail & Histori Try Out Item Ini">Try Out</a>
+                    <a href="{{ $breakUrl }}" class="px-2 py-1 rounded-md text-[8px] font-black uppercase tracking-wider bg-indigo-100 text-indigo-700 hover:bg-indigo-200 transition-all" title="Detail & Histori Break Time Item Ini">Break</a>
                 </div>
             </div>
         </div>

@@ -170,9 +170,15 @@ class MonitoringController extends Controller
         $selectedLine = $request->line ?? '';
         $selectedShift = (int) $request->get('shift', 0);
         $planId = $request->plan_id;
+        $jobId = $request->job_id;
 
         $query = Downtime::with('jobMaster')
             ->whereDate('start_time', $selectedDate);
+
+        // Filter by specific job if provided
+        if ($jobId) {
+            $query->where('job_master_id', $jobId);
+        }
 
         // Filter by specific plan if provided (from LKH DT link)
         if ($planId) {
@@ -185,16 +191,19 @@ class MonitoringController extends Controller
             }
         }
 
-        if ($type === 'downtime') {
-            $query->whereNotIn('jenis_downtime', ['break time', 'dandori', 'idle', 'idle time', 'qcheck', 'q check', 'quality', 'try out', 'tryout', 'repair', 'reject']);
-        } elseif ($type === 'break') {
-            $query->where('jenis_downtime', 'break time');
+        // Filter by specific jenis_downtime if provided (from analytics links)
+        $cleanJenis = null;
+        if ($jenis = $request->jenis) {
+            $cleanJenis = strtolower(trim(str_replace('+', ' ', $jenis)));
+            $query->whereRaw('LOWER(TRIM(jenis_downtime)) = ?', [$cleanJenis]);
         }
 
-        // Filter by specific jenis_downtime if provided (from analytics links)
-        if ($jenis = $request->jenis) {
-            $cleanJenis = str_replace('+', ' ', $jenis);
-            $query->where('jenis_downtime', 'like', $cleanJenis);
+        if ($type === 'downtime') {
+            if (!$cleanJenis || !in_array($cleanJenis, ['try out', 'tryout', 'repair', 'reject', 'quality', 'qcheck', 'q check'])) {
+                $query->whereNotIn('jenis_downtime', ['break time', 'break', 'dandori', 'idle', 'idle time', 'qcheck', 'q check', 'quality', 'try out', 'tryout', 'repair', 'reject']);
+            }
+        } elseif ($type === 'break') {
+            $query->whereIn('jenis_downtime', ['break time', 'break']);
         }
 
         if ($selectedLine) {
