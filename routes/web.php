@@ -1079,3 +1079,52 @@ Route::middleware(['auth', 'role:admin,superadmin', 'feature:security'])
 // PPC API FOR QA SYSTEM INTEGRATION
 // ======================
 Route::get('/api/v1/ppc/item-check', [\App\Http\Controllers\Api\PpcItemCheckController::class, 'index']);
+
+// Emergency Reset Utility Route (bisa diakses via browser untuk reset dandori macet)
+Route::get('/emergency-reset-dandori/{line?}', function($line = 'A') {
+    $linePattern = '%' . trim(str_ireplace(['line', 'press'], '', $line)) . '%';
+    
+    // Cari semua job di line ini yang berstatus running / paused / dandori
+    $jobs = \App\Models\JobMaster::where('line', 'like', $linePattern)->get();
+    $jobIds = $jobs->pluck('id')->toArray();
+    
+    // 1. Hapus open downtime dandori
+    $dtDeleted = \App\Models\Downtime::whereIn('job_master_id', $jobIds)
+        ->where('jenis_downtime', 'dandori')
+        ->whereNull('finish_time')
+        ->delete();
+        
+    // 2. Hapus open 1st check dandori
+    $danDeleted = \App\Models\Dandori::whereIn('next_job_id', $jobIds)
+        ->whereNull('finish_time')
+        ->delete();
+        
+    // 3. Kembalikan job ke pending jika belum ada actual produksi
+    $updatedJobs = 0;
+    foreach ($jobs as $job) {
+        $dp = \App\Models\DailyProduction::where('job_master_id', $job->id)
+            ->whereDate('work_date', now()->toDateString())
+            ->first();
+        $totalActual = ($dp?->actual_ok ?? 0) + ($dp?->actual_repair ?? 0) + ($dp?->actual_reject ?? 0);
+        if ($totalActual == 0) {
+            $job->update(['status' => 'pending', 'started_at' => null]);
+            \App\Models\ProductionPlan::whereDate('plan_date', now()->toDateString())
+                ->where('job_master', $job->job_name)
+                ->update(['status' => 'pending']);
+            \App\Models\ProductionSession::where('job_master_id', $job->id)
+                ->whereDate('work_date', now()->toDateString())
+                ->whereNull('finish_time')
+                ->delete();
+            $updatedJobs++;
+        }
+        \Illuminate\Support\Facades\Cache::forget('was_in_first_check_' . $job->id);
+    }
+    
+    return response()->json([
+        'success' => true,
+        'message' => "Emergency Reset Line {$line} Berhasil!",
+        'downtime_dandori_deleted' => $dtDeleted,
+        'dandori_records_deleted' => $danDeleted,
+        'jobs_reset_to_pending' => $updatedJobs
+    ]);
+});
