@@ -355,24 +355,86 @@ class DashboardRealtimeService
             }
         }
 
-        foreach ($dailyRecords as $dp) {
-            if ($dp->actual_repair > 0) {
-                $job = $dp->jobMaster;
-                $repairRows[] = [
-                    'no'      => count($repairRows) + 1,
-                    'item'    => $shortJob($job?->job_name),
-                    'problem' => 'Defect',
-                    'qty'     => (int) $dp->actual_repair,
-                ];
+        $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'jobMaster'])
+            ->whereIn('job_master_id', $jobIds)
+            ->where('created_at', '>=', $shiftStartDt)
+            ->where('created_at', '<', $shiftEndDt)
+            ->get();
+
+        foreach ($repairRejectLogs as $rr) {
+            $logType = strtolower(trim($rr->type ?? ''));
+            $picName = $rr->creator?->name ?? '-';
+            $timeFormatted = $rr->created_at ? \Carbon\Carbon::parse($rr->created_at)->format('H:i') : '-';
+            $job = $rr->jobMaster;
+            $itemData = [
+                'no'              => 0,
+                'type'            => strtoupper($logType),
+                'item'            => $shortJob($job?->job_name),
+                'job'             => $job?->job_number ?? '-',
+                'defect_name'     => $rr->defect_name ?: '-',
+                'problem'         => $rr->defect_name ?: '-',
+                'qty'             => (int) ($rr->qty_a ?: 1),
+                'repair_category' => $rr->repair_category ?: '-',
+                'area_problem'    => $rr->area_problem ?: '-',
+                'root_cause'      => $rr->root_cause ?: '-',
+                'countermeasure'  => $rr->countermeasure ?: '-',
+                'pic'             => $picName,
+                'time'            => $timeFormatted,
+            ];
+
+            if ($logType === 'repair') {
+                $itemData['no'] = count($repairRows) + 1;
+                $repairRows[] = $itemData;
+            } elseif ($logType === 'reject') {
+                $itemData['no'] = count($rejectRows) + 1;
+                $rejectRows[] = $itemData;
             }
-            if ($dp->actual_reject > 0) {
-                $job = $dp->jobMaster;
-                $rejectRows[] = [
-                    'no'      => count($rejectRows) + 1,
-                    'item'    => $shortJob($job?->job_name),
-                    'problem' => 'Reject',
-                    'qty'     => (int) $dp->actual_reject,
-                ];
+        }
+
+        // Fallback jika belum ada RepairRejectLog detail tapi ada dailyRecords repair/reject
+        if (empty($repairRows)) {
+            foreach ($dailyRecords as $dp) {
+                if ($dp->actual_repair > 0) {
+                    $job = $dp->jobMaster;
+                    $repairRows[] = [
+                        'no'              => count($repairRows) + 1,
+                        'type'            => 'REPAIR',
+                        'item'            => $shortJob($job?->job_name),
+                        'job'             => $job?->job_number ?? '-',
+                        'defect_name'     => 'Defect',
+                        'problem'         => 'Defect',
+                        'qty'             => (int) $dp->actual_repair,
+                        'repair_category' => '-',
+                        'area_problem'    => '-',
+                        'root_cause'      => '-',
+                        'countermeasure'  => '-',
+                        'pic'             => '-',
+                        'time'            => '-',
+                    ];
+                }
+            }
+        }
+
+        if (empty($rejectRows)) {
+            foreach ($dailyRecords as $dp) {
+                if ($dp->actual_reject > 0) {
+                    $job = $dp->jobMaster;
+                    $rejectRows[] = [
+                        'no'              => count($rejectRows) + 1,
+                        'type'            => 'REJECT',
+                        'item'            => $shortJob($job?->job_name),
+                        'job'             => $job?->job_number ?? '-',
+                        'defect_name'     => 'Reject',
+                        'problem'         => 'Reject',
+                        'qty'             => (int) $dp->actual_reject,
+                        'repair_category' => '-',
+                        'area_problem'    => '-',
+                        'root_cause'      => '-',
+                        'countermeasure'  => '-',
+                        'pic'             => '-',
+                        'time'            => '-',
+                    ];
+                }
             }
         }
 

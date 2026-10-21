@@ -1250,14 +1250,19 @@ function updateAllCells(){
                     ac.className = 'val-actual'+(cl.act?' '+cl.act:'') + borderCls;
                     ac.style.cssText = cl.style || '';
 
-                    // Klik untuk downtime rows di mode ALL
+                    // Klik untuk downtime dan defect rows di mode ALL
                     const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
+                    const isDefect = ['REPAIR','REJECT'].includes(desc);
                     const valNum = parseFloat(k.actual);
                     if (isDt && !isNaN(valNum) && valNum > 0) {
                         ac.classList.add('dt-clickable-kpi');
                         ac.title = `Klik untuk rincian ${desc} — ${line}`;
                         ac.onclick = () => openKpiModalFromMonitor(desc, line);
-                    } else if (isDt) {
+                    } else if (isDefect && !isNaN(valNum) && valNum > 0) {
+                        ac.classList.add('dt-clickable-kpi');
+                        ac.title = `Klik untuk rincian ${desc} — ${line}`;
+                        ac.onclick = () => openDefectKpiModal(desc, line);
+                    } else if (isDt || isDefect) {
                         ac.classList.remove('dt-clickable-kpi');
                         ac.onclick = null;
                     }
@@ -1388,12 +1393,16 @@ function renderTable(){
                     const cl = getClasses(desc, k);
                     const pct = k.actualPct ? ` ${k.actualPct}` : '';
                     const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
+                    const isDefect = ['REPAIR','REJECT'].includes(desc);
                     const valNum = parseFloat(k.actual);
                     let clickCls = '';
                     let clickAttr = '';
                     if (isDt && !isNaN(valNum) && valNum > 0) {
                         clickCls = ' dt-clickable-kpi';
                         clickAttr = `onclick="openKpiModalFromMonitor('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
+                    } else if (isDefect && !isNaN(valNum) && valNum > 0) {
+                        clickCls = ' dt-clickable-kpi';
+                        clickAttr = `onclick="openDefectKpiModal('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
                     }
                     b += `<td class="val-plan">${k.plan||'-'}</td>`;
                     b += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
@@ -1477,12 +1486,16 @@ function renderTable(){
                     actValTxt += ` <span style="font-size:0.8vw;">⚠️</span>`;
                 }
                 const isDt = ['TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T'].includes(desc);
+                const isDefect = ['REPAIR','REJECT'].includes(desc);
                 const valNum = parseFloat(k.actual);
                 let clickCls = '';
                 let clickAttr = '';
                 if (isDt && !isNaN(valNum) && valNum > 0) {
                     clickCls = ' dt-clickable-kpi';
                     clickAttr = `onclick="openKpiModalFromMonitor('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
+                } else if (isDefect && !isNaN(valNum) && valNum > 0) {
+                    clickCls = ' dt-clickable-kpi';
+                    clickAttr = `onclick="openDefectKpiModal('${desc}','${lineKey}')" title="Klik untuk rincian ${desc} — ${lineKey}"`;
                 }
                 leftBodyHtml += `<td class="val-plan">${k.plan||'-'}</td>`;
                 leftBodyHtml += `<td class="val-curr ${cl.curr}">${k.current||'-'}</td>`;
@@ -1677,10 +1690,22 @@ window.openKpiModalFromMonitor = function(type, line) {
     }
 };
 
+// ── Resolve active line detail rows (handles array format or {right: [...]} and fuzzy line key) ──
+function getActiveLineDetailRows() {
+    let key = selectedLine;
+    if (!key || key === 'ALL') {
+        key = (LINES && LINES[0]) ? LINES[0] : 'Line A';
+    }
+    const matchedKey = LINES.find(l => l === key || l === `Line ${key}` || l === `PRESS ${key}` || l.endsWith(` ${key}`)) || key;
+    const data = LINE_DETAIL[matchedKey] || LINE_DETAIL[key];
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.right)) return data.right;
+    return [];
+}
+
 // ── Downtime Detail Modal Logic ──
 window.openDtDetailModal = function(rowIndex) {
-    const activeLine = selectedLine === 'ALL' ? 'Line A' : selectedLine;
-    const detailList = (LINE_DETAIL[activeLine] && LINE_DETAIL[activeLine].right) ? LINE_DETAIL[activeLine].right : [];
+    const detailList = getActiveLineDetailRows();
     const item = detailList[rowIndex];
     if (!item) return;
 
@@ -1735,8 +1760,7 @@ window.closeDtDetailModal = function() {
 
 // ── Repair / Reject Detail Modal Logic ──
 window.openDefectDetailModal = function(rowIndex, type) {
-    const activeLine = selectedLine === 'ALL' ? 'Line A' : selectedLine;
-    const detailList = (LINE_DETAIL[activeLine] && LINE_DETAIL[activeLine].right) ? LINE_DETAIL[activeLine].right : [];
+    const detailList = getActiveLineDetailRows();
     const item = detailList[rowIndex];
     if (!item) return;
 
@@ -1788,6 +1812,80 @@ window.openDefectDetailModal = function(rowIndex, type) {
                     </td>
                     <td style="padding: 14px 12px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${rr.pic || '-'}</td>
                     <td style="padding: 14px 12px; text-align: center; color: #64748b; font-weight: 700; vertical-align:top;">${rr.time || '-'}</td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    const modal = document.getElementById('defectDetailModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+};
+
+// ── Defect KPI Modal Logic (untuk klik dari tabel KPI All Lines atau Single Line Left) ──
+window.openDefectKpiModal = function(type, line) {
+    const typeUpper = (type || 'REPAIR').toUpperCase();
+    const isReject = (typeUpper === 'REJECT');
+    const badgeText = isReject ? 'REJECT DETAIL' : 'REPAIR DETAIL';
+    const badgeBg = isReject ? '#dc2626' : '#d97706';
+    const totalColor = isReject ? '#dc2626' : '#d97706';
+
+    const typeData = DETAIL_DATA[typeUpper];
+    const resolveLineData = (td, l) => {
+        if (!td) return null;
+        if (td[l]) return td[l];
+        const matchKey = Object.keys(td).find(k => k === l || k === `PRESS ${l}` || `PRESS ${k}` === l || k.endsWith(` ${l}`) || l.endsWith(` ${k}`));
+        return matchKey ? td[matchKey] : null;
+    };
+
+    const lineData = resolveLineData(typeData, line);
+    const rows = lineData?.rows || [];
+    const totalQty = lineData?.total || '0';
+
+    document.getElementById('defectModalJobNumber').textContent = `RINCIAN ${typeUpper}`;
+    document.getElementById('defectModalPartName').textContent = `LINE: ${line}`;
+
+    const badgeEl = document.getElementById('defectModalBadge');
+    badgeEl.textContent = badgeText;
+    badgeEl.style.background = badgeBg;
+
+    const totalEl = document.getElementById('defectModalTotalQty');
+    totalEl.textContent = totalQty + ' Pcs';
+    totalEl.style.color = totalColor;
+
+    document.getElementById('defectModalTotalLabel').textContent = isReject ? 'Total Reject' : 'Total Repair';
+
+    const tbody = document.getElementById('defectModalTableBody');
+    if (rows.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian defect ${typeUpper} di ${line}.</td></tr>`;
+    } else {
+        let html = '';
+        rows.forEach((r, idx) => {
+            const rowBadgeBg = isReject ? '#fee2e2' : '#fef3c7';
+            const rowBadgeColor = isReject ? '#b91c1c' : '#b45309';
+            html += `
+                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                    <td style="padding: 14px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
+                    <td style="padding: 14px 12px; font-weight: 800; text-align: center; vertical-align:top;">
+                        <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 5px 10px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em; font-weight:900;">${r.type || typeUpper}</span>
+                    </td>
+                    <td style="padding: 14px 16px; font-weight: 800; color: #0f172a; vertical-align:top;">
+                        <div style="font-size:14px; line-height:1.4;">${r.defect_name || r.problem || '-'}</div>
+                        <div style="font-size:12px; color:#2563eb; margin-top:4px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 8px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || r.item || '-'}</div>
+                        ${r.area_problem && r.area_problem !== '-' ? `<div style="font-size:11px; color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${r.area_problem}</span></div>` : ''}
+                    </td>
+                    <td style="padding: 14px 12px; text-align: center; font-weight: 900; color: ${totalColor}; vertical-align:top;">
+                        <div style="font-size:15px;">${r.qty || 0}</div>
+                        <div style="font-size:11px; color:#64748b; font-weight:600;">pcs</div>
+                    </td>
+                    <td style="padding: 14px 16px; color: #334155; font-size: 13px; vertical-align:top;">
+                        <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Root Cause:</span> <span style="font-weight:600;">${r.root_cause || '-'}</span></div>
+                        <div><span style="color:#16a34a; font-weight:700;">Tindakan / Action:</span> <span style="font-weight:600;">${r.countermeasure || '-'}</span></div>
+                    </td>
+                    <td style="padding: 14px 12px; text-align: center; color: #334155; font-weight: 700; vertical-align:top;">${r.pic || '-'}</td>
+                    <td style="padding: 14px 12px; text-align: center; color: #64748b; font-weight: 700; vertical-align:top;">${r.time || '-'}</td>
                 </tr>
             `;
         });
