@@ -896,18 +896,22 @@ function updateClock(){
   // Auto-switch shift sesuai jam kerja riil:
   // Shift 1: 07:30 - 21:00
   // Shift 2: 21:00 - 07:30
-  // Jika user tidak sengaja klik tombol manual dalam 5 menit terakhir, sinkronkan otomatis
   const autoShift = currentShiftFromClock();
   const autoWorkDate = currentWorkDateFromClock();
   const dateInput = document.getElementById('dateInput');
 
-  if (autoShift !== selectedShift && (Date.now() - lastManualShiftAt) > 5 * 60 * 1000) {
+  if (autoShift !== selectedShift) {
       selectedShift = autoShift;
       updateShiftButtonsUI(selectedShift);
       if (dateInput) {
           dateInput.value = autoWorkDate;
           try { localStorage.setItem('dash_filter_date', autoWorkDate); } catch(e) {}
       }
+      flushCardCache();
+      fetchDashboardData();
+  } else if (dateInput && dateInput.value !== autoWorkDate) {
+      dateInput.value = autoWorkDate;
+      try { localStorage.setItem('dash_filter_date', autoWorkDate); } catch(e) {}
       flushCardCache();
       fetchDashboardData();
   }
