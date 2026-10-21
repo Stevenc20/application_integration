@@ -2025,9 +2025,11 @@ document.addEventListener('keydown', function(e) {
 
 /* ── MODAL TABLE EXPLICIT STYLING (mencegah bentrok dengan style global table monitor) ── */
 .modal-table {
-    border-collapse: separate !important;
+    border-collapse: collapse !important;
     border-spacing: 0 !important;
     table-layout: fixed !important;
+    width: 100% !important;
+    border: 1px solid #cbd5e1 !important;
 }
 .modal-table th,
 .modal-table td {
@@ -2037,9 +2039,18 @@ document.addEventListener('keydown', function(e) {
     max-width: none !important;
     box-sizing: border-box !important;
     line-height: 1.45 !important;
+    border: 1px solid #cbd5e1 !important;
+}
+.modal-table th {
+    background: #f1f5f9 !important;
+    font-weight: 900 !important;
+    color: #334155 !important;
 }
 .modal-table td {
     vertical-align: top !important;
+}
+.modal-table tbody tr:hover td {
+    background-color: #f8fafc !important;
 }
 </style>
 
