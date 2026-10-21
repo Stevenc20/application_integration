@@ -955,7 +955,7 @@ function getClasses(desc, k){
     return {act, curr, style};
 }
 
-function dtCell(v,st,cls){ return `<td class="${cls||''}" style="${st||''}">${v}</td>`; }
+function dtCell(v,st,cls,attr){ return `<td class="${cls||''}" style="${st||''}" ${attr||''}>${v}</td>`; }
 function chk(c){ return c?'<span style="display:inline-flex;align-items:center;justify-content:center;width:1vw;height:1vw;border-radius:0.2vw;border:0.1vw solid #22c55e;background:#f0fdf4;color:#16a34a;font-size:0.7vw;font-weight:900;line-height:1">&#10003;</span>':'<span style="display:inline-flex;align-items:center;justify-content:center;padding:0 0.3vw;border-radius:0.2vw;background:#f3f4f6;color:#9ca3af;font-size:0.7vw;font-weight:700">-</span>'; }
 function chkP(c, lbl){
     return `<div class="process-item"><span class="process-lbl">${lbl}</span><span class="process-box ${c?'ok':'ng'}">${c?'&#10003;':'-'}</span></div>`;
@@ -1002,7 +1002,15 @@ function buildRightBody(rows, maxRows, overallPlan){
                 gsphSt = 'background-color:#22c55e!important; color:#fff!important; font-weight:900;';
             }
 
-            const dtSt = j.downtime > 0 ? 'background-color:#ef4444!important; color:#fff!important; font-weight:900;' : '';
+            let dtSt = '';
+            let dtAttr = '';
+            let dtContent = dw;
+
+            if (j.downtime > 0) {
+                dtSt = 'background-color:#ef4444!important; color:#fff!important; font-weight:900; cursor:pointer; text-decoration:underline;';
+                dtAttr = `onclick="openDtDetailModal(${i})" title="Klik untuk lihat detail kendala downtime"`;
+                dtContent = `${dw} <span style="font-size:0.6vw;">🔍</span>`;
+            }
 
             h += `
                 ${dtCell(j.no, 'border-left:none;')}
@@ -1014,7 +1022,7 @@ function buildRightBody(rows, maxRows, overallPlan){
                 ${dtCell(pt)}
                 ${dtCell(dn)}
                 ${dtCell(iq)}
-                ${dtCell(dw, dtSt)}
+                ${dtCell(dtContent, dtSt, 'dt-clickable-cell', dtAttr)}
                 ${dtCell(tp, 'font-weight:700;', 'det-tpt')}
                 ${dtCell(j.plan_finish)}
                 ${dtCell(j.actual_finish)}
@@ -1543,6 +1551,126 @@ window.addEventListener('resize', function(){
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(refitRoot, 150);
 });
+
+// ── Downtime Detail Modal Logic ──
+window.openDtDetailModal = function(rowIndex) {
+    const activeLine = selectedLine === 'ALL' ? 'Line A' : selectedLine;
+    const detailList = (LINE_DETAIL[activeLine] && LINE_DETAIL[activeLine].right) ? LINE_DETAIL[activeLine].right : [];
+    const item = detailList[rowIndex];
+    if (!item) return;
+
+    document.getElementById('dtModalJobNumber').textContent = item.job_number || '-';
+    document.getElementById('dtModalPartName').textContent = item.job_name || '-';
+    document.getElementById('dtModalTotalDuration').textContent = (item.downtime || 0) + ' Menit';
+
+    const tbody = document.getElementById('dtModalTableBody');
+    const list = item.downtime_list || [];
+
+    if (list.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada rincian downtime khusus untuk item ini.</td></tr>`;
+    } else {
+        let html = '';
+        list.forEach((dt, idx) => {
+            html += `
+                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                    <td style="padding: 10px 14px; font-weight: 700; color: #1e293b; text-align: center;">${idx + 1}</td>
+                    <td style="padding: 10px 14px; font-weight: 800; color: #b91c1c; text-align: center;">
+                        <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px;">${dt.jenis_downtime}</span>
+                    </td>
+                    <td style="padding: 10px 14px; font-weight: 700; color: #0f172a;">${dt.problem}</td>
+                    <td style="padding: 10px 14px; color: #475569; font-size: 12px;">
+                        <div><b>Penyebab:</b> ${dt.penyebab}</div>
+                        <div style="margin-top: 3px;"><b>Tindakan:</b> ${dt.tindakan}</div>
+                    </td>
+                    <td style="padding: 10px 14px; text-align: center; color: #334155; font-weight: 600;">${dt.pic}</td>
+                    <td style="padding: 10px 14px; text-align: center; font-weight: 900; color: #b91c1c;">
+                        <div>${dt.duration_minute} m</div>
+                        <div style="font-size: 10px; color: #94a3b8; font-weight: 500;">${dt.start_time} - ${dt.finish_time}</div>
+                    </td>
+                </tr>
+            `;
+        });
+        tbody.innerHTML = html;
+    }
+
+    const modal = document.getElementById('dtDetailModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+};
+
+window.closeDtDetailModal = function() {
+    const modal = document.getElementById('dtDetailModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+};
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+        window.closeDtDetailModal();
+    }
+});
 </script>
+
+<!-- Downtime Detail Modal Popup -->
+<div id="dtDetailModal" style="display:none; position:fixed; inset:0; z-index:99999; background:rgba(15,23,42,0.75); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:20px;">
+    <div style="background:#fff; border-radius:16px; width:100%; max-width:850px; max-height:85vh; display:flex; flex-direction:column; box-shadow:0 25px 50px -12px rgba(0,0,0,0.35); overflow:hidden; border:1px solid #cbd5e1; animation: modalPop 0.2s ease-out;">
+        
+        <!-- Header -->
+        <div style="padding:16px 22px; background:#f8fafc; border-bottom:1px solid #e2e8f0; display:flex; align-items:center; justify-content:between;">
+            <div>
+                <div style="display:flex; align-items:center; gap:10px;">
+                    <span style="font-size:16px; font-weight:900; color:#0f172a;" id="dtModalJobNumber">-</span>
+                    <span style="background:#ef4444; color:#fff; font-size:11px; font-weight:900; padding:3px 8px; border-radius:6px; letter-spacing:0.04em;">DOWNTIME DETAIL</span>
+                </div>
+                <div style="font-size:12px; color:#64748b; font-weight:600; margin-top:2px;" id="dtModalPartName">-</div>
+            </div>
+            <div style="display:flex; align-items:center; gap:16px; margin-left:auto;">
+                <div style="text-align:right;">
+                    <div style="font-size:10px; color:#64748b; font-weight:700; text-transform:uppercase;">Total Downtime</div>
+                    <div style="font-size:18px; font-weight:900; color:#b91c1c;" id="dtModalTotalDuration">0 Menit</div>
+                </div>
+                <button type="button" onclick="closeDtDetailModal()" style="background:#f1f5f9; border:1px solid #cbd5e1; color:#64748b; width:34px; height:34px; border-radius:10px; font-size:18px; font-weight:800; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:all 0.15s;" onmouseover="this.style.background='#e2e8f0'; this.style.color='#0f172a'" onmouseout="this.style.background='#f1f5f9'; this.style.color='#64748b'">&times;</button>
+            </div>
+        </div>
+
+        <!-- Body / Table -->
+        <div style="padding:16px 22px; overflow-y:auto; flex:1;">
+            <table style="width:100%; border-collapse:collapse; text-align:left;">
+                <thead>
+                    <tr style="background:#f1f5f9; border-bottom:2px solid #cbd5e1; font-size:11px; font-weight:900; color:#475569; text-transform:uppercase;">
+                        <th style="padding:10px 14px; text-align:center; width:40px;">No</th>
+                        <th style="padding:10px 14px; text-align:center; width:110px;">Kategori</th>
+                        <th style="padding:10px 14px; width:220px;">Problem / Kendala</th>
+                        <th style="padding:10px 14px;">Penyebab & Tindakan</th>
+                        <th style="padding:10px 14px; text-align:center; width:100px;">PIC</th>
+                        <th style="padding:10px 14px; text-align:center; width:110px;">Durasi</th>
+                    </tr>
+                </thead>
+                <tbody id="dtModalTableBody">
+                    <!-- Populated dynamically via JS -->
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Footer -->
+        <div style="padding:12px 22px; background:#f8fafc; border-top:1px solid #e2e8f0; display:flex; justify-content:flex-end;">
+            <button type="button" onclick="closeDtDetailModal()" style="background:#0f172a; color:#fff; border:none; padding:8px 20px; border-radius:8px; font-size:12px; font-weight:800; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.background='#334155'" onmouseout="this.style.background='#0f172a'">Tutup</button>
+        </div>
+    </div>
+</div>
+
+<style>
+@keyframes modalPop {
+    from { opacity: 0; transform: scale(0.96); }
+    to { opacity: 1; transform: scale(1); }
+}
+.dt-clickable-cell:hover {
+    filter: brightness(1.15);
+    box-shadow: inset 0 0 0 2px #fff;
+}
+</style>
+
 </body>
 </html>

@@ -124,12 +124,27 @@ class DashboardDetailService
             ->get();
 
         $downtimeMinutes = [];
+        $downtimeItems = [];
         foreach ($downtimeData as $dt) {
             $jenis = strtolower($dt->jenis_downtime ?? '');
             if (in_array($jenis, ['dandori', 'idle time', 'idle', 'break time'])) {
                 continue;
             }
             $downtimeMinutes[$dt->job_master_id] = ($downtimeMinutes[$dt->job_master_id] ?? 0) + ($dt->duration_seconds / 60);
+
+            $startTimeFormatted = $dt->start_time ? Carbon::parse($dt->start_time)->format('H:i') : '-';
+            $finishTimeFormatted = $dt->finish_time ? Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang';
+            $downtimeItems[$dt->job_master_id][] = [
+                'id'              => $dt->id,
+                'jenis_downtime'  => strtoupper($dt->jenis_downtime ?: 'DOWNTIME'),
+                'problem'         => $dt->problem ?: '-',
+                'penyebab'        => $dt->penyebab ?: '-',
+                'tindakan'        => $dt->tindakan ?: '-',
+                'pic'             => $dt->pic ?: '-',
+                'start_time'      => $startTimeFormatted,
+                'finish_time'     => $finishTimeFormatted,
+                'duration_minute' => round($dt->duration_seconds / 60, 1),
+            ];
         }
 
         // ── MERGE BREAK SPLITS / CONSECUTIVE SAME JOB INTERVALS ──
@@ -242,11 +257,29 @@ class DashboardDetailService
 
             $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : '-';
 
+            $allDtList = [];
+            if ($jobId && isset($downtimeItems[$jobId])) {
+                $allDtList = array_merge($allDtList, $downtimeItems[$jobId]);
+            }
+            foreach ($children as $c) {
+                $cjn = trim($c->job_no ?? '');
+                $cjm = trim($c->job_master ?? '');
+                $cIdent = $cjn ? ($cjn . '-' . $c->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cjm) . '-' . $c->id);
+                $cJob = $jobMasters->get($cIdent);
+                if ($cJob) {
+                    $cJobId = $cJob->id;
+                    if (isset($downtimeItems[$cJobId])) {
+                        $allDtList = array_merge($allDtList, $downtimeItems[$cJobId]);
+                    }
+                }
+            }
+
             $rows[] = [
                 'no'               => $no,
                 'job_master_id'    => $jobId,
                 'is_running'       => $isRunning,
                 'job_number'       => $plan->job_no ?? '-',
+                'job_name'         => $plan->job_master ?? ($job?->job_name ?? '-'),
                 'p1'               => (bool) (($plan->p1 ?? false) ?: ($plan->a1 > 0) ?: ($plan->total_mesin >= 1)),
                 'p2'               => (bool) (($plan->p2 ?? false) ?: ($plan->a2 > 0) ?: ($plan->total_mesin >= 2)),
                 'p3'               => (bool) (($plan->p3 ?? false) ?: ($plan->a3 > 0) ?: ($plan->total_mesin >= 3)),
@@ -259,6 +292,7 @@ class DashboardDetailService
                 'dandori'          => $dandori,
                 'iq_check'         => $iqCheck,
                 'downtime'         => $downtime,
+                'downtime_list'    => $allDtList,
                 'tpt'              => $tpt,
                 'plan_finish'      => $planFinish ?: '-',
                 'actual_finish'    => $actualFinish,
