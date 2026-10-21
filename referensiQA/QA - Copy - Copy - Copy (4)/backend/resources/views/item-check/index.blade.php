@@ -567,15 +567,25 @@
                                     @endphp
                                     
                                     @if($existingCheck)
-                                        @if($existingCheck->operator_id === auth()->id() && in_array($existingCheck->status, ['in_progress', 'waiting_gl', 'waiting_foreman']))
-                                            <a href="{{ route('item-check.form', $existingCheck->id) }}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-3 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-600/30 active:scale-95">
-                                                Lanjutkan Cek <svg class="ml-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                                            </a>
-                                        @else
-                                            <a href="{{ route('item-check.form', $existingCheck->id) }}" class="flex-1 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-blue-600 text-xs font-black py-3 rounded-xl flex items-center justify-center transition-all shadow-sm">
-                                                Lihat Progress <svg class="ml-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                            </a>
-                                        @endif
+                                        <div class="flex-1 flex gap-2">
+                                            @if($existingCheck->operator_id === auth()->id() && in_array($existingCheck->status, ['in_progress', 'waiting_gl', 'waiting_foreman']))
+                                                <a href="{{ route('item-check.form', $existingCheck->id) }}" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white text-xs font-black py-3 rounded-xl flex items-center justify-center transition-all shadow-lg shadow-blue-600/30 active:scale-95">
+                                                    Lanjutkan Cek <svg class="ml-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
+                                                </a>
+                                            @else
+                                                <a href="{{ route('item-check.form', $existingCheck->id) }}" class="flex-1 bg-blue-50 border border-blue-200 hover:bg-blue-100 hover:border-blue-300 text-blue-600 text-xs font-black py-3 rounded-xl flex items-center justify-center transition-all shadow-sm">
+                                                    Lihat Progress <svg class="ml-1.5 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
+                                                </a>
+                                            @endif
+                                            @if(!in_array($existingCheck->status, ['finished', 'approved', 'locked']))
+                                                <form action="{{ route('item-check.reset', $schedule->id) }}" method="POST" onsubmit="return confirm('Yakin ingin reset item ini kembali ke awal?')">
+                                                    @csrf
+                                                    <button type="submit" class="px-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 text-rose-600 rounded-xl flex items-center justify-center text-[11px] font-black tracking-wider transition-all" title="Batal Mulai / Reset ke Awal">
+                                                        Reset
+                                                    </button>
+                                                </form>
+                                            @endif
+                                        </div>
                                     @else
                                         @php
                                             $hasFormula = !empty($schedule->masterTemplate->sampling_cols) || $schedule->masterTemplate->max_sample > 0 || $schedule->masterTemplate->tact_time > 0 || $schedule->masterTemplate->ct_dimensi > 0;

@@ -230,6 +230,37 @@ class ItemCheckController extends Controller
         });
     }
 
+    public function reset(Request $request, $scheduleId)
+    {
+        $schedule = ProductionSchedule::findOrFail($scheduleId);
+        $user = auth()->user();
+
+        $checks = ItemCheck::where('production_schedule_id', $schedule->id)->get();
+
+        if ($checks->isEmpty()) {
+            return redirect()->back()->with('error', 'Item ini belum pernah dimulai atau sudah bersih.');
+        }
+
+        // Boleh direset jika belum selesai (in_progress, waiting_*) oleh yang memulai atau Admin/Leader/Foreman
+        $isOperatorWhoStarted = $checks->contains('operator_id', $user ? $user->id : null);
+        $isLeaderOrAbove = $user && in_array($user->role, ['Admin', 'Leader', 'Group Leader', 'Foreman', 'Supervisor']);
+
+        if (!$isOperatorWhoStarted && !$isLeaderOrAbove) {
+            return redirect()->back()->with('error', 'Hanya operator yang memulai atau Leader/Foreman yang dapat mereset item ini.');
+        }
+
+        // Jangan reset yang sudah approved / locked
+        $isCompleted = $checks->contains(fn($c) => in_array($c->status, ['finished', 'approved', 'locked']));
+        if ($isCompleted) {
+            return redirect()->back()->with('error', 'Inspeksi yang sudah selesai/disetujui tidak dapat di-reset.');
+        }
+
+        // Hapus item check yang kepencet agar tombol balik jadi Ambil & Mulai Cek
+        ItemCheck::where('production_schedule_id', $schedule->id)->delete();
+
+        return redirect()->route('item-check.index')->with('success', 'Berhasil mereset tugas inspeksi untuk Job ' . ($schedule->job_no ?? $schedule->part_name) . '. Tombol kembali siap dimulai.');
+    }
+
     public function form($id)
     {
         $itemCheck = ItemCheck::with(['masterTemplate', 'schedule', 'operator'])->findOrFail($id);

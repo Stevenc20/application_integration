@@ -50,6 +50,7 @@ Route::middleware(['auth'])->group(function() {
     // Item Check Routes
     Route::get('/item-check', [\App\Http\Controllers\Web\ItemCheckController::class, 'index'])->name('item-check.index');
     Route::post('/item-check/{scheduleId}/start', [\App\Http\Controllers\Web\ItemCheckController::class, 'start'])->name('item-check.start');
+    Route::post('/item-check/{scheduleId}/reset', [\App\Http\Controllers\Web\ItemCheckController::class, 'reset'])->name('item-check.reset');
     Route::get('/item-check/{id}/form', [\App\Http\Controllers\Web\ItemCheckController::class, 'form'])->name('item-check.form');
     Route::middleware(['role:Admin,QC'])->group(function() {
         Route::get('/item-check/preview/{templateId}', [\App\Http\Controllers\Web\ItemCheckController::class, 'preview'])->name('item-check.preview');
