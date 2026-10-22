@@ -1,10 +1,10 @@
 {
-  "_polyfills-legacy-CRaAXCnN.js": {
-    "file": "assets/polyfills-legacy-CRaAXCnN.js",
-    "name": "assets/polyfills-legacy-CRaAXCnN.js"
+  "_polyfills-legacy-Cj2c1LUM.js": {
+    "file": "assets/polyfills-legacy-Cj2c1LUM.js",
+    "name": "assets/polyfills-legacy-Cj2c1LUM.js"
   },
   "resources/css/app.css": {
-    "file": "assets/app-CtAU2zW4.css",
+    "file": "assets/app-DOjcmAPa.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +13,7 @@
     ]
   },
   "resources/css/supervisor.css": {
-    "file": "assets/supervisor-4EIYkJxH.css",
+    "file": "assets/supervisor-BBlI8CxF.css",
     "src": "resources/css/supervisor.css",
     "isEntry": true,
     "name": "supervisor",
@@ -28,7 +28,7 @@
     "isEntry": true
   },
   "resources/js/operational/production-engine.js": {
-    "file": "assets/production-engine-CAA3G4cs.js",
+    "file": "assets/production-engine-C-nnyPIB.js",
     "name": "production-engine",
     "src": "resources/js/operational/production-engine.js",
     "isEntry": true
