@@ -1899,8 +1899,8 @@ async function restartJob(id) {
         }
     });
 }
-
-window.finishJob = function finishJob(id, jobNumber, jobName, explicitTargetQty) {
+window.finishJob = function finishJob(id, jobNumber, jobName, 
+explicitTargetQty) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     window.currentFinishId = id;
     if (explicitTargetQty !== undefined && explicitTargetQty !== null && !isNaN(explicitTargetQty)) {
@@ -1951,16 +1951,20 @@ window.finishJob = function finishJob(id, jobNumber, jobName, explicitTargetQty)
         const finalOkInput = document.getElementById('final-ok');
         const finalRepairInput = document.getElementById('final-repair');
         const finalRejectInput = document.getElementById('final-reject');
+        const reasonInput = document.getElementById('finishTargetReason');
+        const reasonErr = document.getElementById('finishReasonError');
 
         if (finalOkInput) finalOkInput.value = job.actual_ok || 0;
         if (finalRepairInput) finalRepairInput.value = job.actual_repair || 0;
         if (finalRejectInput) finalRejectInput.value = job.actual_reject || 0;
+        if (reasonInput) reasonInput.value = '';
+        if (reasonErr) reasonErr.classList.add('hidden');
 
         window.updateFinishModalShortageAlert();
 
         autoCloseJobDowntimes(id).then(() => {
             openFinishModal();
-            // Re-trigger in case modal DOM elements needed visibility
+                    // Re-trigger in case modal DOM elements needed visibility
             setTimeout(() => window.updateFinishModalShortageAlert(), 50);
         });
     });
@@ -1970,6 +1974,8 @@ window.updateFinishModalShortageAlert = function () {
     const id = window.currentFinishId;
     const alertBox = document.getElementById('finishShortageAlert');
     const descEl = document.getElementById('finishShortageDesc');
+    const reasonWrap = document.getElementById('finishReasonWrap');
+    const reasonErr = document.getElementById('finishReasonError');
     if (!alertBox || !descEl || !id) return;
 
     const job = (window.jobMasterData && window.jobMasterData[id]) || {};
@@ -1981,14 +1987,27 @@ window.updateFinishModalShortageAlert = function () {
     }
 
     const finalOkInput = document.getElementById('final-ok');
+    const finalRepairInput = document.getElementById('final-repair');
+    const finalRejectInput = document.getElementById('final-reject');
     const actualOk = finalOkInput ? (parseFloat(finalOkInput.value) || 0) : (parseFloat(job.actual_ok) || 0);
+    const actualRepair = finalRepairInput ? (parseFloat(finalRepairInput.value) || 0) : (parseFloat(job.actual_repair) || 0);
+    const actualReject = finalRejectInput ? (parseFloat(finalRejectInput.value) || 0) : (parseFloat(job.actual_reject) || 0);
+    const actualTotal = actualOk + actualRepair + actualReject;
 
-    if (planQty > 0 && actualOk < planQty) {
-        const shortQty = planQty - actualOk;
-        descEl.innerHTML = `Target Plan: <b>${planQty} pcs</b> | Aktual OK: <b>${actualOk} pcs</b>.<br>Kurang <b>${shortQty} pcs</b>. Kekurangan ini otomatis masuk antrean <b>Recovery PPC</b>.`;
+    if (planQty > 0 && actualTotal < planQty) {
+        const shortQty = planQty - actualTotal;
+        descEl.innerHTML = `Target Plan: <b>${planQty} pcs</b> | Aktual (OK+Repair+Reject): <b>${actualTotal} pcs</b>.<br>Kurang <b>${shortQty} pcs</b>. Kekurangan ini otomatis masuk antrean <b>Recovery PPC</b>.`;
         alertBox.classList.remove('hidden');
+        if (reasonWrap) reasonWrap.classList.remove('hidden');
+        if (reasonErr) reasonErr.classList.add('hidden');
     } else {
         alertBox.classList.add('hidden');
+        if (reasonWrap) {
+            reasonWrap.classList.add('hidden');
+            const reasonInput = document.getElementById('finishTargetReason');
+            if (reasonInput) reasonInput.value = '';
+        }
+        if (reasonErr) reasonErr.classList.add('hidden');
     }
 };
 
@@ -2036,11 +2055,38 @@ async function submitFinalJob() {
     const nextJobId = document.getElementById('nextSelect').value;
     if (!id) return;
 
-    await window.ActionRunner.run('Submit Final Job', async () => {
-        const finalOk = parseInt(document.getElementById('final-ok').value) || 0;
-        const finalRepair = parseInt(document.getElementById('final-repair').value) || 0;
-        const finalReject = parseInt(document.getElementById('final-reject').value) || 0;
+    const finalOk = parseInt(document.getElementById('final-ok').value) || 0;
+    const finalRepair = parseInt(document.getElementById('final-repair').value) || 0;
+    const finalReject = parseInt(document.getElementById('final-reject').value) || 0;
+    const reasonWrap = document.getElementById('finishReasonWrap');
+    const reasonInput = document.getElementById('finishTargetReason');
+    const reasonErr = document.getElementById('finishReasonError');
+    const job = (window.jobMasterData && window.jobMasterData[id]) || {};
+    let planQty = 0;
+    if (window.currentFinishTargetQty !== null && window.currentFinishTargetQty !== undefined && !isNaN(window.currentFinishTargetQty)) {
+        planQty = parseFloat(window.currentFinishTargetQty);
+    } else {
+        planQty = parseFloat(job.target_qty || 0);
+    }
+    const actualTotal = finalOk + finalRepair + finalReject;
 
+    if (planQty > 0 && actualTotal < planQty) {
+        if (reasonWrap) reasonWrap.classList.remove('hidden');
+        const reasonVal = reasonInput ? reasonInput.value.trim() : '';
+        if (reasonVal.length < 3) {
+            if (reasonErr) reasonErr.classList.remove('hidden');
+            if (reasonInput) {
+                reasonInput.focus();
+                reasonInput.classList.add('border-red-400', 'ring-2', 'ring-red-200');
+                setTimeout(() => reasonInput.classList.remove('border-red-400', 'ring-2', 'ring-red-200'), 1500);
+            }
+            showToast('Alasan target tidak tercapai wajib diisi minimal 3 karakter', 'danger');
+            return;
+        }
+        if (reasonErr) reasonErr.classList.add('hidden');
+    }
+
+    await window.ActionRunner.run('Submit Final Job', async () => {
         if (finalRepair > 0 || finalReject > 0) {
             showToast('⚠️ Pastikan data Repair & Reject sudah tercatat di history RR', 'warning');
         }
@@ -2069,7 +2115,8 @@ async function submitFinalJob() {
                 skip_idle: false,
                 ok_qty: finalOk,
                 repair_qty: finalRepair,
-                reject_qty: finalReject
+                reject_qty: finalReject,
+                reason_not_achieved: reasonInput ? reasonInput.value.trim() : null
             })
         }).then(r => r.json());
 

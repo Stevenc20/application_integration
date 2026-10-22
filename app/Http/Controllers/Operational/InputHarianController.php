@@ -777,7 +777,16 @@ class InputHarianController extends Controller
             $finalOk = $request->json('ok_qty');
             $finalRepair = $request->json('repair_qty');
             $finalReject = $request->json('reject_qty');
-            $result = $this->productionService->finishJob($id, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject);
+            $reasonNotAchieved = $request->json('reason_not_achieved') ?? $request->input('reason_not_achieved');
+
+            if ($reasonNotAchieved !== null) {
+                $reasonNotAchieved = trim((string)$reasonNotAchieved);
+                if ($reasonNotAchieved === '') {
+                    $reasonNotAchieved = null;
+                }
+            }
+
+            $result = $this->productionService->finishJob($id, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, [], $reasonNotAchieved);
             $runtime = is_array($result) ? ($result['runtime'] ?? 0) : $result;
             $recovery = is_array($result) ? ($result['recovery'] ?? null) : null;
 

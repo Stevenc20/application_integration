@@ -9,6 +9,8 @@ use App\Models\Downtime;
 use App\Models\Dandori;
 use App\Models\ProductionLog;
 use App\Models\HambatanJalur;
+use App\Models\JobFinishReason;
+use App\Models\LineMaster;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
@@ -533,9 +535,9 @@ class ProductionService
     /**
      * Finish a job and sync metrics.
      */
-    public function finishJob(int $jobId, int|string|null $nextJobId = null, bool $skipIdle = false, int|float|null $finalOk = null, int|float|null $finalRepair = null, int|float|null $finalReject = null, array $skippedActions = [])
+    public function finishJob(int $jobId, int|string|null $nextJobId = null, bool $skipIdle = false, int|float|null $finalOk = null, int|float|null $finalRepair = null, int|float|null $finalReject = null, array $skippedActions = [], ?string $reasonNotAchieved = null)
     {
-        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions) {
+        return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions, $reasonNotAchieved) {
             // Auto-close any active downtimes for this job
             Downtime::where('job_master_id', $jobId)
                 ->whereNull('finish_time')
@@ -564,7 +566,7 @@ class ProductionService
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
                 // Finalisasi: replace semua log dengan nilai final
                 ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now())
+                    ->whereDate('created_at', now()->toDateString())
                     ->delete();
                 ProductionLog::create([
                     'job_master_id' => $jobId,
@@ -576,9 +578,9 @@ class ProductionService
                 $totalRepair = $finalRepair ?? 0;
                 $totalReject = $finalReject ?? 0;
             } else {
-                $totalOk     = ProductionLog::where('job_master_id', $jobId)->sum('ok_qty');
-                $totalRepair = ProductionLog::where('job_master_id', $jobId)->sum('repair_qty');
-                $totalReject = ProductionLog::where('job_master_id', $jobId)->sum('reject_qty');
+                $totalOk     = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', now()->toDateString())->sum('ok_qty');
+                $totalRepair = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', now()->toDateString())->sum('repair_qty');
+                $totalReject = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', now()->toDateString())->sum('reject_qty');
             }
 
             DailyProduction::updateOrCreate(
@@ -617,7 +619,8 @@ class ProductionService
             $mismatch = null;
             $autoRecoveryItem = null;
             $job = \App\Models\JobMaster::find($jobId);
-            $actualQty = $finalOk !== null ? (float) $finalOk : (float) ($totalOk ?? 0);
+            $actualQtyOk = $finalOk !== null ? (float) $finalOk : (float) ($totalOk ?? 0);
+            $actualQtyTotal = ($finalOk !== null ? (float) $finalOk : (float) ($totalOk ?? 0)) + ($finalRepair !== null ? (float) $finalRepair : (float) ($totalRepair ?? 0)) + ($finalReject !== null ? (float) $finalReject : (float) ($totalReject ?? 0));
 
             if ($planId) {
                 $parts = explode('-', $job->job_number);
@@ -631,17 +634,79 @@ class ProductionService
 
                 $plan = \App\Models\ProductionPlan::find($planId);
                 $planQty = (float) (($plan && (float) ($plan->plan ?? 0) > 0) ? $plan->plan : ($job->target_qty ?? 0));
-                if ($planQty > 0 && $actualQty < $planQty) {
-                    $recoveryQty = $planQty - $actualQty;
-                    $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQty, $recoveryQty, 'waiting_approval');
+                if ($planQty > 0 && $actualQtyTotal < $planQty) {
+                    $recoveryQty = $planQty - $actualQtyOk;
+                    if ($recoveryQty < 0) {
+                        $recoveryQty = $planQty - $actualQtyTotal;
+                    }
+                    if ($recoveryQty > 0) {
+                        $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQtyOk, $recoveryQty, 'waiting_approval');
+                    }
+                    if ($reasonNotAchieved) {
+                        $lineId = null;
+                        $lineName = $job->line;
+                        if ($lineName) {
+                            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineName)));
+                            $lm = LineMaster::whereRaw("REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalized}%"])->first();
+                            if ($lm) {
+                                $lineId = $lm->id;
+                            }
+                        }
+                        JobFinishReason::create([
+                            'job_master_id' => $job->id,
+                            'production_plan_id' => $plan ? $plan->id : null,
+                            'user_id' => Auth::id(),
+                            'line_id' => $lineId,
+                            'line_name' => $lineName,
+                            'work_date' => now()->toDateString(),
+                            'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
+                            'target_qty' => (int) $planQty,
+                            'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
+                            'actual_repair' => (int) ($finalRepair ?? $totalRepair ?? 0),
+                            'actual_reject' => (int) ($finalReject ?? $totalReject ?? 0),
+                            'actual_total' => (int) $actualQtyTotal,
+                            'reason' => $reasonNotAchieved,
+                        ]);
+                    }
                 }
             }
 
             if (!$autoRecoveryItem && $job) {
                 $planQty = (float) ($job->target_qty ?? 0);
-                if ($planQty > 0 && $actualQty < $planQty) {
-                    $recoveryQty = $planQty - $actualQty;
-                    $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQty, $recoveryQty, 'waiting_approval', true);
+                if ($planQty > 0 && $actualQtyTotal < $planQty) {
+                    $recoveryQty = $planQty - $actualQtyOk;
+                    if ($recoveryQty < 0) {
+                        $recoveryQty = $planQty - $actualQtyTotal;
+                    }
+                    if ($recoveryQty > 0) {
+                        $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQtyOk, $recoveryQty, 'waiting_approval', true);
+                    }
+                    if ($reasonNotAchieved) {
+                        $lineId = null;
+                        $lineName = $job->line;
+                        if ($lineName) {
+                            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineName)));
+                            $lm = LineMaster::whereRaw("REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalized}%"])->first();
+                            if ($lm) {
+                                $lineId = $lm->id;
+                            }
+                        }
+                        JobFinishReason::create([
+                            'job_master_id' => $job->id,
+                            'production_plan_id' => null,
+                            'user_id' => Auth::id(),
+                            'line_id' => $lineId,
+                            'line_name' => $lineName,
+                            'work_date' => now()->toDateString(),
+                            'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
+                            'target_qty' => (int) $planQty,
+                            'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
+                            'actual_repair' => (int) ($finalRepair ?? $totalRepair ?? 0),
+                            'actual_reject' => (int) ($finalReject ?? $totalReject ?? 0),
+                            'actual_total' => (int) $actualQtyTotal,
+                            'reason' => $reasonNotAchieved,
+                        ]);
+                    }
                 }
             }
 
