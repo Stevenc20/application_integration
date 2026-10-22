@@ -163,6 +163,7 @@
         .status-not-running{background:#64748b!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-tryout{background:#3b82f6!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
         .status-1stcheck{background:#a855f7!important;color:#fff!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
+        .status-setup{background:#facc15!important;color:#000!important;font-weight:900;overflow:hidden;text-overflow:ellipsis}
 
         @keyframes blink-red{0%,100%{opacity:1}50%{opacity:0.45}}
         @keyframes blink-yellow{0%,100%{opacity:1}50%{opacity:0.45}}
@@ -189,7 +190,8 @@
         /* Dark mode warning alert (High-contrast vivid amber) */
         body.dark .bg-yellow,
         body.dark .bg-yellow-blink,
-        body.dark .status-break {
+        body.dark .status-break,
+        body.dark .status-setup {
             background: #fbbf24 !important;
             color: #0f172a !important;
             font-weight: 900 !important;
@@ -357,7 +359,7 @@
         .large-table .status-running,.large-table .status-break,
         .large-table .status-downtime,.large-table .status-idle,
         .large-table .status-not-running,.large-table .status-tryout,
-        .large-table .status-1stcheck{font-size:1.2vw!important;padding:0.6vw!important}
+        .large-table .status-1stcheck,.large-table .status-setup{font-size:1.2vw!important;padding:0.6vw!important}
         .sep-row td{background:#e2e8f0!important;height:3px;padding:0!important;border:0!important}
         .sep-row .desc-cell{background:#e2e8f0!important}
         .detail-header td{background:#dbeafe!important;font-size:0.8vw;font-weight:800;color:#1e40af!important;padding:0.3vw 0.4vw!important}
@@ -564,7 +566,7 @@
             .large-table .status-running,.large-table .status-break,
             .large-table .status-downtime,.large-table .status-idle,
             .large-table .status-not-running,.large-table .status-tryout,
-            .large-table .status-1stcheck{font-size:17px!important;padding:13px!important}
+            .large-table .status-1stcheck,.large-table .status-setup{font-size:17px!important;padding:13px!important}
             .single-top-header th{font-size:17px!important;padding:12px 16px!important}
         }
         /* ── QHD / 2K (2560px) ── */
@@ -585,7 +587,7 @@
             .large-table .status-running,.large-table .status-break,
             .large-table .status-downtime,.large-table .status-idle,
             .large-table .status-not-running,.large-table .status-tryout,
-            .large-table .status-1stcheck{font-size:21px!important;padding:17px!important}
+            .large-table .status-1stcheck,.large-table .status-setup{font-size:21px!important;padding:17px!important}
             .single-top-header th{font-size:21px!important;padding:16px 22px!important}
         }
         /* ── 4K / 65-INCH MONITOR (3840px) ── */
@@ -609,7 +611,7 @@
             .large-table .status-running,.large-table .status-break,
             .large-table .status-downtime,.large-table .status-idle,
             .large-table .status-not-running,.large-table .status-tryout,
-            .large-table .status-1stcheck{font-size:27px!important;padding:24px!important}
+            .large-table .status-1stcheck,.large-table .status-setup{font-size:27px!important;padding:24px!important}
             .single-top-header th{font-size:28px!important;padding:24px 32px!important}
         }
 
@@ -1297,7 +1299,7 @@ function updateAllCells(){
         const s=LINE_STATUSES[line];
         if(s){
             const l=(s.label||'NOT RUNNING').toUpperCase();
-            const cls=(l==='RUNNING'||l==='PRODUCTION'?'status-running':l==='BREAK'||l==='BREAKTIME'?'status-break':l==='DOWNTIME'||l==='TROUBLE'?'status-downtime':l==='TRYOUT'?'status-tryout':l==='1ST CHECK'?'status-1stcheck':l==='IDLE'?'status-idle':'status-not-running') + borderCls;
+            const cls=(l==='RUNNING'||l==='PRODUCTION'?'status-running':l==='BREAK'||l==='BREAKTIME'?'status-break':l==='DOWNTIME'||l==='TROUBLE'?'status-downtime':l==='TRYOUT'?'status-tryout':l==='1ST CHECK'?'status-1stcheck':l==='SETUP'?'status-setup':l==='IDLE'?'status-idle':'status-not-running') + borderCls;
             if(cell.textContent!==l) cell.textContent=l;
             if(cell.className!==cls) cell.className=cls;
         }else{
@@ -1438,7 +1440,7 @@ function renderTable(){
         let statusClass = 'status-not-running';
         if (st) {
             const l = (st.label || 'NOT RUNNING').toUpperCase();
-            statusClass = l === 'RUNNING' || l === 'PRODUCTION' ? 'status-running' : l === 'BREAK' || l === 'BREAKTIME' ? 'status-break' : l === 'DOWNTIME' || l === 'TROUBLE' ? 'status-downtime' : l === 'TRYOUT' ? 'status-tryout' : l === '1ST CHECK' ? 'status-1stcheck' : l === 'IDLE' ? 'status-idle' : 'status-not-running';
+            statusClass = l === 'RUNNING' || l === 'PRODUCTION' ? 'status-running' : l === 'BREAK' || l === 'BREAKTIME' ? 'status-break' : l === 'DOWNTIME' || l === 'TROUBLE' ? 'status-downtime' : l === 'TRYOUT' ? 'status-tryout' : l === '1ST CHECK' ? 'status-1stcheck' : l === 'SETUP' ? 'status-setup' : l === 'IDLE' ? 'status-idle' : 'status-not-running';
             statusVal = l;
         }
 
@@ -1533,7 +1535,7 @@ function renderTable(){
     let statusClass = 'status-not-running';
     if (st) {
         const l = (st.label || 'NOT RUNNING').toUpperCase();
-        statusClass = l === 'RUNNING' || l === 'PRODUCTION' ? 'status-running' : l === 'BREAK' || l === 'BREAKTIME' ? 'status-break' : l === 'DOWNTIME' || l === 'TROUBLE' ? 'status-downtime' : l === 'TRYOUT' ? 'status-tryout' : l === '1ST CHECK' ? 'status-1stcheck' : l === 'IDLE' ? 'status-idle' : 'status-not-running';
+        statusClass = l === 'RUNNING' || l === 'PRODUCTION' ? 'status-running' : l === 'BREAK' || l === 'BREAKTIME' ? 'status-break' : l === 'DOWNTIME' || l === 'TROUBLE' ? 'status-downtime' : l === 'TRYOUT' ? 'status-tryout' : l === '1ST CHECK' ? 'status-1stcheck' : l === 'SETUP' ? 'status-setup' : l === 'IDLE' ? 'status-idle' : 'status-not-running';
         statusVal = l;
     }
 
