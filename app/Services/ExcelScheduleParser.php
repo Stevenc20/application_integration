@@ -473,11 +473,11 @@ class ExcelScheduleParser
             'SEPTEMBER' => '09', 'OKTOBER' => '10', 'NOVEMBER' => '11', 'DESEMBER' => '12',
         ];
         foreach ($months as $name => $num) {
-            if (preg_match('/(\d{1,2})[\s\-/]+' . $name . '[\s\-/]+(\d{4})/', $textUp, $m)) {
+            if (preg_match('~(\d{1,2})[\s\-/]+' . $name . '[\s\-/]+(\d{4})~', $textUp, $m)) {
                 return sprintf('%02d', (int)$m[1]) . ' ' . $name . ' ' . $m[2];
             }
         }
-        if (preg_match('/(\d{2})[-/](\d{2})[-/](\d{4})/', $textUp, $m)) {
+        if (preg_match('~(\d{2})[-/](\d{2})[-/](\d{4})~', $textUp, $m)) {
             $monthNames = array_keys($months);
             return sprintf('%02d %s %s', (int)$m[1], $monthNames[(int)$m[2] - 1], $m[3]);
         }

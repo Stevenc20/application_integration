@@ -14,6 +14,98 @@
     <script>document.addEventListener('DOMContentLoaded',function(){showToast({!! json_encode($err) !!},'error');});</script>
     @endforeach
     @endif
+    @php($importPreview = session('import_preview'))
+    @if($importPreview && isset($importPreview['counts']))
+    <div class="mx-auto max-w-screen-2xl px-4">
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <div class="px-5 py-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                    <h2 class="text-sm font-black text-slate-800 uppercase tracking-tight">Preview Import (Merge)</h2>
+                    <p class="text-[11px] text-slate-500 mt-0.5">Revisi PPC hanya menambah/mengubah jadwal. Item yang tidak tercantum <b>tidak dihapus</b> dan aktual produksi tetap utuh.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-2 text-[11px] font-bold">
+                    <span class="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200">Added: {{ $importPreview['counts']['added'] ?? 0 }}</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200">Updated: {{ $importPreview['counts']['updated'] ?? 0 }}</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">Unchanged: {{ $importPreview['counts']['unchanged'] ?? 0 }}</span>
+                    <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-200">Not in revision: {{ $importPreview['counts']['not_in_revision'] ?? 0 }}</span>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-0 divide-y lg:divide-y-0 lg:divide-x divide-slate-100">
+                <div class="p-4">
+                    <details open>
+                        <summary class="cursor-pointer text-xs font-black text-slate-700">Added ({{ $importPreview['counts']['added'] ?? 0 }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @forelse(($importPreview['added'] ?? []) as $item)
+                            <div class="text-[11px] text-slate-600 flex items-center justify-between gap-2 border-b border-slate-50 pb-1">
+                                <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> {{ $item['job_master'] ?? '' }}</span>
+                                <span class="shrink-0 text-slate-400">{{ $item['start_time'] ?? '-' }}–{{ $item['finish_time'] ?? '-' }}</span>
+                            </div>
+                            @empty
+                            <p class="text-[11px] text-slate-400">Tidak ada item baru.</p>
+                            @endforelse
+                        </div>
+                    </details>
+                </div>
+
+                <div class="p-4">
+                    <details open>
+                        <summary class="cursor-pointer text-xs font-black text-slate-700">Updated ({{ $importPreview['counts']['updated'] ?? 0 }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @forelse(($importPreview['updated'] ?? []) as $item)
+                            <div class="text-[11px] text-slate-600 border-b border-slate-50 pb-1">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> {{ $item['job_master'] ?? '' }}</span>
+                                    <span class="shrink-0 text-amber-600">{{ count($item['changed_fields'] ?? []) }} field</span>
+                                </div>
+                                <div class="text-[10px] text-slate-400 truncate">Field: {{ implode(', ', $item['changed_fields'] ?? []) ?: '-' }}</div>
+                            </div>
+                            @empty
+                            <p class="text-[11px] text-slate-400">Tidak ada item berubah.</p>
+                            @endforelse
+                        </div>
+                    </details>
+                </div>
+
+                <div class="p-4">
+                    <details>
+                        <summary class="cursor-pointer text-xs font-black text-slate-700">Unchanged ({{ $importPreview['counts']['unchanged'] ?? 0 }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @forelse(($importPreview['unchanged'] ?? []) as $item)
+                            <div class="text-[11px] text-slate-500 flex items-center justify-between gap-2 border-b border-slate-50 pb-1">
+                                <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> {{ $item['job_master'] ?? '' }}</span>
+                                <span class="shrink-0 text-slate-400">{{ $item['start_time'] ?? '-' }}–{{ $item['finish_time'] ?? '-' }}</span>
+                            </div>
+                            @empty
+                            <p class="text-[11px] text-slate-400">Tidak ada item identik.</p>
+                            @endforelse
+                        </div>
+                    </details>
+                </div>
+
+                <div class="p-4">
+                    <details>
+                        <summary class="cursor-pointer text-xs font-black text-slate-700">Tidak Tercantum di Revisi ({{ $importPreview['counts']['not_in_revision'] ?? 0 }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @forelse(($importPreview['not_in_revision'] ?? []) as $item)
+                            <div class="text-[11px] text-slate-500 flex items-center justify-between gap-2 border-b border-slate-50 pb-1">
+                                <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> {{ $item['job_master'] ?? '' }}</span>
+                                @if($item['has_activity'] ?? false)
+                                <span class="shrink-0 px-1.5 py-0.5 rounded bg-rose-50 text-rose-600 text-[10px] font-bold">AKTIVITAS</span>
+                                @else
+                                <span class="shrink-0 text-slate-400">dipertahankan</span>
+                                @endif
+                            </div>
+                            @empty
+                            <p class="text-[11px] text-slate-400">Semua item lama masih tercantum di revisi.</p>
+                            @endforelse
+                        </div>
+                    </details>
+                </div>
+            </div>
+        </div>
+    </div>
+    @endif
     {{-- Header Section --}}
     <div class="bg-gradient-to-r from-red-900 via-red-800 to-rose-700 px-6 py-5 shadow-lg">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mx-auto max-w-screen-2xl">

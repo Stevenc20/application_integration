@@ -26,11 +26,10 @@ Schedule::command('production:cleanup-notify')
     ->onOneServer()
     ->appendOutputTo(storage_path('logs/cleanup-notify-scheduler.log'));
 
-// Schedule: cleanup old production plans daily at 00:30
-Schedule::command('ppc:cleanup-old-plans')
-    ->dailyAt('00:30')
-    ->onOneServer()
-    ->appendOutputTo(storage_path('logs/ppc-cleanup-scheduler.log'));
+// PPC schedule cleanup is intentionally NOT scheduled automatically.
+// Deleting past ProductionPlan rows caused historical schedules to disappear
+// after an import on the following day. Run `ppc:cleanup-old-plans --dry-run`
+// manually and only delete after an explicit retention decision.
 
 // Schedule: auto-break pause/resume every minute
 Schedule::command('break:auto')

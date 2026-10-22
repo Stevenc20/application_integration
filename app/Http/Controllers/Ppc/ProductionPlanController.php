@@ -37,14 +37,14 @@ class ProductionPlanController extends Controller
         // Sync LKH quantities to ProductionPlan for display
         try {
             $plansForDate = ProductionPlan::whereDate('plan_date', $date)->get();
+            $mergeService = app(\App\Services\PpcScheduleMergeService::class);
             foreach ($plansForDate as $plan) {
                 $jn = trim($plan->job_no ?? '');
                 $jm = trim($plan->job_master ?? '');
                 if (blank($jn) && blank($jm)) continue;
-                
-                $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
-                $job = \App\Models\JobMaster::where('job_number', $identifier)->first();
-                
+
+                $job = $mergeService->findLinkedJobMaster((int) $plan->id);
+
                 if ($job) {
                     $daily = \App\Models\DailyProduction::where('job_master_id', $job->id)
                         ->whereDate('work_date', $date)
@@ -399,542 +399,17 @@ class ProductionPlanController extends Controller
             }
             $result['sheets'] = $sheets;
 
-            DB::transaction(function () use ($result, $parsedDate, &$imported) {
-                $lineMap = LineMaster::pluck('id', 'line_name')->toArray();
+            $mergeResult = app(\App\Services\PpcScheduleMergeService::class)
+                ->merge($result['sheets'] ?? [], $parsedDate, Auth::id());
+            $imported = $mergeResult['counts']['rows_imported'] ?? 0;
+            $importPreview = $mergeResult['preview'] ?? null;
 
-                $sheets = array_values($result['sheets'] ?? []);
-                if (empty($sheets)) return;
-
-                // Ambil semua ProductionPlan yang sudah ada di database untuk tanggal ini (source_type = 'ppc')
-                $existingPlans = ProductionPlan::whereDate('plan_date', $parsedDate)
-                    ->where('source_type', 'ppc')
-                    ->get();
-
-                // Cari semua JobMaster yang terhubung ke existing plans
-                $existingPlanIds = $existingPlans->pluck('id')->filter()->unique();
-                $connectedJobs = collect();
-                if ($existingPlanIds->isNotEmpty()) {
-                    foreach ($existingPlanIds->chunk(100) as $pidChunk) {
-                        $chunkJobs = \App\Models\JobMaster::where(function($q) use ($pidChunk) {
-                            foreach ($pidChunk as $pid) {
-                                $q->orWhere('job_number', 'LIKE', "%-{$pid}");
-                            }
-                        })
-                        ->with(['dailyProduction', 'productionSessions', 'downtimes'])
-                        ->get();
-                        $connectedJobs = $connectedJobs->merge($chunkJobs);
-                    }
-                }
-
-                // Helper: Cek apakah suatu job sudah aktif / berjalan / memiliki data produksi di lini
-                $isJobActiveOrCompleted = function($planId) use ($connectedJobs) {
-                    $job = $connectedJobs->first(function($jm) use ($planId) {
-                        return str_ends_with($jm->job_number, "-{$planId}");
-                    });
-                    if (!$job) {
-                        // Double check langsung ke database demi keamanan permanen
-                        $directJob = \App\Models\JobMaster::where('job_number', 'LIKE', "%-{$planId}")
-                            ->with(['dailyProduction', 'productionSessions', 'downtimes'])
-                            ->first();
-                        if (!$directJob) return false;
-                        $job = $directJob;
-                    }
-
-                    $status = strtolower($job->status);
-                    if (in_array($status, ['running', 'paused', 'complete', 'completed', 'finished'])) {
-                        return true;
-                    }
-                    $dp = $job->dailyProduction;
-                    $actualPcs = ($dp?->actual_ok ?? 0) + ($dp?->actual_repair ?? 0) + ($dp?->actual_reject ?? 0);
-                    if ($actualPcs > 0 || !empty($job->started_at)) {
-                        return true;
-                    }
-                    if ($job->productionSessions->isNotEmpty() || $job->downtimes->isNotEmpty()) {
-                        return true;
-                    }
-                    return false;
-                };
-
-                // Index existing plans by matching key: shift||lineId||job_master||job_no
-                $existingPlansByKey = [];
-                $existingPlansByJobNo = [];
-                $existingPlansByJobMaster = [];
-
-                foreach ($existingPlans as $ep) {
-                    $cShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $ep->shift_name))));
-                    $epLineId = $ep->line_master_id;
-                    $epJm = strtoupper(trim($ep->job_master ?? ''));
-                    $epJn = strtoupper(trim($ep->job_no ?? ''));
-
-                    if ($ep->row_type === 'break') {
-                        $bKey = $cShift . '||' . $epLineId . '||break||' . strtoupper(trim($ep->job_no ?? $ep->keterangan ?? '')) . '||' . trim($ep->start_time ?? '') . '||' . trim($ep->finish_time ?? '');
-                        $existingPlansByKey[$bKey] = $ep;
-                    } else {
-                        // Primary key: CleanShift + Line + JobMaster + JobNo + RowNo (Preserve every split part row)
-                        $jKeyWithRow = $cShift . '||' . $epLineId . '||' . $epJm . '||' . $epJn . '||' . (int)$ep->row_no;
-                        $existingPlansByKey[$jKeyWithRow] = $ep;
-
-                        $jKey = $cShift . '||' . $epLineId . '||' . $epJm . '||' . $epJn;
-                        if (!isset($existingPlansByKey[$jKey]) || $isJobActiveOrCompleted($ep->id)) {
-                            $existingPlansByKey[$jKey] = $ep;
-                        }
-
-                        // Secondary key: CleanShift + Line + JobNo (jika job_no terisi dan spesifik)
-                        if ($epJn && !in_array($epJn, ['-', 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) {
-                            $noKey = $cShift . '||' . $epLineId . '||' . $epJn;
-                            if (!isset($existingPlansByJobNo[$noKey]) || $isJobActiveOrCompleted($ep->id)) {
-                                $existingPlansByJobNo[$noKey] = $ep;
-                            }
-                        }
-
-                        // Tertiary key: CleanShift + Line + JobMaster (jika tanpa job_no)
-                        if ($epJm) {
-                            $jmKey = $cShift . '||' . $epLineId . '||' . $epJm;
-                            if (!isset($existingPlansByJobMaster[$jmKey]) || $isJobActiveOrCompleted($ep->id)) {
-                                $existingPlansByJobMaster[$jmKey] = $ep;
-                            }
-                        }
-                    }
-                }
-
-                $retainedPlanIds = [];
-
-                // PRE-PASS: deteksi grup (cleanShift||press) yang punya sheet REV
-                $hasRevInGroup = [];
-                foreach ($sheets as $s) {
-                    $raw = $s['shift_name'] ?? '';
-                    $clean = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $raw))));
-                    $key = $clean . '||' . ($s['press_name'] ?? '');
-                    if (preg_match('/REV|REVISI/i', $raw)) {
-                        $hasRevInGroup[$key] = true;
-                    }
-                }
-
-                // Sort sheets so Rev sheets are processed FIRST before non-Rev sheets
-                // This ensures Rev sheets register items first in $importedJobKeys
-                usort($sheets, function ($a, $b) {
-                    $aRev = (int) preg_match('/REV|REVISI/i', $a['shift_name'] ?? '');
-                    $bRev = (int) preg_match('/REV|REVISI/i', $b['shift_name'] ?? '');
-                    return $bRev <=> $aRev; // Rev sheets first
-                });
-
-                $importedJobKeys = [];
-                $importedBreakKeys = [];
-                foreach ($sheets as $sheetData) {
-                    $originalShift = $sheetData['shift_name'] ?? '';
-                    $cleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $originalShift))));
-                    $groupKey = $cleanShift . '||' . ($sheetData['press_name'] ?? '');
-                    $isRevSheet = (bool) preg_match('/REV|REVISI/i', $originalShift);
-
-                    // Jika grup (Shift + Press) ini memiliki sheet REV, skip seluruh sheet non-REV
-                    // karena sheet REV sudah merupakan revisi final yang menggantikan sheet non-REV
-                    if (!$isRevSheet && !empty($hasRevInGroup[$groupKey])) {
-                        Log::info("[IMPORT] Skipping non-Rev sheet because Rev sheet exists for group", ['group' => $groupKey, 'sheet' => $originalShift]);
-                        continue;
-                    }
-
-                    $rows = [];
-                    $shiftName = $sheetData['shift_name'];
-                    $shiftName = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $shiftName);
-                    $shiftName = trim(ucwords(strtolower($shiftName)));
-                    $pressName = $sheetData['press_name'];
-                    
-                    // Fuzzy match line_master_id
-                    $lineId = null;
-                    $pressKey = strtoupper(str_replace([' ', '-'], '', $pressName));
-                    foreach ($lineMap as $name => $id) {
-                        $cleanName = strtoupper(str_replace([' ', '-', 'LINE'], '', $name));
-                        if ($cleanName === $pressKey || str_contains($pressKey, $cleanName) || str_contains($cleanName, $pressKey)) {
-                            $lineId = $id;
-                            break;
-                        }
-                    }
-                    if (!$lineId) $lineId = array_values($lineMap)[0] ?? 1;
-
-                    // INSERT / UPDATE EXCEL ITEMS
-                    $excelRowNos = [];
-                    $totalReceived = count($sheetData['rows']);
-                    $skippedMeta = 0;
-                    $sectionCount = 0;
-
-                    foreach ($sheetData['rows'] as $item) {
-                        // ── SAFETY NET: skip rows that are clearly Excel metadata, not jobs ──
-                        $rawJm = $item['job_master'] ?? '';
-                        $rawJn = $item['job_no'] ?? '';
-                        $isMeta = (
-                            str_starts_with($rawJm, ':') ||                                   // ": Selasa Pagi", ": 23-Juni-2026"
-                            strtoupper(trim($rawJm)) === 'JOB MASTER' ||                       // "JOB MASTER" header row
-                            strtoupper(trim($rawJn)) === 'JOB NO.'                             // "JOB NO." header row
-                        );
-                        if ($isMeta) {
-                            Log::info('[IMPORT] Skipped metadata row', ['job_master' => $rawJm, 'job_no' => $rawJn]);
-                            $skippedMeta++;
-                            continue;
-                        }
-
-                        // ── Skip rows marked as "Delete" in keterangan (deleted schedule items) ──
-                        if (str_contains(strtoupper($item['keterangan'] ?? ''), 'DELETE')) {
-                            // Track Rev sheet job key BEFORE skipping, so non-Rev dedup can match
-                            if ($isRevSheet && $rawJn && $rawJm) {
-                                $jobKey = $lineId . '||' . $rawJm . '||' . $rawJn;
-                                $importedJobKeys[$jobKey] = true;
-                            }
-                            Log::info('[IMPORT] Skipped deleted row', ['keterangan' => $item['keterangan'], 'job_no' => $rawJn]);
-                            $skippedMeta++;
-                            continue;
-                        }
-
-                        $rowType = $item['row_type'] ?? 'job';
-                        $jn = strtoupper($item['job_no'] ?? '');
-                        $jm = strtoupper($item['job_master'] ?? '');
-                        
-                        $planQty = floatval($item['plan'] ?? 0);
-                        $processTime = floatval($item['process_time'] ?? 0);
-                        $ctDetik = floatval($item['ct_detik'] ?? 0);
-                        $qtyPlt = floatval($item['qty_plt'] ?? 0);
-
-                        $isBreakDesc = false;
-                        $breakKeywords = ['ISTIRAHAT', 'CINGKORAK', 'BREAKTIME', 'BREAK TIME', 'ISHOMA'];
-                        foreach ($breakKeywords as $kw) {
-                            if (str_contains($jn, $kw) || str_contains($jm, $kw) || str_contains(strtoupper($item['keterangan'] ?? ''), $kw)) {
-                                $isBreakDesc = true;
-                                break;
-                            }
-                        }
-
-                        $isSummaryPattern = str_contains($jm, 'TOTAL FINISH') || str_contains($jn, 'TOTAL FINISH') || 
-                                            str_contains($jm, 'TOTAL FNISH') || str_contains($jn, 'TOTAL FNISH');
-
-                        // Structure-Driven RowClassifier
-                        if ($isSummaryPattern) {
-                            $rowType = 'total_finish';
-                        } elseif ($isBreakDesc || $rowType === 'break') {
-                            $rowType = 'break';
-                            // Safety net: skip non-break rows misclassified as break (e.g. info/note row containing keyword like ISTIRAHAT)
-                            // Legitimate breaks always have proper start_time; misclassified rows have empty start_time
-                            if (empty($item['start_time'])) {
-                                Log::info('[IMPORT] Skipped break misclassification', ['job_no' => $rawJn]);
-                                $skippedMeta++;
-                                continue;
-                            }
-                        } elseif ($planQty > 0 || $ctDetik > 0) {
-                            $rowType = 'job';
-                        } elseif ($planQty == 0 && $ctDetik == 0 && $processTime == 0) {
-                            // Zero production metrics -> Note / Info / Spacer (not a real job)
-                            $rowType = 'note';
-                        } else {
-                            $rowType = 'job';
-                        }
-
-                        $jm = $item['job_master'] ?? '';
-                        $jn = $item['job_no'] ?? '';
-                        
-                        // Normalization: only force TOTAL FINISH for break rows (not for legitimate job data)
-                        if ($rowType === 'break' && (str_contains(strtoupper($jm), 'FINISH') || str_contains(strtoupper($jn), 'FINISH') || 
-                            str_contains(strtoupper($jm), 'FNISH') || str_contains(strtoupper($jn), 'FNISH'))) {
-                            $jm = 'TOTAL FINISH';
-                            $jn = 'TOTAL FINISH';
-                        }
-
-                        $planQty = (int) $this->safeVal($item['plan'], 0);
-                        $ctDetik = (float) $this->safeVal($item['ct_detik'], 0);
-                        $processTime = $rowType === 'job'
-                            ? (int) $this->safeVal($item['process_time'], ProductionMetricsService::calculateProcessTime($ctDetik, $planQty))
-                            : 0;
-
-                        // Dedup: skip non-Rev row if same job_master+job_no already imported from Rev
-                        if (!$isRevSheet && $rowType === 'job' && $jm && $jn) {
-                            $jobKey = $lineId . '||' . $jm . '||' . $jn;
-                            if (isset($importedJobKeys[$jobKey])) {
-                                $skippedMeta++;
-                                continue;
-                            }
-                        }
-                        // Track job key for Rev sheets
-                        if ($isRevSheet && $rowType === 'job' && $jm && $jn) {
-                            $jobKey = $lineId . '||' . $jm . '||' . $jn;
-                            $importedJobKeys[$jobKey] = true;
-                        }
-
-                        // Dedup break rows: skip if same line+press+keterangan+start+finish already imported
-                        if ($rowType === 'break') {
-                            $breakKeterangan = strtoupper(trim($item['job_no'] ?? $item['keterangan'] ?? ''));
-                            $breakStart = $item['start_time'] ?? '';
-                            $breakFinish = $item['finish_time'] ?? '';
-                            $breakKey = $lineId . '||break||' . $breakKeterangan . '||' . $breakStart . '||' . $breakFinish;
-                            if (isset($importedBreakKeys[$breakKey])) {
-                                $skippedMeta++;
-                                continue;
-                            }
-                            $importedBreakKeys[$breakKey] = true;
-                        }
-
-                        $finalRowNo = $this->safeVal($item['row_no']) ?: 0;
-
-                        $rowAttributes = [
-                            'line_master_id' => $lineId,
-                            'plan_date'      => $parsedDate,
-                            'shift_name'     => $shiftName,
-                            'press_name'     => $pressName,
-                            'hari'           => $this->safeVal($sheetData['hari']),
-                            'tgl'            => $this->safeVal($sheetData['tgl']),
-                            'jam'            => $this->safeVal($sheetData['jam']),
-                            'revisi'         => $this->safeVal($sheetData['revisi']),
-                            'row_no'         => $finalRowNo,
-                            'source_type'    => 'ppc',
-                            'row_type'       => $rowType,
-                            'job_master'     => $this->safeVal($jm),
-                            'type_plt'       => $this->safeVal($item['type_plt']),
-                            'qty_plt'        => $this->safeVal($item['qty_plt'], 0),
-                            'keb_mtl'        => $this->safeVal($item['keb_mtl'], 0),
-                            'total_plt'      => $this->safeVal($item['total_plt'], 0),
-                            'job_no'         => $this->safeVal($jn),
-                            'each_part'      => $this->safeVal($item['each_part']),
-                            'plan'           => $planQty,
-                            'ok'             => $this->safeVal($item['ok'], 0),
-                            'repair'         => 0, // repair is actual daily data, not from schedule
-                            'reject'         => $this->safeVal($item['reject'], 0),
-                            'total_mesin'    => $this->safeVal($item['total_mesin'], 1),
-                            'p1'             => ($this->safeVal($item['a1'] ?? 0, 0) > 0),
-                            'p2'             => ($this->safeVal($item['a2'] ?? 0, 0) > 0),
-                            'p3'             => ($this->safeVal($item['a3'] ?? 0, 0) > 0),
-                            'p4'             => ($this->safeVal($item['a4'] ?? 0, 0) > 0),
-                            'ct_detik'       => $ctDetik,
-                            'process_time'   => $processTime,
-                            'reg_active'     => $this->safeVal($item['reg_active'], 0),
-                            'dct'            => $this->safeVal($item['dct'], 0),
-                            'mct'            => $this->safeVal($item['mct'], 0),
-                            'plan_dct'       => $this->safeVal($item['plan_dct'], 0),
-                            'tpt'            => $this->safeVal($item['tpt'], 0),
-                            'gsph_item'      => $this->safeVal($item['gsph_item'], 0),
-                            'start_time'     => $this->safeVal($item['start_time']),
-                            'finish_time'    => $this->safeVal($item['finish_time']),
-                            'act_start'      => $this->safeVal($item['act_start']),
-                            'act_finish'     => $this->safeVal($item['act_finish']),
-                            'keterangan'     => $this->safeVal($item['keterangan']) ?: ($item['row_type'] === 'break' ? $this->safeVal($item['job_no']) : null),
-                            'a1'             => $this->safeVal($item['a1'], 0),
-                            'a2'             => $this->safeVal($item['a2'], 0),
-                            'a3'             => $this->safeVal($item['a3'], 0),
-                            'a4'             => $this->safeVal($item['a4'], 0),
-                            'dt_menit'       => $this->safeVal($item['dt_menit'], 0),
-                            'total_pcs'      => $this->safeVal($item['total_pcs'], 0),
-                            'tpt_total'      => $this->safeVal($item['tpt_total'], 0),
-                        ];
-
-                        // SMART MATCHING: Cari apakah baris ini sudah ada di DB
-                        $cleanImportShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $shiftName))));
-                        $cleanJm = strtoupper(trim($jm));
-                        $cleanJn = strtoupper(trim($jn));
-
-                        $matchKeyWithRow = ($rowType === 'break')
-                            ? ($cleanImportShift . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
-                            : ($cleanImportShift . '||' . $lineId . '||' . $cleanJm . '||' . $cleanJn . '||' . (int)$finalRowNo);
-
-                        $matchKey = ($rowType === 'break')
-                            ? ($cleanImportShift . '||' . $lineId . '||break||' . strtoupper(trim($jn ?: ($item['keterangan'] ?? ''))) . '||' . trim($item['start_time'] ?? '') . '||' . trim($item['finish_time'] ?? ''))
-                            : ($cleanImportShift . '||' . $lineId . '||' . $cleanJm . '||' . $cleanJn);
-
-                        $matchedExistingPlan = $existingPlansByKey[$matchKeyWithRow] ?? ($existingPlansByKey[$matchKey] ?? null);
-
-                        // Fallback matching 1: by Job No (jika ada dan unik di shift+line ini)
-                        if (!$matchedExistingPlan && $rowType === 'job' && $cleanJn && !in_array($cleanJn, ['-', 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) {
-                            $noKey = $cleanImportShift . '||' . $lineId . '||' . $cleanJn;
-                            if (isset($existingPlansByJobNo[$noKey])) {
-                                $matchedExistingPlan = $existingPlansByJobNo[$noKey];
-                            }
-                        }
-
-                        // Fallback matching 2: by Job Master jika Job No kosong di salah satu sisi
-                        if (!$matchedExistingPlan && $rowType === 'job' && $cleanJm && (!$cleanJn || $cleanJn === '-')) {
-                            $jmKey = $cleanImportShift . '||' . $lineId . '||' . $cleanJm;
-                            if (isset($existingPlansByJobMaster[$jmKey])) {
-                                $matchedExistingPlan = $existingPlansByJobMaster[$jmKey];
-                            }
-                        }
-
-                        if ($matchedExistingPlan) {
-                            // ITEM SAMA: Lakukan UPDATE in-place tanpa mengubah ID & tanpa mereset sesi
-                            $updatePayload = $rowAttributes;
-                            if (in_array(strtolower($matchedExistingPlan->status ?? ''), ['running', 'paused', 'complete', 'completed', 'finished'])) {
-                                unset($updatePayload['status']);
-                            }
-                            $matchedExistingPlan->update($updatePayload);
-                            $retainedPlanIds[] = $matchedExistingPlan->id;
-
-                            // Update target_qty & sequence di JobMaster terkait tanpa merusak sesi running
-                            $connectedJm = $connectedJobs->first(function($jm) use ($matchedExistingPlan) {
-                                return str_ends_with($jm->job_number, "-{$matchedExistingPlan->id}");
-                            });
-                            if ($connectedJm) {
-                                $jmUpdate = [
-                                    'target_qty'  => (int) ($rowAttributes['plan'] ?? 0),
-                                    'sequence_no' => $finalRowNo ?: $connectedJm->sequence_no,
-                                    'capacity'    => (int) ($rowAttributes['qty_plt'] ?? 0),
-                                ];
-                                if ($rowAttributes['start_time']) {
-                                    $jmUpdate['plan_start'] = Carbon::parse($parsedDate . ' ' . $rowAttributes['start_time'])->startOfMinute();
-                                }
-                                if ($rowAttributes['finish_time']) {
-                                    $jmUpdate['plan_end'] = Carbon::parse($parsedDate . ' ' . $rowAttributes['finish_time'])->startOfMinute();
-                                }
-                                $connectedJm->update($jmUpdate);
-                            }
-                        } else {
-                            // ITEM BARU: Buat baru
-                            $newPlan = ProductionPlan::create(array_merge($rowAttributes, [
-                                'status' => 'pending',
-                            ]));
-                            $retainedPlanIds[] = $newPlan->id;
-                        }
-
-                        $sectionCount++;
-                    }
-
-                    Log::info('[IMPORT] Section stats', [
-                        'shift' => $shiftName,
-                        'press' => $pressName,
-                        'rows_from_python' => $totalReceived,
-                        'meta_skipped' => $skippedMeta,
-                        'processed' => $sectionCount,
-                    ]);
-
-                    $imported += $sectionCount;
-                }
-
-                // ── CLEANUP & PROTEKSI ITEM OBSOLETE (Dihapus PPC di revisi baru) ──
-                // SCOPE PENTING: Hanya bersihkan item obsolete pada Shift & Press yang MEMANG DIUNGGAH dalam sheet file revisi ini!
-                // Shift / Press lain yang tidak ada dalam file unggahan TIDAK BOLEH disentuh.
-                $importedSectionKeys = [];
-                foreach ($sheets as $s) {
-                    $cShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $s['shift_name'] ?? ''))));
-                    $pName = strtoupper(str_replace([' ', '-'], '', $s['press_name'] ?? ''));
-                    $importedSectionKeys[$cShift . '||' . $pName] = true;
-                }
-
-                $obsoletePlans = $existingPlans->whereNotIn('id', $retainedPlanIds);
-                foreach ($obsoletePlans as $obsPlan) {
-                    $obsCleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $obsPlan->shift_name))));
-                    $obsPress = strtoupper(str_replace([' ', '-'], '', $obsPlan->press_name ?? ''));
-                    $sectionScopeKey = $obsCleanShift . '||' . $obsPress;
-
-                    // Jika item ini berada di shift/press yang TIDAK diimpor pada file ini, jangan hapus!
-                    if (!isset($importedSectionKeys[$sectionScopeKey])) {
-                        continue;
-                    }
-
-                    // Pengecekan riil: jika job sudah aktif / berjalan / memiliki data di lini, PERTAHANKAN
-                    if ($isJobActiveOrCompleted($obsPlan->id)) {
-                        Log::info("[IMPORT] Retaining obsolete plan because job is active/completed in line", [
-                            'plan_id' => $obsPlan->id,
-                            'job_no' => $obsPlan->job_no,
-                        ]);
-                        continue;
-                    }
-
-                    $pid = $obsPlan->id;
-                    $unusedJobs = \App\Models\JobMaster::where('job_number', 'LIKE', "%-{$pid}")->get();
-                    
-                    // Safety net tambahan: cek apakah unusedJobs memiliki data produksi
-                    $canDelete = true;
-                    foreach ($unusedJobs as $uj) {
-                        $hasProdData = \App\Models\DailyProduction::where('job_master_id', $uj->id)
-                            ->where(function($q) {
-                                $q->where('actual_ok', '>', 0)
-                                  ->orWhere('actual_repair', '>', 0)
-                                  ->orWhere('actual_reject', '>', 0);
-                            })->exists();
-                        $hasDt = \App\Models\Downtime::where('job_master_id', $uj->id)->exists();
-                        $hasSess = \App\Models\ProductionSession::where('job_master_id', $uj->id)->exists();
-                        if ($hasProdData || $hasDt || $hasSess || !empty($uj->started_at)) {
-                            $canDelete = false;
-                            break;
-                        }
-                    }
-
-                    if (!$canDelete) {
-                        Log::info("[IMPORT] Retaining obsolete plan because JobMaster has existing production data", [
-                            'plan_id' => $obsPlan->id,
-                            'job_no' => $obsPlan->job_no,
-                        ]);
-                        continue;
-                    }
-
-                    foreach ($unusedJobs as $uj) {
-                        $uj->delete();
-                    }
-                    $obsPlan->delete();
-                }
-
-                // 2. Recovery-generated timeline rows cleanup (hanya yang belum jalan pada shift & press yang diimpor)
-                $recoveryPlansToClean = ProductionPlan::whereDate('plan_date', $parsedDate)
-                    ->where('source_type', 'recovery')
-                    ->whereDoesntHave('recoveryItem', function ($q) {
-                        $q->whereIn('status', ['in_production', 'completed']);
-                    })
-                    ->get();
-
-                $filteredRecoveryPlanIds = [];
-                foreach ($recoveryPlansToClean as $rp) {
-                    $rpCleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $rp->shift_name))));
-                    $rpPress = strtoupper(str_replace([' ', '-'], '', $rp->press_name ?? ''));
-                    if (isset($importedSectionKeys[$rpCleanShift . '||' . $rpPress])) {
-                        $filteredRecoveryPlanIds[] = $rp->id;
-                    }
-                }
-
-                if (!empty($filteredRecoveryPlanIds)) {
-                    \App\Models\RecoveryItem::whereIn('production_plan_id', $filteredRecoveryPlanIds)
-                        ->update(['production_plan_id' => null]);
-                    ProductionPlan::whereIn('id', $filteredRecoveryPlanIds)->delete();
-                }
-
-                // 3. Delete leftover breaks yang tidak retained hanya pada section yang diimpor
-                $leftoverBreaks = ProductionPlan::whereDate('plan_date', $parsedDate)
-                    ->where('row_type', 'break')
-                    ->whereNotIn('id', $retainedPlanIds)
-                    ->get();
-                foreach ($leftoverBreaks as $lb) {
-                    $lbCleanShift = trim(ucwords(strtolower(preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $lb->shift_name))));
-                    $lbPress = strtoupper(str_replace([' ', '-'], '', $lb->press_name ?? ''));
-                    if (isset($importedSectionKeys[$lbCleanShift . '||' . $lbPress])) {
-                        $lb->delete();
-                    }
-                }
-
-                // Log Python's own row counts if available
-                if (isset($result['log'])) {
-                    Log::info('[IMPORT] Python parser stats', $result['log']);
-                }
- 
-            });
-
-            // LOG SCHEDULE REVISION
-            try {
-                $shiftNames = collect($sheets)->map(function ($s) {
-                    $sn = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $s['shift_name'] ?? '');
-                    return trim(ucwords(strtolower($sn)));
-                })->unique()->values()->implode(', ');
-
-                \App\Models\ScheduleRevision::create([
-                    'plan_date' => $parsedDate,
-                    'shift_name' => $shiftNames ?: '-',
-                    'action' => 'import',
-                    'snapshot_after' => ['sheets' => count($sheets), 'rows_imported' => $imported],
-                    'created_by' => Auth::id(),
-                ]);
-            } catch (\Throwable $e) {
-                Log::warning("Failed to log schedule revision: " . $e->getMessage());
-            }
-
-            // CLEANUP DATA LAMA: Hapus PPC production plan untuk tanggal sebelum yang diimport
-            // Hanya source_type='ppc' — jangan sentuh recovery items dan plan yang punya recovery
-            $activeRecoveryPlanIds = \App\Models\RecoveryItem::pluck('production_plan_id')->filter()->unique();
-            $oldPlansCount = ProductionPlan::whereDate('plan_date', '<', $parsedDate)
-                ->where('source_type', 'ppc')
-                ->whereNotIn('id', $activeRecoveryPlanIds)
-                ->delete();
-            if ($oldPlansCount > 0) {
-                Log::info("Import cleanup: {$oldPlansCount} old PPC plans deleted (before {$parsedDate})");
+            Log::info('[IMPORT] Merge result', [
+                'date' => $parsedDate,
+                'counts' => $mergeResult['counts'] ?? [],
+            ]);
+            if (isset($result['log'])) {
+                Log::info('[IMPORT] Python parser stats', $result['log']);
             }
 
             @unlink($dataPath);
@@ -944,47 +419,6 @@ class ProductionPlanController extends Controller
                 'imported' => $imported,
             ]);
 
-            // Bulk pre-create JobMasters for the imported date so Dashboard and Input Harian load instantly without N+1 insert lag
-            try {
-                $newPlans = ProductionPlan::whereDate('plan_date', $parsedDate)
-                    ->where('row_type', 'job')
-                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                    ->get(['id', 'job_no', 'job_master', 'press_name', 'plan', 'row_no', 'start_time', 'finish_time', 'qty_plt']);
-
-                if ($newPlans->isNotEmpty()) {
-                    $identifiers = $newPlans->map(fn($p) => (trim($p->job_no ?? '') ?: 'AUTO-' . \Illuminate\Support\Str::slug($p->job_master ?? '')) . '-' . $p->id)->toArray();
-                    $existingJn = JobMaster::whereIn('job_number', $identifiers)->pluck('job_number')->flip()->toArray();
-
-                    $batchJobs = [];
-                    foreach ($newPlans as $p) {
-                        $jn = trim($p->job_no ?? '');
-                        $jm = trim($p->job_master ?? '');
-                        $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
-                        if (!isset($existingJn[$identifier])) {
-                            $batchJobs[] = [
-                                'job_number'   => $identifier,
-                                'job_name'     => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
-                                'line'         => $p->press_name ?? 'Line A',
-                                'target_qty'   => (int) ($p->plan ?? 0),
-                                'sequence_no'  => $p->row_no ?? 1,
-                                'status'       => 'pending',
-                                'plan_start'   => $p->start_time ? Carbon::parse($parsedDate . ' ' . $p->start_time)->startOfMinute() : null,
-                                'plan_end'     => $p->finish_time ? Carbon::parse($parsedDate . ' ' . $p->finish_time)->startOfMinute() : null,
-                                'capacity'     => (int) ($p->qty_plt ?? 0),
-                                'created_at'   => now(),
-                                'updated_at'   => now(),
-                            ];
-                        }
-                    }
-                    if (!empty($batchJobs)) {
-                        foreach (array_chunk($batchJobs, 500) as $chunk) {
-                            JobMaster::insertOrIgnore($chunk);
-                        }
-                    }
-                }
-            } catch (\Throwable $e) {
-                Log::warning("Pre-creating JobMasters post-import warning: " . $e->getMessage());
-            }
 
             // OTOMATIS SYNC KE QA: Setiap kali PPC upload jadwal baru, langsung sync ke QA schedules
             try {
@@ -1007,10 +441,12 @@ class ProductionPlanController extends Controller
                     'date'  => $parsedDate,
                     'press' => $firstSheet['press_name'] ?? null,
                     'shift' => $redirectShift,
-                ])->with('success', "Import Berhasil! {$imported} data diproses.");
+                ])->with('success', "Import Berhasil! {$imported} data diproses.")
+                    ->with('import_preview', $importPreview);
             }
 
-            return back()->with('success', "Import Berhasil! {$imported} data diproses.");
+            return back()->with('success', "Import Berhasil! {$imported} data diproses.")
+                ->with('import_preview', $importPreview);
 
         } catch (\Throwable $e) {
             Log::error("Python Import Error: " . $e->getMessage());
@@ -1039,17 +475,26 @@ class ProductionPlanController extends Controller
             $query->where('shift_name', 'like', "Shift $shift%");
         }
 
-        $plansToDelete = (clone $query)->pluck('id');
-        if ($plansToDelete->isNotEmpty()) {
-            \App\Models\RecoveryItem::whereIn('production_plan_id', $plansToDelete)
+        $mergeService = app(\App\Services\PpcScheduleMergeService::class);
+        $plans = (clone $query)->get(['id', 'job_no', 'shift_name', 'press_name', 'ok', 'repair', 'reject', 'status', 'act_start']);
+        $protectedPlans = $plans->filter(fn ($plan) => $mergeService->planHasProductionActivity($plan));
+        $deletableIds = $plans->pluck('id')->diff($protectedPlans->pluck('id'))->values();
+
+        if ($deletableIds->isNotEmpty()) {
+            \App\Models\RecoveryItem::whereIn('production_plan_id', $deletableIds)
                 ->delete();
         }
 
-        $count = $query->count();
-        $query->delete();
+        $count = ProductionPlan::whereIn('id', $deletableIds)->delete();
+        $skipped = $protectedPlans->count();
+
+        $message = "Clear Data Selesai! $count record untuk tanggal $date" . ($shift ? " (Shift $shift)" : '') . " telah dihapus.";
+        if ($skipped > 0) {
+            $message .= " $skipped plan dilewati karena sudah memiliki aktivitas produksi.";
+        }
 
         return redirect()->route('ppc.planning.production_plan', ['date' => $date])
-            ->with('success', "Clear Data Selesai! $count record untuk tanggal $date" . ($shift ? " (Shift $shift)" : '') . " telah dihapus.");
+            ->with('success', $message);
     }
 
     public function cancelApproval(Request $request)
@@ -1412,7 +857,17 @@ class ProductionPlanController extends Controller
 
     public function destroy(int|string $id)
     {
-        ProductionPlan::findOrFail($id)->delete();
+        $plan = ProductionPlan::findOrFail($id);
+        $mergeService = app(\App\Services\PpcScheduleMergeService::class);
+
+        if ($mergeService->planHasProductionActivity($plan)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Plan tidak bisa dihapus karena sudah memiliki aktivitas produksi. Hapus hanya jadwal yang belum berjalan.'
+            ], 422);
+        }
+
+        $plan->delete();
 
         return response()->json([
             'success' => true,
