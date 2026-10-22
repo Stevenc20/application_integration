@@ -95,18 +95,17 @@
     {{-- 1. ITEM SPEC --}}
     <td class="px-6 py-5 align-top">
         <div class="flex flex-col gap-1">
-            <span class="font-black text-slate-800 text-sm tracking-tight leading-none">{{ $job->job_no ?: ($job->job_master ?: 'NO ITEM NAME') }}</span>
-            <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-slate-400 uppercase leading-tight">{{ $job->job_master ?: ($job->job_no ?: 'NO JOB NO') }}</span>
-                @if(!empty($job->session_no))
+            <span class="font-black text-slate-800 text-sm tracking-tight leading-none">{{ $job->job_no ?: 'NO JOB NO' }}</span>
+            @if(!empty($job->session_no))
+                <div class="flex items-center gap-2">
                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm shrink-0" title="Split Session {{ $job->session_no }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
                         </svg>
                         SES {{ chr(64 + (int)$job->session_no) }}
                     </span>
-                @endif
-            </div>
+                </div>
+            @endif
             <div class="mt-2 flex items-center gap-1.5">
                 <span class="px-2 py-0.5 rounded bg-slate-900 text-white text-[8px] font-black tracking-tighter uppercase">LINE: {{ $job->press_name ?? 'N/A' }}</span>
                 <span class="px-2 py-0.5 rounded bg-blue-50 text-blue-500 text-[8px] font-black tracking-tighter uppercase">POS: {{ $job->row_no }}</span>
