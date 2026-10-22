@@ -279,12 +279,9 @@
                             </div>
                             <div class="min-w-0">
                                 <span class="text-[10px] sm:text-xs font-black text-red-500 uppercase tracking-widest block leading-none">Running Session</span>
-                                <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5" title="{{ $activeJob->job_name }}">
-                                    {{ $activeJob->job_name ?: (strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number) }}
-                                </h2>
-                                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-tight block mt-0.5">
+                                <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5" title="{{ $activeJob->job_number }}">
                                     {{ strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number }}
-                                </span>
+                                </h2>
                             </div>
                         </div>
 
@@ -329,9 +326,9 @@
 
                     <div class="space-y-1">
                         <p class="text-[9px] sm:text-xs text-slate-400 font-black uppercase tracking-wider leading-none">Next Item</p>
-                        <p class="text-xs sm:text-sm font-black truncate leading-tight text-slate-700" title="{{ $nextJob ? ($nextJob->job_name . ' (' . $nextJob->job_number . ')') : 'No pending items' }}">
+                        <p class="text-xs sm:text-sm font-black truncate leading-tight text-slate-700" title="{{ $nextJob ? $nextJob->job_number : 'No pending items' }}">
                             @if($nextJob)
-                                {{ $nextJob->job_name ?: (strpos($nextJob->job_number, '-') !== false ? substr($nextJob->job_number, 0, strrpos($nextJob->job_number, '-')) : $nextJob->job_number) }}
+                                {{ strpos($nextJob->job_number, '-') !== false ? substr($nextJob->job_number, 0, strrpos($nextJob->job_number, '-')) : $nextJob->job_number }}
                             @else
                                 <span class="text-slate-500 italic">None</span>
                             @endif
