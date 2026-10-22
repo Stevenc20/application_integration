@@ -424,6 +424,14 @@ test('snapshot detail view accurately renders multiple press, shift, urutan row_
         ->assertSee('13:00')
         ->assertSee('18:30')
         ->assertDontSee('Peringatan: Data Snapshot Tidak Lengkap');
+
+    // Test filtering by PRESS B only
+    $this->actingAs($user)
+        ->get(route('ppc.planning.backups.show', ['id' => $backup->id, 'press' => 'PRESS B']))
+        ->assertOk()
+        ->assertSee('BR-202')
+        ->assertDontSee('MF-101')
+        ->assertDontSee('RP-303');
 });
 
 test('incomplete snapshot displays warning and blocks restore execution', function () {

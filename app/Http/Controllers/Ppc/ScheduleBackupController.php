@@ -88,17 +88,22 @@ class ScheduleBackupController extends Controller
             ->with('success', "Snapshot backup #{$backup->id} berhasil dibuat.");
     }
 
-    public function show(int $id)
+    public function show(Request $request, int $id)
     {
         $backup = ScheduleBackup::with(['creator', 'restorer', 'restoredFrom'])->findOrFail($id);
         $comparison = $this->backupService->compareWithLive($backup);
         $completeness = $comparison['completeness'] ?? $this->backupService->validateSnapshotCompleteness($backup);
+
+        $currentPress = strtoupper((string) $request->query('press', 'ALL'));
+        $currentShift = (string) $request->query('shift', 'ALL');
 
         return view('ppc.planning.schedule_backup_show', [
             'backup' => $backup,
             'comparison' => $comparison,
             'diff' => $comparison,
             'completeness' => $completeness,
+            'currentPress' => $currentPress,
+            'currentShift' => $currentShift,
         ]);
     }
 

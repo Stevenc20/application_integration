@@ -18,9 +18,49 @@
 
     @php
         $planDateStr = $backup->plan_date ? $backup->plan_date->format('Y-m-d') : now()->format('Y-m-d');
-        $counts = $diff['counts'] ?? [];
-        $snapshotRows = $diff['snapshot_rows'] ?? ($backup->snapshot_payload['production_plans'] ?? []);
-        $liveRows = $diff['live_rows'] ?? [];
+        $activePress = strtoupper($currentPress ?? request('press', 'ALL'));
+        $activeShift = $currentShift ?? request('shift', 'ALL');
+
+        $matchFilter = function (array $row) use ($activePress, $activeShift): bool {
+            if ($activePress !== '' && $activePress !== 'ALL') {
+                $rowPress = strtoupper(trim((string) ($row['press_name'] ?? $row['press'] ?? '')));
+                if ($rowPress !== $activePress) {
+                    return false;
+                }
+            }
+            if ($activeShift !== '' && strtoupper($activeShift) !== 'ALL') {
+                $rowShift = strtolower(trim((string) ($row['shift_name'] ?? $row['shift'] ?? '')));
+                $needle = strtolower(trim($activeShift));
+                if ($needle === 'pagi' && !str_contains($rowShift, 'pagi') && !str_contains($rowShift, '1')) {
+                    return false;
+                }
+                if ($needle === 'malam' && !str_contains($rowShift, 'malam') && !str_contains($rowShift, '2')) {
+                    return false;
+                }
+            }
+            return true;
+        };
+
+        $allSnapshotRows = $diff['snapshot_rows'] ?? ($backup->snapshot_payload['production_plans'] ?? []);
+        $allLiveRows = $diff['live_rows'] ?? [];
+
+        $snapshotRows = array_values(array_filter($allSnapshotRows, $matchFilter));
+        $liveRows = array_values(array_filter($allLiveRows, $matchFilter));
+
+        $filteredMissing = array_values(array_filter($diff['will_restore_missing'] ?? [], $matchFilter));
+        $filteredUpdated = array_values(array_filter($diff['will_update_schedule'] ?? [], $matchFilter));
+        $filteredUnchanged = array_values(array_filter($diff['unchanged'] ?? [], $matchFilter));
+        $filteredPostSnapshot = array_values(array_filter($diff['post_snapshot_plans'] ?? [], $matchFilter));
+        $filteredProtected = array_values(array_filter($diff['protected_active_plans'] ?? [], $matchFilter));
+
+        $counts = [
+            'will_restore_missing' => count($filteredMissing),
+            'will_update_schedule' => count($filteredUpdated),
+            'unchanged' => count($filteredUnchanged),
+            'post_snapshot_plans' => count($filteredPostSnapshot),
+            'protected_active_plans' => count($filteredProtected),
+        ];
+
         $completenessInfo = $completeness ?? ($diff['completeness'] ?? ['is_complete' => true, 'incomplete_count' => 0, 'issues' => []]);
         $isComplete = (bool) ($completenessInfo['is_complete'] ?? true);
         $incompleteCount = (int) ($completenessInfo['incomplete_count'] ?? 0);
@@ -49,7 +89,7 @@
     </div>
     @endif
 
-    {{-- Header Merah Solid PT IPPI --}}
+    {{-- Header Merah Solid PT IPPI + Filter Press & Shift --}}
     <div class="bg-red-700 border border-red-800 px-6 py-5 rounded-2xl shadow-sm">
         <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div>
@@ -64,6 +104,7 @@
                 </h1>
                 <p class="text-red-100 text-xs mt-0.5">
                     Tanggal Jadwal: <b class="text-white">{{ $planDateStr }}</b> &bull;
+                    Filter: <b class="text-white">{{ $activePress }}</b> / <b class="text-white">{{ strtoupper($activeShift) === 'ALL' ? 'SEMUA SHIFT' : 'SHIFT ' . strtoupper($activeShift) }}</b> &bull;
                     Dibuat: <b class="text-white">{{ $backup->created_at ? $backup->created_at->format('d M Y H:i:s') : '-' }}</b> &bull;
                     Oleh: <b class="text-white">{{ $backup->creator->name ?? 'System' }}</b>
                     @if($backup->source_filename)
@@ -77,9 +118,41 @@
                    class="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-black transition-all border border-red-600">
                     &larr; DAFTAR BACKUP
                 </a>
-                <a href="{{ route('ppc.planning.production_plan', ['date' => $planDateStr]) }}"
+                <a href="{{ route('ppc.planning.production_plan', ['date' => $planDateStr, 'press' => $activePress === 'ALL' ? 'PRESS A' : $activePress]) }}"
                    class="px-4 py-2 bg-white hover:bg-slate-100 text-red-700 rounded-xl text-xs font-black transition-all shadow-sm">
                     LIHAT LIVE PLAN
+                </a>
+            </div>
+        </div>
+
+        {{-- Press & Shift Selector (Identik dengan Production Plan) --}}
+        <div class="mt-4 pt-4 border-t border-red-600/60 flex flex-wrap items-center gap-3">
+            <div class="flex flex-wrap items-center gap-1 bg-red-800 p-1 rounded-xl border border-red-600">
+                @foreach(['PRESS A', 'PRESS B', 'PRESS C', 'PRESS D', 'ALL'] as $p)
+                <a href="{{ route('ppc.planning.backups.show', ['id' => $backup->id, 'press' => $p, 'shift' => $activeShift]) }}"
+                   class="px-4 py-1.5 rounded-lg text-[11px] font-black transition-all {{ $activePress === $p ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:text-white hover:bg-red-700' }}">
+                    {{ $p }}
+                </a>
+                @endforeach
+            </div>
+
+            <div class="w-px h-6 bg-red-500/50 hidden sm:block"></div>
+
+            <div class="flex flex-wrap items-center gap-1 bg-red-800 p-1 rounded-xl border border-red-600">
+                @php
+                    $shiftUpper = strtoupper($activeShift);
+                @endphp
+                <a href="{{ route('ppc.planning.backups.show', ['id' => $backup->id, 'press' => $activePress, 'shift' => 'ALL']) }}"
+                   class="px-4 py-1.5 rounded-lg text-[11px] font-black transition-all {{ $shiftUpper === 'ALL' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:text-white hover:bg-red-700' }}">
+                    SEMUA SHIFT
+                </a>
+                <a href="{{ route('ppc.planning.backups.show', ['id' => $backup->id, 'press' => $activePress, 'shift' => 'Pagi']) }}"
+                   class="px-4 py-1.5 rounded-lg text-[11px] font-black transition-all {{ $shiftUpper === 'PAGI' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:text-white hover:bg-red-700' }}">
+                    SHIFT PAGI
+                </a>
+                <a href="{{ route('ppc.planning.backups.show', ['id' => $backup->id, 'press' => $activePress, 'shift' => 'Malam']) }}"
+                   class="px-4 py-1.5 rounded-lg text-[11px] font-black transition-all {{ $shiftUpper === 'MALAM' ? 'bg-white text-red-700 shadow-sm' : 'text-red-100 hover:text-white hover:bg-red-700' }}">
+                    SHIFT MALAM
                 </a>
             </div>
         </div>
@@ -93,6 +166,9 @@
                     <h2 class="text-sm font-black text-slate-800 uppercase">Ringkasan Perbandingan Snapshot #{{ $backup->id }} vs Jadwal Live</h2>
                     <p class="text-[11px] text-slate-500">Data snapshot dipertahankan murni sebagai referensi historis saat backup dibuat.</p>
                 </div>
+                <span class="px-2.5 py-1 rounded-lg bg-red-50 text-red-700 border border-red-200 text-[10px] font-black uppercase">
+                    {{ $activePress }} &bull; {{ strtoupper($activeShift) === 'ALL' ? 'SEMUA SHIFT' : 'SHIFT ' . strtoupper($activeShift) }}
+                </span>
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
@@ -178,10 +254,10 @@
         {{-- Will Restore Missing & Will Update --}}
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <h3 class="text-xs font-black text-slate-800 uppercase">
-                Detail Item Hilang &amp; Berubah ({{ count($diff['will_restore_missing'] ?? []) + count($diff['will_update_schedule'] ?? []) }} Item)
+                Detail Item Hilang &amp; Berubah ({{ count($filteredMissing) + count($filteredUpdated) }} Item)
             </h3>
             <div class="max-h-72 overflow-y-auto space-y-2">
-                @foreach(($diff['will_restore_missing'] ?? []) as $item)
+                @foreach($filteredMissing as $item)
                     @php
                         $itemPress = $item['press_name'] ?? $item['press'] ?? '-';
                         $itemShift = $item['shift_name'] ?? $item['shift'] ?? '-';
@@ -197,7 +273,7 @@
                     </div>
                 @endforeach
 
-                @foreach(($diff['will_update_schedule'] ?? []) as $item)
+                @foreach($filteredUpdated as $item)
                     @php
                         $itemPress = $item['press_name'] ?? $item['press'] ?? '-';
                         $itemShift = $item['shift_name'] ?? $item['shift'] ?? '-';
@@ -227,8 +303,8 @@
                     </div>
                 @endforeach
 
-                @if(empty($diff['will_restore_missing']) && empty($diff['will_update_schedule']))
-                    <p class="text-xs text-slate-400 py-4 text-center">Semua jadwal pada snapshot ini sudah identik dengan jadwal live saat ini.</p>
+                @if(empty($filteredMissing) && empty($filteredUpdated))
+                    <p class="text-xs text-slate-400 py-4 text-center">Semua jadwal pada filter ini sudah identik dengan jadwal live saat ini.</p>
                 @endif
             </div>
         </div>
@@ -236,10 +312,10 @@
         {{-- Post-Snapshot Plans --}}
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <h3 class="text-xs font-black text-slate-800 uppercase">
-                Item yang Ditambahkan Setelah Snapshot ({{ count($diff['post_snapshot_plans'] ?? []) }} Item)
+                Item yang Ditambahkan Setelah Snapshot ({{ count($filteredPostSnapshot) }} Item)
             </h3>
             <div class="max-h-72 overflow-y-auto space-y-2">
-                @forelse(($diff['post_snapshot_plans'] ?? []) as $item)
+                @forelse($filteredPostSnapshot as $item)
                     @php
                         $itemPress = $item['press_name'] ?? $item['press'] ?? '-';
                         $itemShift = $item['shift_name'] ?? $item['shift'] ?? '-';
