@@ -109,42 +109,42 @@
     </div>
     @endif
     {{-- Header Section --}}
-    <div class="bg-gradient-to-r from-red-900 via-red-800 to-rose-700 px-6 py-5 shadow-lg">
+    <div class="bg-red-700 border-b border-red-800 px-6 py-5 shadow-sm">
         <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mx-auto max-w-screen-2xl">
             <div class="flex items-center gap-4">
-                <div class="w-12 h-12 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center text-white ring-1 ring-white/20">
+                <div class="w-12 h-12 bg-red-800 rounded-2xl flex items-center justify-center text-white border border-red-600">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-2a4 4 0 00-4-4H5m11 0h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1" />
                     </svg>
                 </div>
                 <div>
                     <h1 class="text-xl font-black text-white tracking-tight">PRODUCTION PLANNING</h1>
-                    <p class="text-slate-300 text-[10px] font-semibold flex flex-wrap items-center gap-2 mt-0.5">
+                    <p class="text-red-100 text-[10px] font-semibold flex flex-wrap items-center gap-2 mt-0.5">
                         <span class="inline-block w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
                         {{ \Carbon\Carbon::parse($date)->translatedFormat('d F Y') }} &bull; {{ $currentPress }} &bull; 
-                        <span class="text-white font-black px-1.5 py-0.5 bg-white/10 rounded">{{ $totalJobs }} ITEMS</span>
+                        <span class="text-white font-black px-1.5 py-0.5 bg-red-800 rounded">{{ $totalJobs }} ITEMS</span>
                         <span class="mx-1 text-white/30">|</span>
-                        <span class="text-emerald-400 font-bold uppercase tracking-tighter">Last Import: {{ $activeFilters['last_import'] }}</span>
+                        <span class="text-emerald-300 font-bold uppercase tracking-tighter">Last Import: {{ $activeFilters['last_import'] }}</span>
                     </p>
                 </div>
             </div>
 
             <div class="flex flex-wrap items-center gap-2">
-                <button onclick="openImportModal()" class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 ring-1 ring-white/20">
+                <button onclick="openImportModal()" class="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 border border-red-600">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
                     </svg>
                     IMPORT EXCEL
                 </button>
 
-                <button onclick="openAddJobModal()" class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 ring-1 ring-white/20">
+                <button onclick="openAddJobModal()" class="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 border border-red-600">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                     </svg>
                     TAMBAH MANUAL
                 </button>
 
-                <a href="{{ route('ppc.planning.recovery.index') }}" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm ring-1 ring-amber-400">
+                <a href="{{ route('ppc.planning.recovery.index') }}" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 shadow-sm border border-amber-400">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
@@ -154,7 +154,7 @@
                     @endif
                 </a>
 
-                <a href="{{ route('ppc.planning.backups.index', ['date' => $date]) }}" class="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 ring-1 ring-white/20">
+                <a href="{{ route('ppc.planning.backups.index', ['date' => $date]) }}" class="px-4 py-2 bg-red-800 hover:bg-red-900 text-white rounded-xl text-xs font-black transition-all flex items-center gap-2 border border-red-600">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>

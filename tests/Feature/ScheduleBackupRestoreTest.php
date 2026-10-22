@@ -337,3 +337,151 @@ test('schedule backup controller endpoints render history, diff view, manual sna
     $revertedPlan = ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'JZ-10')->firstOrFail();
     expect((float) $revertedPlan->plan)->toBe(300.0);
 });
+
+test('snapshot detail view accurately renders multiple press, shift, urutan row_no, qty plan, and jam plan from database payload', function () {
+    $lineA = backupTestLine('L-A', 'PRESS A');
+    $lineB = backupTestLine('L-B', 'PRESS B');
+    $lineD = backupTestLine('L-D', 'PRESS D');
+    $user = backupTestUser();
+    $date = '2026-10-23';
+
+    ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'MEMBER FRONT',
+        'job_no' => 'MF-101',
+        'row_no' => 1,
+        'row_type' => 'job',
+        'plan' => 450,
+        'start_time' => '07:30',
+        'finish_time' => '11:45',
+        'status' => 'pending',
+        'source_type' => 'ppc',
+    ]);
+
+    ProductionPlan::create([
+        'line_master_id' => $lineB->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Malam',
+        'press_name' => 'PRESS B',
+        'job_master' => 'BRACKET REAR',
+        'job_no' => 'BR-202',
+        'row_no' => 7,
+        'row_type' => 'job',
+        'plan' => 620,
+        'start_time' => '21:00',
+        'finish_time' => '02:15',
+        'status' => 'pending',
+        'source_type' => 'ppc',
+    ]);
+
+    ProductionPlan::create([
+        'line_master_id' => $lineD->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS D',
+        'job_master' => 'REINF PANEL',
+        'job_no' => 'RP-303',
+        'row_no' => 12,
+        'row_type' => 'job',
+        'plan' => 890,
+        'start_time' => '13:00',
+        'finish_time' => '18:30',
+        'status' => 'pending',
+        'source_type' => 'ppc',
+    ]);
+
+    $backup = app(ScheduleBackupService::class)->captureSnapshot($date, 'manual', $user->id, [
+        'label' => 'Multi Press Snapshot',
+    ]);
+
+    // Also test legacy snapshot payload that only stored raw DB attributes without alias keys
+    $rawPayload = $backup->snapshot_payload;
+    foreach ($rawPayload['production_plans'] as &$p) {
+        unset($p['press'], $p['shift'], $p['urutan_plan'], $p['qty_plan']);
+    }
+    $backup->update(['snapshot_payload' => $rawPayload]);
+
+    $response = $this->actingAs($user)->get(route('ppc.planning.backups.show', $backup->id));
+    $response->assertOk()
+        ->assertSee('PRESS A')
+        ->assertSee('PRESS B')
+        ->assertSee('PRESS D')
+        ->assertSee('Shift Pagi')
+        ->assertSee('Shift Malam')
+        ->assertSee('MF-101')
+        ->assertSee('BR-202')
+        ->assertSee('RP-303')
+        ->assertSee('450')
+        ->assertSee('620')
+        ->assertSee('890')
+        ->assertSee('07:30 - 11:45')
+        ->assertSee('21:00 - 02:15')
+        ->assertSee('13:00 - 18:30')
+        ->assertDontSee('Peringatan: Data Snapshot Tidak Lengkap');
+});
+
+test('incomplete snapshot displays warning and blocks restore execution', function () {
+    $lineA = backupTestLine('L-A', 'PRESS A');
+    $user = backupTestUser();
+    $date = '2026-10-23';
+
+    ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'PART CORRUPT',
+        'job_no' => 'PC-01',
+        'row_no' => 1,
+        'row_type' => 'job',
+        'plan' => 100,
+        'status' => 'pending',
+        'source_type' => 'ppc',
+    ]);
+
+    $backup = ScheduleBackup::create([
+        'plan_date' => $date,
+        'shift_scope' => 'all',
+        'press_scope' => 'all',
+        'backup_type' => 'manual',
+        'label' => 'Incomplete Snapshot',
+        'plans_count' => 1,
+        'jobs_count' => 0,
+        'active_jobs_count' => 0,
+        'signatures_count' => 0,
+        'snapshot_payload' => [
+            'version' => 1,
+            'plan_date' => $date,
+            'production_plans' => [
+                [
+                    'id' => 99999,
+                    'press_name' => null,
+                    'shift_name' => null,
+                    'row_no' => null,
+                    'row_type' => 'job',
+                    'job_no' => 'PC-01',
+                    'job_master' => 'PART CORRUPT',
+                    'plan' => 500,
+                ],
+            ],
+        ],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('ppc.planning.backups.show', $backup->id))
+        ->assertOk()
+        ->assertSee('Peringatan: Data Snapshot Tidak Lengkap')
+        ->assertSee('RESTORE DINONAKTIFKAN');
+
+    $this->actingAs($user)
+        ->post(route('ppc.planning.backups.restore', $backup->id))
+        ->assertRedirect()
+        ->assertSessionHas('error');
+
+    // Live plan must remain untouched (100 pcs, not overwritten to 500)
+    $livePlan = ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'PC-01')->firstOrFail();
+    expect((float) $livePlan->plan)->toBe(100.0);
+});

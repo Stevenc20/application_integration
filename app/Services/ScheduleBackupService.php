@@ -144,7 +144,7 @@ class ScheduleBackupService
         $mergeService = app(PpcScheduleMergeService::class);
         $activeJobsCount = $plans->filter(fn (ProductionPlan $p) => $mergeService->planHasProductionActivity($p))->count();
 
-        $plansArray = $plans->map(fn (ProductionPlan $plan) => $this->serializeModel($plan))->values()->all();
+        $plansArray = $plans->map(fn (ProductionPlan $plan) => $this->normalizePlanRow($this->serializeModel($plan)))->values()->all();
         $jobsArray = $connectedJobs->map(fn (JobMaster $job) => $this->serializeModel($job))->values()->all();
 
         $checksumSource = json_encode([
@@ -231,6 +231,59 @@ class ScheduleBackupService
     }
 
     /**
+     * Validate whether a backup snapshot payload has complete required fields for safe restore.
+     */
+    public function validateSnapshotCompleteness(ScheduleBackup $backup): array
+    {
+        $payload = $backup->snapshot_payload ?? [];
+        $plans = $payload['production_plans'] ?? [];
+
+        if (empty($plans)) {
+            return [
+                'is_complete' => false,
+                'incomplete_count' => 0,
+                'issues' => ['Snapshot tidak memiliki data jadwal (production_plans kosong).'],
+            ];
+        }
+
+        $incompleteCount = 0;
+        $issues = [];
+
+        foreach ($plans as $idx => $row) {
+            $normalized = $this->normalizePlanRow((array) $row);
+            $rowType = strtolower((string) ($normalized['row_type'] ?? 'job'));
+            $missingFields = [];
+
+            if (empty($normalized['press_name'])) {
+                $missingFields[] = 'press_name';
+            }
+            if (empty($normalized['shift_name'])) {
+                $missingFields[] = 'shift_name';
+            }
+            if ($rowType === 'job' && ($normalized['row_no'] === null || $normalized['row_no'] === '')) {
+                $missingFields[] = 'row_no';
+            }
+            if ($rowType === 'job' && empty($normalized['job_master']) && empty($normalized['job_no'])) {
+                $missingFields[] = 'job_master/job_no';
+            }
+
+            if (! empty($missingFields)) {
+                $incompleteCount++;
+                if (count($issues) < 5) {
+                    $rowLabel = $normalized['job_no'] ?: ($normalized['job_master'] ?: ('Baris #'.($idx + 1)));
+                    $issues[] = "Item {$rowLabel} kehilangan atribut penting: ".implode(', ', $missingFields);
+                }
+            }
+        }
+
+        return [
+            'is_complete' => $incompleteCount === 0,
+            'incomplete_count' => $incompleteCount,
+            'issues' => $issues,
+        ];
+    }
+
+    /**
      * Ensure an initial backup exists for a date after the very first schedule import.
      */
     public function ensureInitialBackup(string $planDate, ?int $userId = null, ?string $sourceFilename = null): ?ScheduleBackup
@@ -257,7 +310,9 @@ class ScheduleBackupService
     {
         $parsedDate = $backup->plan_date->toDateString();
         $payload = $backup->snapshot_payload ?? [];
-        $snapshotPlans = collect($payload['production_plans'] ?? []);
+        $snapshotPlans = collect($payload['production_plans'] ?? [])
+            ->map(fn ($row) => $this->normalizePlanRow((array) $row));
+        $completeness = $this->validateSnapshotCompleteness($backup);
 
         /** @var Collection<int, ProductionPlan> $livePlans */
         $livePlans = ProductionPlan::whereDate('plan_date', $parsedDate)
@@ -303,17 +358,28 @@ class ScheduleBackupService
 
             $changedFields = $this->diffScheduleFields($livePlan, $snapPlan);
             if (! empty($changedFields)) {
+                $shiftVal = $snapPlan['shift_name'] ?? $livePlan->shift_name;
+                $pressVal = $snapPlan['press_name'] ?? $livePlan->press_name;
+                $rowNoVal = $snapPlan['row_no'] ?? $livePlan->row_no;
+                $planVal = (float) ($snapPlan['plan'] ?? 0);
+
                 $willUpdateSchedule[] = [
                     'plan_id' => $livePlan->id,
-                    'shift_name' => $snapPlan['shift_name'] ?? $livePlan->shift_name,
-                    'press_name' => $snapPlan['press_name'] ?? $livePlan->press_name,
-                    'row_no' => $snapPlan['row_no'] ?? $livePlan->row_no,
+                    'shift_name' => $shiftVal,
+                    'shift' => $shiftVal,
+                    'press_name' => $pressVal,
+                    'press' => $pressVal,
+                    'row_no' => $rowNoVal,
+                    'urutan_plan' => $rowNoVal,
                     'job_master' => $snapPlan['job_master'] ?? $livePlan->job_master,
                     'job_no' => $snapPlan['job_no'] ?? $livePlan->job_no,
+                    'plan' => $planVal,
+                    'qty_plan' => $planVal,
                     'changed_fields' => $changedFields,
                     'has_live_activity' => $hasLiveActivity,
+                    'has_activity' => $hasLiveActivity,
                     'live_plan_qty' => (float) $livePlan->plan,
-                    'backup_plan_qty' => (float) ($snapPlan['plan'] ?? 0),
+                    'backup_plan_qty' => $planVal,
                     'live_start' => $livePlan->start_time,
                     'backup_start' => $snapPlan['start_time'] ?? null,
                     'live_finish' => $livePlan->finish_time,
@@ -329,6 +395,7 @@ class ScheduleBackupService
                 $hasActivity = $mergeService->planHasProductionActivity($livePlan);
                 $postSnapshotPlans[] = array_merge($this->summarizePlanRow($livePlan->toArray()), [
                     'has_activity' => $hasActivity,
+                    'has_live_activity' => $hasActivity,
                     'action_on_restore' => $hasActivity ? 'kept_protected' : 'removed_or_kept_by_mode',
                 ]);
             }
@@ -341,6 +408,7 @@ class ScheduleBackupService
         return [
             'backup_id' => $backup->id,
             'plan_date' => $parsedDate,
+            'completeness' => $completeness,
             'counts' => [
                 'snapshot_plans' => $snapshotPlans->count(),
                 'live_plans' => $livePlans->count(),
@@ -380,7 +448,8 @@ class ScheduleBackupService
     ): array {
         $parsedDate = $backup->plan_date->toDateString();
         $payload = $backup->snapshot_payload ?? [];
-        $snapshotPlans = collect($payload['production_plans'] ?? []);
+        $snapshotPlans = collect($payload['production_plans'] ?? [])
+            ->map(fn ($row) => $this->normalizePlanRow((array) $row));
         $snapshotJobs = collect($payload['job_masters'] ?? []);
         $snapshotSignatures = collect($payload['signatures'] ?? []);
 
@@ -738,37 +807,72 @@ class ScheduleBackupService
 
             if (is_numeric($liveVal) && is_numeric($snapVal)) {
                 if ((float) $liveVal !== (float) $snapVal) {
-                    $changed[] = $field;
+                    $changed[$field] = [
+                        'live' => $liveVal,
+                        'backup' => $snapVal,
+                    ];
                 }
 
                 continue;
             }
 
             if (trim((string) ($liveVal ?? '')) !== trim((string) ($snapVal ?? ''))) {
-                $changed[] = $field;
+                $changed[$field] = [
+                    'live' => $liveVal,
+                    'backup' => $snapVal,
+                ];
             }
         }
 
         return $changed;
     }
 
+    /**
+     * Normalize a ProductionPlan array so both DB column keys (`press_name`, `shift_name`, `row_no`, `plan`)
+     * and view/legacy keys (`press`, `shift`, `urutan_plan`, `qty_plan`) are guaranteed to exist without inventing data.
+     */
+    public function normalizePlanRow(array $plan): array
+    {
+        $pressName = $plan['press_name'] ?? $plan['press'] ?? null;
+        $shiftName = $plan['shift_name'] ?? $plan['shift'] ?? null;
+        $rowNo = $plan['row_no'] ?? $plan['urutan_plan'] ?? null;
+        $planQty = $plan['plan'] ?? $plan['qty_plan'] ?? null;
+
+        $plan['press_name'] = $pressName;
+        $plan['press'] = $pressName;
+        $plan['shift_name'] = $shiftName;
+        $plan['shift'] = $shiftName;
+        $plan['row_no'] = $rowNo;
+        $plan['urutan_plan'] = $rowNo;
+        $plan['plan'] = $planQty !== null ? (float) $planQty : 0.0;
+        $plan['qty_plan'] = $plan['plan'];
+
+        return $plan;
+    }
+
     private function summarizePlanRow(array $plan, array $extra = []): array
     {
+        $normalized = $this->normalizePlanRow($plan);
+
         return array_merge([
-            'id' => $plan['id'] ?? null,
-            'shift_name' => $plan['shift_name'] ?? '-',
-            'press_name' => $plan['press_name'] ?? '-',
-            'row_no' => $plan['row_no'] ?? 0,
-            'row_type' => $plan['row_type'] ?? 'job',
-            'job_master' => $plan['job_master'] ?? '-',
-            'job_no' => $plan['job_no'] ?? '-',
-            'plan' => (float) ($plan['plan'] ?? 0),
-            'ok' => (float) ($plan['ok'] ?? 0),
-            'repair' => (float) ($plan['repair'] ?? 0),
-            'reject' => (float) ($plan['reject'] ?? 0),
-            'start_time' => $plan['start_time'] ?? null,
-            'finish_time' => $plan['finish_time'] ?? null,
-            'status' => $plan['status'] ?? 'pending',
+            'id' => $normalized['id'] ?? null,
+            'shift_name' => $normalized['shift_name'] ?? '-',
+            'shift' => $normalized['shift_name'] ?? '-',
+            'press_name' => $normalized['press_name'] ?? '-',
+            'press' => $normalized['press_name'] ?? '-',
+            'row_no' => $normalized['row_no'] ?? 0,
+            'urutan_plan' => $normalized['row_no'] ?? 0,
+            'row_type' => $normalized['row_type'] ?? 'job',
+            'job_master' => $normalized['job_master'] ?? '-',
+            'job_no' => $normalized['job_no'] ?? '-',
+            'plan' => (float) ($normalized['plan'] ?? 0),
+            'qty_plan' => (float) ($normalized['plan'] ?? 0),
+            'ok' => (float) ($normalized['ok'] ?? 0),
+            'repair' => (float) ($normalized['repair'] ?? 0),
+            'reject' => (float) ($normalized['reject'] ?? 0),
+            'start_time' => $normalized['start_time'] ?? null,
+            'finish_time' => $normalized['finish_time'] ?? null,
+            'status' => $normalized['status'] ?? 'pending',
         ], $extra);
     }
 

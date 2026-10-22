@@ -92,11 +92,13 @@ class ScheduleBackupController extends Controller
     {
         $backup = ScheduleBackup::with(['creator', 'restorer', 'restoredFrom'])->findOrFail($id);
         $comparison = $this->backupService->compareWithLive($backup);
+        $completeness = $comparison['completeness'] ?? $this->backupService->validateSnapshotCompleteness($backup);
 
         return view('ppc.planning.schedule_backup_show', [
             'backup' => $backup,
             'comparison' => $comparison,
             'diff' => $comparison,
+            'completeness' => $completeness,
         ]);
     }
 
@@ -116,6 +118,21 @@ class ScheduleBackupController extends Controller
     public function restore(Request $request, int $id)
     {
         $backup = ScheduleBackup::findOrFail($id);
+        $completeness = $this->backupService->validateSnapshotCompleteness($backup);
+
+        if (! ($completeness['is_complete'] ?? true)) {
+            $errMsg = 'Restore dibatalkan: Snapshot #'.$backup->id.' memiliki data jadwal yang tidak lengkap (PRESS / SHIFT / URUTAN kosong).';
+            if ($request->wantsJson()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $errMsg,
+                    'completeness' => $completeness,
+                ], 422);
+            }
+
+            return back()->with('error', $errMsg);
+        }
+
         $pruneIdle = $request->boolean('prune_unlisted_idle', true);
 
         $result = $this->backupService->restoreSnapshot($backup, Auth::id(), $pruneIdle);
