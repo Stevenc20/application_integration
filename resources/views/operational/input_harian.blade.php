@@ -25,7 +25,7 @@
             <p class="text-sm text-gray-500 mt-1">Pencatatan produksi harian per item &amp; line</p>
         </div>
         <div class="flex flex-wrap items-center gap-3">
-            <a href="{{ route('supervisor.reports.daily_production', ['line' => request('line', 'Line A'), 'shift' => request('shift', 'Shift Pagi'), 'date' => request('date', $date)]) }}" 
+            <a href="{{ route('supervisor.reports.daily_production', ['line' => request('line', $lineFilter ?? 'Line A'), 'shift' => request('shift', $currentShift ?? 'Shift Pagi'), 'date' => request('date', $date)]) }}" 
                class="flex items-center gap-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-sm px-5 py-2.5 rounded-xl shadow-md shadow-emerald-500/10 transition-all border border-emerald-600/20">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a1 1 0 01-2 2z"/>
@@ -123,8 +123,8 @@
                 class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
                 
                 {{-- Preserve Shift and Line filters --}}
-                <input type="hidden" name="shift" value="{{ request('shift') }}">
-                <input type="hidden" name="line" value="{{ request('line') }}">
+                <input type="hidden" name="shift" value="{{ request('shift', $currentShift) }}">
+                <input type="hidden" name="line" value="{{ request('line', $lineFilter) }}">
 
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-1.5 ml-1">Status</label>

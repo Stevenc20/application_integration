@@ -80,37 +80,19 @@ class InputHarianController extends Controller
             }
         }
 
-        // LOGIKA TANGGAL PRODUKSI (Work Date) - Shift 07:30-21:00 / 21:00-07:30
+        // LOGIKA TANGGAL PRODUKSI (Work Date) & SHIFT - Shift Pagi: 07:30-21:00 | Shift Malam: 21:00-07:30
         $h = (int) now()->format('H');
         $m = (int) now()->format('i');
         $timeInMin = $h * 60 + $m;
         $hour = $h;
         $date = $request->get('date') ?: (($timeInMin < 450) ? now()->subDay()->toDateString() : now()->toDateString());
 
-        // Smart fallback: jika auto-detected Malam+kemarin kosong, cek Pagi+hari ini
-        if ($timeInMin < 450 && !$request->has('shift')) {
-            $autoShift = $this->getShift();
-            $hasData = \App\Models\ProductionPlan::whereDate('plan_date', $date)
-                ->where('shift_name', $autoShift)
-                ->exists();
-            if (!$hasData) {
-                $todayStr = now()->toDateString();
-                $hasTodayPagi = \App\Models\ProductionPlan::whereDate('plan_date', $todayStr)
-                    ->where('shift_name', 'like', 'Shift Pagi%')
-                    ->exists();
-                if ($hasTodayPagi) {
-                    $date = $todayStr;
-                    $currentShift = 'Shift Pagi';
-                }
-            }
-        } elseif (!$request->has('shift')) {
-            $autoShift = $this->getShift();
-            $currentShift = $autoShift;
-        }
+        $autoShift = $this->getShift(); // 07:30 - 21:00 -> Shift Pagi, selain itu -> Shift Malam
+        $currentShift = $request->filled('shift') ? $request->get('shift') : $autoShift;
 
-        // SAFEGUARD: hanya izinkan akses ke tanggal produksi aktif (hari ini atau kemarin jika sebelum jam 7)
+        // SAFEGUARD: hanya izinkan akses ke tanggal produksi aktif (hari ini atau kemarin jika sebelum 07:30)
         // Data tanggal lewat sudah otomatis di-cleanup oleh scheduler dan tersimpan di Production Analytics
-        $activeDate = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
+        $activeDate = ($timeInMin < 450) ? now()->subDay()->toDateString() : now()->toDateString();
         if ($request->has('date') && $request->get('date') < $activeDate) {
             return redirect()->route('operational.input_harian', array_merge(
                 $request->except('date'),
@@ -120,9 +102,6 @@ class InputHarianController extends Controller
 
         $lineFilter   = $request->get('line');
         $search       = trim($request->get('search', ''));
-        
-        // Pilih shift: dari request atau auto-detect
-        $currentShift = $request->get('shift', $currentShift ?? 'Shift Pagi');
 
         // 1. Tentukan SHIFT TERBARU (Revisi Terakhir)
         $latestShiftName = $currentShift;
