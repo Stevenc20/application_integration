@@ -95,9 +95,9 @@
     {{-- 1. ITEM SPEC --}}
     <td class="px-6 py-5 align-top">
         <div class="flex flex-col gap-1">
-            <span class="font-black text-slate-800 text-sm tracking-tight leading-none">{{ $job->job_master ?: ($job->job_no ?: 'NO ITEM NAME') }}</span>
+            <span class="font-black text-slate-800 text-sm tracking-tight leading-none">{{ $job->job_no ?: ($job->job_master ?: 'NO ITEM NAME') }}</span>
             <div class="flex items-center gap-2">
-                <span class="text-[10px] font-bold text-slate-400 uppercase leading-tight">{{ $job->job_no ?: 'NO JOB NO' }}</span>
+                <span class="text-[10px] font-bold text-slate-400 uppercase leading-tight">{{ $job->job_master ?: ($job->job_no ?: 'NO JOB NO') }}</span>
                 @if(!empty($job->session_no))
                     <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[9px] font-black bg-indigo-50 text-indigo-600 border border-indigo-100 shadow-sm shrink-0" title="Split Session {{ $job->session_no }}">
                         <svg xmlns="http://www.w3.org/2000/svg" class="w-2.5 h-2.5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
