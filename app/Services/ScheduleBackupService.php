@@ -117,14 +117,19 @@ class ScheduleBackupService
 
         $recoveryItems = (! empty($planIds) || ! empty($jobIds)) && Schema::hasTable('recovery_items')
             ? RecoveryItem::where(function ($q) use ($planIds, $jobIds, $parsedDate) {
-                if (! empty($planIds)) {
+                $recoveryCols = array_flip(Schema::getColumnListing('recovery_items'));
+                if (! empty($planIds) && isset($recoveryCols['production_plan_id'])) {
                     $q->orWhereIn('production_plan_id', $planIds);
                 }
-                if (! empty($jobIds)) {
+                if (! empty($jobIds) && isset($recoveryCols['job_master_id'])) {
                     $q->orWhereIn('job_master_id', $jobIds);
                 }
-                $q->orWhereDate('source_date', $parsedDate)
-                    ->orWhereDate('original_date', $parsedDate);
+                if (isset($recoveryCols['source_date'])) {
+                    $q->orWhereDate('source_date', $parsedDate);
+                }
+                if (isset($recoveryCols['original_date'])) {
+                    $q->orWhereDate('original_date', $parsedDate);
+                }
             })->get()
             : collect();
 
