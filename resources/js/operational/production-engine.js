@@ -2012,6 +2012,9 @@ window.updateFinishModalShortageAlert = function () {
 };
 
 window.submitFinalJobWithNext = function (stopSession) {
+    if (document.activeElement && typeof document.activeElement.blur === 'function') {
+        document.activeElement.blur();
+    }
     const nextSelect = document.getElementById('nextSelect');
     if (nextSelect) {
         if (stopSession) {
@@ -2052,12 +2055,13 @@ function autoCloseJobDowntimes(jobId) {
 async function submitFinalJob() {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
     const id = window.currentFinishId;
-    const nextJobId = document.getElementById('nextSelect').value;
+    const nextSelectEl = document.getElementById('nextSelect');
+    const nextJobId = nextSelectEl ? nextSelectEl.value : '';
     if (!id) return;
 
-    const finalOk = parseInt(document.getElementById('final-ok').value) || 0;
-    const finalRepair = parseInt(document.getElementById('final-repair').value) || 0;
-    const finalReject = parseInt(document.getElementById('final-reject').value) || 0;
+    const finalOk = parseInt(document.getElementById('final-ok')?.value) || 0;
+    const finalRepair = parseInt(document.getElementById('final-repair')?.value) || 0;
+    const finalReject = parseInt(document.getElementById('final-reject')?.value) || 0;
     const reasonWrap = document.getElementById('finishReasonWrap');
     const reasonInput = document.getElementById('finishTargetReason');
     const reasonErr = document.getElementById('finishReasonError');
@@ -2086,62 +2090,85 @@ async function submitFinalJob() {
         if (reasonErr) reasonErr.classList.add('hidden');
     }
 
+    const btnCont = document.getElementById('btnFinishContinue');
+    const btnStop = document.getElementById('btnFinishStop');
+    const origContHtml = btnCont ? btnCont.innerHTML : '';
+    const origStopHtml = btnStop ? btnStop.innerHTML : '';
+
     await window.ActionRunner.run('Submit Final Job', async () => {
-        if (finalRepair > 0 || finalReject > 0) {
-            showToast('⚠️ Pastikan data Repair & Reject sudah tercatat di history RR', 'warning');
-        }
+        if (btnCont) { btnCont.disabled = true; btnCont.classList.add('opacity-60'); }
+        if (btnStop) { btnStop.disabled = true; btnStop.classList.add('opacity-60'); }
 
-        let jobNo = '';
-        const titleEl = document.getElementById('finishJobTitle');
-        if (titleEl) {
-            jobNo = titleEl.innerText || '';
-        }
-        if (!jobNo) {
-            const rowEl = document.getElementById('row-' + id);
-            if (rowEl) {
-                jobNo = rowEl.getAttribute('data-job-number') || '';
+        try {
+            if (finalRepair > 0 || finalReject > 0) {
+                showToast('⚠️ Pastikan data Repair & Reject sudah tercatat di history RR', 'warning');
             }
-        }
 
-        const res = await fetch(`/operational/job/${id}/finish`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
-                'Accept': 'application/json'
-            },
-            body: JSON.stringify({ 
-                next_job_id: nextJobId,
-                skip_idle: false,
-                ok_qty: finalOk,
-                repair_qty: finalRepair,
-                reject_qty: finalReject,
-                reason_not_achieved: reasonInput ? reasonInput.value.trim() : null
-            })
-        }).then(r => r.json());
+            let jobNo = '';
+            const titleEl = document.getElementById('finishJobTitle');
+            if (titleEl) {
+                jobNo = titleEl.innerText || '';
+            }
+            if (!jobNo) {
+                const rowEl = document.getElementById('row-' + id);
+                if (rowEl) {
+                    jobNo = rowEl.getAttribute('data-job-number') || '';
+                }
+            }
 
-        if (res.success) {
-            notifyLineStatusChange(jobMasterData[id]?.line);
-            const itemName = jobNo || `#${id}`;
-            if (res.recovery && res.recovery.recovery_qty > 0) {
-                localStorage.setItem('lkh_completion_toast', JSON.stringify({
-                    item: itemName,
-                    recovery_qty: res.recovery.recovery_qty,
-                    is_recovery: true
-                }));
+            const response = await fetch(`/operational/job/${id}/finish`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ 
+                    next_job_id: nextJobId,
+                    skip_idle: false,
+                    ok_qty: finalOk,
+                    repair_qty: finalRepair,
+                    reject_qty: finalReject,
+                    reason_not_achieved: reasonInput ? reasonInput.value.trim() : null
+                })
+            });
+
+            const rawText = await response.text();
+            let res;
+            try {
+                res = JSON.parse(rawText);
+            } catch (parseErr) {
+                console.error('Finish job response parse error:', rawText);
+                showToast('Gagal menyimpan finalisasi (Server Error ' + response.status + ')', 'danger');
+                return;
+            }
+
+            if (res.success) {
+                notifyLineStatusChange(jobMasterData[id]?.line);
+                const itemName = jobNo || `#${id}`;
+                if (res.recovery && res.recovery.recovery_qty > 0) {
+                    localStorage.setItem('lkh_completion_toast', JSON.stringify({
+                        item: itemName,
+                        recovery_qty: res.recovery.recovery_qty,
+                        is_recovery: true
+                    }));
+                } else {
+                    localStorage.setItem('lkh_completion_toast', JSON.stringify({
+                        item: itemName,
+                        is_recovery: false
+                    }));
+                }
+                const card = document.getElementById('active-job-card');
+                if (card) card.style.display = 'none';
+                closeFinishModal();
+                showToast('Pekerjaan selesai!', 'success');
+                setTimeout(() => location.reload(), 600);
             } else {
-                localStorage.setItem('lkh_completion_toast', JSON.stringify({
-                    item: itemName,
-                    is_recovery: false
-                }));
+                showToast(res.message || 'Gagal menyelesaikan', 'danger');
             }
-            const card = document.getElementById('active-job-card');
-            if (card) card.style.display = 'none';
-            closeFinishModal();
-            showToast('Pekerjaan selesai!', 'success');
-            setTimeout(() => location.reload(), 600);
-        } else {
-            showToast(res.message || 'Gagal menyelesaikan', 'danger');
+        } finally {
+            if (btnCont) { btnCont.disabled = false; btnCont.classList.remove('opacity-60'); btnCont.innerHTML = origContHtml; }
+            if (btnStop) { btnStop.disabled = false; btnStop.classList.remove('opacity-60'); btnStop.innerHTML = origStopHtml; }
         }
     });
 }
@@ -2972,7 +2999,7 @@ function _isInBreakState(activeId) {
 }
 
 function _isModalOpen() {
-    const ids = ['confirmModal', 'shiftValidationModal', 'tarikShiftModal', 'downtimeModal', 'rrInputModal', 'rrListModal', 'skipConfirmModal'];
+    const ids = ['finishModal', 'confirmModal', 'shiftValidationModal', 'tarikShiftModal', 'downtimeModal', 'rrInputModal', 'rrListModal', 'skipConfirmModal'];
     for (const id of ids) {
         const el = document.getElementById(id);
         if (el && !el.classList.contains('hidden')) return true;

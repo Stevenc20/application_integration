@@ -642,31 +642,35 @@ class ProductionService
                     if ($recoveryQty > 0) {
                         $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQtyOk, $recoveryQty, 'waiting_approval');
                     }
-                    if ($reasonNotAchieved) {
-                        $lineId = null;
-                        $lineName = $job->line;
-                        if ($lineName) {
-                            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineName)));
-                            $lm = LineMaster::whereRaw("REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalized}%"])->first();
-                            if ($lm) {
-                                $lineId = $lm->id;
+                    if ($reasonNotAchieved && \Illuminate\Support\Facades\Schema::hasTable('job_finish_reasons')) {
+                        try {
+                            $lineId = null;
+                            $lineName = $job->line;
+                            if ($lineName) {
+                                $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineName)));
+                                $lm = LineMaster::whereRaw("REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalized}%"])->first();
+                                if ($lm) {
+                                    $lineId = $lm->id;
+                                }
                             }
+                            JobFinishReason::create([
+                                'job_master_id' => $job->id,
+                                'production_plan_id' => $plan ? $plan->id : null,
+                                'user_id' => Auth::id(),
+                                'line_id' => $lineId,
+                                'line_name' => $lineName,
+                                'work_date' => now()->toDateString(),
+                                'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
+                                'target_qty' => (int) $planQty,
+                                'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
+                                'actual_repair' => (int) ($finalRepair ?? $totalRepair ?? 0),
+                                'actual_reject' => (int) ($finalReject ?? $totalReject ?? 0),
+                                'actual_total' => (int) $actualQtyTotal,
+                                'reason' => $reasonNotAchieved,
+                            ]);
+                        } catch (\Throwable $reasonEx) {
+                            \Illuminate\Support\Facades\Log::warning('Failed to save JobFinishReason: ' . $reasonEx->getMessage());
                         }
-                        JobFinishReason::create([
-                            'job_master_id' => $job->id,
-                            'production_plan_id' => $plan ? $plan->id : null,
-                            'user_id' => Auth::id(),
-                            'line_id' => $lineId,
-                            'line_name' => $lineName,
-                            'work_date' => now()->toDateString(),
-                            'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
-                            'target_qty' => (int) $planQty,
-                            'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
-                            'actual_repair' => (int) ($finalRepair ?? $totalRepair ?? 0),
-                            'actual_reject' => (int) ($finalReject ?? $totalReject ?? 0),
-                            'actual_total' => (int) $actualQtyTotal,
-                            'reason' => $reasonNotAchieved,
-                        ]);
                     }
                 }
             }
@@ -681,31 +685,35 @@ class ProductionService
                     if ($recoveryQty > 0) {
                         $autoRecoveryItem = $this->createRecoveryItem(null, $job, $actualQtyOk, $recoveryQty, 'waiting_approval', true);
                     }
-                    if ($reasonNotAchieved) {
-                        $lineId = null;
-                        $lineName = $job->line;
-                        if ($lineName) {
-                            $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineName)));
-                            $lm = LineMaster::whereRaw("REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalized}%"])->first();
-                            if ($lm) {
-                                $lineId = $lm->id;
+                    if ($reasonNotAchieved && \Illuminate\Support\Facades\Schema::hasTable('job_finish_reasons')) {
+                        try {
+                            $lineId = null;
+                            $lineName = $job->line;
+                            if ($lineName) {
+                                $normalized = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineName)));
+                                $lm = LineMaster::whereRaw("REPLACE(REPLACE(UPPER(TRIM(line_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalized}%"])->first();
+                                if ($lm) {
+                                    $lineId = $lm->id;
+                                }
                             }
+                            JobFinishReason::create([
+                                'job_master_id' => $job->id,
+                                'production_plan_id' => null,
+                                'user_id' => Auth::id(),
+                                'line_id' => $lineId,
+                                'line_name' => $lineName,
+                                'work_date' => now()->toDateString(),
+                                'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
+                                'target_qty' => (int) $planQty,
+                                'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
+                                'actual_repair' => (int) ($finalRepair ?? $totalRepair ?? 0),
+                                'actual_reject' => (int) ($finalReject ?? $totalReject ?? 0),
+                                'actual_total' => (int) $actualQtyTotal,
+                                'reason' => $reasonNotAchieved,
+                            ]);
+                        } catch (\Throwable $reasonEx) {
+                            \Illuminate\Support\Facades\Log::warning('Failed to save JobFinishReason: ' . $reasonEx->getMessage());
                         }
-                        JobFinishReason::create([
-                            'job_master_id' => $job->id,
-                            'production_plan_id' => null,
-                            'user_id' => Auth::id(),
-                            'line_id' => $lineId,
-                            'line_name' => $lineName,
-                            'work_date' => now()->toDateString(),
-                            'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
-                            'target_qty' => (int) $planQty,
-                            'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
-                            'actual_repair' => (int) ($finalRepair ?? $totalRepair ?? 0),
-                            'actual_reject' => (int) ($finalReject ?? $totalReject ?? 0),
-                            'actual_total' => (int) $actualQtyTotal,
-                            'reason' => $reasonNotAchieved,
-                        ]);
                     }
                 }
             }

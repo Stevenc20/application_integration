@@ -4,19 +4,19 @@
 
 {{-- FINISH JOB MODAL --}}
 <div id="finishModal" class="fixed inset-0 bg-gray-900/80 backdrop-blur-lg hidden z-[9999] items-center justify-center p-4">
-    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden transform transition-all">
-        <div class="p-8 space-y-6">
+    <div class="bg-white rounded-3xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto transform transition-all">
+        <div class="p-6 sm:p-8 space-y-5">
             <div class="text-center">
-                <div class="w-20 h-20 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-4 shadow-inner">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="w-10 h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
+                <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-3xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8 sm:w-10 sm:h-10" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/></svg>
                 </div>
-                <h3 class="text-2xl font-black text-gray-800">Finalisasi Produksi</h3>
+                <h3 class="text-xl sm:text-2xl font-black text-gray-800">Finalisasi Produksi</h3>
                 <p class="text-gray-600 text-sm italic">Proses untuk item <b id="finishJobName" class="text-gray-800">-</b> telah selesai.</p>
             </div>
             
             <div class="bg-blue-50 border border-blue-100 rounded-xl p-4">
                 <label class="block text-xs font-black text-blue-400 uppercase tracking-widest mb-2">Pilih Item Berikutnya</label>
-                <select id="nextSelect" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-blue-300 outline-none bg-white">
+                <select id="nextSelect" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-base sm:text-sm focus:ring-2 focus:ring-blue-300 outline-none bg-white">
                     <option value="">AUTO – lanjut ke urutan berikutnya</option>
                 </select>
             </div>
@@ -57,7 +57,7 @@
                     </div>
                     <div class="flex-1 min-w-0 space-y-2">
                         <p class="text-xs font-black text-amber-800 uppercase tracking-tight">Alasan Target Tidak Tercapai (Wajib Diisi)</p>
-                        <textarea id="finishTargetReason" rows="3" class="w-full border border-amber-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none transition bg-white" placeholder="Jelaskan alasan kenapa target tidak tercapai..."></textarea>
+                        <textarea id="finishTargetReason" rows="3" oninput="document.getElementById('finishReasonError')?.classList.add('hidden')" class="w-full border border-amber-200 rounded-xl px-3 py-2 text-base sm:text-sm focus:ring-2 focus:ring-amber-300 focus:border-amber-400 outline-none transition bg-white" placeholder="Jelaskan alasan kenapa target tidak tercapai..."></textarea>
                         <p id="finishReasonError" class="hidden text-[11px] text-red-600 font-bold">Alasan wajib diisi (minimal 3 karakter, tidak boleh hanya spasi).</p>
                     </div>
                 </div>
@@ -67,12 +67,13 @@
                 ⚠️ Pastikan Repair & Reject sudah diinput melalui form Repair/Reject
             </div>
 
-        <div class="flex flex-col gap-2 pt-2">
-            <div class="flex gap-2">
-                <button onclick="submitFinalJobWithNext(false)" class="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-lg shadow-blue-100 transition-all uppercase tracking-wider">Simpan &amp; Lanjut</button>
-                <button onclick="submitFinalJobWithNext(true)" class="flex-1 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-lg shadow-red-100 transition-all uppercase tracking-wider">Simpan &amp; STOP SESI</button>
+            <div class="flex flex-col gap-2 pt-2">
+                <div class="flex gap-2">
+                    <button type="button" id="btnFinishContinue" onclick="submitFinalJobWithNext(false)" class="flex-1 px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs shadow-lg shadow-blue-100 transition-all uppercase tracking-wider cursor-pointer" style="touch-action: manipulation;">Simpan &amp; Lanjut</button>
+                    <button type="button" id="btnFinishStop" onclick="submitFinalJobWithNext(true)" class="flex-1 px-4 py-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-bold text-xs shadow-lg shadow-red-100 transition-all uppercase tracking-wider cursor-pointer" style="touch-action: manipulation;">Simpan &amp; STOP SESI</button>
+                </div>
+                <button type="button" onclick="closeFinishModal()" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs transition-all uppercase tracking-wider cursor-pointer" style="touch-action: manipulation;">Batal</button>
             </div>
-            <button onclick="closeFinishModal()" class="w-full px-4 py-2.5 rounded-xl border border-gray-200 hover:bg-gray-50 text-gray-700 font-bold text-xs transition-all uppercase tracking-wider">Batal</button>
         </div>
     </div>
 </div>
