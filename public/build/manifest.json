@@ -4,7 +4,7 @@
     "name": "assets/polyfills-legacy-Cj2c1LUM.js"
   },
   "resources/css/app.css": {
-    "file": "assets/app-DOjcmAPa.css",
+    "file": "assets/app-BL3sHnvG.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +13,7 @@
     ]
   },
   "resources/css/supervisor.css": {
-    "file": "assets/supervisor-BBlI8CxF.css",
+    "file": "assets/supervisor-6-Jw9Dyh.css",
     "src": "resources/css/supervisor.css",
     "isEntry": true,
     "name": "supervisor",
