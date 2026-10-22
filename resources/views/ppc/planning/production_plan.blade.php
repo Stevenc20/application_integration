@@ -14,7 +14,9 @@
     <script>document.addEventListener('DOMContentLoaded',function(){showToast({!! json_encode($err) !!},'error');});</script>
     @endforeach
     @endif
-    @php($importPreview = session('import_preview'))
+    @php
+        $importPreview = session('import_preview');
+    @endphp
     @if($importPreview && isset($importPreview['counts']))
     <div class="mx-auto max-w-screen-2xl px-4">
         <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
