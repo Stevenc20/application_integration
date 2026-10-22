@@ -331,6 +331,8 @@ class ScheduleBackupService
         $unchanged = [];
         $postSnapshotPlans = [];
         $protectedActivePlans = [];
+        $snapshotComparisonRows = [];
+        $matchedLiveIds = [];
 
         foreach ($snapshotPlans as $snapPlan) {
             $snapId = (int) ($snapPlan['id'] ?? 0);
@@ -341,11 +343,19 @@ class ScheduleBackupService
             }
 
             if (! $livePlan) {
-                $willRestoreMissing[] = $this->summarizePlanRow($snapPlan);
+                $summaryRow = $this->summarizePlanRow($snapPlan);
+                $willRestoreMissing[] = $summaryRow;
+                $snapshotComparisonRows[] = array_merge($snapPlan, [
+                    'diff_state' => 'missing_in_live',
+                    'changed_fields' => [],
+                    'live_id' => null,
+                    'has_live_activity' => false,
+                ]);
 
                 continue;
             }
 
+            $matchedLiveIds[(int) $livePlan->id] = $snapPlan;
             $hasLiveActivity = $mergeService->planHasProductionActivity($livePlan);
             if ($hasLiveActivity) {
                 $protectedActivePlans[] = $this->summarizePlanRow($livePlan->toArray(), [
@@ -385,18 +395,47 @@ class ScheduleBackupService
                     'live_finish' => $livePlan->finish_time,
                     'backup_finish' => $snapPlan['finish_time'] ?? null,
                 ];
+
+                $snapshotComparisonRows[] = array_merge($snapPlan, [
+                    'diff_state' => 'changed',
+                    'changed_fields' => $changedFields,
+                    'live_id' => $livePlan->id,
+                    'has_live_activity' => $hasLiveActivity,
+                ]);
             } else {
                 $unchanged[] = $this->summarizePlanRow($snapPlan);
+                $snapshotComparisonRows[] = array_merge($snapPlan, [
+                    'diff_state' => 'identical',
+                    'changed_fields' => [],
+                    'live_id' => $livePlan->id,
+                    'has_live_activity' => $hasLiveActivity,
+                ]);
             }
         }
 
+        $liveComparisonRows = [];
         foreach ($livePlans as $livePlan) {
-            if (! $snapshotById->has($livePlan->id)) {
-                $hasActivity = $mergeService->planHasProductionActivity($livePlan);
-                $postSnapshotPlans[] = array_merge($this->summarizePlanRow($livePlan->toArray()), [
+            $liveArr = $this->normalizePlanRow($this->serializeModel($livePlan));
+            $hasActivity = $mergeService->planHasProductionActivity($livePlan);
+
+            if (! isset($matchedLiveIds[(int) $livePlan->id])) {
+                $postSnapshotPlans[] = array_merge($this->summarizePlanRow($liveArr), [
                     'has_activity' => $hasActivity,
                     'has_live_activity' => $hasActivity,
                     'action_on_restore' => $hasActivity ? 'kept_protected' : 'removed_or_kept_by_mode',
+                ]);
+                $liveComparisonRows[] = array_merge($liveArr, [
+                    'diff_state' => 'added_after_backup',
+                    'changed_fields' => [],
+                    'has_live_activity' => $hasActivity,
+                ]);
+            } else {
+                $matchedSnap = $matchedLiveIds[(int) $livePlan->id];
+                $changedFields = $this->diffScheduleFields($livePlan, $matchedSnap);
+                $liveComparisonRows[] = array_merge($liveArr, [
+                    'diff_state' => empty($changedFields) ? 'identical' : 'changed',
+                    'changed_fields' => $changedFields,
+                    'has_live_activity' => $hasActivity,
                 ]);
             }
         }
@@ -425,6 +464,8 @@ class ScheduleBackupService
             'unchanged' => $unchanged,
             'post_snapshot_plans' => $postSnapshotPlans,
             'protected_active_plans' => $protectedActivePlans,
+            'snapshot_rows' => $snapshotComparisonRows,
+            'live_rows' => $liveComparisonRows,
         ];
     }
 

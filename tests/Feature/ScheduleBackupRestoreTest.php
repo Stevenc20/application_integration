@@ -417,9 +417,12 @@ test('snapshot detail view accurately renders multiple press, shift, urutan row_
         ->assertSee('450')
         ->assertSee('620')
         ->assertSee('890')
-        ->assertSee('07:30 - 11:45')
-        ->assertSee('21:00 - 02:15')
-        ->assertSee('13:00 - 18:30')
+        ->assertSee('07:30')
+        ->assertSee('11:45')
+        ->assertSee('21:00')
+        ->assertSee('02:15')
+        ->assertSee('13:00')
+        ->assertSee('18:30')
         ->assertDontSee('Peringatan: Data Snapshot Tidak Lengkap');
 });
 
@@ -484,4 +487,137 @@ test('incomplete snapshot displays warning and blocks restore execution', functi
     // Live plan must remain untouched (100 pcs, not overwritten to 500)
     $livePlan = ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'PC-01')->firstOrFail();
     expect((float) $livePlan->plan)->toBe(100.0);
+});
+
+test('detail and compare page renders snapshot and live tables with identical, changed, added, and missing badges while preserving historical snapshot values', function () {
+    $lineA = backupTestLine('L-A', 'PRESS A');
+    $user = backupTestUser();
+    $date = '2026-10-23';
+
+    // 1. Item Identical
+    $planIdentical = ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'PART IDENTIK',
+        'job_no' => 'ID-01',
+        'row_no' => 1,
+        'row_type' => 'job',
+        'plan' => 200,
+        'ok' => 50,
+        'repair' => 2,
+        'reject' => 1,
+        'dct' => 10,
+        'dt_menit' => 5,
+        'start_time' => '07:30',
+        'finish_time' => '09:30',
+        'status' => 'running',
+        'source_type' => 'ppc',
+    ]);
+
+    // 2. Item that will be Changed after backup
+    $planChanged = ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'PART UBAH',
+        'job_no' => 'CH-02',
+        'row_no' => 2,
+        'row_type' => 'job',
+        'plan' => 300,
+        'ok' => 10,
+        'start_time' => '09:30',
+        'finish_time' => '11:45',
+        'status' => 'running',
+        'source_type' => 'ppc',
+    ]);
+
+    // 3. Item that will be Deleted (Missing in live) after backup
+    $planMissing = ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'PART HILANG',
+        'job_no' => 'MS-03',
+        'row_no' => 3,
+        'row_type' => 'job',
+        'plan' => 150,
+        'start_time' => '13:00',
+        'finish_time' => '15:00',
+        'status' => 'pending',
+        'source_type' => 'ppc',
+    ]);
+
+    $service = app(ScheduleBackupService::class);
+    $backup = $service->captureSnapshot($date, 'manual', $user->id, ['label' => 'Baseline Compare']);
+
+    // Mutate live state AFTER backup:
+    // - Update CH-02 plan from 300 -> 450, start_time from 09:30 -> 10:00, and live OK from 10 -> 180
+    $planChanged->update([
+        'plan' => 450,
+        'ok' => 180,
+        'start_time' => '10:00',
+        'finish_time' => '12:30',
+    ]);
+
+    // - Delete MS-03 so it becomes missing in live
+    $planMissing->delete();
+
+    // - Add a brand new item AD-04 after backup
+    ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'PART BARU',
+        'job_no' => 'AD-04',
+        'row_no' => 4,
+        'row_type' => 'job',
+        'plan' => 250,
+        'start_time' => '15:15',
+        'finish_time' => '17:00',
+        'status' => 'pending',
+        'source_type' => 'ppc',
+    ]);
+
+    $diff = $service->compareWithLive($backup);
+
+    expect($diff['counts']['unchanged'])->toBe(1)
+        ->and($diff['counts']['will_update_schedule'])->toBe(1)
+        ->and($diff['counts']['will_restore_missing'])->toBe(1)
+        ->and($diff['counts']['post_snapshot_plans'])->toBe(1);
+
+    // Verify historical snapshot row for CH-02 still holds plan=300 and ok=10 (NOT live's 450 and 180)
+    $snapCh02 = collect($diff['snapshot_rows'])->firstWhere('job_no', 'CH-02');
+    $liveCh02 = collect($diff['live_rows'])->firstWhere('job_no', 'CH-02');
+
+    expect((float) $snapCh02['plan'])->toBe(300.0)
+        ->and((float) $snapCh02['ok'])->toBe(10.0)
+        ->and($snapCh02['diff_state'])->toBe('changed')
+        ->and((float) $liveCh02['plan'])->toBe(450.0)
+        ->and((float) $liveCh02['ok'])->toBe(180.0)
+        ->and($liveCh02['diff_state'])->toBe('changed');
+
+    // Verify backup record in DB was never mutated by compareWithLive
+    $backup->refresh();
+    $persistedCh02 = collect($backup->snapshot_payload['production_plans'])->firstWhere('job_no', 'CH-02');
+    expect((float) $persistedCh02['plan'])->toBe(300.0)
+        ->and((float) $persistedCh02['ok'])->toBe(10.0);
+
+    // Verify UI renders all 4 states and field diff indicators
+    $response = $this->actingAs($user)->get(route('ppc.planning.backups.show', $backup->id));
+    $response->assertOk()
+        ->assertSee('IDENTIK')
+        ->assertSee('BERUBAH')
+        ->assertSee('HILANG DI LIVE')
+        ->assertSee('ITEM BARU')
+        ->assertSee('PART IDENTIK')
+        ->assertSee('PART UBAH')
+        ->assertSee('PART HILANG')
+        ->assertSee('PART BARU')
+        ->assertSee('vs 450')
+        ->assertSee('vs 300');
 });

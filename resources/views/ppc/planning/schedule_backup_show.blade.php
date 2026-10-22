@@ -19,7 +19,8 @@
     @php
         $planDateStr = $backup->plan_date ? $backup->plan_date->format('Y-m-d') : now()->format('Y-m-d');
         $counts = $diff['counts'] ?? [];
-        $payloadPlans = $backup->snapshot_payload['production_plans'] ?? [];
+        $snapshotRows = $diff['snapshot_rows'] ?? ($backup->snapshot_payload['production_plans'] ?? []);
+        $liveRows = $diff['live_rows'] ?? [];
         $completenessInfo = $completeness ?? ($diff['completeness'] ?? ['is_complete' => true, 'incomplete_count' => 0, 'issues' => []]);
         $isComplete = (bool) ($completenessInfo['is_complete'] ?? true);
         $incompleteCount = (int) ($completenessInfo['incomplete_count'] ?? 0);
@@ -89,36 +90,36 @@
         <div class="lg:col-span-2 bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <div class="flex items-center justify-between border-b border-slate-100 pb-3">
                 <div>
-                    <h2 class="text-sm font-black text-slate-800 uppercase">Preview Perbandingan dengan Jadwal Live Saat Ini</h2>
-                    <p class="text-[11px] text-slate-500">Simulasi perubahan jika Snapshot #{{ $backup->id }} di-restore sekarang.</p>
+                    <h2 class="text-sm font-black text-slate-800 uppercase">Ringkasan Perbandingan Snapshot #{{ $backup->id }} vs Jadwal Live</h2>
+                    <p class="text-[11px] text-slate-500">Data snapshot dipertahankan murni sebagai referensi historis saat backup dibuat.</p>
                 </div>
             </div>
 
             <div class="grid grid-cols-2 sm:grid-cols-5 gap-3">
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div class="text-[10px] font-black text-slate-700 uppercase">Akan Dipulihkan</div>
+                    <div class="text-[10px] font-black text-slate-700 uppercase">Hilang di Live</div>
                     <div class="text-xl font-black text-red-700 mt-1">{{ $counts['will_restore_missing'] ?? 0 }}</div>
-                    <div class="text-[10px] text-slate-500">Item hilang di live</div>
+                    <div class="text-[10px] text-slate-500">Akan dipulihkan</div>
                 </div>
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div class="text-[10px] font-black text-slate-700 uppercase">Update Jadwal</div>
+                    <div class="text-[10px] font-black text-slate-700 uppercase">Berubah</div>
                     <div class="text-xl font-black text-amber-700 mt-1">{{ $counts['will_update_schedule'] ?? 0 }}</div>
-                    <div class="text-[10px] text-slate-500">Jam / Qty / Urutan</div>
+                    <div class="text-[10px] text-slate-500">Plan / Jam / Urutan</div>
                 </div>
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div class="text-[10px] font-black text-slate-700 uppercase">Aktual Dilindungi</div>
-                    <div class="text-xl font-black text-emerald-700 mt-1">{{ $counts['protected_active_plans'] ?? 0 }}</div>
-                    <div class="text-[10px] text-slate-500">OK/NG/Status utuh</div>
-                </div>
-                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
-                    <div class="text-[10px] font-black text-slate-700 uppercase">Item Pasca-Backup</div>
-                    <div class="text-xl font-black text-slate-800 mt-1">{{ $counts['post_snapshot_plans'] ?? 0 }}</div>
-                    <div class="text-[10px] text-slate-500">Ditambahkan setelah backup</div>
+                    <div class="text-[10px] font-black text-slate-700 uppercase">Ditambahkan</div>
+                    <div class="text-xl font-black text-emerald-700 mt-1">{{ $counts['post_snapshot_plans'] ?? 0 }}</div>
+                    <div class="text-[10px] text-slate-500">Item baru di live</div>
                 </div>
                 <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
                     <div class="text-[10px] font-black text-slate-700 uppercase">Identik</div>
                     <div class="text-xl font-black text-slate-800 mt-1">{{ $counts['unchanged'] ?? 0 }}</div>
                     <div class="text-[10px] text-slate-500">Tidak berubah</div>
+                </div>
+                <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+                    <div class="text-[10px] font-black text-slate-700 uppercase">Aktual Dilindungi</div>
+                    <div class="text-xl font-black text-blue-700 mt-1">{{ $counts['protected_active_plans'] ?? 0 }}</div>
+                    <div class="text-[10px] text-slate-500">OK/NG/Status utuh</div>
                 </div>
             </div>
 
@@ -172,12 +173,12 @@
         </div>
     </div>
 
-    {{-- Diff Breakdown Sections --}}
+    {{-- Diff Breakdown Cards --}}
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {{-- Will Restore Missing & Will Update --}}
         <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
             <h3 class="text-xs font-black text-slate-800 uppercase">
-                Perubahan Jadwal ({{ count($diff['will_restore_missing'] ?? []) + count($diff['will_update_schedule'] ?? []) }} Item)
+                Detail Item Hilang &amp; Berubah ({{ count($diff['will_restore_missing'] ?? []) + count($diff['will_update_schedule'] ?? []) }} Item)
             </h3>
             <div class="max-h-72 overflow-y-auto space-y-2">
                 @foreach(($diff['will_restore_missing'] ?? []) as $item)
@@ -189,10 +190,10 @@
                     @endphp
                     <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
                         <div>
-                            <span class="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-black uppercase mr-1">PULIHKAN</span>
+                            <span class="px-1.5 py-0.5 rounded bg-red-600 text-white text-[9px] font-black uppercase mr-1">HILANG DI LIVE</span>
                             <b>{{ $itemPress }}</b> &bull; {{ $itemShift }} &bull; #{{ $itemRowNo }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> ({{ $item['job_master'] ?? '-' }})
                         </div>
-                        <span class="text-[11px] font-bold text-slate-800">Qty: {{ number_format($itemPlanQty) }}</span>
+                        <span class="text-[11px] font-bold text-slate-800">Plan: {{ number_format($itemPlanQty) }}</span>
                     </div>
                 @endforeach
 
@@ -206,7 +207,7 @@
                     <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs space-y-1">
                         <div class="flex items-center justify-between">
                             <div>
-                                <span class="px-1.5 py-0.5 rounded bg-amber-600 text-white text-[9px] font-black uppercase mr-1">UPDATE</span>
+                                <span class="px-1.5 py-0.5 rounded bg-amber-600 text-white text-[9px] font-black uppercase mr-1">BERUBAH</span>
                                 <b>{{ $itemPress }}</b> &bull; {{ $itemShift }} &bull; #{{ $itemRowNo }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> ({{ $item['job_master'] ?? '-' }})
                             </div>
                             @if($hasAct)
@@ -247,6 +248,7 @@
                     @endphp
                     <div class="p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-xs flex items-center justify-between">
                         <div>
+                            <span class="px-1.5 py-0.5 rounded bg-emerald-600 text-white text-[9px] font-black uppercase mr-1">ITEM BARU</span>
                             <b>{{ $itemPress }}</b> &bull; {{ $itemShift }} &bull; #{{ $itemRowNo }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> ({{ $item['job_master'] ?? '-' }})
                         </div>
                         @if($hasAct)
@@ -262,57 +264,51 @@
         </div>
     </div>
 
-    {{-- Full Snapshot Plans Table --}}
-    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-        <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/50">
-            <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Isi Lengkap Jadwal pada Snapshot #{{ $backup->id }} ({{ count($payloadPlans) }} Item)</h3>
-            <span class="px-3 py-1 rounded-xl bg-red-50 text-red-700 border border-red-200 text-xs font-black">{{ count($payloadPlans) }} Baris</span>
+    {{-- TABEL 1: JADWAL SNAPSHOT (HISTORICAL DATA SAAT BACKUP) --}}
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+                <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">
+                    Tabel Jadwal Snapshot #{{ $backup->id }} — Kondisi Historis Saat Backup ({{ count($snapshotRows) }} Baris)
+                </h3>
+                <p class="text-[11px] text-slate-500">
+                    Menampilkan nilai murni dari dalam Snapshot #{{ $backup->id }} dengan struktur kolom Production Plan. Sel berwarna kuning menandakan field yang berbeda terhadap jadwal live.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase">
+                <span class="px-2.5 py-1 rounded bg-slate-100 text-slate-700 border border-slate-200">Identik: {{ $counts['unchanged'] ?? 0 }}</span>
+                <span class="px-2.5 py-1 rounded bg-amber-500 text-white">Berubah: {{ $counts['will_update_schedule'] ?? 0 }}</span>
+                <span class="px-2.5 py-1 rounded bg-red-600 text-white">Hilang di Live: {{ $counts['will_restore_missing'] ?? 0 }}</span>
+            </div>
         </div>
-        <div class="overflow-x-auto max-h-96">
-            <table class="w-full text-left border-collapse">
-                <thead>
-                    <tr class="bg-slate-50 border-b border-slate-200 text-[10px] font-black text-slate-600 uppercase tracking-wider sticky top-0">
-                        <th class="py-2.5 px-4">Press</th>
-                        <th class="py-2.5 px-4">Shift</th>
-                        <th class="py-2.5 px-4">Urutan</th>
-                        <th class="py-2.5 px-4">Job No</th>
-                        <th class="py-2.5 px-4">Part Name / Job Master</th>
-                        <th class="py-2.5 px-4 text-right">Qty Plan</th>
-                        <th class="py-2.5 px-4 text-center">Jam Plan</th>
-                        <th class="py-2.5 px-4 text-right">OK (Saat Backup)</th>
-                        <th class="py-2.5 px-4 text-center">Status (Saat Backup)</th>
-                    </tr>
-                </thead>
-                <tbody class="divide-y divide-slate-100 text-xs">
-                    @forelse($payloadPlans as $row)
-                        @php
-                            $rowPress = $row['press_name'] ?? $row['press'] ?? null;
-                            $rowShift = $row['shift_name'] ?? $row['shift'] ?? null;
-                            $rowUrutan = $row['row_no'] ?? $row['urutan_plan'] ?? null;
-                            $rowQtyPlan = (float) ($row['plan'] ?? $row['qty_plan'] ?? 0);
-                            $rowType = strtolower((string) ($row['row_type'] ?? 'job'));
-                        @endphp
-                        <tr class="hover:bg-slate-50">
-                            <td class="py-2 px-4 font-black text-slate-800">{{ $rowPress ?: '-' }}</td>
-                            <td class="py-2 px-4 font-semibold text-slate-700">{{ $rowShift ?: '-' }}</td>
-                            <td class="py-2 px-4 font-bold text-slate-800">{{ ($rowUrutan !== null && $rowUrutan !== '') ? $rowUrutan : ($rowType === 'break' ? 'BREAK' : '-') }}</td>
-                            <td class="py-2 px-4 font-bold text-slate-800">{{ $row['job_no'] ?? '-' }}</td>
-                            <td class="py-2 px-4 text-slate-700">{{ $row['job_master'] ?? '-' }}</td>
-                            <td class="py-2 px-4 text-right font-black text-slate-800">{{ number_format($rowQtyPlan) }}</td>
-                            <td class="py-2 px-4 text-center text-slate-600">{{ $row['start_time'] ?? '-' }} - {{ $row['finish_time'] ?? '-' }}</td>
-                            <td class="py-2 px-4 text-right font-bold text-emerald-700">{{ number_format((float) ($row['ok'] ?? 0)) }}</td>
-                            <td class="py-2 px-4 text-center">
-                                <span class="px-2 py-0.5 rounded bg-slate-100 border border-slate-200 text-slate-700 text-[10px] font-bold uppercase">{{ $row['status'] ?? 'pending' }}</span>
-                            </td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="9" class="py-8 text-center text-slate-400">Tidak ada baris jadwal di dalam snapshot ini.</td>
-                        </tr>
-                    @endforelse
-                </tbody>
-            </table>
+
+        @include('ppc.planning.partials._schedule_plan_table', [
+            'rows' => $snapshotRows,
+            'tableMode' => 'snapshot',
+        ])
+    </div>
+
+    {{-- TABEL 2: JADWAL LIVE SAAT INI (UNTUK PERBANDINGAN LANGSUNG) --}}
+    <div class="bg-white border border-slate-200 rounded-2xl p-5 shadow-sm space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-3">
+            <div>
+                <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">
+                    Tabel Jadwal Live Saat Ini — Tanggal {{ $planDateStr }} ({{ count($liveRows) }} Baris)
+                </h3>
+                <p class="text-[11px] text-slate-500">
+                    Menampilkan jadwal aktif di database saat ini lengkap dengan progres aktual produksi terkini sebagai pembanding terhadap Snapshot #{{ $backup->id }}.
+                </p>
+            </div>
+            <div class="flex flex-wrap items-center gap-2 text-[10px] font-black uppercase">
+                <span class="px-2.5 py-1 rounded bg-emerald-600 text-white">Item Baru: {{ $counts['post_snapshot_plans'] ?? 0 }}</span>
+                <span class="px-2.5 py-1 rounded bg-blue-50 text-blue-800 border border-blue-200">Aktual Dilindungi: {{ $counts['protected_active_plans'] ?? 0 }}</span>
+            </div>
         </div>
+
+        @include('ppc.planning.partials._schedule_plan_table', [
+            'rows' => $liveRows,
+            'tableMode' => 'live',
+        ])
     </div>
 </div>
 @endsection
