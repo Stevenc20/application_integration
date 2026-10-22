@@ -526,35 +526,151 @@ class DashboardRealtimeService
         $dandoriTotalMinutes = round($dandoriTotalMinutes, 1);
         $currDandoriMinutes = round($currDandoriMinutes, 1);
 
-        // TPT Aktual = Runtime (Press Time) + Dandori + Total Downtime
-        $actualTptMinutes = round($runtimeMinutes + $dandoriTotalMinutes + $dtTotalMinutes, 1);
+        // Determine cumulative set up to and including running item (item belum mulai dikecualikan)
+        $includedJobIds = [];
+        $runningJobId = null;
+        if ($runningRecord && $runningRecord->jobMaster) {
+            $runningJobId = $runningRecord->job_master_id;
+        }
 
-        // GSPH Aktual = Total Pcs OK / TPT Aktual * 60
-        $gsph = ($ok > 0 && $actualTptMinutes > 0)
-            ? (int) round(($ok / $actualTptMinutes) * 60)
+        // Build ordered list by sequence
+        $ordered = $dailyRecords->filter(function ($dp) {
+            return $dp->jobMaster !== null;
+        })->sortBy(function ($dp) {
+            $seq = $dp->jobMaster->sequence_no ?? 9999;
+            return $seq;
+        })->values();
+
+        foreach ($ordered as $dp) {
+            $jm = $dp->jobMaster;
+            $isRunningJob = $runningJobId && $dp->job_master_id == $runningJobId;
+            $hasStarted = !empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
+            $hasProgress = ((int)$dp->actual_ok + (int)$dp->actual_repair + (int)$dp->actual_reject) > 0;
+            // Include if processed up to running: include all before running that are processed or started; include running if it exists
+            if ($isRunningJob) {
+                // include running even if just started with 0 qty? but qty item berjalan is used for current; for actual cumulative include if processed up to running
+                if ($hasStarted || $hasProgress || true) { // include running
+                    $includedJobIds[] = $dp->job_master_id;
+                }
+                break; // up to and including running
+            }
+            if ($hasStarted || $hasProgress) {
+                $includedJobIds[] = $dp->job_master_id;
+            }
+            // if not started and no progress, exclude
+        }
+
+        // If no running found or cutoff logic didn't include running properly, fallback: include all except those with no start and no progress
+        if (empty($includedJobIds)) {
+            foreach ($ordered as $dp) {
+                $jm = $dp->jobMaster;
+                $hasStarted = !empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
+                $hasProgress = ((int)$dp->actual_ok + (int)$dp->actual_repair + (int)$dp->actual_reject) > 0;
+                if ($hasStarted || $hasProgress) {
+                    $includedJobIds[] = $dp->job_master_id;
+                }
+            }
+            if (empty($includedJobIds) && $runningJobId) {
+                $includedJobIds[] = $runningJobId;
+            }
+        }
+
+        // Sum qty for included jobs (use actual_ok as output qty)
+        $okCum = 0;
+        foreach ($dailyRecords as $dp) {
+            if (in_array($dp->job_master_id, $includedJobIds)) {
+                $okCum += (int)$dp->actual_ok;
+            }
+        }
+
+        // Compute durations for included jobs only
+        $runtimeCumSeconds = 0;
+        foreach ($dailyRecords as $dp) {
+            if (!in_array($dp->job_master_id, $includedJobIds)) {
+                continue;
+            }
+            $dpRuntime = (float) $dp->runtime_seconds;
+            if ($dpRuntime <= 0 && $dp->jobMaster) {
+                if ($dp->jobMaster->status === 'running') {
+                    $session = $sessionsMap->get($dp->job_master_id);
+                    if ($session && $session->start_time) {
+                        $dpRuntime = (float) $session->total_seconds;
+                        if ($session->status === 'running') {
+                            $dpRuntime += abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($session->start_time)));
+                        }
+                    } elseif ($dp->jobMaster->started_at) {
+                        $dpRuntime = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
+                    }
+                } elseif ($dp->jobMaster->status === 'paused') {
+                    $session = $sessionsMap->get($dp->job_master_id);
+                    $dpRuntime = (float) ($session->total_seconds ?? 0);
+                } elseif ($dp->jobMaster->started_at) {
+                    $endAt = $dp->jobMaster->finished_at ?: \Carbon\Carbon::now();
+                    $dpRuntime = abs(\Carbon\Carbon::parse($endAt)->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
+                }
+            }
+            if ($dpRuntime < 0) $dpRuntime = 0;
+            $runtimeCumSeconds += $dpRuntime;
+        }
+        $runtimeCumMinutes = round($runtimeCumSeconds / 60, 1);
+        if ($runtimeCumMinutes < 0) $runtimeCumMinutes = 0;
+
+        // Dandori + 1st check for included jobs
+        $dandoriCumMinutes = 0.0;
+        foreach ($dandoriModels as $d) {
+            if ($d->next_job_id && in_array($d->next_job_id, $includedJobIds)) {
+                $dur = (float) ($d->duration_minutes ?? 0);
+                if ($dur <= 0 && $d->start_time) {
+                    $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+                    $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
+                }
+                if ($dur > 0) {
+                    $dandoriCumMinutes += $dur;
+                }
+            }
+        }
+        $dandoriCumMinutes = round($dandoriCumMinutes, 1);
+
+        // Downtime for included jobs
+        $dtCumMinutes = 0.0;
+        foreach ($allDowntimes as $dt) {
+            if ($dt->job_master_id && in_array($dt->job_master_id, $includedJobIds)) {
+                $type = strtoupper(trim($dt->jenis_downtime ?? ''));
+                if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
+                $dur = $this->downtimeDurationSeconds($dt) / 60;
+                if ($dur > 0) {
+                    $dtCumMinutes += $dur;
+                }
+            }
+        }
+        $dtCumMinutes = round($dtCumMinutes, 1);
+
+        // TPT Aktual = Press Time + Dandori + 1st Check + Downtime (akumulatif sampai item berjalan)
+        $actualTptMinutes = round($runtimeCumMinutes + $dandoriCumMinutes + $dtCumMinutes, 1);
+        if ($actualTptMinutes < 0) $actualTptMinutes = 0;
+
+        // GSPH ACTUAL = (Total Qty seluruh item yang sudah diproses sampai item berjalan / Total TPT) × 60
+        $gsph = ($okCum > 0 && $actualTptMinutes > 0 && is_finite($actualTptMinutes))
+            ? (int) round(($okCum / $actualTptMinutes) * 60)
             : 0;
 
         $currRuntimeMinutes = round($currRuntime / 60, 1);
-        // GSPH Curr: hanya untuk item yang sedang running, dihitung berdasarkan PCS yang sudah di-input leader / TPT kumulatif sampai qty tersebut
+        // GSPH CURRENT = (Qty item berjalan / (Press Time item berjalan + Dandori item berjalan + 1st Check item berjalan + Downtime item berjalan)) × 60
         $currGsph = 0;
-        if ($hasRunning && $currOk > 0 && $runningRecord && $runningRecord->jobMaster) {
-            $rjn = trim($runningRecord->jobMaster->job_number ?? '');
-            $runningPlan = $plans->first(function ($p) use ($rjn) {
-                return trim($p->job_no ?? '') === $rjn && ($p->row_type ?? 'job') === 'job';
-            });
-            $runningCt = $runningPlan ? (float) ($runningPlan->ct_detik ?? 0) : 0;
-            if ($runningCt > 0) {
-                // GSPH Curr = (PCS yang sudah di-input / ((PCS yang di-input * CT) / 60)) * 60 = 3600 / CT
-                $tptCumMins = ($currOk * $runningCt) / 60;
-                if ($tptCumMins > 0) {
-                    $currGsph = (int) round(($currOk / $tptCumMins) * 60);
-                }
+        if ($hasRunning && $runningRecord && $runningRecord->jobMaster) {
+            $currQtyRunning = (int) $currOk;
+            if ($currQtyRunning <= 0) {
+                // if no qty yet, still follow formula; if denominator zero -> 0
+                $currQtyRunning = 0;
+            }
+            $currPressTime = (float) $currRuntimeMinutes;
+            $currDandori = (float) $currDandoriMinutes; // includes dandori + 1st check
+            $currDowntime = (float) $currDtTotal;
+            $currDenom = $currPressTime + $currDandori + $currDowntime;
+            if ($currQtyRunning > 0 && $currDenom > 0 && is_finite($currDenom)) {
+                $currGsph = (int) round(($currQtyRunning / $currDenom) * 60);
             } else {
-                // Fallback jika CT tidak ditemukan
-                $currActualTpt = round($currRuntimeMinutes + $currDandoriMinutes + $currDtTotal, 1);
-                if ($currActualTpt > 0) {
-                    $currGsph = (int) round(($currOk / $currActualTpt) * 60);
-                }
+                $currGsph = 0;
             }
         }
 
