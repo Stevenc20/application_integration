@@ -34,7 +34,7 @@ class PpcScheduleMergeService
      * Merge imported PPC rows into existing plans for the given date.
      * Rows that are no longer listed by PPC are intentionally left untouched.
      */
-    public function merge(array $sheets, string $parsedDate, ?int $userId = null): array
+    public function merge(array $sheets, string $parsedDate, ?int $userId = null, array $options = []): array
     {
         $lineMap = LineMaster::pluck('id', 'line_name')->toArray();
         $sheets = array_values($sheets);
@@ -43,11 +43,18 @@ class PpcScheduleMergeService
             return $this->emptyResult();
         }
 
-        return DB::transaction(function () use ($sheets, $parsedDate, $userId, $lineMap) {
+        return DB::transaction(function () use ($sheets, $parsedDate, $userId, $lineMap, $options) {
             /** @var Collection<int, ProductionPlan> $existingPlans */
             $existingPlans = ProductionPlan::whereDate('plan_date', $parsedDate)
                 ->where('source_type', 'ppc')
                 ->get();
+
+            if ($existingPlans->isNotEmpty() && empty($options['skip_backup'])) {
+                app(ScheduleBackupService::class)->captureSnapshot($parsedDate, 'pre_import', $userId, [
+                    'shift_scope' => $options['shift_scope'] ?? 'all',
+                    'source_filename' => $options['source_filename'] ?? null,
+                ]);
+            }
 
             $snapshotBefore = $existingPlans->map(fn ($plan) => $this->snapshotPlan($plan))->values()->all();
 
@@ -323,6 +330,16 @@ class PpcScheduleMergeService
                 'unchanged' => $unchanged,
                 'not_in_revision' => $notInRevision,
             ], $userId);
+
+            if ($existingPlans->isEmpty() && $imported > 0 && empty($options['skip_backup'])) {
+                app(ScheduleBackupService::class)->ensureInitialBackup(
+                    $parsedDate,
+                    $userId,
+                    $options['source_filename'] ?? null
+                );
+            }
+
+            DashboardRealtimeService::flushCache();
 
             return [
                 'counts' => $counts,

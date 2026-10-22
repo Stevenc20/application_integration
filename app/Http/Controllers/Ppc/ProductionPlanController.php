@@ -2,23 +2,22 @@
 
 namespace App\Http\Controllers\Ppc;
 
-use App\Http\Controllers\Controller;
 use App\Events\ProductionPlanUpdated;
+use App\Http\Controllers\Controller;
+use App\Models\JobMaster;
+use App\Models\LineMaster;
+use App\Models\MasterStamping;
 use App\Models\ProductionPlan;
+use App\Models\RecoveryItem;
+use App\Services\ExcelScheduleParser;
 use App\Services\ProductionMetricsService;
 use App\Services\TimelineGenerationService;
-use App\Models\LineMaster;
-use App\Models\JobMaster;
-use App\Models\MasterStamping;
-use App\Models\RecoveryItem;
-use App\Models\RecoverySchedule;
-use App\Services\ExcelScheduleParser;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Carbon\Carbon;
+use Illuminate\Support\Str;
 
 class ProductionPlanController extends Controller
 {
@@ -26,13 +25,13 @@ class ProductionPlanController extends Controller
     {
         // 1. DATA CONTEXT: Cari data terbaru hanya untuk default awal
         $maxDateRecord = ProductionPlan::orderBy('plan_date', 'desc')->first();
-        $maxDate       = $maxDateRecord ? $maxDateRecord->plan_date->toDateString() : now()->toDateString();
-        
+        $maxDate = $maxDateRecord ? $maxDateRecord->plan_date->toDateString() : now()->toDateString();
+
         $latestImport = ProductionPlan::orderBy('created_at', 'desc')->first();
         $lastImportAt = $latestImport ? $latestImport->created_at->format('d M Y H:i') : '—';
 
         $rawDate = $request->get('date');
-        $date    = $rawDate ?: now()->toDateString();
+        $date = $rawDate ?: now()->toDateString();
 
         // Sync LKH quantities to ProductionPlan for display
         try {
@@ -41,7 +40,9 @@ class ProductionPlanController extends Controller
             foreach ($plansForDate as $plan) {
                 $jn = trim($plan->job_no ?? '');
                 $jm = trim($plan->job_master ?? '');
-                if (blank($jn) && blank($jm)) continue;
+                if (blank($jn) && blank($jm)) {
+                    continue;
+                }
 
                 $job = $mergeService->findLinkedJobMaster((int) $plan->id);
 
@@ -49,7 +50,7 @@ class ProductionPlanController extends Controller
                     $daily = \App\Models\DailyProduction::where('job_master_id', $job->id)
                         ->whereDate('work_date', $date)
                         ->first();
-                    
+
                     if ($daily) {
                         $ok = $daily->actual_qty;
                         $repair = $daily->actual_repair ?: $daily->repair_qty;
@@ -59,50 +60,50 @@ class ProductionPlanController extends Controller
                         $repair = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('repair_qty');
                         $reject = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('reject_qty');
                     }
-                    
+
                     $plan->update([
                         'ok' => (float) $ok,
                         'repair' => (float) $repair,
-                        'reject' => (float) $reject
+                        'reject' => (float) $reject,
                     ]);
                 }
             }
         } catch (\Throwable $e) {
-            Log::error("Failed to auto-sync PPC quantities: " . $e->getMessage());
+            Log::error('Failed to auto-sync PPC quantities: '.$e->getMessage());
         }
 
         $currentPress = strtoupper($request->get('press', 'PRESS A'));
         $hasExplicitShift = $request->has('shift');
-        $currentShift = $request->get('shift', 'Pagi'); 
+        $currentShift = $request->get('shift', 'Pagi');
 
         // 3. GET DATA CONTEXT
         $allAvailableForDate = ProductionPlan::whereDate('plan_date', $date)->get();
-        $hasDataOnDate       = $allAvailableForDate->count() > 0;
+        $hasDataOnDate = $allAvailableForDate->count() > 0;
 
         // Smart Fallback Press & Shift
         if ($hasDataOnDate) {
             $existingPresses = $allAvailableForDate->pluck('press_name')->unique()->toArray();
-            $matchFound      = false;
-            foreach($existingPresses as $ep) {
+            $matchFound = false;
+            foreach ($existingPresses as $ep) {
                 if (stripos($ep, $currentPress) !== false) {
-                    $currentPress = $ep; 
-                    $matchFound   = true;
+                    $currentPress = $ep;
+                    $matchFound = true;
                     break;
                 }
             }
-            if (!$matchFound && $currentPress !== 'ALL') {
+            if (! $matchFound && $currentPress !== 'ALL') {
                 $currentPress = $existingPresses[0];
             }
-            
+
             // Re-fetch shifts for the new currentPress
             $availableShifts = $allAvailableForDate
-                ->when($currentPress !== 'ALL', fn($q) => $q->where('press_name', $currentPress))
+                ->when($currentPress !== 'ALL', fn ($q) => $q->where('press_name', $currentPress))
                 ->pluck('shift_name')
                 ->unique()
                 ->toArray();
 
             // Fuzzy match shift: cari nama shift di DB yang mengandung keyword (Pagi→Shift Pagi)
-            if (!in_array($currentShift, $availableShifts) && count($availableShifts) > 0) {
+            if (! in_array($currentShift, $availableShifts) && count($availableShifts) > 0) {
                 foreach ($availableShifts as $s) {
                     if (stripos($s, $currentShift) !== false) {
                         $currentShift = $s;
@@ -110,7 +111,7 @@ class ProductionPlanController extends Controller
                     }
                 }
                 // Jangan fallback ke shift lain jika user eksplisit klik shift tertentu
-                if (!in_array($currentShift, $availableShifts) && !$hasExplicitShift) {
+                if (! in_array($currentShift, $availableShifts) && ! $hasExplicitShift) {
                     $currentShift = $availableShifts[0];
                 }
             }
@@ -120,12 +121,12 @@ class ProductionPlanController extends Controller
 
         // 4. PACKAGING METADATA
         $activeFilters = [
-            'date'        => $date,
-            'press'       => $currentPress,
-            'shift'       => $currentShift,
-            'has_data'    => $hasDataOnDate,
-            'max_date'    => $maxDate,
-            'last_import' => $lastImportAt
+            'date' => $date,
+            'press' => $currentPress,
+            'shift' => $currentShift,
+            'has_data' => $hasDataOnDate,
+            'max_date' => $maxDate,
+            'last_import' => $lastImportAt,
         ];
 
         // =====================================
@@ -135,8 +136,12 @@ class ProductionPlanController extends Controller
         $allPlans = ProductionPlan::with('line')
             ->whereDate('plan_date', $date);
 
-        if ($currentPress !== 'ALL') $allPlans->where('press_name', $currentPress);
-        if ($currentShift !== 'ALL') $allPlans->where('shift_name', $currentShift);
+        if ($currentPress !== 'ALL') {
+            $allPlans->where('press_name', $currentPress);
+        }
+        if ($currentShift !== 'ALL') {
+            $allPlans->where('shift_name', $currentShift);
+        }
         if ($request->filled('status') && $request->status !== '') {
             $allPlans->where(DB::raw('LOWER(status)'), strtolower($request->status));
         }
@@ -151,85 +156,93 @@ class ProductionPlanController extends Controller
         $plans = ProductionPlan::with('line')
             ->whereDate('plan_date', $date);
 
-        if ($currentPress !== 'ALL') $plans->where('press_name', $currentPress);
-        if ($currentShift !== 'ALL') $plans->where('shift_name', $currentShift);
+        if ($currentPress !== 'ALL') {
+            $plans->where('press_name', $currentPress);
+        }
+        if ($currentShift !== 'ALL') {
+            $plans->where('shift_name', $currentShift);
+        }
         if ($request->filled('status') && $request->status !== '') {
             $plans->where(DB::raw('LOWER(status)'), strtolower($request->status));
         }
         $plans = $plans->orderByRaw("CASE WHEN LOWER(status) = 'running' THEN 0 ELSE 1 END")
             ->orderBy('row_no', 'asc')
-            ->where(function($q) {
+            ->where(function ($q) {
                 $q->where('row_type', '!=', 'total_finish')
-                  ->where('row_type', '!=', 'note')
-                  ->where(function($q2) {
-                      $q2->whereNull('job_master')
-                         ->orWhere('job_master', 'NOT LIKE', '%TOTAL FINISH%');
-                  })
-                  ->where(function($q2) {
-                      $q2->whereNull('job_no')
-                         ->orWhere('job_no', 'NOT LIKE', '%TOTAL FINISH%');
-                  });
+                    ->where('row_type', '!=', 'note')
+                    ->where(function ($q2) {
+                        $q2->whereNull('job_master')
+                            ->orWhere('job_master', 'NOT LIKE', '%TOTAL FINISH%');
+                    })
+                    ->where(function ($q2) {
+                        $q2->whereNull('job_no')
+                            ->orWhere('job_no', 'NOT LIKE', '%TOTAL FINISH%');
+                    });
             })
             ->get();
 
         // =====================================
         // TOTAL FINISH ROW (from ALL data, so sums are accurate)
         // =====================================
-        $totalFinishRow = $allPlans->filter(function($row) {
+        $totalFinishRow = $allPlans->filter(function ($row) {
             $jm = strtoupper($row->job_master ?? '');
             $jn = strtoupper($row->job_no ?? '');
-            $combined = $jm . ' ' . $jn;
+            $combined = $jm.' '.$jn;
+
             return ($row->row_type === 'total_finish') || str_contains($combined, 'TOTAL FINISH') || str_contains($combined, 'TOTAL FNISH') || str_contains($combined, 'FINISH');
         })->first();
 
         // FALLBACK: Generate automatic summary if explicit row is missing
-        if (!$totalFinishRow && $allPlans->count() > 0) {
+        if (! $totalFinishRow && $allPlans->count() > 0) {
             $jobPlans = $allPlans->where('row_type', 'job');
-            
-            $totalFinishRow = (object)[
-                'id'          => 0,
-                'plan'        => $jobPlans->sum('plan'),
-                'ok'          => $jobPlans->sum('ok'),
-                'repair'      => $jobPlans->sum('repair'),
-                'reject'      => $jobPlans->sum('reject'),
+
+            $totalFinishRow = (object) [
+                'id' => 0,
+                'plan' => $jobPlans->sum('plan'),
+                'ok' => $jobPlans->sum('ok'),
+                'repair' => $jobPlans->sum('repair'),
+                'reject' => $jobPlans->sum('reject'),
                 'total_mesin' => $jobPlans->sum('total_mesin'),
-                'ct_detik'    => round($jobPlans->where('ct_detik', '>', 0)->avg('ct_detik'), 1),
-                'tpt'         => $jobPlans->sum('tpt'),
+                'ct_detik' => round($jobPlans->where('ct_detik', '>', 0)->avg('ct_detik'), 1),
+                'tpt' => $jobPlans->sum('tpt'),
                 'process_time' => round($jobPlans->sum('process_time'), 1),
-                'reg_active'  => $jobPlans->sum('reg_active'),
-                'dct'         => $jobPlans->sum('dct'),
-                'mct'         => $jobPlans->sum('mct'),
-                'plan_dct'    => $jobPlans->sum('plan_dct'),
-                'gsph_item'   => ProductionMetricsService::gsph(
+                'reg_active' => $jobPlans->sum('reg_active'),
+                'dct' => $jobPlans->sum('dct'),
+                'mct' => $jobPlans->sum('mct'),
+                'plan_dct' => $jobPlans->sum('plan_dct'),
+                'gsph_item' => ProductionMetricsService::gsph(
                     (int) $jobPlans->sum('plan'),
                     (float) $jobPlans->sum('tpt')
                 ),
-                'start_time'  => $allPlans->first()->start_time ?? '—',
+                'start_time' => $allPlans->first()->start_time ?? '—',
                 'finish_time' => $allPlans->last()->finish_time ?? '—',
-                'row_type'    => 'total_finish',
-                'a1'          => $jobPlans->sum('a1'),
-                'a2'          => $jobPlans->sum('a2'),
-                'a3'          => $jobPlans->sum('a3'),
-                'a4'          => $jobPlans->sum('a4'),
-                'dt_menit'    => $jobPlans->sum('dt_menit'),
-                'job_master'  => 'TOTAL FINISH',
-                'job_no'      => 'TOTAL FINISH',
-                'keterangan'  => ''
+                'row_type' => 'total_finish',
+                'a1' => $jobPlans->sum('a1'),
+                'a2' => $jobPlans->sum('a2'),
+                'a3' => $jobPlans->sum('a3'),
+                'a4' => $jobPlans->sum('a4'),
+                'dt_menit' => $jobPlans->sum('dt_menit'),
+                'job_master' => 'TOTAL FINISH',
+                'job_no' => 'TOTAL FINISH',
+                'keterangan' => '',
             ];
         }
 
         // Card summaries from all data
-        $cardSummaries = $allPlans->filter(function($row) use ($totalFinishRow) {
-            if ($totalFinishRow && $row->id === $totalFinishRow->id) return false;
-            $combined = strtoupper(($row->job_master ?? '') . ' ' . ($row->job_no ?? ''));
-            return str_contains($combined, 'PLAN') || str_contains($combined, 'STROKE') || 
-                   str_contains($combined, 'TPT') || str_contains($combined, 'GSPH') || 
+        $cardSummaries = $allPlans->filter(function ($row) use ($totalFinishRow) {
+            if ($totalFinishRow && $row->id === $totalFinishRow->id) {
+                return false;
+            }
+            $combined = strtoupper(($row->job_master ?? '').' '.($row->job_no ?? ''));
+
+            return str_contains($combined, 'PLAN') || str_contains($combined, 'STROKE') ||
+                   str_contains($combined, 'TPT') || str_contains($combined, 'GSPH') ||
                    str_contains($combined, 'TOTAL PCS');
         });
 
         $totalJobs = $allPlans->where('row_type', 'job')
-            ->filter(function($p) {
-                return (!empty($p->job_no) && $p->job_no !== '—') || (!empty($p->job_master) && $p->job_master !== '—');
+            ->filter(function ($p) {
+                return (! empty($p->job_no) && $p->job_no !== '—') || (! empty($p->job_master) && $p->job_master !== '—');
             })
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
             ->count();
@@ -258,8 +271,12 @@ class ProductionPlanController extends Controller
             ->where('job_no', '!=', '')
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
-        if ($currentPress !== 'ALL') $overflowQuery->where('press_name', $currentPress);
-        if ($currentShift !== 'ALL') $overflowQuery->where('shift_name', $currentShift);
+        if ($currentPress !== 'ALL') {
+            $overflowQuery->where('press_name', $currentPress);
+        }
+        if ($currentShift !== 'ALL') {
+            $overflowQuery->where('shift_name', $currentShift);
+        }
 
         $overflowItems = $overflowQuery->get();
         $overflowByPress = $overflowItems->groupBy('press_name');
@@ -268,7 +285,7 @@ class ProductionPlanController extends Controller
         // Press config for production boundaries (extended shift, jebol alert)
         $pressMeta = null;
         if ($currentPress !== 'ALL') {
-            $pressMeta = \App\Models\LineMaster::where(DB::raw('REPLACE(REPLACE(UPPER(line_name), " ", ""), "-", "")'), 'LIKE', '%' . str_replace([' ', '-', 'LINE'], '', $currentPress) . '%')
+            $pressMeta = \App\Models\LineMaster::where(DB::raw('REPLACE(REPLACE(UPPER(line_name), " ", ""), "-", "")'), 'LIKE', '%'.str_replace([' ', '-', 'LINE'], '', $currentPress).'%')
                 ->select('line_name', 'production_start', 'production_end')
                 ->first();
         }
@@ -277,10 +294,17 @@ class ProductionPlanController extends Controller
         $boundaryOverflowIds = [];
         if ($pressMeta && $pressMeta->production_end) {
             $endMins = \App\Models\MasterBreakTime::timeToMinutes($pressMeta->production_end);
-            $boundaryOverflow = $plans->filter(function($plan) use ($endMins) {
-                if (($plan->row_type ?? 'job') !== 'job') return false;
-                if (!$plan->finish_time) return false;
-                if (($plan->source_type ?? 'ppc') === 'recovery') return false;
+            $boundaryOverflow = $plans->filter(function ($plan) use ($endMins) {
+                if (($plan->row_type ?? 'job') !== 'job') {
+                    return false;
+                }
+                if (! $plan->finish_time) {
+                    return false;
+                }
+                if (($plan->source_type ?? 'ppc') === 'recovery') {
+                    return false;
+                }
+
                 return \App\Models\MasterBreakTime::timeToMinutes($plan->finish_time) >= $endMins;
             })->values();
             $boundaryOverflowIds = $boundaryOverflow->pluck('id')->toArray();
@@ -302,20 +326,22 @@ class ProductionPlanController extends Controller
 
     public function import(Request $request)
     {
-        Log::info("--- PRODUCTION PLAN IMPORT STARTED ---");
+        Log::info('--- PRODUCTION PLAN IMPORT STARTED ---');
         $request->validate([
             'excel_file' => 'required|file|max:51200|extensions:xlsx,xls,xlsm',
         ]);
 
         try {
-            $file         = $request->file('excel_file');
+            $file = $request->file('excel_file');
             $originalName = $file->getClientOriginalName();
-            $extension    = strtolower($file->getClientOriginalExtension());
-            $uploadDir    = storage_path('app/uploads');
-            $dataPath     = $uploadDir . '/prod_plan_temp.' . $extension;
+            $extension = strtolower($file->getClientOriginalExtension());
+            $uploadDir = storage_path('app/uploads');
+            $dataPath = $uploadDir.'/prod_plan_temp.'.$extension;
 
-            if (!is_dir($uploadDir)) mkdir($uploadDir, 0755, true);
-            $file->move($uploadDir, 'prod_plan_temp.' . $extension);
+            if (! is_dir($uploadDir)) {
+                mkdir($uploadDir, 0755, true);
+            }
+            $file->move($uploadDir, 'prod_plan_temp.'.$extension);
 
             $result = null;
             $parserSource = null;
@@ -329,17 +355,19 @@ class ProductionPlanController extends Controller
                     if ($output) {
                         $output = trim($output);
                         $jsonStart = strpos($output, '{');
-                        if ($jsonStart !== false) $output = substr($output, $jsonStart);
+                        if ($jsonStart !== false) {
+                            $output = substr($output, $jsonStart);
+                        }
                         $parsed = json_decode($output, true);
-                        if ($parsed && !isset($parsed['error'])) {
+                        if ($parsed && ! isset($parsed['error'])) {
                             $result = $parsed;
                             $parserSource = 'python';
                             Log::info('[IMPORT] Python engine succeeded.');
                         } else {
-                            Log::warning("Python engine failed, falling back to PHP: " . ($parsed['error'] ?? 'Invalid JSON'));
+                            Log::warning('Python engine failed, falling back to PHP: '.($parsed['error'] ?? 'Invalid JSON'));
                         }
                     } else {
-                        Log::warning("Python engine produced no output, falling back to PHP.");
+                        Log::warning('Python engine produced no output, falling back to PHP.');
                     }
                 }
             } else {
@@ -347,26 +375,29 @@ class ProductionPlanController extends Controller
             }
 
             // ATTEMPT 2: PHP PhpSpreadsheet fallback
-            if (!$result) {
+            if (! $result) {
                 try {
                     $parser = app(ExcelScheduleParser::class);
                     $result = $parser->parse($dataPath, $originalName);
                     $parserSource = 'php';
                     if (isset($result['error'])) {
-                        Log::error("PHP Excel Parser Error: " . $result['error']);
+                        Log::error('PHP Excel Parser Error: '.$result['error']);
                         @unlink($dataPath);
-                        return back()->with('error', 'Error Parsing Excel: ' . $result['error']);
+
+                        return back()->with('error', 'Error Parsing Excel: '.$result['error']);
                     }
                     Log::info('[IMPORT] PHP ExcelParser succeeded.');
                 } catch (\Throwable $e) {
-                    Log::error("PHP ExcelParser crashed: " . $e->getMessage());
+                    Log::error('PHP ExcelParser crashed: '.$e->getMessage());
                     @unlink($dataPath);
-                    return back()->with('error', 'Gagal membaca Excel: ' . $e->getMessage());
+
+                    return back()->with('error', 'Gagal membaca Excel: '.$e->getMessage());
                 }
             }
 
-            if (!$result) {
+            if (! $result) {
                 @unlink($dataPath);
+
                 return back()->with('error', 'Gagal mendapatkan output dari engine Python maupun PHP fallback.');
             }
 
@@ -385,7 +416,7 @@ class ProductionPlanController extends Controller
                 $uploadDateStr = $result['upload_date'];
                 $parsedDate = $this->parseIndoDate($uploadDateStr)->format('Y-m-d');
             }
-            
+
             $imported = 0;
 
             // APPLY SHIFT FILTER FROM MODAL
@@ -394,13 +425,17 @@ class ProductionPlanController extends Controller
             if ($shiftFilter !== 'all') {
                 $sheets = array_values(array_filter($sheets, function ($s) use ($shiftFilter) {
                     $name = strtolower($s['shift_name'] ?? '');
+
                     return str_contains($name, $shiftFilter);
                 }));
             }
             $result['sheets'] = $sheets;
 
             $mergeResult = app(\App\Services\PpcScheduleMergeService::class)
-                ->merge($result['sheets'] ?? [], $parsedDate, Auth::id());
+                ->merge($result['sheets'] ?? [], $parsedDate, Auth::id(), [
+                    'source_filename' => $originalName,
+                    'shift_scope' => $shiftFilter,
+                ]);
             $imported = $mergeResult['counts']['rows_imported'] ?? 0;
             $importPreview = $mergeResult['preview'] ?? null;
 
@@ -419,17 +454,16 @@ class ProductionPlanController extends Controller
                 'imported' => $imported,
             ]);
 
-
             // OTOMATIS SYNC KE QA: Setiap kali PPC upload jadwal baru, langsung sync ke QA schedules
             try {
                 \Illuminate\Support\Facades\Artisan::call('qa:sync-schedule', ['date' => $parsedDate]);
                 Log::info("Auto-sync QA schedules triggered for date: {$parsedDate}");
             } catch (\Throwable $e) {
-                Log::warning("Auto-sync QA schedule failed: " . $e->getMessage());
+                Log::warning('Auto-sync QA schedule failed: '.$e->getMessage());
             }
 
             // Auto-redirect to the first parsed sheet for convenience
-            if (!empty($result['sheets'])) {
+            if (! empty($result['sheets'])) {
                 $firstKey = array_key_first($result['sheets']);
                 $firstSheet = $result['sheets'][$firstKey];
                 $redirectShift = $firstSheet['shift_name'] ?? null;
@@ -437,8 +471,9 @@ class ProductionPlanController extends Controller
                     $redirectShift = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $redirectShift);
                     $redirectShift = trim(ucwords(strtolower($redirectShift)));
                 }
+
                 return redirect()->route('ppc.planning.production_plan', [
-                    'date'  => $parsedDate,
+                    'date' => $parsedDate,
                     'press' => $firstSheet['press_name'] ?? null,
                     'shift' => $redirectShift,
                 ])->with('success', "Import Berhasil! {$imported} data diproses.")
@@ -449,8 +484,9 @@ class ProductionPlanController extends Controller
                 ->with('import_preview', $importPreview);
 
         } catch (\Throwable $e) {
-            Log::error("Python Import Error: " . $e->getMessage());
-            return redirect()->back()->with('error', 'Gagal import: ' . $e->getMessage());
+            Log::error('Python Import Error: '.$e->getMessage());
+
+            return redirect()->back()->with('error', 'Gagal import: '.$e->getMessage());
         }
     }
 
@@ -475,6 +511,11 @@ class ProductionPlanController extends Controller
             $query->where('shift_name', 'like', "Shift $shift%");
         }
 
+        app(\App\Services\ScheduleBackupService::class)->captureSnapshot($date, 'pre_clear', Auth::id(), [
+            'shift_scope' => $shift ?: 'all',
+            'label' => 'Pre-Clear Snapshot ('.$date.($shift ? " - Shift {$shift}" : '').')',
+        ]);
+
         $mergeService = app(\App\Services\PpcScheduleMergeService::class);
         $plans = (clone $query)->get(['id', 'job_no', 'shift_name', 'press_name', 'ok', 'repair', 'reject', 'status', 'act_start']);
         $protectedPlans = $plans->filter(fn ($plan) => $mergeService->planHasProductionActivity($plan));
@@ -488,7 +529,7 @@ class ProductionPlanController extends Controller
         $count = ProductionPlan::whereIn('id', $deletableIds)->delete();
         $skipped = $protectedPlans->count();
 
-        $message = "Clear Data Selesai! $count record untuk tanggal $date" . ($shift ? " (Shift $shift)" : '') . " telah dihapus.";
+        $message = "Clear Data Selesai! $count record untuk tanggal $date".($shift ? " (Shift $shift)" : '').' telah dihapus.';
         if ($skipped > 0) {
             $message .= " $skipped plan dilewati karena sudah memiliki aktivitas produksi.";
         }
@@ -517,22 +558,23 @@ class ProductionPlanController extends Controller
 
             foreach ($items as $item) {
                 $plan = ProductionPlan::where('recovery_id', $item->id)->first();
-                
+
                 if ($plan) {
                     // Strict cancelation check based on operational reality
                     $hasStarted = ($plan->ok > 0 || $plan->repair > 0 || $plan->reject > 0 || $plan->status === 'running');
-                    
+
                     if ($hasStarted) {
                         $failedCount++;
+
                         continue;
                     }
 
                     // Save target context to recalculate the timeline later
-                    $key = $plan->plan_date . '||' . $plan->press_name;
+                    $key = $plan->plan_date.'||'.$plan->press_name;
                     $targets[$key] = [
                         'date' => $plan->plan_date,
                         'shift' => $plan->shift_name,
-                        'press' => $plan->press_name
+                        'press' => $plan->press_name,
                     ];
 
                     $plan->delete();
@@ -560,7 +602,7 @@ class ProductionPlanController extends Controller
                     $timelineGenerator->regenerateSection($target['date'], $target['shift'], $target['press']);
                 }
             } catch (\Throwable $e) {
-                Log::warning('Resimulation after cancel failed: ' . $e->getMessage());
+                Log::warning('Resimulation after cancel failed: '.$e->getMessage());
             }
         }
 
@@ -568,9 +610,9 @@ class ProductionPlanController extends Controller
             return response()->json(['success' => false, 'message' => 'Semua item ditolak untuk cancel karena sudah diproduksi atau tidak ditemukan.']);
         }
 
-        $msg = $processedCount . ' item berhasil di-cancel.';
+        $msg = $processedCount.' item berhasil di-cancel.';
         if ($failedCount > 0) {
-            $msg .= ' (' . $failedCount . ' item ditolak karena sudah mulai diproduksi).';
+            $msg .= ' ('.$failedCount.' item ditolak karena sudah mulai diproduksi).';
         }
 
         return response()->json(['success' => true, 'message' => $msg]);
@@ -666,7 +708,7 @@ class ProductionPlanController extends Controller
                         break;
                     }
                 }
-                if (!$lineMasterId) {
+                if (! $lineMasterId) {
                     $existingPlan = ProductionPlan::whereDate('plan_date', $itemTargetDate)
                         ->where('press_name', $effectivePress)
                         ->first();
@@ -674,29 +716,29 @@ class ProductionPlanController extends Controller
                 }
 
                 $hari = Carbon::parse($itemTargetDate)->locale('id')->isoFormat('dddd');
-                $recoveryQty = $item->recovery_qty > 0 ? (float)$item->recovery_qty : (float)($item->plan_qty ?? 0);
-                $processTime = (int)ceil(((float)($item->ct_detik ?? 0) * $recoveryQty) / 60.0);
+                $recoveryQty = $item->recovery_qty > 0 ? (float) $item->recovery_qty : (float) ($item->plan_qty ?? 0);
+                $processTime = (int) ceil(((float) ($item->ct_detik ?? 0) * $recoveryQty) / 60.0);
 
                 ProductionPlan::create([
-                    'plan_date'      => $itemTargetDate,
-                    'shift_name'     => $itemTargetShift,
-                    'press_name'     => $effectivePress,
+                    'plan_date' => $itemTargetDate,
+                    'shift_name' => $itemTargetShift,
+                    'press_name' => $effectivePress,
                     'line_master_id' => $lineMasterId,
-                    'hari'           => $hari,
-                    'row_type'       => 'job',
-                    'row_no'         => 0,
-                    'job_no'         => $item->job_no,
-                    'job_master'     => $item->job_master,
-                    'plan'           => $recoveryQty,
-                    'original_plan'  => $item->plan_qty,
+                    'hari' => $hari,
+                    'row_type' => 'job',
+                    'row_no' => 0,
+                    'job_no' => $item->job_no,
+                    'job_master' => $item->job_master,
+                    'plan' => $recoveryQty,
+                    'original_plan' => $item->plan_qty,
                     'remaining_plan' => $recoveryQty,
-                    'ct_detik'       => $item->ct_detik,
-                    'dct'            => $item->dct,
-                    'total_mesin'    => (int)($item->total_mesin ?? 1),
-                    'process_time'   => $processTime,
-                    'recovery_id'    => $item->id,
-                    'source_type'    => 'recovery',
-                    'status'         => 'pending',
+                    'ct_detik' => $item->ct_detik,
+                    'dct' => $item->dct,
+                    'total_mesin' => (int) ($item->total_mesin ?? 1),
+                    'process_time' => $processTime,
+                    'recovery_id' => $item->id,
+                    'source_type' => 'recovery',
+                    'status' => 'pending',
                 ]);
 
                 $item->update([
@@ -708,7 +750,7 @@ class ProductionPlanController extends Controller
 
                 $secKey = "{$itemTargetDate}||{$itemTargetShift}||{$effectivePress}";
                 $affectedSections[$secKey] = [
-                    'date'  => $itemTargetDate,
+                    'date' => $itemTargetDate,
                     'shift' => $itemTargetShift,
                     'press' => $effectivePress,
                 ];
@@ -726,62 +768,71 @@ class ProductionPlanController extends Controller
                 $timelineGenerator->regenerateSection($sec['date'], $sec['shift'], $sec['press']);
             }
         } catch (\Throwable $e) {
-            Log::warning('Resimulation after approve failed: ' . $e->getMessage());
+            Log::warning('Resimulation after approve failed: '.$e->getMessage());
         }
 
         return response()->json([
             'success' => true,
-            'message' => $processedCount . ' item berhasil di-approve ke next shift di line yang sama.',
+            'message' => $processedCount.' item berhasil di-approve ke next shift di line yang sama.',
         ]);
     }
-
-
 
     private function findPython(): ?string
     {
         $candidates = [
             'C:\\Users\\StevC\\AppData\\Local\\Programs\\Python\\Python310\\python.exe',
-            'python', 'python3', 'py', 'C:\\Python312\\python.exe', 'C:\\Python311\\python.exe'
+            'python', 'python3', 'py', 'C:\\Python312\\python.exe', 'C:\\Python311\\python.exe',
         ];
         foreach ($candidates as $cmd) {
-            $process = @proc_open([$cmd, '--version'], [1 => ['pipe','w'], 2 => ['pipe','w']], $pipes);
+            $process = @proc_open([$cmd, '--version'], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
             if (is_resource($process)) {
                 $out = stream_get_contents($pipes[1]);
                 proc_close($process);
-                if (str_contains($out, 'Python 3')) return $cmd;
+                if (str_contains($out, 'Python 3')) {
+                    return $cmd;
+                }
             }
         }
-        return null; 
+
+        return null;
     }
 
     private function runPythonScript(string $python, string $script, string $file, string $orig)
     {
-        $cmd = [ $python, $script, $file, $orig ];
-        $process = proc_open($cmd, [1 => ['pipe','w'], 2 => ['pipe','w']], $pipes);
-        if (!is_resource($process)) return null;
+        $cmd = [$python, $script, $file, $orig];
+        $process = proc_open($cmd, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if (! is_resource($process)) {
+            return null;
+        }
         $out = stream_get_contents($pipes[1]);
         $err = stream_get_contents($pipes[2]);
         proc_close($process);
+
         return $out ?: $err;
     }
 
     private function safeVal(mixed $val, mixed $default = null)
     {
-        if (is_null($val) || $val === '') return $default;
+        if (is_null($val) || $val === '') {
+            return $default;
+        }
+
         return $val;
     }
 
     private function parseIndoDate(?string $dateStr)
     {
-        if (!$dateStr) return now();
-        
+        if (! $dateStr) {
+            return now();
+        }
+
         $dateStr = strtoupper($dateStr);
         $months = [
             'JANUARI' => '01', 'FEBRUARI' => '02', 'MARET' => '03', 'APRIL' => '04',
             'MEI' => '05', 'MAY' => '05', 'JUNI' => '06', 'JULI' => '07', 'AGUSTUS' => '08',
             'SEPTEMBER' => '09', 'OKTOBER' => '10', 'NOVEMBER' => '11', 'DESEMBER' => '12',
             'JAN' => '01', 'FEB' => '02', 'MAR' => '03', 'APR' => '04', 'JUN' => '06',
-            'JUL' => '07', 'AGU' => '08', 'SEP' => '09', 'OKT' => '10', 'NOV' => '11', 'DES' => '12'
+            'JUL' => '07', 'AGU' => '08', 'SEP' => '09', 'OKT' => '10', 'NOV' => '11', 'DES' => '12',
         ];
 
         foreach ($months as $name => $num) {
@@ -796,9 +847,10 @@ class ProductionPlanController extends Controller
             if (preg_match('/(\d{1,2})[\s\-\/](\d{1,2})[\s\-\/](\d{4})/', $dateStr, $m)) {
                 return Carbon::createFromDate($m[3], $m[2], $m[1]);
             }
-            
+
             $clean = preg_replace('/[^0-9\- ]/', '', $dateStr);
             $clean = trim(preg_replace('/\s+/', '-', $clean));
+
             return Carbon::parse($clean);
         } catch (\Exception $e) {
             return now();
@@ -809,10 +861,10 @@ class ProductionPlanController extends Controller
     {
         $data = $request->validate([
             'line_master_id' => 'required|exists:line_masters,id',
-            'target_qty'     => 'required|integer|min:1',
-            'plan_date'      => 'required|date',
-            'status'         => 'required|in:pending,approved,completed',
-            'notes'          => 'nullable|string',
+            'target_qty' => 'required|integer|min:1',
+            'plan_date' => 'required|date',
+            'status' => 'required|in:pending,approved,completed',
+            'notes' => 'nullable|string',
         ]);
 
         $plan = ProductionPlan::create($data);
@@ -820,7 +872,7 @@ class ProductionPlanController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Plan berhasil ditambahkan'
+            'message' => 'Plan berhasil ditambahkan',
         ]);
     }
 
@@ -830,7 +882,7 @@ class ProductionPlanController extends Controller
 
         return response()->json([
             'success' => true,
-            'plan' => $plan
+            'plan' => $plan,
         ]);
     }
 
@@ -840,10 +892,10 @@ class ProductionPlanController extends Controller
 
         $data = $request->validate([
             'line_master_id' => 'required|exists:line_masters,id',
-            'target_qty'     => 'required|integer|min:1',
-            'plan_date'      => 'required|date',
-            'status'         => 'required|in:pending,approved,completed',
-            'notes'          => 'nullable|string',
+            'target_qty' => 'required|integer|min:1',
+            'plan_date' => 'required|date',
+            'status' => 'required|in:pending,approved,completed',
+            'notes' => 'nullable|string',
         ]);
 
         $plan->update($data);
@@ -851,7 +903,7 @@ class ProductionPlanController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Plan berhasil diupdate'
+            'message' => 'Plan berhasil diupdate',
         ]);
     }
 
@@ -863,7 +915,7 @@ class ProductionPlanController extends Controller
         if ($mergeService->planHasProductionActivity($plan)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Plan tidak bisa dihapus karena sudah memiliki aktivitas produksi. Hapus hanya jadwal yang belum berjalan.'
+                'message' => 'Plan tidak bisa dihapus karena sudah memiliki aktivitas produksi. Hapus hanya jadwal yang belum berjalan.',
             ], 422);
         }
 
@@ -871,21 +923,22 @@ class ProductionPlanController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Plan berhasil dihapus'
+            'message' => 'Plan berhasil dihapus',
         ]);
     }
+
     public function updateInline(Request $request)
     {
         $request->validate([
-            'id'    => 'required|exists:production_plans,id',
+            'id' => 'required|exists:production_plans,id',
             'field' => 'required|string',
             'value' => 'required',
         ]);
 
-        $plan  = ProductionPlan::findOrFail($request->id);
+        $plan = ProductionPlan::findOrFail($request->id);
         $field = $request->field;
 
-        if ($field === 'ct_detik' && !$request->boolean('manual_override')) {
+        if ($field === 'ct_detik' && ! $request->boolean('manual_override')) {
             return response()->json([
                 'success' => false,
                 'message' => 'CT hanya bisa diubah lewat mode manual override.',
@@ -901,12 +954,12 @@ class ProductionPlanController extends Controller
         $metricsFields = ['ct_detik', 'plan', 'reg_active', 'dct', 'mct'];
         if (in_array($field, $metricsFields)) {
             $plan->refresh(); // Ambil data terbaru dari DB setelah save di atas
-            $planQty = (int)   ($plan->plan     ?? 0);
-            $ct      = (float) ($plan->ct_detik ?? 0);
+            $planQty = (int) ($plan->plan ?? 0);
+            $ct = (float) ($plan->ct_detik ?? 0);
 
             $plan->process_time = ProductionMetricsService::calculateProcessTime($ct, $planQty);
-            $plan->tpt          = ProductionMetricsService::planTptMinutes($plan);
-            $plan->gsph_item    = ProductionMetricsService::gsph($planQty, $plan->tpt);
+            $plan->tpt = ProductionMetricsService::planTptMinutes($plan);
+            $plan->gsph_item = ProductionMetricsService::gsph($planQty, $plan->tpt);
             $plan->save();
 
             // Regenerate timeline agar start_time / finish_time ikut terupdate
@@ -914,7 +967,7 @@ class ProductionPlanController extends Controller
                 $timelineGenerator = app(TimelineGenerationService::class);
                 $timelineGenerator->regenerateForPlan($plan);
             } catch (\Throwable $e) {
-                Log::warning("Timeline regeneration skipped after updateInline: " . $e->getMessage());
+                Log::warning('Timeline regeneration skipped after updateInline: '.$e->getMessage());
             }
         }
 
@@ -928,14 +981,14 @@ class ProductionPlanController extends Controller
         $plan = $plan->fresh();
 
         return response()->json([
-            'success'      => true,
-            'message'      => 'Data berhasil diperbarui',
-            'plan'         => $plan,
+            'success' => true,
+            'message' => 'Data berhasil diperbarui',
+            'plan' => $plan,
             'process_time' => $plan->process_time,
-            'tpt'          => $plan->tpt,
-            'gsph'         => $plan->gsph_item,
-            'start_time'   => $plan->start_time,
-            'finish_time'  => $plan->finish_time,
+            'tpt' => $plan->tpt,
+            'gsph' => $plan->gsph_item,
+            'start_time' => $plan->start_time,
+            'finish_time' => $plan->finish_time,
         ]);
     }
 
@@ -950,7 +1003,7 @@ class ProductionPlanController extends Controller
 
         // AUDIT 1: Pastikan array $ids dari Javascript benar-benar masuk
         Log::info('[REORDER IDS]', [
-            'ids' => $ids
+            'ids' => $ids,
         ]);
 
         DB::transaction(function () use ($ids) {
@@ -978,7 +1031,7 @@ class ProductionPlanController extends Controller
                 'count' => count($recoveryIds),
                 'orders' => RecoveryItem::whereIn('id', $recoveryIds)
                     ->pluck('sort_order', 'id')
-                    ->toArray()
+                    ->toArray(),
             ]);
         });
 
@@ -991,7 +1044,7 @@ class ProductionPlanController extends Controller
                 ->where('press_name', $firstPlan->press_name)
                 ->orderBy('row_no')
                 ->pluck('id', 'row_no');
-                
+
             Log::info('[REORDER AFTER UPDATE]', $rows->toArray());
 
             try {
@@ -1008,7 +1061,7 @@ class ProductionPlanController extends Controller
                     ProductionPlanUpdated::dispatch($dispatchPlan, 'row_no');
                 }
             } catch (\Throwable $e) {
-                Log::warning("Timeline regeneration after reorder: " . $e->getMessage());
+                Log::warning('Timeline regeneration after reorder: '.$e->getMessage());
             }
         }
 
@@ -1018,11 +1071,11 @@ class ProductionPlanController extends Controller
     public function recalculate(int|string $id)
     {
         $plan = ProductionPlan::findOrFail($id);
-        
+
         // Recalculate derived fields
         $planQty = (int) ($plan->plan ?? 0);
         $ct = (float) ($plan->ct_detik ?? 0);
-        
+
         $plan->process_time = ProductionMetricsService::calculateProcessTime($ct, $planQty);
         $plan->tpt = ProductionMetricsService::planTptMinutes($plan);
         $plan->gsph_item = ProductionMetricsService::gsph($planQty, $plan->tpt);
@@ -1047,33 +1100,33 @@ class ProductionPlanController extends Controller
     public function addJob(Request $request)
     {
         $request->validate([
-            'plan_date'   => 'required|date',
-            'shift_name'  => 'required|string|max:50',
-            'press_name'  => 'required|string|max:50',
-            'job_no'      => 'required|string|max:100',
-            'plan'        => 'nullable|numeric|min:0',
-            'ct_detik'    => 'nullable|numeric|min:0',
-            'dct'         => 'nullable|numeric|min:0',
-            'reg_active'  => 'nullable|numeric|min:0',
-            'keterangan'  => 'nullable|string|max:255',
-            'machines'    => 'nullable|array',
-            'machines.*'  => 'integer|in:1,2,3,4',
+            'plan_date' => 'required|date',
+            'shift_name' => 'required|string|max:50',
+            'press_name' => 'required|string|max:50',
+            'job_no' => 'required|string|max:100',
+            'plan' => 'nullable|numeric|min:0',
+            'ct_detik' => 'nullable|numeric|min:0',
+            'dct' => 'nullable|numeric|min:0',
+            'reg_active' => 'nullable|numeric|min:0',
+            'keterangan' => 'nullable|string|max:255',
+            'machines' => 'nullable|array',
+            'machines.*' => 'integer|in:1,2,3,4',
         ]);
 
-        $date      = $request->plan_date;
-        $shift     = $request->shift_name;
-        $press     = $request->press_name;
-        $jobNo     = trim($request->job_no);
+        $date = $request->plan_date;
+        $shift = $request->shift_name;
+        $press = $request->press_name;
+        $jobNo = trim($request->job_no);
 
         // Lookup master data stamping for auto-fill
         $master = MasterStamping::where('job_no', $jobNo)->first();
 
-        $jobMaster  = $master ? $master->job_master : $jobNo;
-        $typePlt    = $master ? $master->type_pallet : null;
-        $qtyPlt     = $master ? (float)$master->qty_pallet : 0;
-        $ctDetik    = $request->ct_detik !== null ? (float)$request->ct_detik : ($master ? (float)$master->ct_detik : 0);
-        $dct        = $request->dct !== null ? (float)$request->dct : ($master ? (float)$master->dct : 0);
-        $regActive  = $request->reg_active !== null ? (float)$request->reg_active : ($master ? (float)$master->reg_active : 0);
+        $jobMaster = $master ? $master->job_master : $jobNo;
+        $typePlt = $master ? $master->type_pallet : null;
+        $qtyPlt = $master ? (float) $master->qty_pallet : 0;
+        $ctDetik = $request->ct_detik !== null ? (float) $request->ct_detik : ($master ? (float) $master->ct_detik : 0);
+        $dct = $request->dct !== null ? (float) $request->dct : ($master ? (float) $master->dct : 0);
+        $regActive = $request->reg_active !== null ? (float) $request->reg_active : ($master ? (float) $master->reg_active : 0);
 
         $selectedMachines = $request->input('machines', []);
         if (empty($selectedMachines)) {
@@ -1093,7 +1146,9 @@ class ProductionPlanController extends Controller
                 break;
             }
         }
-        if (!$lineId) $lineId = reset($lineMap) ?: 1;
+        if (! $lineId) {
+            $lineId = reset($lineMap) ?: 1;
+        }
 
         // Determine next row_no for this section
         $maxRowNo = ProductionPlan::whereDate('plan_date', $date)
@@ -1104,7 +1159,7 @@ class ProductionPlanController extends Controller
         $newRowNo = $maxRowNo + 1;
 
         // Calculate process time (simple formula)
-        $planQty = $request->plan !== null ? (int)$request->plan : 0;
+        $planQty = $request->plan !== null ? (int) $request->plan : 0;
         $processTime = ProductionMetricsService::calculateProcessTime($ctDetik, $planQty);
 
         // Map machines to p1-p4 booleans
@@ -1130,39 +1185,39 @@ class ProductionPlanController extends Controller
 
         $plan = ProductionPlan::create([
             'line_master_id' => $lineId,
-            'plan_date'      => $date,
-            'shift_name'     => $shift,
-            'press_name'     => $press,
-            'row_no'         => $newRowNo,
-            'row_type'       => 'job',
-            'job_master'     => $jobMaster,
-            'type_plt'       => $typePlt,
-            'qty_plt'        => $qtyPlt,
-            'total_plt'      => $qtyPlt > 0 && $planQty > 0 ? ceil($planQty / $qtyPlt) : 0,
-            'job_no'         => $jobNo,
-            'plan'           => $planQty,
-            'total_mesin'    => $totalMesin,
-            'p1'             => $p1,
-            'p2'             => $p2,
-            'p3'             => $p3,
-            'p4'             => $p4,
-            'ct_detik'       => $ctDetik,
-            'process_time'   => $processTime,
-            'reg_active'     => $regActive,
-            'dct'            => $dct,
-            'start_time'     => $startTime,
-            'keterangan'     => $keterangan,
-            'status'         => 'pending',
+            'plan_date' => $date,
+            'shift_name' => $shift,
+            'press_name' => $press,
+            'row_no' => $newRowNo,
+            'row_type' => 'job',
+            'job_master' => $jobMaster,
+            'type_plt' => $typePlt,
+            'qty_plt' => $qtyPlt,
+            'total_plt' => $qtyPlt > 0 && $planQty > 0 ? ceil($planQty / $qtyPlt) : 0,
+            'job_no' => $jobNo,
+            'plan' => $planQty,
+            'total_mesin' => $totalMesin,
+            'p1' => $p1,
+            'p2' => $p2,
+            'p3' => $p3,
+            'p4' => $p4,
+            'ct_detik' => $ctDetik,
+            'process_time' => $processTime,
+            'reg_active' => $regActive,
+            'dct' => $dct,
+            'start_time' => $startTime,
+            'keterangan' => $keterangan,
+            'status' => 'pending',
         ]);
 
         // Recalculate derived metrics using the now-persisted model
         $plan->process_time = ProductionMetricsService::calculateProcessTime($plan->ct_detik, $plan->plan);
-        $plan->tpt          = ProductionMetricsService::planTptMinutes($plan);
-        $plan->gsph_item    = ProductionMetricsService::gsph((int)$plan->plan, $plan->tpt);
-        $plan->a1           = $plan->p1 ? $plan->tpt : 0;
-        $plan->a2           = $plan->p2 ? $plan->tpt : 0;
-        $plan->a3           = $plan->p3 ? $plan->tpt : 0;
-        $plan->a4           = $plan->p4 ? $plan->tpt : 0;
+        $plan->tpt = ProductionMetricsService::planTptMinutes($plan);
+        $plan->gsph_item = ProductionMetricsService::gsph((int) $plan->plan, $plan->tpt);
+        $plan->a1 = $plan->p1 ? $plan->tpt : 0;
+        $plan->a2 = $plan->p2 ? $plan->tpt : 0;
+        $plan->a3 = $plan->p3 ? $plan->tpt : 0;
+        $plan->a4 = $plan->p4 ? $plan->tpt : 0;
         $plan->save();
 
         // Regenerate timeline
@@ -1170,13 +1225,13 @@ class ProductionPlanController extends Controller
             $timelineGenerator = app(TimelineGenerationService::class);
             $timelineGenerator->regenerateForPlan($plan);
         } catch (\Throwable $e) {
-            Log::warning("Timeline regeneration after addJob: " . $e->getMessage());
+            Log::warning('Timeline regeneration after addJob: '.$e->getMessage());
         }
 
         return response()->json([
             'success' => true,
             'message' => 'Job berhasil ditambahkan',
-            'plan'    => $plan->fresh(),
+            'plan' => $plan->fresh(),
         ]);
     }
 
@@ -1189,25 +1244,25 @@ class ProductionPlanController extends Controller
 
         // Gunakan job_no dari excel jika ada, jika tidak generate
         $jobNumber = $plan->job_no;
-        if (!$jobNumber) {
+        if (! $jobNumber) {
             $dateStr = $plan->plan_date ? $plan->plan_date->format('Ymd') : now()->format('Ymd');
             $lineName = $plan->press_name ?? ($plan->line ? $plan->line->line_name : 'UNKNOWN');
-            $jobNumber = 'JOB-' . $dateStr . '-' . strtoupper(Str::slug($lineName));
+            $jobNumber = 'JOB-'.$dateStr.'-'.strtoupper(Str::slug($lineName));
         }
 
         // Map data plan ke JobMaster
         JobMaster::updateOrCreate(
             ['job_number' => $jobNumber],
             [
-                'job_name'    => $plan->job_master ?? ('Plan: ' . ($plan->press_name ?? 'Line')),
-                'line'        => $plan->press_name ?? ($plan->line ? $plan->line->line_name : null),
-                'capacity'    => $plan->qty_plt ?? 0,
-                'status'      => 'active',
+                'job_name' => $plan->job_master ?? ('Plan: '.($plan->press_name ?? 'Line')),
+                'line' => $plan->press_name ?? ($plan->line ? $plan->line->line_name : null),
+                'capacity' => $plan->qty_plt ?? 0,
+                'status' => 'active',
                 'sequence_no' => $plan->row_no ?? 1,
-                'plan_start'  => $plan->start_time,
-                'plan_end'    => $plan->finish_time,
+                'plan_start' => $plan->start_time,
+                'plan_end' => $plan->finish_time,
                 // Kita simpan target_qty (PLAN di excel)
-                'target_qty'  => $plan->plan ?? 0,
+                'target_qty' => $plan->plan ?? 0,
             ]
         );
     }
@@ -1219,9 +1274,9 @@ class ProductionPlanController extends Controller
     public function movePlanItem(Request $request)
     {
         $request->validate([
-            'plan_ids'     => 'required|array|min:1',
-            'plan_ids.*'   => 'exists:production_plans,id',
-            'target_date'  => 'required|date',
+            'plan_ids' => 'required|array|min:1',
+            'plan_ids.*' => 'exists:production_plans,id',
+            'target_date' => 'required|date',
             'target_shift' => 'required|string|max:50',
             'target_press' => 'required|string|max:50',
         ]);
@@ -1241,9 +1296,9 @@ class ProductionPlanController extends Controller
         // Track source sections for regeneration (deduplicate)
         $sourceSections = [];
         foreach ($plans as $plan) {
-            $key = $plan->plan_date->format('Y-m-d') . '||' . $plan->shift_name . '||' . $plan->press_name;
+            $key = $plan->plan_date->format('Y-m-d').'||'.$plan->shift_name.'||'.$plan->press_name;
             $sourceSections[$key] = [
-                'date'  => $plan->plan_date->format('Y-m-d'),
+                'date' => $plan->plan_date->format('Y-m-d'),
                 'shift' => $plan->shift_name,
                 'press' => $plan->press_name,
             ];
@@ -1270,14 +1325,14 @@ class ProductionPlanController extends Controller
         DB::transaction(function () use ($plans, $targetDate, $targetShift, $targetPress, $hari, $lineId) {
             foreach ($plans as $plan) {
                 $plan->update([
-                    'plan_date'      => $targetDate,
-                    'shift_name'     => $targetShift,
-                    'press_name'     => $targetPress,
+                    'plan_date' => $targetDate,
+                    'shift_name' => $targetShift,
+                    'press_name' => $targetPress,
                     'line_master_id' => $lineId ?? $plan->line_master_id,
-                    'hari'           => $hari,
-                    'row_no'         => 0,
-                    'start_time'     => null,
-                    'finish_time'    => null,
+                    'hari' => $hari,
+                    'row_no' => 0,
+                    'start_time' => null,
+                    'finish_time' => null,
                 ]);
 
                 // Disassociate any recovery item so it stays in the queue
@@ -1295,25 +1350,25 @@ class ProductionPlanController extends Controller
             try {
                 $timelineGenerator->regenerateSection($section['date'], $section['shift'], $section['press']);
             } catch (\Throwable $e) {
-                Log::warning('Resimulation after move (source): ' . $e->getMessage());
+                Log::warning('Resimulation after move (source): '.$e->getMessage());
             }
         }
         try {
             $timelineGenerator->regenerateSection($targetDate, $targetShift, $targetPress);
         } catch (\Throwable $e) {
-            Log::warning('Resimulation after move (target): ' . $e->getMessage());
+            Log::warning('Resimulation after move (target): '.$e->getMessage());
         }
 
         return response()->json([
             'success' => true,
-            'message' => count($plans) . ' item berhasil dipindahkan.',
+            'message' => count($plans).' item berhasil dipindahkan.',
         ]);
     }
 
     public function forceOverflow(Request $request)
     {
         $planIds = $request->input('plan_ids', []);
-        $action  = $request->input('action'); // 'force_timeline' | 'to_recovery'
+        $action = $request->input('action'); // 'force_timeline' | 'to_recovery'
 
         if (empty($planIds)) {
             return response()->json(['success' => false, 'message' => 'Tidak ada item dipilih.']);
@@ -1325,7 +1380,7 @@ class ProductionPlanController extends Controller
             // Tetap di timeline: hapus flag cutoff, timing diatur ulang
             foreach ($plans as $plan) {
                 $plan->update([
-                    'start_time'  => null,
+                    'start_time' => null,
                     'finish_time' => null,
                 ]);
             }
@@ -1339,9 +1394,10 @@ class ProductionPlanController extends Controller
                     $first->press_name
                 );
             }
+
             return response()->json([
                 'success' => true,
-                'message' => count($plans) . ' item tetap di timeline.',
+                'message' => count($plans).' item tetap di timeline.',
             ]);
         }
 
@@ -1350,9 +1406,9 @@ class ProductionPlanController extends Controller
             foreach ($plans as $plan) {
                 $plan->update([
                     'source_type' => 'recovery',
-                    'start_time'  => null,
+                    'start_time' => null,
                     'finish_time' => null,
-                    'row_no'      => null,
+                    'row_no' => null,
                 ]);
             }
             $first = $plans->first();
@@ -1364,13 +1420,13 @@ class ProductionPlanController extends Controller
                     $first->press_name
                 );
             }
+
             return response()->json([
                 'success' => true,
-                'message' => count($plans) . ' item dipindah ke recovery queue.',
+                'message' => count($plans).' item dipindah ke recovery queue.',
             ]);
         }
 
         return response()->json(['success' => false, 'message' => 'Action tidak dikenali.']);
     }
 }
-

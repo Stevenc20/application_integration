@@ -722,6 +722,13 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(func
         Route::get('/clear-data',                      [ProductionPlanController::class, 'clearDataForm'])->name('production_plan.clear_form');
         Route::delete('/clear-data',                   [ProductionPlanController::class, 'clearData'])->name('production_plan.clear');
 
+        // Schedule Backups & Restore
+        Route::get('/backups',                         [\App\Http\Controllers\Ppc\ScheduleBackupController::class, 'index'])->name('backups.index');
+        Route::post('/backups',                        [\App\Http\Controllers\Ppc\ScheduleBackupController::class, 'store'])->name('backups.store');
+        Route::get('/backups/{id}',                    [\App\Http\Controllers\Ppc\ScheduleBackupController::class, 'show'])->name('backups.show');
+        Route::get('/backups/{id}/compare',            [\App\Http\Controllers\Ppc\ScheduleBackupController::class, 'compare'])->name('backups.compare');
+        Route::post('/backups/{id}/restore',           [\App\Http\Controllers\Ppc\ScheduleBackupController::class, 'restore'])->name('backups.restore');
+
         // Recovery Schedule (Legacy routes still point to ProductionPlanController for backward compat)
         Route::post('/recovery/{id}/approve',          [ProductionPlanController::class, 'approveRecovery'])->name('recovery.approve');
         Route::post('/recovery/{id}/reject',           [ProductionPlanController::class, 'rejectRecovery'])->name('recovery.reject');

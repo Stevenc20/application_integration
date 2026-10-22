@@ -9,8 +9,8 @@ use App\Models\JobMaster;
 use App\Models\LineMaster;
 use App\Models\ProductionPlan;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 
 class DashboardRealtimeService
 {
@@ -26,7 +26,7 @@ class DashboardRealtimeService
 
     public function getLineMetrics(string $lineName, string $date, int $shift): array
     {
-        $shortJob = fn($name) => strtoupper(trim(explode(' ', $name ?? '-')[0])) ?: '-';
+        $shortJob = fn ($name) => strtoupper(trim(explode(' ', $name ?? '-')[0])) ?: '-';
         $planShiftText = self::SHIFT_PLAN_MAP[$shift] ?? 'Shift Pagi';
 
         $shiftStartDt = $shift === 1
@@ -50,14 +50,15 @@ class DashboardRealtimeService
         $jobNumbers = $plans->map(function ($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
         })->toArray();
 
         $plansByIdentifier = [];
         foreach ($plans as $p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            $identifier = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
             $plansByIdentifier[$identifier] = $p;
         }
 
@@ -69,27 +70,27 @@ class DashboardRealtimeService
         foreach ($plans as $p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            $identifier = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
 
-            if (!$jobMasters->has($identifier)) {
+            if (! $jobMasters->has($identifier)) {
                 $jobName = $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB');
                 $insertJobs[] = [
-                    'job_number'   => $identifier,
-                    'job_name'     => $jobName,
-                    'line'         => $p->press_name ?? $lineName,
-                    'target_qty'   => (int) ($p->plan ?? 0),
-                    'sequence_no'  => $p->row_no ?? 1,
-                    'status'       => 'pending',
-                    'plan_start'   => $p->start_time ? Carbon::parse($date . ' ' . $p->start_time)->startOfMinute() : null,
-                    'plan_end'     => $p->finish_time ? Carbon::parse($date . ' ' . $p->finish_time)->startOfMinute() : null,
-                    'capacity'     => (int) ($p->qty_plt ?? 0),
-                    'created_at'   => now(),
-                    'updated_at'   => now(),
+                    'job_number' => $identifier,
+                    'job_name' => $jobName,
+                    'line' => $p->press_name ?? $lineName,
+                    'target_qty' => (int) ($p->plan ?? 0),
+                    'sequence_no' => $p->row_no ?? 1,
+                    'status' => 'pending',
+                    'plan_start' => $p->start_time ? Carbon::parse($date.' '.$p->start_time)->startOfMinute() : null,
+                    'plan_end' => $p->finish_time ? Carbon::parse($date.' '.$p->finish_time)->startOfMinute() : null,
+                    'capacity' => (int) ($p->qty_plt ?? 0),
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
             }
         }
 
-        if (!empty($insertJobs)) {
+        if (! empty($insertJobs)) {
             JobMaster::insertOrIgnore($insertJobs);
             $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
                 ->get()
@@ -128,7 +129,7 @@ class DashboardRealtimeService
             $logAggMap = collect();
             $downtimeSecsMap = collect();
 
-            if (!empty($stillMissingIds)) {
+            if (! empty($stillMissingIds)) {
                 // 1 query to aggregate production logs for all missing jobs
                 $logAggMap = \App\Models\ProductionLog::whereIn('job_master_id', $stillMissingIds)
                     ->groupBy('job_master_id')
@@ -158,16 +159,16 @@ class DashboardRealtimeService
                     $dtSecs = (int) ($downtimeSecsMap->get($mj->id) ?? 0);
 
                     $virtual = new DailyProduction([
-                        'job_master_id'    => $mj->id,
-                        'work_date'        => $workDate,
-                        'actual_ok'        => (int) ($logAgg?->total_ok ?? 0),
-                        'actual_qty'       => (int) ($logAgg?->total_ok ?? 0),
-                        'actual_repair'    => (int) ($logAgg?->total_repair ?? 0),
-                        'actual_reject'    => (int) ($logAgg?->total_reject ?? 0),
-                        'runtime_seconds'  => 0,
+                        'job_master_id' => $mj->id,
+                        'work_date' => $workDate,
+                        'actual_ok' => (int) ($logAgg?->total_ok ?? 0),
+                        'actual_qty' => (int) ($logAgg?->total_ok ?? 0),
+                        'actual_repair' => (int) ($logAgg?->total_repair ?? 0),
+                        'actual_reject' => (int) ($logAgg?->total_reject ?? 0),
+                        'runtime_seconds' => 0,
                         'downtime_seconds' => $dtSecs,
-                        'line'             => $lineName,
-                        'shift'            => self::SHIFT_MAP[$shift] ?? 'Shift Pagi',
+                        'line' => $lineName,
+                        'shift' => self::SHIFT_MAP[$shift] ?? 'Shift Pagi',
                     ]);
                     $virtual->setRelation('jobMaster', $mj);
                     $dailyRecords->push($virtual);
@@ -179,15 +180,15 @@ class DashboardRealtimeService
             return $this->emptyMetrics($lineName);
         }
 
-        $ok      = (int) $dailyRecords->sum('actual_ok');
-        $repair  = (int) $dailyRecords->sum('actual_repair');
-        $reject  = (int) $dailyRecords->sum('actual_reject');
+        $ok = (int) $dailyRecords->sum('actual_ok');
+        $repair = (int) $dailyRecords->sum('actual_repair');
+        $reject = (int) $dailyRecords->sum('actual_reject');
 
         $runningRecord = $dailyRecords->first(function ($dp) {
             return $dp->jobMaster && in_array($dp->jobMaster->status, ['running', 'paused']);
         });
 
-        if (!$runningRecord) {
+        if (! $runningRecord) {
             $runningRecord = $dailyRecords->filter(function ($dp) {
                 return $dp->jobMaster && $dp->jobMaster->started_at !== null;
             })->sortByDesc(function ($dp) {
@@ -195,14 +196,14 @@ class DashboardRealtimeService
             })->first();
         }
 
-        if (!$runningRecord && $dailyRecords->isNotEmpty()) {
+        if (! $runningRecord && $dailyRecords->isNotEmpty()) {
             $runningRecord = $dailyRecords->sortBy(function ($dp) {
                 return $dp->jobMaster->sequence_no ?? 9999;
             })->first();
         }
 
         $hasRunning = $runningRecord !== null && $runningRecord->jobMaster && $runningRecord->jobMaster->status === 'running';
-        $currOk     = $hasRunning ? (int) $runningRecord->actual_ok : 0;
+        $currOk = $hasRunning ? (int) $runningRecord->actual_ok : 0;
         $currRepair = $hasRunning ? (int) $runningRecord->actual_repair : 0;
         $currReject = $hasRunning ? (int) $runningRecord->actual_reject : 0;
 
@@ -239,7 +240,7 @@ class DashboardRealtimeService
                 $currRuntime = $dpRuntime;
             }
         }
-        $dtSecs  = (int) $dailyRecords->sum('downtime_seconds');
+        $dtSecs = (int) $dailyRecords->sum('downtime_seconds');
 
         $planQty = (int) $plans->sum('plan');
 
@@ -270,7 +271,9 @@ class DashboardRealtimeService
         $dtTotalMinutes = 0;
         foreach ($allDowntimes as $dt) {
             $type = strtoupper(trim($dt->jenis_downtime ?? ''));
-            if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
+            if (ProductionMetricsService::isExcludedDowntimeType($type)) {
+                continue;
+            }
             $dtTotalMinutes += $this->downtimeDurationSeconds($dt) / 60;
         }
         $dtTotalMinutes = round($dtTotalMinutes, 1);
@@ -278,71 +281,81 @@ class DashboardRealtimeService
         $breakdown = ProductionMetricsService::downtimeBreakdown($allDowntimes);
 
         $dtMachMinutes = $breakdown['machine'];
-        $dtMatMinutes  = $breakdown['material'];
-        $dtLogMinutes  = $breakdown['logistic'];
+        $dtMatMinutes = $breakdown['material'];
+        $dtLogMinutes = $breakdown['logistic'];
         $dtProdMinutes = $breakdown['production'];
         $dtDiesMinutes = $breakdown['dies'];
         $dtTotalCategorized = $breakdown['total'];
 
         $currDtTotal = 0;
-        $currDtMach  = 0;
-        $currDtDies  = 0;
-        $currDtMat   = 0;
-        $currDtLog   = 0;
-        $currDtProd  = 0;
+        $currDtMach = 0;
+        $currDtDies = 0;
+        $currDtMat = 0;
+        $currDtLog = 0;
+        $currDtProd = 0;
         if ($runningRecord) {
             $runningJobId = $runningRecord->job_master_id;
             $runningDt = $allDowntimes->where('job_master_id', $runningJobId);
             foreach ($runningDt as $dt) {
                 $type = strtoupper(trim($dt->jenis_downtime ?? ''));
-                if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
+                if (ProductionMetricsService::isExcludedDowntimeType($type)) {
+                    continue;
+                }
                 $dur = $this->downtimeDurationSeconds($dt) / 60;
                 $currDtTotal += $dur;
-                if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) $currDtMach += $dur;
-                elseif (str_contains($type, 'DIES')) $currDtDies += $dur;
-                elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) $currDtMat += $dur;
-                elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) $currDtLog += $dur;
-                elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) $currDtProd += $dur;
+                if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
+                    $currDtMach += $dur;
+                } elseif (str_contains($type, 'DIES')) {
+                    $currDtDies += $dur;
+                } elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) {
+                    $currDtMat += $dur;
+                } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
+                    $currDtLog += $dur;
+                } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
+                    $currDtProd += $dur;
+                }
             }
             $currDtTotal = round($currDtTotal, 1);
-            $currDtMach  = round($currDtMach, 1);
-            $currDtDies  = round($currDtDies, 1);
-            $currDtMat   = round($currDtMat, 1);
-            $currDtLog   = round($currDtLog, 1);
-            $currDtProd  = round($currDtProd, 1);
+            $currDtMach = round($currDtMach, 1);
+            $currDtDies = round($currDtDies, 1);
+            $currDtMat = round($currDtMat, 1);
+            $currDtLog = round($currDtLog, 1);
+            $currDtProd = round($currDtProd, 1);
         }
 
-        $dtRows     = [];
-        $machRows   = [];
-        $diesRows   = [];
-        $matRows    = [];
-        $logRows    = [];
-        $prodRows   = [];
+        $dtRows = [];
+        $machRows = [];
+        $diesRows = [];
+        $matRows = [];
+        $logRows = [];
+        $prodRows = [];
         $repairRows = [];
         $rejectRows = [];
 
         foreach ($allDowntimes as $dt) {
             $type = strtoupper(trim($dt->jenis_downtime ?? ''));
-            if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
+            if (ProductionMetricsService::isExcludedDowntimeType($type)) {
+                continue;
+            }
             $dur = round($this->downtimeDurationSeconds($dt) / 60, 1);
             $rawJob = $dt->jobMaster?->job_name ?? '-';
             $jobName = $shortJob($rawJob);
             $row = [
-                'id'       => $dt->id,
-                'no'       => count($dtRows) + 1,
-                'jenis'    => $dt->jenis_downtime,
-                'job'      => $jobName,
-                'item'     => $dt->problem ?? '-',
-                'problem'  => $dt->problem ?? '-',
+                'id' => $dt->id,
+                'no' => count($dtRows) + 1,
+                'jenis' => $dt->jenis_downtime,
+                'job' => $jobName,
+                'item' => $dt->problem ?? '-',
+                'problem' => $dt->problem ?? '-',
                 'penyebab' => $dt->penyebab ?? '-',
-                'action'   => $dt->action ?? ($dt->tindakan ?? '-'),
+                'action' => $dt->action ?? ($dt->tindakan ?? '-'),
                 'tindakan' => $dt->tindakan ?? ($dt->action ?? '-'),
-                'pic'      => $dt->pic ?? '-',
-                'durasi'   => $dur,
-                'start_time'  => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
+                'pic' => $dt->pic ?? '-',
+                'durasi' => $dur,
+                'start_time' => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
                 'finish_time' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang',
-                'lhj_id'      => $dt->hambatanJalur?->id,
-                'lhj_status'  => $dt->hambatanJalur?->status,
+                'lhj_id' => $dt->hambatanJalur?->id,
+                'lhj_status' => $dt->hambatanJalur?->status,
             ];
             $dtRows[] = $row;
 
@@ -368,29 +381,29 @@ class DashboardRealtimeService
         foreach ($repairRejectLogs as $rr) {
             $logType = strtolower(trim($rr->type ?? ''));
             $picName = $rr->creator?->name;
-            if (!$picName && !empty($rr->created_by)) {
+            if (! $picName && ! empty($rr->created_by)) {
                 $userRec = \App\Models\User::find($rr->created_by);
                 $picName = $userRec?->name;
             }
-            if (!$picName) {
+            if (! $picName) {
                 $picName = '-';
             }
             $timeFormatted = $rr->created_at ? \Carbon\Carbon::parse($rr->created_at)->format('H:i') : '-';
             $job = $rr->jobMaster;
             $itemData = [
-                'no'              => 0,
-                'type'            => strtoupper($logType),
-                'item'            => $shortJob($job?->job_name),
-                'job'             => $job?->job_number ?? '-',
-                'defect_name'     => $rr->defect_name ?: '-',
-                'problem'         => $rr->defect_name ?: '-',
-                'qty'             => (int) ($rr->qty_a ?: 1),
+                'no' => 0,
+                'type' => strtoupper($logType),
+                'item' => $shortJob($job?->job_name),
+                'job' => $job?->job_number ?? '-',
+                'defect_name' => $rr->defect_name ?: '-',
+                'problem' => $rr->defect_name ?: '-',
+                'qty' => (int) ($rr->qty_a ?: 1),
                 'repair_category' => $rr->repair_category ?: '-',
-                'area_problem'    => $rr->area_problem ?: '-',
-                'root_cause'      => $rr->root_cause ?: '-',
-                'countermeasure'  => $rr->countermeasure ?: '-',
-                'pic'             => $picName,
-                'time'            => $timeFormatted,
+                'area_problem' => $rr->area_problem ?: '-',
+                'root_cause' => $rr->root_cause ?: '-',
+                'countermeasure' => $rr->countermeasure ?: '-',
+                'pic' => $picName,
+                'time' => $timeFormatted,
             ];
 
             if ($logType === 'repair') {
@@ -408,23 +421,23 @@ class DashboardRealtimeService
                 if ($dp->actual_repair > 0) {
                     $job = $dp->jobMaster;
                     $fallbackPic = '-';
-                    if (!empty($dp->saved_by)) {
+                    if (! empty($dp->saved_by)) {
                         $fallbackPic = \App\Models\User::find($dp->saved_by)?->name ?? '-';
                     }
                     $repairRows[] = [
-                        'no'              => count($repairRows) + 1,
-                        'type'            => 'REPAIR',
-                        'item'            => $shortJob($job?->job_name),
-                        'job'             => $job?->job_number ?? '-',
-                        'defect_name'     => 'Defect',
-                        'problem'         => 'Defect',
-                        'qty'             => (int) $dp->actual_repair,
+                        'no' => count($repairRows) + 1,
+                        'type' => 'REPAIR',
+                        'item' => $shortJob($job?->job_name),
+                        'job' => $job?->job_number ?? '-',
+                        'defect_name' => 'Defect',
+                        'problem' => 'Defect',
+                        'qty' => (int) $dp->actual_repair,
                         'repair_category' => '-',
-                        'area_problem'    => '-',
-                        'root_cause'      => '-',
-                        'countermeasure'  => '-',
-                        'pic'             => $fallbackPic,
-                        'time'            => '-',
+                        'area_problem' => '-',
+                        'root_cause' => '-',
+                        'countermeasure' => '-',
+                        'pic' => $fallbackPic,
+                        'time' => '-',
                     ];
                 }
             }
@@ -435,23 +448,23 @@ class DashboardRealtimeService
                 if ($dp->actual_reject > 0) {
                     $job = $dp->jobMaster;
                     $fallbackPic = '-';
-                    if (!empty($dp->saved_by)) {
+                    if (! empty($dp->saved_by)) {
                         $fallbackPic = \App\Models\User::find($dp->saved_by)?->name ?? '-';
                     }
                     $rejectRows[] = [
-                        'no'              => count($rejectRows) + 1,
-                        'type'            => 'REJECT',
-                        'item'            => $shortJob($job?->job_name),
-                        'job'             => $job?->job_number ?? '-',
-                        'defect_name'     => 'Reject',
-                        'problem'         => 'Reject',
-                        'qty'             => (int) $dp->actual_reject,
+                        'no' => count($rejectRows) + 1,
+                        'type' => 'REJECT',
+                        'item' => $shortJob($job?->job_name),
+                        'job' => $job?->job_number ?? '-',
+                        'defect_name' => 'Reject',
+                        'problem' => 'Reject',
+                        'qty' => (int) $dp->actual_reject,
                         'repair_category' => '-',
-                        'area_problem'    => '-',
-                        'root_cause'      => '-',
-                        'countermeasure'  => '-',
-                        'pic'             => $fallbackPic,
-                        'time'            => '-',
+                        'area_problem' => '-',
+                        'root_cause' => '-',
+                        'countermeasure' => '-',
+                        'pic' => $fallbackPic,
+                        'time' => '-',
                     ];
                 }
             }
@@ -462,9 +475,9 @@ class DashboardRealtimeService
         foreach ($dailyRecords as $dp) {
             $job = $dp->jobMaster;
             $qtyRows[] = [
-                'no'     => count($qtyRows) + 1,
-                'item'   => $shortJob($job?->job_name),
-                'ok'     => (int) $dp->actual_ok,
+                'no' => count($qtyRows) + 1,
+                'item' => $shortJob($job?->job_name),
+                'ok' => (int) $dp->actual_ok,
                 'repair' => (int) $dp->actual_repair,
                 'reject' => (int) $dp->actual_reject,
             ];
@@ -494,19 +507,19 @@ class DashboardRealtimeService
             }
             $jobRuntime = round($jobRuntimeSeconds / 60, 1);
             $runtimeRows[] = [
-                'no'      => count($runtimeRows) + 1,
-                'item'    => $shortJob($job?->job_name),
-                'durasi'  => $jobRuntime . ' m',
+                'no' => count($runtimeRows) + 1,
+                'item' => $shortJob($job?->job_name),
+                'durasi' => $jobRuntime.' m',
             ];
         }
 
-        $runtimeMinutes = round(array_sum(array_map(fn($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 1);
+        $runtimeMinutes = round(array_sum(array_map(fn ($r) => (float) str_replace(' m', '', $r['durasi']), $runtimeRows)) ?: $runtime / 60, 1);
 
         // Ambil data Dandori (Dies/Variant changeover & 1st-Q check)
         $dandoriModels = Dandori::whereIn('next_job_id', $jobIds)
             ->where(function ($q) use ($shiftStartDt, $shiftEndDt, $workDate) {
                 $q->whereBetween('start_time', [$shiftStartDt, $shiftEndDt])
-                  ->orWhere('work_date', $workDate);
+                    ->orWhere('work_date', $workDate);
             })
             ->get();
 
@@ -538,14 +551,15 @@ class DashboardRealtimeService
             return $dp->jobMaster !== null;
         })->sortBy(function ($dp) {
             $seq = $dp->jobMaster->sequence_no ?? 9999;
+
             return $seq;
         })->values();
 
         foreach ($ordered as $dp) {
             $jm = $dp->jobMaster;
             $isRunningJob = $runningJobId && $dp->job_master_id == $runningJobId;
-            $hasStarted = !empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
-            $hasProgress = ((int)$dp->actual_ok + (int)$dp->actual_repair + (int)$dp->actual_reject) > 0;
+            $hasStarted = ! empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
+            $hasProgress = ((int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject) > 0;
             // Include if processed up to running: include all before running that are processed or started; include running if it exists
             if ($isRunningJob) {
                 // include running even if just started with 0 qty? but qty item berjalan is used for current; for actual cumulative include if processed up to running
@@ -564,8 +578,8 @@ class DashboardRealtimeService
         if (empty($includedJobIds)) {
             foreach ($ordered as $dp) {
                 $jm = $dp->jobMaster;
-                $hasStarted = !empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
-                $hasProgress = ((int)$dp->actual_ok + (int)$dp->actual_repair + (int)$dp->actual_reject) > 0;
+                $hasStarted = ! empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
+                $hasProgress = ((int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject) > 0;
                 if ($hasStarted || $hasProgress) {
                     $includedJobIds[] = $dp->job_master_id;
                 }
@@ -579,14 +593,14 @@ class DashboardRealtimeService
         $okCum = 0;
         foreach ($dailyRecords as $dp) {
             if (in_array($dp->job_master_id, $includedJobIds)) {
-                $okCum += (int)$dp->actual_ok;
+                $okCum += (int) $dp->actual_ok;
             }
         }
 
         // Compute durations for included jobs only
         $runtimeCumSeconds = 0;
         foreach ($dailyRecords as $dp) {
-            if (!in_array($dp->job_master_id, $includedJobIds)) {
+            if (! in_array($dp->job_master_id, $includedJobIds)) {
                 continue;
             }
             $dpRuntime = (float) $dp->runtime_seconds;
@@ -609,11 +623,15 @@ class DashboardRealtimeService
                     $dpRuntime = abs(\Carbon\Carbon::parse($endAt)->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
                 }
             }
-            if ($dpRuntime < 0) $dpRuntime = 0;
+            if ($dpRuntime < 0) {
+                $dpRuntime = 0;
+            }
             $runtimeCumSeconds += $dpRuntime;
         }
         $runtimeCumMinutes = round($runtimeCumSeconds / 60, 1);
-        if ($runtimeCumMinutes < 0) $runtimeCumMinutes = 0;
+        if ($runtimeCumMinutes < 0) {
+            $runtimeCumMinutes = 0;
+        }
 
         // Dandori + 1st check for included jobs
         $dandoriCumMinutes = 0.0;
@@ -636,7 +654,9 @@ class DashboardRealtimeService
         foreach ($allDowntimes as $dt) {
             if ($dt->job_master_id && in_array($dt->job_master_id, $includedJobIds)) {
                 $type = strtoupper(trim($dt->jenis_downtime ?? ''));
-                if (ProductionMetricsService::isExcludedDowntimeType($type)) continue;
+                if (ProductionMetricsService::isExcludedDowntimeType($type)) {
+                    continue;
+                }
                 $dur = $this->downtimeDurationSeconds($dt) / 60;
                 if ($dur > 0) {
                     $dtCumMinutes += $dur;
@@ -647,7 +667,9 @@ class DashboardRealtimeService
 
         // TPT Aktual = Press Time + Dandori + 1st Check + Downtime (akumulatif sampai item berjalan)
         $actualTptMinutes = round($runtimeCumMinutes + $dandoriCumMinutes + $dtCumMinutes, 1);
-        if ($actualTptMinutes < 0) $actualTptMinutes = 0;
+        if ($actualTptMinutes < 0) {
+            $actualTptMinutes = 0;
+        }
 
         // GSPH ACTUAL = (Total Qty seluruh item yang sudah diproses sampai item berjalan / Total TPT) × 60
         $gsph = ($okCum > 0 && $actualTptMinutes > 0 && is_finite($actualTptMinutes))
@@ -677,45 +699,45 @@ class DashboardRealtimeService
         $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
         $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
 
-        $dtProdLabel = round($dtProdMinutes, 1) . ' m';
-        $dtTotalLabel = round($dtTotalMinutes, 1) . ' m';
-        $dtMachLabel = round($dtMachMinutes, 1) . ' m';
-        $dtDiesLabel = round($dtDiesMinutes, 1) . ' m';
-        $dtMatLabel  = round($dtMatMinutes, 1) . ' m';
-        $dtLogLabel  = round($dtLogMinutes, 1) . ' m';
+        $dtProdLabel = round($dtProdMinutes, 1).' m';
+        $dtTotalLabel = round($dtTotalMinutes, 1).' m';
+        $dtMachLabel = round($dtMachMinutes, 1).' m';
+        $dtDiesLabel = round($dtDiesMinutes, 1).' m';
+        $dtMatLabel = round($dtMatMinutes, 1).' m';
+        $dtLogLabel = round($dtLogMinutes, 1).' m';
 
         $kpi = [
-            ['desc'=>'QTY',      'plan'=>(string)$planQty,           'actual'=>(string)$ok,         'actualLink'=>true, 'current'=>$hasRunning ? (string)$currOk : '-'],
-            ['desc'=>'GSPH',     'plan'=>(string)$gsphPlan,          'actual'=>(string)$gsph,       'current'=>$hasRunning ? (string)$currGsph : '-'],
-            ['desc'=>'PROD_T',   'plan'=>'0 m',                      'actual'=>$dtProdLabel,        'current'=>$hasRunning ? $currDtProd.' m' : '-', 'popup'=>true],
-            ['desc'=>'TOTAL_DT', 'plan'=>'0 m',                      'actual'=>$dtTotalLabel,       'current'=>$hasRunning ? $currDtTotal.' m' : '-', 'popup'=>true, 'danger'=>$dtTotalMinutes > 0],
-            ['desc'=>'MACH_T',   'plan'=>'0 m',                      'actual'=>$dtMachLabel,        'current'=>$hasRunning ? $currDtMach.' m' : '-', 'popup'=>true],
-            ['desc'=>'DIES_T',   'plan'=>'0 m',                      'actual'=>$dtDiesLabel,        'current'=>$hasRunning ? $currDtDies.' m' : '-', 'popup'=>true],
-            ['desc'=>'MAT_T',    'plan'=>'0 m',                      'actual'=>$dtMatLabel,         'current'=>$hasRunning ? $currDtMat.' m' : '-', 'popup'=>true],
-            ['desc'=>'LOG_T',    'plan'=>'0 m',                      'actual'=>$dtLogLabel,         'current'=>$hasRunning ? $currDtLog.' m' : '-', 'popup'=>true],
+            ['desc' => 'QTY',      'plan' => (string) $planQty,           'actual' => (string) $ok,         'actualLink' => true, 'current' => $hasRunning ? (string) $currOk : '-'],
+            ['desc' => 'GSPH',     'plan' => (string) $gsphPlan,          'actual' => (string) $gsph,       'current' => $hasRunning ? (string) $currGsph : '-'],
+            ['desc' => 'PROD_T',   'plan' => '0 m',                      'actual' => $dtProdLabel,        'current' => $hasRunning ? $currDtProd.' m' : '-', 'popup' => true],
+            ['desc' => 'TOTAL_DT', 'plan' => '0 m',                      'actual' => $dtTotalLabel,       'current' => $hasRunning ? $currDtTotal.' m' : '-', 'popup' => true, 'danger' => $dtTotalMinutes > 0],
+            ['desc' => 'MACH_T',   'plan' => '0 m',                      'actual' => $dtMachLabel,        'current' => $hasRunning ? $currDtMach.' m' : '-', 'popup' => true],
+            ['desc' => 'DIES_T',   'plan' => '0 m',                      'actual' => $dtDiesLabel,        'current' => $hasRunning ? $currDtDies.' m' : '-', 'popup' => true],
+            ['desc' => 'MAT_T',    'plan' => '0 m',                      'actual' => $dtMatLabel,         'current' => $hasRunning ? $currDtMat.' m' : '-', 'popup' => true],
+            ['desc' => 'LOG_T',    'plan' => '0 m',                      'actual' => $dtLogLabel,         'current' => $hasRunning ? $currDtLog.' m' : '-', 'popup' => true],
 
-            ['desc'=>'OVERTIME', 'plan'=>'0 m',                      'actual'=>'0 m',               'current'=>$hasRunning ? '0 m' : '-'],
-            ['desc'=>'REPAIR',   'plan'=>'0 pcs',                    'actual'=>$repair.' pcs',      'actualPct'=>($ok>0?round(($repair/$ok)*100,1):0).'%', 'current'=>$hasRunning ? $currRepair.' pcs' : '-', 'popup'=>true],
-            ['desc'=>'REJECT',   'plan'=>'0 pcs',                    'actual'=>$reject.' pcs',      'actualPct'=>($ok>0?round(($reject/$ok)*100,1):0).'%', 'current'=>$hasRunning ? $currReject.' pcs' : '-', 'popup'=>true],
+            ['desc' => 'OVERTIME', 'plan' => '0 m',                      'actual' => '0 m',               'current' => $hasRunning ? '0 m' : '-'],
+            ['desc' => 'REPAIR',   'plan' => '0 pcs',                    'actual' => $repair.' pcs',      'actualPct' => ($ok > 0 ? round(($repair / $ok) * 100, 1) : 0).'%', 'current' => $hasRunning ? $currRepair.' pcs' : '-', 'popup' => true],
+            ['desc' => 'REJECT',   'plan' => '0 pcs',                    'actual' => $reject.' pcs',      'actualPct' => ($ok > 0 ? round(($reject / $ok) * 100, 1) : 0).'%', 'current' => $hasRunning ? $currReject.' pcs' : '-', 'popup' => true],
         ];
 
         $detailData = [
-            'QTY'      => ['type' => 'production', $lineName => ['rows' => $qtyRows, 'total' => (string)$ok]],
-            'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string)round($dtTotalMinutes, 1)]],
-            'MACH_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $machRows, 'total' => (string)round($dtMachMinutes, 1)]],
-            'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string)round($dtDiesMinutes, 1)]],
-            'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string)round($dtMatMinutes, 1)]],
-            'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string)round($dtLogMinutes, 1)]],
-            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string)round($dtProdMinutes, 1)]],
-            'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => $repairRows, 'total' => (string)$repair]],
-            'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string)$reject]],
+            'QTY' => ['type' => 'production', $lineName => ['rows' => $qtyRows, 'total' => (string) $ok]],
+            'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => $dtRows, 'total' => (string) round($dtTotalMinutes, 1)]],
+            'MACH_T' => ['type' => 'dt_detail',  $lineName => ['rows' => $machRows, 'total' => (string) round($dtMachMinutes, 1)]],
+            'DIES_T' => ['type' => 'dt_detail',  $lineName => ['rows' => $diesRows, 'total' => (string) round($dtDiesMinutes, 1)]],
+            'MAT_T' => ['type' => 'dt_detail',  $lineName => ['rows' => $matRows, 'total' => (string) round($dtMatMinutes, 1)]],
+            'LOG_T' => ['type' => 'dt_detail',  $lineName => ['rows' => $logRows, 'total' => (string) round($dtLogMinutes, 1)]],
+            'PROD_T' => ['type' => 'dt_detail',  $lineName => ['rows' => $prodRows, 'total' => (string) round($dtProdMinutes, 1)]],
+            'REPAIR' => ['type' => 'quality',    $lineName => ['rows' => $repairRows, 'total' => (string) $repair]],
+            'REJECT' => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string) $reject]],
         ];
 
         $jobName = '-';
         if ($hasRunning && $runningRecord?->jobMaster) {
             $jmObj = $runningRecord->jobMaster;
             $matchedPlan = $plansByIdentifier[$jmObj->job_number ?? ''] ?? null;
-            if ($matchedPlan && !empty(trim($matchedPlan->job_no ?? ''))) {
+            if ($matchedPlan && ! empty(trim($matchedPlan->job_no ?? ''))) {
                 $jobName = trim($matchedPlan->job_no);
             } else {
                 $raw = $jmObj->job_name ?? $jmObj->job_number ?? '';
@@ -723,26 +745,26 @@ class DashboardRealtimeService
             }
         }
 
-        $uniqueBasePlans = $plans->filter(fn($p) => empty($p->parent_job_id));
+        $uniqueBasePlans = $plans->filter(fn ($p) => empty($p->parent_job_id));
         $totalJobs = $uniqueBasePlans->count();
         $parentJobIds = $uniqueBasePlans->pluck('id')->filter()->toArray();
 
         // Finished jobs: count unique base plans whose parent or child jobs are finished
-        $finishedJobs = $dailyRecords->filter(fn($dp) => $dp->jobMaster && in_array(strtolower($dp->jobMaster->status), ['finished', 'complete', 'closed']))->count();
+        $finishedJobs = $dailyRecords->filter(fn ($dp) => $dp->jobMaster && in_array(strtolower($dp->jobMaster->status), ['finished', 'complete', 'closed']))->count();
         if ($totalJobs > 0 && $finishedJobs > $totalJobs) {
             $finishedJobs = $totalJobs;
         }
-        $jobActual = $finishedJobs . '/' . $totalJobs;
+        $jobActual = $finishedJobs.'/'.$totalJobs;
 
         $totalStroke = $ok + $repair + $reject;
 
         $currStroke = $hasRunning ? ($currOk + $currRepair + $currReject) : '-';
 
         $meta = [
-            'job'        => $jobName,
-            'jobPlan'    => (string) $totalJobs,
-            'jobActual'  => $jobActual,
-            'stroke'     => (string) $totalStroke,
+            'job' => $jobName,
+            'jobPlan' => (string) $totalJobs,
+            'jobActual' => $jobActual,
+            'stroke' => (string) $totalStroke,
             'currStroke' => (string) $currStroke,
         ];
 
@@ -764,6 +786,7 @@ class DashboardRealtimeService
         foreach (Cache::getMultiple([]) as $key => $val) {
             // all keys not possible with file cache; fallback handled in stream endpoint
         }
+
         return $lines;
     }
 
@@ -777,14 +800,16 @@ class DashboardRealtimeService
         $ts = Cache::get("dash_update_{$line}");
         if ($ts) {
             Cache::forget("dash_update_{$line}");
+
             return $ts;
         }
+
         return null;
     }
 
     private function downtimeDurationSeconds(Downtime $dt): float
     {
-        if (!empty($dt->duration_seconds)) {
+        if (! empty($dt->duration_seconds)) {
             return (float) $dt->duration_seconds;
         }
         if ($dt->finish_time) {
@@ -793,6 +818,7 @@ class DashboardRealtimeService
         if ($dt->start_time) {
             return (float) abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
         }
+
         return 0.0;
     }
 
@@ -805,8 +831,17 @@ class DashboardRealtimeService
     }
 
     protected static array $plansCache = [];
+
     protected static ?Collection $allLineMasters = null;
+
     protected static array $resolvedDates = [];
+
+    public static function flushCache(): void
+    {
+        self::$plansCache = [];
+        self::$allLineMasters = null;
+        self::$resolvedDates = [];
+    }
 
     /**
      * Tanggal schedule yang benar-benar punya data. Kalau tanggal yang diminta kosong,
@@ -824,6 +859,7 @@ class DashboardRealtimeService
 
         if ($hasJobs) {
             self::$resolvedDates[$date] = $date;
+
             return $date;
         }
 
@@ -839,7 +875,7 @@ class DashboardRealtimeService
      */
     private function getPlansForDateAndShift(string $date, bool $isMorning)
     {
-        $cacheKey = $date . '_' . ($isMorning ? '1' : '2');
+        $cacheKey = $date.'_'.($isMorning ? '1' : '2');
         if (isset(self::$plansCache[$cacheKey])) {
             return self::$plansCache[$cacheKey];
         }
@@ -848,21 +884,22 @@ class DashboardRealtimeService
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')
-                      ->orWhere('shift_name', 'like', '%1%');
+                        ->orWhere('shift_name', 'like', '%1%');
                 } else {
                     $q->where('shift_name', 'like', '%Malam%')
-                      ->orWhere('shift_name', 'like', '%2%');
+                        ->orWhere('shift_name', 'like', '%2%');
                 }
             })
             ->where('row_type', 'job')
             ->where(function ($q) {
                 $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                  ->orWhereNull('job_no');
+                    ->orWhereNull('job_no');
             })
             ->orderBy('row_no')
             ->get();
 
         self::$plansCache[$cacheKey] = $plans;
+
         return $plans;
     }
 
@@ -904,36 +941,37 @@ class DashboardRealtimeService
     private function emptyMetrics(string $lineName): array
     {
         $kpi = [
-            ['desc'=>'QTY',      'plan'=>'0',     'actual'=>'0',     'actualLink'=>true, 'current'=>'-'],
-            ['desc'=>'GSPH',     'plan'=>'0',     'actual'=>'0',     'current'=>'-'],
-            ['desc'=>'PROD_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'TOTAL_DT', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'MACH_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'DIES_T',   'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'MAT_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'LOG_T',    'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
+            ['desc' => 'QTY',      'plan' => '0',     'actual' => '0',     'actualLink' => true, 'current' => '-'],
+            ['desc' => 'GSPH',     'plan' => '0',     'actual' => '0',     'current' => '-'],
+            ['desc' => 'PROD_T',   'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
+            ['desc' => 'TOTAL_DT', 'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
+            ['desc' => 'MACH_T',   'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
+            ['desc' => 'DIES_T',   'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
+            ['desc' => 'MAT_T',    'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
+            ['desc' => 'LOG_T',    'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
 
-            ['desc'=>'OVERTIME', 'plan'=>'0 m',   'actual'=>'0 m',   'current'=>'-'],
-            ['desc'=>'REPAIR',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs'],
-            ['desc'=>'REJECT',   'plan'=>'0 pcs', 'actual'=>'0 pcs', 'actualPct'=>'0%',   'current'=>'0 pcs'],
+            ['desc' => 'OVERTIME', 'plan' => '0 m',   'actual' => '0 m',   'current' => '-'],
+            ['desc' => 'REPAIR',   'plan' => '0 pcs', 'actual' => '0 pcs', 'actualPct' => '0%',   'current' => '0 pcs'],
+            ['desc' => 'REJECT',   'plan' => '0 pcs', 'actual' => '0 pcs', 'actualPct' => '0%',   'current' => '0 pcs'],
         ];
         $detailData = [
-            'QTY'      => ['type' => 'production', $lineName => ['rows' => [], 'total' => '0']],
+            'QTY' => ['type' => 'production', $lineName => ['rows' => [], 'total' => '0']],
             'TOTAL_DT' => ['type' => 'dt_summary', $lineName => ['rows' => [], 'total' => '0']],
-            'MACH_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'DIES_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'MAT_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'LOG_T'    => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'PROD_T'   => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
-            'REPAIR'   => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
-            'REJECT'   => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
+            'MACH_T' => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
+            'DIES_T' => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
+            'MAT_T' => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
+            'LOG_T' => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
+            'PROD_T' => ['type' => 'dt_detail',  $lineName => ['rows' => [], 'total' => '0']],
+            'REPAIR' => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
+            'REJECT' => ['type' => 'quality',    $lineName => ['rows' => [], 'total' => '0']],
         ];
         $meta = [
-            'job'        => '-',
-            'jobPlan'    => '0',
-            'jobActual'  => '0/0',
-            'stroke'     => '0',
+            'job' => '-',
+            'jobPlan' => '0',
+            'jobActual' => '0/0',
+            'stroke' => '0',
         ];
+
         return compact('kpi', 'detailData', 'meta');
     }
 }
