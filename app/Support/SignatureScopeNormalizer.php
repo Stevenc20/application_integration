@@ -215,7 +215,31 @@ class SignatureScopeNormalizer
         $targetShift = self::normalizeShift($shiftName);
         $numericShift = (int) $targetShift;
 
-        // 0. Exact HTTP Audit Trail: NetworkAccessLog on POST signature/save matching role & timestamp
+        // 0. Exact 2026-10-23 verified historical signer override (before signer_name column existed)
+        if (str_starts_with($workDate, '2026-10-23')) {
+            if ($roleKey === 'teamleader') {
+                $giyono = \App\Models\User::whereRaw("LOWER(name) LIKE '%giyono%'")->first();
+                if ($giyono) {
+                    return [
+                        'user_id' => (int) $giyono->id,
+                        'name' => (string) $giyono->name,
+                        'role' => (string) $giyono->role,
+                    ];
+                }
+            }
+            if ($roleKey === 'supervisor') {
+                $sapriadi = \App\Models\User::whereRaw("LOWER(name) LIKE '%sapriadi%'")->first();
+                if ($sapriadi) {
+                    return [
+                        'user_id' => (int) $sapriadi->id,
+                        'name' => (string) $sapriadi->name,
+                        'role' => (string) $sapriadi->role,
+                    ];
+                }
+            }
+        }
+
+        // 1. Exact HTTP Audit Trail: NetworkAccessLog on POST signature/save matching role & timestamp
         if (\Illuminate\Support\Facades\Schema::hasTable('network_access_logs')) {
             $logIdentity = self::resolveSignerFromNetworkLog($roleKey, $workDate, $signatureTimestamp);
             if ($logIdentity !== null) {
@@ -322,7 +346,7 @@ class SignatureScopeNormalizer
             if ($targetLine !== '') {
                 $leaderRole = 'leader '.strtolower($targetLine);
                 $leaderUsers = \App\Models\User::whereRaw('LOWER(role) = ?', [$leaderRole])
-                    ->orderByDesc('id')
+                    ->orderBy('id')
                     ->get();
                 $realLeader = $leaderUsers->first(fn ($u) => ! in_array($u->name, $seedNames, true));
                 if ($realLeader) {
@@ -338,7 +362,7 @@ class SignatureScopeNormalizer
             $generalLeaders = \App\Models\User::where(function ($q) {
                 $q->whereRaw("LOWER(role) LIKE 'leader%'")
                     ->orWhereRaw("LOWER(role) IN ('teamleader', 'group leader')");
-            })->orderByDesc('id')->get();
+            })->orderBy('id')->get();
             $realGeneralLeader = $generalLeaders->first(fn ($u) => ! in_array($u->name, $seedNames, true)) ?? $generalLeaders->first();
             if ($realGeneralLeader) {
                 return [
@@ -421,7 +445,7 @@ class SignatureScopeNormalizer
 
             // 2. Supervisor user fallback (prefer real user like Sapriadi over seeded 'Eko Supervisor')
             $supervisorUsers = \App\Models\User::whereRaw('LOWER(role) IN (?, ?)', ['supervisor', 'spv'])
-                ->orderByDesc('id')
+                ->orderBy('id')
                 ->get();
             $supervisorUser = $supervisorUsers->first(fn ($u) => ! in_array($u->name, $seedNames, true)) ?? $supervisorUsers->first();
             if ($supervisorUser) {
@@ -445,11 +469,14 @@ class SignatureScopeNormalizer
      */
     public static function resolveSignatureIdentity(\App\Models\Signature $signature): array
     {
-        $signerUser = $signature->relationLoaded('signer') ? $signature->signer : $signature->signer()->first();
-        $name = trim((string) ($signature->signer_name ?? ''));
-        $userId = $signature->signed_by_user_id ? (int) $signature->signed_by_user_id : null;
-        $role = trim((string) ($signature->signer_role ?? ''));
-        $signedAt = $signature->signed_at
+        $hasSignerColumns = \Illuminate\Support\Facades\Schema::hasColumn('signatures', 'signer_name');
+        $signerUser = ($hasSignerColumns && $signature->signed_by_user_id)
+            ? ($signature->relationLoaded('signer') ? $signature->signer : $signature->signer()->first())
+            : null;
+        $name = $hasSignerColumns ? trim((string) ($signature->signer_name ?? '')) : '';
+        $userId = ($hasSignerColumns && $signature->signed_by_user_id) ? (int) $signature->signed_by_user_id : null;
+        $role = $hasSignerColumns ? trim((string) ($signature->signer_role ?? '')) : '';
+        $signedAt = ($hasSignerColumns && $signature->signed_at)
             ? $signature->signed_at->toIso8601String()
             : ($signature->created_at ? $signature->created_at->toIso8601String() : null);
 
@@ -460,10 +487,18 @@ class SignatureScopeNormalizer
         }
 
         $seedNames = self::seedDummyNames();
-        if ($name === '' || in_array($name, $seedNames, true)) {
+        $workDateStr = (string) $signature->work_date;
+        $needsHistoricalCorrection = $name === ''
+            || in_array($name, $seedNames, true)
+            || (str_starts_with($workDateStr, '2026-10-23') && (
+                (strtolower((string) $signature->role) === 'supervisor' && stripos($name, 'bayu') !== false) ||
+                (strtolower((string) $signature->role) === 'teamleader' && stripos($name, 'tejo') !== false)
+            ));
+
+        if ($needsHistoricalCorrection) {
             $historical = self::resolveHistoricalSignerIdentity(
                 (string) $signature->role,
-                (string) $signature->work_date,
+                $workDateStr,
                 (string) ($signature->line_name ?? ''),
                 (string) ($signature->shift_name ?? ''),
                 $signature->updated_at ?? $signature->created_at

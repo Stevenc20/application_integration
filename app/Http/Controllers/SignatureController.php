@@ -216,6 +216,14 @@ class SignatureController extends Controller
             : (string) ($authUser?->role ?? '');
         $lockedSignedAt = $existing?->signed_at ?? ($existing?->created_at ?? now());
 
+        $payload = ['signature_data' => $request->signature];
+        if (\Illuminate\Support\Facades\Schema::hasColumn('signatures', 'signer_name')) {
+            $payload['signed_by_user_id'] = $lockedUserId;
+            $payload['signer_name'] = $lockedName;
+            $payload['signer_role'] = $lockedRole;
+            $payload['signed_at'] = $lockedSignedAt;
+        }
+
         $saved = Signature::updateOrCreate(
             [
                 'role' => $request->role,
@@ -223,21 +231,15 @@ class SignatureController extends Controller
                 'line_name' => $standardLine,
                 'shift_name' => $standardShift,
             ],
-            [
-                'signature_data' => $request->signature,
-                'signed_by_user_id' => $lockedUserId,
-                'signer_name' => $lockedName,
-                'signer_role' => $lockedRole,
-                'signed_at' => $lockedSignedAt,
-            ]
+            $payload
         );
 
         return response()->json([
             'success' => true,
-            'signer_name' => $saved->signer_name,
-            'signed_by_user_id' => $saved->signed_by_user_id,
-            'signer_role' => $saved->signer_role,
-            'signed_at' => $saved->signed_at?->toIso8601String(),
+            'signer_name' => $lockedName,
+            'signed_by_user_id' => $lockedUserId,
+            'signer_role' => $lockedRole,
+            'signed_at' => $lockedSignedAt?->toIso8601String(),
         ]);
     }
 

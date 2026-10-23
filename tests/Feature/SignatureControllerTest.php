@@ -1125,10 +1125,17 @@ describe('LKH Signer Identity Lock (23 October 2026 Bugfix)', function () {
             'is_active' => 1,
         ]);
 
-        // Real operational users created after seeder
+        // Real operational users created after seeder (including Bayu & Tejo with higher IDs)
         $giyonoLeader = User::create([
             'name' => 'Giyono',
             'nrp' => 'TL-GIYONO',
+            'password' => 'password',
+            'role' => 'leader',
+            'is_active' => 1,
+        ]);
+        $tejoLeader = User::create([
+            'name' => 'Tejo',
+            'nrp' => 'TL-TEJO',
             'password' => 'password',
             'role' => 'leader',
             'is_active' => 1,
@@ -1140,14 +1147,24 @@ describe('LKH Signer Identity Lock (23 October 2026 Bugfix)', function () {
             'role' => 'supervisor',
             'is_active' => 1,
         ]);
+        $bayuSpv = User::create([
+            'name' => 'Bayu BR',
+            'nrp' => 'SPV-BAYU',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
 
-        // Historical signatures created on 2026-10-23 before migration (or where seeded Eko was previously backfilled)
+        // Historical signatures created on 2026-10-23 before migration (or where Bayu/Tejo/Eko was previously backfilled)
         $tlSig = Signature::create([
             'role' => 'teamleader',
             'work_date' => '2026-10-23',
             'line_name' => 'PRESS A',
             'shift_name' => 'Shift Pagi',
             'signature_data' => 'data:image/png;base64,GIYONO_SIG',
+            'signed_by_user_id' => $tejoLeader->id,
+            'signer_name' => 'Tejo',
+            'signer_role' => 'leader',
         ]);
         $fmSig = Signature::create([
             'role' => 'foreman',
@@ -1162,8 +1179,8 @@ describe('LKH Signer Identity Lock (23 October 2026 Bugfix)', function () {
             'line_name' => 'PRESS A',
             'shift_name' => 'Shift Pagi',
             'signature_data' => 'data:image/png;base64,SAPRIADI_SIG',
-            'signed_by_user_id' => $ekoSeeded->id,
-            'signer_name' => 'Eko Supervisor',
+            'signed_by_user_id' => $bayuSpv->id,
+            'signer_name' => 'Bayu BR',
             'signer_role' => 'supervisor',
         ]);
 

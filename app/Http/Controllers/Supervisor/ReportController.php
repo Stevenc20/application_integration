@@ -968,12 +968,14 @@ class ReportController extends Controller
             // Never use auth()->user() so viewing LKH or regenerating PDF as another user never changes the signer name.
             if ($sigRecord) {
                 $identity = SignatureScopeNormalizer::resolveSignatureIdentity($sigRecord);
-                // Persist backfilled real identity onto historical signature records if missing or still holding a seeded placeholder
+                // Persist backfilled real identity onto historical signature records if missing or still holding a seeded/wrong placeholder
                 if (
+                    \Illuminate\Support\Facades\Schema::hasColumn('signatures', 'signer_name') &&
                     $identity['name'] !== '' &&
                     (
                         trim((string) $sigRecord->signer_name) === '' ||
-                        in_array((string) $sigRecord->signer_name, SignatureScopeNormalizer::seedDummyNames(), true)
+                        in_array((string) $sigRecord->signer_name, SignatureScopeNormalizer::seedDummyNames(), true) ||
+                        $sigRecord->signer_name !== $identity['name']
                     ) &&
                     ! in_array($identity['name'], SignatureScopeNormalizer::seedDummyNames(), true)
                 ) {
