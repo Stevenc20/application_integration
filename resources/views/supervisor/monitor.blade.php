@@ -197,6 +197,46 @@
             font-weight: 900 !important;
         }
 
+        /* REJECT: solid red across PLAN, CURR, ACTUAL (same family as DOWNTIME) */
+        #row-REJECT td.val-plan,
+        #row-REJECT td.val-curr,
+        #row-REJECT td.val-actual {
+            background-color: #ef4444 !important;
+            color: #ffffff !important;
+            font-weight: 900 !important;
+            border-color: #b91c1c !important;
+        }
+
+        /* REPAIR: solid yellow across PLAN, CURR, ACTUAL */
+        #row-REPAIR td.val-plan,
+        #row-REPAIR td.val-curr,
+        #row-REPAIR td.val-actual {
+            background-color: #facc15 !important;
+            color: #111827 !important;
+            font-weight: 900 !important;
+            border-color: #ca8a04 !important;
+        }
+
+        /* Keep REJECT/REPAIR readable and clearly separated in dark mode */
+        body.dark #row-REJECT td.val-plan,
+        body.dark #row-REJECT td.val-curr,
+        body.dark #row-REJECT td.val-actual {
+            background-color: #dc2626 !important;
+            color: #ffffff !important;
+            border-color: #fca5a5 !important;
+            box-shadow: inset 0 0 0 1px rgba(254, 202, 202, 0.35) !important;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        body.dark #row-REPAIR td.val-plan,
+        body.dark #row-REPAIR td.val-curr,
+        body.dark #row-REPAIR td.val-actual {
+            background-color: #eab308 !important;
+            color: #111827 !important;
+            border-color: #fde047 !important;
+            box-shadow: inset 0 0 0 1px rgba(253, 230, 138, 0.35) !important;
+        }
+
         /* ── SEPARATOR VERTIKAL ANTARA PRESS A, B, C, D (Semua View) ── */
         .line-border-r {
             border-right: 3px solid #2563eb !important;
@@ -979,11 +1019,9 @@ function getClasses(desc, k){
             } else if(currVal>0) curr = 'bg-green';
         }
     }else if(desc==='REPAIR'||desc==='REJECT'){
-        const p=parseFloat(k.actualPct||k.actual);
-        if(p>5) act='bg-red';
-        else if(p>2) act='bg-yellow';
-        
-        if(k.current && k.current!=='-' && k.current!=='0 pcs' && parseFloat(k.current)>0) curr = act;
+        // Fixed semantic colors are applied by #row-REPAIR / #row-REJECT CSS so
+        // PLAN, CURR, and ACTUAL stay solid in every line and both themes.
+        return {act:'', curr:'', style:''};
     }else if(['DIES_T','PROD_T','TOTAL_DT','MACH_T','MAT_T','LOG_T','OVERTIME'].includes(desc)){
         const v=parseFloat(k.actual);
         if(!isNaN(v) && v>0) act='bg-red';
