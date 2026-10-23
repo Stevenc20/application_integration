@@ -710,6 +710,10 @@ class ScheduleBackupService
                             'signature_data' => $sig['signature_data'],
                             'line_name' => $sig['line_name'] ?? null,
                             'shift_name' => $sig['shift_name'] ?? null,
+                            'signed_by_user_id' => $sig['signed_by_user_id'] ?? null,
+                            'signer_name' => $sig['signer_name'] ?? null,
+                            'signer_role' => $sig['signer_role'] ?? null,
+                            'signed_at' => $sig['signed_at'] ?? null,
                         ]);
                         $restoredSignatures++;
                     }

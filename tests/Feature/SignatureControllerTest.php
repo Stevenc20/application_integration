@@ -1,12 +1,12 @@
 <?php
 
-use App\Models\User;
-use App\Models\Signature;
-use App\Models\LineMaster;
 use App\Models\LineAssignment;
+use App\Models\LineMaster;
 use App\Models\ProductionPlan;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Models\Signature;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
 
@@ -22,8 +22,8 @@ function sigCreateLineMaster(string $lineName): LineMaster
 function sigCreateUser(string $role): User
 {
     return User::create([
-        'name' => ucfirst($role) . ' Test',
-        'nrp' => $role . '-' . uniqid(),
+        'name' => ucfirst($role).' Test',
+        'nrp' => $role.'-'.uniqid(),
         'password' => 'password',
         'role' => $role,
         'is_active' => 1,
@@ -33,7 +33,7 @@ function sigCreateUser(string $role): User
 function sigAssign(int $userId, string $sigRole, string $line, string $shift): void
 {
     $data = ['line_name' => $line, 'shift_name' => $shift];
-    $data[$sigRole . '_user_id'] = $userId;
+    $data[$sigRole.'_user_id'] = $userId;
 
     LineAssignment::create($data);
 }
@@ -396,6 +396,7 @@ describe('Signature Read Authorization', function () {
         $leaderA = sigCreateUser('leader');
         $other = sigCreateUser('leader');
         sigAssign($leaderA->id, 'leader', 'Line A', '1');
+
         return compact('leaderA', 'other');
     }
 
@@ -601,14 +602,17 @@ describe('Signature Canonicalization', function () {
 describe('LKH Update Cells Scope Lock', function () {
     function lkhGrantFeature(string $role): void
     {
-        $feature = \App\Models\Feature::create([
-            'feature_code' => 'daily_report',
-            'feature_name' => 'Daily Report',
-            'group_name' => 'Reports',
-        ]);
-        \App\Models\RoleFeature::create([
+        $feature = \App\Models\Feature::firstOrCreate(
+            ['feature_code' => 'daily_report'],
+            [
+                'feature_name' => 'Daily Report',
+                'group_name' => 'Reports',
+            ]
+        );
+        \App\Models\RoleFeature::firstOrCreate([
             'role' => $role,
             'feature_id' => $feature->id,
+        ], [
             'enabled' => true,
         ]);
     }
@@ -690,5 +694,404 @@ describe('LKH Update Cells Scope Lock', function () {
             ])
             ->assertStatus(422)
             ->assertJsonPath('error', 'Payload tidak valid');
+    });
+});
+
+// ──────────────── 10. SIGNER IDENTITY LOCK & 23 OCTOBER 2026 BUGFIX ────────────────
+
+describe('LKH Signer Identity Lock (23 October 2026 Bugfix)', function () {
+    test('stores actual signer identity (user_id, signer_name, signer_role, signed_at) and locks it on LKH 23 October 2026', function () {
+        $line = sigCreateLineMaster('PRESS A');
+        sigMakePlan($line, '2026-10-23');
+        lkhGrantFeature('leader');
+        lkhGrantFeature('foreman');
+        lkhGrantFeature('supervisor');
+
+        $leaderActual = User::create([
+            'name' => 'Budi Santoso (TL A)',
+            'nrp' => 'TL-20261023-A',
+            'password' => 'password',
+            'role' => 'leader',
+            'is_active' => 1,
+        ]);
+        $foremanActual = User::create([
+            'name' => 'Andi Wijaya (Foreman)',
+            'nrp' => 'FM-20261023-A',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $supervisorActual = User::create([
+            'name' => 'Rudi Hartono (SPV)',
+            'nrp' => 'SPV-20261023-A',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+
+        LineAssignment::create([
+            'line_name' => 'Line A',
+            'shift_name' => '1',
+            'leader_user_id' => $leaderActual->id,
+            'foreman_user_id' => $foremanActual->id,
+            'supervisor_user_id' => $supervisorActual->id,
+        ]);
+
+        // 1. Team Leader signs slot 1
+        $this->actingAs($leaderActual)
+            ->postJson('/signature/save', [
+                'role' => 'teamleader',
+                'work_date' => '2026-10-23',
+                'line_name' => 'PRESS A',
+                'shift_name' => 'Shift Pagi',
+                'signature' => 'data:image/png;base64,TL_SIG_20261023',
+            ])
+            ->assertOk()
+            ->assertJsonPath('signer_name', 'Budi Santoso (TL A)')
+            ->assertJsonPath('signed_by_user_id', $leaderActual->id);
+
+        // 2. Foreman signs slot 2
+        $this->actingAs($foremanActual)
+            ->postJson('/signature/save', [
+                'role' => 'foreman',
+                'work_date' => '2026-10-23',
+                'line_name' => 'PRESS A',
+                'shift_name' => 'Shift Pagi',
+                'signature' => 'data:image/png;base64,FM_SIG_20261023',
+            ])
+            ->assertOk()
+            ->assertJsonPath('signer_name', 'Andi Wijaya (Foreman)')
+            ->assertJsonPath('signed_by_user_id', $foremanActual->id);
+
+        // 3. Supervisor signs slot 3
+        $this->actingAs($supervisorActual)
+            ->postJson('/signature/save', [
+                'role' => 'supervisor',
+                'work_date' => '2026-10-23',
+                'line_name' => 'PRESS A',
+                'shift_name' => 'Shift Pagi',
+                'signature' => 'data:image/png;base64,SPV_SIG_20261023',
+            ])
+            ->assertOk()
+            ->assertJsonPath('signer_name', 'Rudi Hartono (SPV)')
+            ->assertJsonPath('signed_by_user_id', $supervisorActual->id);
+
+        // Verify DB persistence of all 3 slots
+        $tlSig = Signature::where('role', 'teamleader')->where('work_date', '2026-10-23')->first();
+        $fmSig = Signature::where('role', 'foreman')->where('work_date', '2026-10-23')->first();
+        $spvSig = Signature::where('role', 'supervisor')->where('work_date', '2026-10-23')->first();
+
+        expect($tlSig->signed_by_user_id)->toBe($leaderActual->id)
+            ->and($tlSig->signer_name)->toBe('Budi Santoso (TL A)')
+            ->and($tlSig->signed_at)->not->toBeNull();
+        expect($fmSig->signed_by_user_id)->toBe($foremanActual->id)
+            ->and($fmSig->signer_name)->toBe('Andi Wijaya (Foreman)')
+            ->and($fmSig->signed_at)->not->toBeNull();
+        expect($spvSig->signed_by_user_id)->toBe($supervisorActual->id)
+            ->and($spvSig->signer_name)->toBe('Rudi Hartono (SPV)')
+            ->and($spvSig->signed_at)->not->toBeNull();
+    });
+
+    test('opening LKH or regenerating PDF as different logged-in users never changes locked signer identities on 23 October 2026', function () {
+        $line = sigCreateLineMaster('PRESS A');
+        sigMakePlan($line, '2026-10-23');
+        lkhGrantFeature('leader');
+        lkhGrantFeature('foreman');
+        lkhGrantFeature('supervisor');
+
+        $leaderActual = User::create([
+            'name' => 'Budi Santoso (TL A)',
+            'nrp' => 'TL-ACTUAL',
+            'password' => 'password',
+            'role' => 'leader a',
+            'is_active' => 1,
+        ]);
+        $foremanActual = User::create([
+            'name' => 'Andi Wijaya (Foreman 1)',
+            'nrp' => 'FM-ACTUAL',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $supervisorActual = User::create([
+            'name' => 'Rudi Hartono (SPV 1)',
+            'nrp' => 'SPV-ACTUAL',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+
+        // Different users with the same roles who later open the LKH / export PDF
+        $otherLeader = User::create([
+            'name' => 'Doni Pratama (Other Leader)',
+            'nrp' => 'TL-OTHER',
+            'password' => 'password',
+            'role' => 'leader b',
+            'is_active' => 1,
+        ]);
+        $otherForeman = User::create([
+            'name' => 'Hendra Kusuma (Other Foreman)',
+            'nrp' => 'FM-OTHER',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $otherSupervisor = User::create([
+            'name' => 'Surya Saputra (Other SPV)',
+            'nrp' => 'SPV-OTHER',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+
+        LineAssignment::create([
+            'line_name' => 'Line A',
+            'shift_name' => '1',
+            'leader_user_id' => $leaderActual->id,
+            'foreman_user_id' => $foremanActual->id,
+            'supervisor_user_id' => $supervisorActual->id,
+        ]);
+
+        $this->actingAs($leaderActual)->postJson('/signature/save', [
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,TL_SIG',
+        ])->assertOk();
+
+        $this->actingAs($foremanActual)->postJson('/signature/save', [
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,FM_SIG',
+        ])->assertOk();
+
+        $this->actingAs($supervisorActual)->postJson('/signature/save', [
+            'role' => 'supervisor',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,SPV_SIG',
+        ])->assertOk();
+
+        // Open LKH web page as Other Foreman, Other Supervisor, and Other Leader
+        foreach ([$otherForeman, $otherSupervisor, $otherLeader] as $viewer) {
+            $response = $this->actingAs($viewer)
+                ->get(route('supervisor.reports.daily_production', [
+                    'date' => '2026-10-23',
+                    'line' => 'PRESS A',
+                    'shift' => 'Shift Pagi',
+                ]))
+                ->assertOk();
+
+            $sigStatus = $response->viewData('signatureStatus');
+            expect($sigStatus['teamleader']['name'])->toBe('Budi Santoso (TL A)')
+                ->and($sigStatus['foreman']['name'])->toBe('Andi Wijaya (Foreman 1)')
+                ->and($sigStatus['supervisor']['name'])->toBe('Rudi Hartono (SPV 1)');
+
+            $html = $response->getContent();
+            expect($html)->toContain('id="ttd_teamleader" name="ttd_teamleader"')
+                ->and($html)->toContain('value="Budi Santoso (TL A)"')
+                ->and($html)->toContain('value="Andi Wijaya (Foreman 1)"')
+                ->and($html)->toContain('value="Rudi Hartono (SPV 1)"')
+                ->and($html)->not->toContain('value="Doni Pratama (Other Leader)"')
+                ->and($html)->not->toContain('value="Hendra Kusuma (Other Foreman)"')
+                ->and($html)->not->toContain('value="Surya Saputra (Other SPV)"');
+        }
+    });
+
+    test('another user cannot overwrite an already-valid signature via normal submit', function () {
+        sigCreateLineMaster('PRESS A');
+
+        $foreman1 = User::create([
+            'name' => 'Foreman Satu',
+            'nrp' => 'FM-001',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $foreman2 = User::create([
+            'name' => 'Foreman Dua',
+            'nrp' => 'FM-002',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $leader = sigCreateUser('leader');
+        sigAssign($leader->id, 'leader', 'Line A', '1');
+
+        $this->actingAs($leader)->postJson('/signature/save', [
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,LEADER_SIG',
+        ])->assertOk();
+
+        // Foreman 1 signs
+        $this->actingAs($foreman1)->postJson('/signature/save', [
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,FOREMAN1_SIG',
+        ])->assertOk();
+
+        // Foreman 2 tries to overwrite Foreman 1's signature via normal submit -> rejected with 403
+        $this->actingAs($foreman2)->postJson('/signature/save', [
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,FOREMAN2_OVERWRITE',
+        ])->assertStatus(403);
+
+        // Verify Foreman 1's identity and signature remain intact
+        $sig = Signature::where('role', 'foreman')->where('work_date', '2026-10-23')->first();
+        expect($sig->signed_by_user_id)->toBe($foreman1->id)
+            ->and($sig->signer_name)->toBe('Foreman Satu')
+            ->and($sig->signature_data)->toBe('data:image/png;base64,FOREMAN1_SIG');
+    });
+
+    test('historical signatures without stored signer_name resolve deterministically from ShiftSubmission and LineAssignment instead of active user', function () {
+        $line = sigCreateLineMaster('PRESS A');
+        sigMakePlan($line, '2026-10-23');
+        lkhGrantFeature('foreman');
+
+        $submitterLeader = User::create([
+            'name' => 'Agus Salim (Shift Submitter)',
+            'nrp' => 'TL-SUBMITTER',
+            'password' => 'password',
+            'role' => 'leader a',
+            'is_active' => 1,
+        ]);
+        $assignedForeman = User::create([
+            'name' => 'Bambang Pamungkas (Assigned Foreman)',
+            'nrp' => 'FM-ASSIGNED',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $viewerForeman = User::create([
+            'name' => 'Viewer Foreman Lain',
+            'nrp' => 'FM-VIEWER',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+
+        LineAssignment::create([
+            'line_name' => 'Line A',
+            'shift_name' => '1',
+            'leader_user_id' => $submitterLeader->id,
+            'foreman_user_id' => $assignedForeman->id,
+        ]);
+
+        \App\Models\ShiftSubmission::create([
+            'line_id' => $line->id,
+            'work_date' => '2026-10-23',
+            'shift' => 1,
+            'submitted_at' => '2026-10-23 15:00:00',
+            'submitted_by' => $submitterLeader->id,
+        ]);
+
+        // Simulate legacy pre-migration signatures on 2026-10-23 (null signer_name & signed_by_user_id)
+        Signature::create([
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature_data' => 'data:image/png;base64,LEGACY_TL',
+        ]);
+        Signature::create([
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature_data' => 'data:image/png;base64,LEGACY_FM',
+        ]);
+
+        // Viewed by a different foreman (`$viewerForeman`)
+        $response = $this->actingAs($viewerForeman)
+            ->get(route('supervisor.reports.daily_production', [
+                'date' => '2026-10-23',
+                'line' => 'PRESS A',
+                'shift' => 'Shift Pagi',
+            ]))
+            ->assertOk();
+
+        $sigStatus = $response->viewData('signatureStatus');
+        expect($sigStatus['teamleader']['name'])->toBe('Agus Salim (Shift Submitter)')
+            ->and($sigStatus['foreman']['name'])->toBe('Bambang Pamungkas (Assigned Foreman)')
+            ->and($sigStatus['foreman']['name'])->not->toBe('Viewer Foreman Lain');
+    });
+
+    test('PDF template preserves mandatory 1. Team Leader -> 2. Foreman -> 3. Supervisor order with locked names', function () {
+        $html = view('reports.daily_production_pdf', [
+            'jobsData' => [],
+            'totals' => [
+                'plan_qty' => 100,
+                'actual_good' => 100,
+                'actual_repair' => 0,
+                'actual_reject' => 0,
+                'total_stroke' => 100,
+                'total_loading_time' => 480.0,
+                'total_operating_time' => 450.0,
+                'press_time' => 400.0,
+                'total_dandori' => 20.0,
+                'total_qcheck' => 10.0,
+                'downtime_total' => 20.0,
+                'total_report_tpt' => 450.0,
+                'total_panel_record_ct' => 10.0,
+                'total_break_time' => 30.0,
+                'total_work_time' => 480.0,
+                'downtime_prod' => 5.0,
+                'downtime_dies' => 5.0,
+                'downtime_mach' => 5.0,
+                'downtime_matl' => 5.0,
+                'downtime_log' => 0.0,
+                'downtime_ubp' => 0.0,
+                'tpt_plan' => 450.0,
+                'tpt_act' => 450.0,
+            ],
+            'summary' => [
+                'oee' => 95.0,
+                'availability' => 95.0,
+                'performance' => 100.0,
+                'quality' => 100.0,
+            ],
+            'lineNamesUnique' => collect(['PRESS A']),
+            'selectedLineName' => 'PRESS A',
+            'selectedShift' => 'Shift Pagi',
+            'latestShiftName' => 'Shift Pagi',
+            'date' => '2026-10-23',
+            'operationalHours' => '8',
+            'shiftDisplayStart' => Carbon::parse('2026-10-23 07:30:00'),
+            'shiftDisplayEnd' => Carbon::parse('2026-10-23 21:00:00'),
+            'signatureStatus' => [
+                'teamleader' => ['signed' => true, 'available' => true, 'name' => 'Budi Santoso (TL A)'],
+                'foreman' => ['signed' => true, 'available' => true, 'name' => 'Andi Wijaya (Foreman)'],
+                'supervisor' => ['signed' => true, 'available' => true, 'name' => 'Rudi Hartono (SPV)'],
+            ],
+            'canEdit' => false,
+            'ttdLocked' => true,
+            'userRole' => 'supervisor',
+            'authorizedScope' => true,
+        ])->render();
+
+        $posTlLabel = strpos($html, 'Team Leader');
+        $posFmLabel = strpos($html, 'Foreman');
+        $posSpvLabel = strpos($html, 'Supervisor');
+
+        $posTlName = strpos($html, 'Budi Santoso (TL A)');
+        $posFmName = strpos($html, 'Andi Wijaya (Foreman)');
+        $posSpvName = strpos($html, 'Rudi Hartono (SPV)');
+
+        expect($posTlLabel)->toBeLessThan($posFmLabel)
+            ->and($posFmLabel)->toBeLessThan($posSpvLabel)
+            ->and($posTlName)->toBeLessThan($posFmName)
+            ->and($posFmName)->toBeLessThan($posSpvName);
     });
 });

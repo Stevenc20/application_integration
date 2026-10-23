@@ -278,7 +278,8 @@
                                 <input type="text" id="ttd_{{ $roleKey }}" name="ttd_{{ $roleKey }}"
                                        placeholder="NAMA {{ strtoupper($role) }}"
                                        value="{{ $sigState['name'] ?? '' }}"
-                                       class="border-0 border-b border-dashed border-transparent hover:border-gray-300 focus:border-red-500 focus:ring-0 text-center bg-transparent w-full font-black text-gray-800 py-0.5 text-xs lg:text-[13px] uppercase tracking-wide transition-all focus:outline-none placeholder-gray-400" />
+                                       readonly
+                                       class="border-0 border-b border-dashed border-transparent text-center bg-transparent w-full font-black text-gray-800 py-0.5 text-xs lg:text-[13px] uppercase tracking-wide transition-all focus:outline-none placeholder-gray-400 cursor-default" />
                             </div>
                         </div>
                         @endforeach
@@ -709,12 +710,14 @@ function saveSignature() {
         const placeholder = document.getElementById('placeholder_ttd_' + activeSignatureRole);
         const badge = document.getElementById('badge_ttd_' + activeSignatureRole);
         const delBtn = document.getElementById('btn_delete_ttd_' + activeSignatureRole);
+        const nameInput = document.getElementById('ttd_' + activeSignatureRole);
         img.src = dataUrl;
         img.classList.remove('hidden');
         placeholder.classList.add('hidden');
         badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>';
         badge.classList.remove('bg-gray-100','text-gray-400','border-gray-200');
         badge.classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
+        if (d.signer_name && nameInput) nameInput.value = d.signer_name;
         if (sigRoleOwned(activeSignatureRole)) delBtn.classList.remove('hidden');
         closeSignatureModal();
         refreshSignatureStatus();
@@ -774,7 +777,11 @@ function refreshSignatureStatus() {
                 const lock = document.getElementById('lock_ttd_' + role);
                 const clickArea = document.getElementById('clickarea_ttd_' + role);
                 const card = document.getElementById('card_ttd_' + role);
+                const nameInput = document.getElementById('ttd_' + role);
                 if (!s) return;
+                if (typeof s.name === 'string' && nameInput && s.name !== '') {
+                    nameInput.value = s.name;
+                }
                 const canClick = SIG_AUTHORIZED && sigRoleOwned(role) && s.available && !s.signed;
                 const showLock = !s.signed && !canClick;
                 if (lock) {
@@ -813,6 +820,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 document.getElementById('badge_ttd_{{ $role }}').innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span><span class="text-emerald-700">SIGNED</span>';
                 document.getElementById('badge_ttd_{{ $role }}').classList.remove('bg-gray-100','text-gray-400','border-gray-200');
                 document.getElementById('badge_ttd_{{ $role }}').classList.add('bg-emerald-50','text-emerald-700','border-emerald-200');
+                if (d.signer_name) {
+                    const nameInput = document.getElementById('ttd_{{ $role }}');
+                    if (nameInput) nameInput.value = d.signer_name;
+                }
                 if (sigRoleOwned('{{ $role }}')) document.getElementById('btn_delete_ttd_{{ $role }}').classList.remove('hidden');
             }
         })

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Supervisor;
 
+use App\Exports\LkhActualExport;
 use App\Http\Controllers\Controller;
 use App\Models\BreakTime;
 use App\Models\Dandori;
@@ -9,7 +10,6 @@ use App\Models\Downtime;
 use App\Models\JobMaster;
 use App\Models\ProductionPlan;
 use App\Services\ProductionMetricsService;
-use App\Exports\LkhActualExport;
 use App\Support\SignatureScopeNormalizer;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
@@ -36,6 +36,7 @@ class ReportController extends Controller
                 shiftDisplayStart: $data['shiftDisplayStart'],
                 shiftDisplayEnd: $data['shiftDisplayEnd'],
             );
+
             return $export->download();
         }
 
@@ -47,6 +48,7 @@ class ReportController extends Controller
             $safeLine = \Illuminate\Support\Str::slug($data['selectedLineName'] ?? 'Line');
             $safeShift = \Illuminate\Support\Str::slug($data['latestShiftName'] ?? 'Shift');
             $filename = "LKH_{$safeLine}_{$data['date']}_{$safeShift}.pdf";
+
             return $pdf->download($filename);
         }
 
@@ -62,7 +64,7 @@ class ReportController extends Controller
     {
         // 1. Line Filters (Flexible & Normalization)
         $lineNamesUnique = \App\Models\LineMaster::select('line_name')->distinct()->pluck('line_name');
-        
+
         $selectedLineName = $request->get('line', 'Line A');
         if (str_contains($selectedLineName, '-')) {
             $selectedLineName = ucwords(str_replace('-', ' ', $selectedLineName));
@@ -80,7 +82,7 @@ class ReportController extends Controller
 
         // 2. Date Filter
         $date = $request->get('date');
-        if (!$date) {
+        if (! $date) {
             $hour = (int) now()->format('H');
             $date = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
         } else {
@@ -135,13 +137,14 @@ class ReportController extends Controller
             ->get()
             ->groupBy('parent_job_id');
 
-        $plans = $plans->filter(fn ($p) => !$p->parent_job_id)->values();
+        $plans = $plans->filter(fn ($p) => ! $p->parent_job_id)->values();
 
         // 5. Map plan to JobMaster with DailyProduction and Downtimes
-        $jobNumbers = $plans->map(function($p) {
+        $jobNumbers = $plans->map(function ($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
         })->toArray();
 
         // Also include children's identifiers for loading their JobMasters
@@ -149,7 +152,7 @@ class ReportController extends Controller
             foreach ($children as $child) {
                 $jn = trim($child->job_no ?? '');
                 $jm = trim($child->job_master ?? '');
-                $jobNumbers[] = $jn ? ($jn . '-' . $child->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $child->id);
+                $jobNumbers[] = $jn ? ($jn.'-'.$child->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$child->id);
             }
         }
 
@@ -159,7 +162,7 @@ class ReportController extends Controller
                     $q->where('work_date', $date);
                 },
                 'downtimes',
-                'qChecks'
+                'qChecks',
             ])
             ->get()
             ->keyBy('job_number');
@@ -167,15 +170,23 @@ class ReportController extends Controller
         // Merge children's production data into parent's JobMaster
         foreach ($childPlans as $parentId => $children) {
             $parent = $plans->firstWhere('id', $parentId);
-            if (!$parent) continue;
-            $parentJm = $jobMasters->get(trim($parent->job_no ?? '') . '-' . $parent->id);
-            if (!$parentJm) continue;
+            if (! $parent) {
+                continue;
+            }
+            $parentJm = $jobMasters->get(trim($parent->job_no ?? '').'-'.$parent->id);
+            if (! $parentJm) {
+                continue;
+            }
             foreach ($children as $child) {
-                $childKey = trim($child->job_no ?? '') . '-' . $child->id;
+                $childKey = trim($child->job_no ?? '').'-'.$child->id;
                 $childJm = $jobMasters->get($childKey);
-                if (!$childJm || !$childJm->dailyProduction) continue;
-                if (!$parentJm->dailyProduction) continue;
-                $parentJm->dailyProduction->actual_ok     = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
+                if (! $childJm || ! $childJm->dailyProduction) {
+                    continue;
+                }
+                if (! $parentJm->dailyProduction) {
+                    continue;
+                }
+                $parentJm->dailyProduction->actual_ok = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
                 $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
                 $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
                 // Merge downtimes too
@@ -216,11 +227,11 @@ class ReportController extends Controller
         $allBreaks = collect();
         if ($ppcBreaks->isNotEmpty()) {
             foreach ($ppcBreaks as $pb) {
-                if (!empty($pb->start_time) && !empty($pb->finish_time)) {
-                    $allBreaks->push((object)[
+                if (! empty($pb->start_time) && ! empty($pb->finish_time)) {
+                    $allBreaks->push((object) [
                         'waktu_mulai' => $pb->start_time,
                         'waktu_selesai' => $pb->finish_time,
-                        'shift' => $pb->shift_name
+                        'shift' => $pb->shift_name,
                     ]);
                 }
             }
@@ -232,19 +243,22 @@ class ReportController extends Controller
         $isShiftMalam = str_contains(strtolower($latestShiftName), 'malam') || str_contains(strtolower($latestShiftName), '2');
 
         // Unified Time Parser handling Shift Malam midnight crossover
-        $parseTime = function($timeStr) use ($date, $isShiftMalam) {
-            if (!$timeStr) return null;
+        $parseTime = function ($timeStr) use ($date, $isShiftMalam) {
+            if (! $timeStr) {
+                return null;
+            }
             $timeStr = str_replace('.', ':', trim($timeStr));
             if (str_contains($timeStr, '-')) {
                 return \Carbon\Carbon::parse($timeStr);
             }
-            $dt = \Carbon\Carbon::parse($date . ' ' . $timeStr);
+            $dt = \Carbon\Carbon::parse($date.' '.$timeStr);
             if ($isShiftMalam) {
-                $hour = (int)$dt->format('H');
+                $hour = (int) $dt->format('H');
                 if ($hour < 12) {
                     $dt->addDay();
                 }
             }
+
             return $dt;
         };
 
@@ -262,7 +276,6 @@ class ReportController extends Controller
         $listOfCycleTimes = [];
         $totalActualStrokeFinished = 0;
         $totalActualTptMinutesFinished = 0.0;
-
 
         $totals = [
             'plan_qty' => 0,
@@ -295,17 +308,19 @@ class ReportController extends Controller
         $kebMtlByPlanId = $this->buildKebMtlGroupTotals($plans);
 
         // Helper to calculate finish time taking breaks into account (High-Fidelity Industrial Cascade)
-        $calculateFinishTime = function($startTime, $durationMinutes, $allBreaks, $isShiftMalam) use ($parseTime) {
-            if (!$startTime) return null;
-            
+        $calculateFinishTime = function ($startTime, $durationMinutes, $allBreaks, $isShiftMalam) use ($parseTime) {
+            if (! $startTime) {
+                return null;
+            }
+
             $currentTimeMins = ($startTime->hour * 60) + $startTime->minute;
             if ($isShiftMalam && $startTime->hour < 7) {
                 $currentTimeMins += 24 * 60;
             }
-            
+
             $remainingWork = (int) round($durationMinutes);
             $jobCurrentMins = $currentTimeMins;
-            
+
             // Build break windows in minutes
             $breakWindowsMins = [];
             foreach ($allBreaks as $br) {
@@ -315,22 +330,26 @@ class ReportController extends Controller
                     $bEnd = $parseTime($br->waktu_selesai);
                     if ($bStart && $bEnd) {
                         $bStartMin = ($bStart->hour * 60) + $bStart->minute;
-                        if ($isShiftMalam && $bStart->hour < 7) $bStartMin += 24 * 60;
-                        
+                        if ($isShiftMalam && $bStart->hour < 7) {
+                            $bStartMin += 24 * 60;
+                        }
+
                         $bEndMin = ($bEnd->hour * 60) + $bEnd->minute;
-                        if ($isShiftMalam && $bEnd->hour < 7) $bEndMin += 24 * 60;
-                        
+                        if ($isShiftMalam && $bEnd->hour < 7) {
+                            $bEndMin += 24 * 60;
+                        }
+
                         $breakWindowsMins[] = [
                             'start' => $bStartMin,
-                            'finish' => $bEndMin
+                            'finish' => $bEndMin,
                         ];
                     }
                 }
             }
-            
+
             // Sort breaks chronologically
-            usort($breakWindowsMins, fn($a, $b) => $a['start'] <=> $b['start']);
-            
+            usort($breakWindowsMins, fn ($a, $b) => $a['start'] <=> $b['start']);
+
             foreach ($breakWindowsMins as $b) {
                 if ($jobCurrentMins < $b['start']) {
                     $availableBeforeBreak = $b['start'] - $jobCurrentMins;
@@ -347,24 +366,25 @@ class ReportController extends Controller
                     $jobCurrentMins = $b['finish'];
                 }
             }
-            
+
             if ($remainingWork > 0) {
                 $jobCurrentMins += $remainingWork;
             }
-            
+
             // Convert jobCurrentMins back to Carbon object
             $finishTime = $startTime->copy();
             $targetHour = (int) floor($jobCurrentMins / 60);
             $targetMinute = (int) ($jobCurrentMins % 60);
-            
+
             if ($isShiftMalam && $targetHour >= 24) {
                 $targetHour -= 24;
                 if ($startTime->hour >= 12) {
                     $finishTime->addDay();
                 }
             }
-            
+
             $finishTime->setTime($targetHour, $targetMinute, 0);
+
             return $finishTime;
         };
 
@@ -374,8 +394,12 @@ class ReportController extends Controller
         $buffer = null;
         foreach ($plans as $plan) {
             if (($plan->row_type ?? 'job') === 'break') {
-                if ($buffer) { $mergedPlans->push($buffer); $buffer = null; }
+                if ($buffer) {
+                    $mergedPlans->push($buffer);
+                    $buffer = null;
+                }
                 $mergedPlans->push($plan);
+
                 continue;
             }
             $currentJobNo = trim($plan->job_no ?? '');
@@ -383,21 +407,29 @@ class ReportController extends Controller
                 $buffer->plan = ($buffer->plan ?? 0) + ($plan->plan ?? $plan->target_qty ?? 0);
                 $buffer->target_qty = ($buffer->target_qty ?? 0) + ($plan->target_qty ?? 0);
                 $mergedPlanIdsMap[$buffer->id][] = $plan->id;
-                if ($plan->start_time && (!$buffer->start_time || $plan->start_time < $buffer->start_time))
+                if ($plan->start_time && (! $buffer->start_time || $plan->start_time < $buffer->start_time)) {
                     $buffer->start_time = $plan->start_time;
-                if ($plan->finish_time && (!$buffer->finish_time || $plan->finish_time > $buffer->finish_time))
+                }
+                if ($plan->finish_time && (! $buffer->finish_time || $plan->finish_time > $buffer->finish_time)) {
                     $buffer->finish_time = $plan->finish_time;
-                if ($plan->act_start && (!$buffer->act_start || $plan->act_start < $buffer->act_start))
+                }
+                if ($plan->act_start && (! $buffer->act_start || $plan->act_start < $buffer->act_start)) {
                     $buffer->act_start = $plan->act_start;
-                if ($plan->act_finish && (!$buffer->act_finish || $plan->act_finish > $buffer->act_finish))
+                }
+                if ($plan->act_finish && (! $buffer->act_finish || $plan->act_finish > $buffer->act_finish)) {
                     $buffer->act_finish = $plan->act_finish;
+                }
             } else {
-                if ($buffer) $mergedPlans->push($buffer);
+                if ($buffer) {
+                    $mergedPlans->push($buffer);
+                }
                 $buffer = clone $plan;
                 $mergedPlanIdsMap[$buffer->id] = [$plan->id];
             }
         }
-        if ($buffer) $mergedPlans->push($buffer);
+        if ($buffer) {
+            $mergedPlans->push($buffer);
+        }
         $plans = $mergedPlans;
 
         $jobDisplayNo = 0;
@@ -418,7 +450,7 @@ class ReportController extends Controller
                     if ($planRunningTime->lt($planFinish)) {
                         $planRunningTime = $planFinish->copy();
                     }
-                    
+
                     // Advance actual running time ONLY if the preceding job finished after the break started
                     if ($planStart && $actualRunningTime->gt($planStart)) {
                         if ($actualRunningTime->lt($planFinish)) {
@@ -428,12 +460,13 @@ class ReportController extends Controller
                 }
 
                 $totals['total_break_time'] += $breakDuration;
+
                 continue;
             }
 
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
-            $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+            $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
             $jobData = $jobMasters->get($identifier);
 
             // If this plan is merged from multiple consecutive plan rows, aggregate production from all their JobMasters
@@ -444,9 +477,9 @@ class ReportController extends Controller
             $seenJmIds = [];
 
             foreach ($mergedPlanIds as $mPlanId) {
-                $mIdent = $jn ? ($jn . '-' . $mPlanId) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $mPlanId);
+                $mIdent = $jn ? ($jn.'-'.$mPlanId) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$mPlanId);
                 $mJm = $jobMasters->get($mIdent);
-                if ($mJm && !in_array($mJm->id, $seenJmIds)) {
+                if ($mJm && ! in_array($mJm->id, $seenJmIds)) {
                     $seenJmIds[] = $mJm->id;
                     if ($mJm->dailyProduction) {
                         $actualQtySafe += (int) ($mJm->dailyProduction->actual_ok ?? 0);
@@ -500,7 +533,7 @@ class ReportController extends Controller
 
             // Retrieve actual times from ProductionPlan (PPC) act_start/act_finish, falling back to JobMaster
             $actStart = $plan->act_start ? $parseTime($plan->act_start) : (($jobData && $jobData->started_at) ? \Carbon\Carbon::parse($jobData->started_at) : null);
-            
+
             $actFinish = null;
             if ($plan->act_finish) {
                 $actFinish = $parseTime($plan->act_finish);
@@ -518,11 +551,16 @@ class ReportController extends Controller
             // Keep unfiltered copy for timeline-based press time calculation (needs all history entries for anchor/deadline)
             $timelineDowntimes = $downtimes ?? collect();
             if (isset($downtimes) && $actStart && $actFinish && $actFinish->gt($actStart)) {
-                $downtimes = $downtimes->filter(function($dt) use ($actStart, $actFinish) {
+                $downtimes = $downtimes->filter(function ($dt) use ($actStart, $actFinish) {
                     $dtStart = $dt->start_time ? \Carbon\Carbon::parse($dt->start_time) : null;
                     $dtEnd = $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : null;
-                    if (!$dtStart) return false;
-                    if (!$dtEnd) return $dtStart->lt($actFinish);
+                    if (! $dtStart) {
+                        return false;
+                    }
+                    if (! $dtEnd) {
+                        return $dtStart->lt($actFinish);
+                    }
+
                     return $dtStart->lt($actFinish) && $dtEnd->gte($actStart);
                 });
                 $dandoriTime = $diesChangeTime + $variantChangeTime + $qcheckTime;
@@ -549,7 +587,7 @@ class ReportController extends Controller
                     if ($brShiftMalam == $isShiftMalam) {
                         $breakStart = $parseTime($br->waktu_mulai);
                         $breakEnd = $parseTime($br->waktu_selesai);
-                        
+
                         if ($breakStart && $breakEnd) {
                             $overlapStart = $breakBaseStart->gt($breakStart) ? $breakBaseStart : $breakStart;
                             $overlapEnd = $breakBaseEnd->lt($breakEnd) ? $breakBaseEnd : $breakEnd;
@@ -598,11 +636,11 @@ class ReportController extends Controller
             $jobBreakDuration = 0.0;
             if (isset($downtimes)) {
                 $now = \Carbon\Carbon::now();
-                foreach ($downtimes->filter(fn($dt) => str_contains(strtolower($dt->jenis_downtime ?? ''), 'break')) as $bdt) {
-                    $secs = !empty($bdt->duration_seconds) ? (float)$bdt->duration_seconds
+                foreach ($downtimes->filter(fn ($dt) => str_contains(strtolower($dt->jenis_downtime ?? ''), 'break')) as $bdt) {
+                    $secs = ! empty($bdt->duration_seconds) ? (float) $bdt->duration_seconds
                         : ($bdt->finish_time
-                            ? (float)abs(\Carbon\Carbon::parse($bdt->finish_time)->diffInSeconds(\Carbon\Carbon::parse($bdt->start_time)))
-                            : ($bdt->start_time ? (float)abs($now->diffInSeconds(\Carbon\Carbon::parse($bdt->start_time))) : 0.0));
+                            ? (float) abs(\Carbon\Carbon::parse($bdt->finish_time)->diffInSeconds(\Carbon\Carbon::parse($bdt->start_time)))
+                            : ($bdt->start_time ? (float) abs($now->diffInSeconds(\Carbon\Carbon::parse($bdt->start_time))) : 0.0));
                     $jobBreakDuration += $secs / 60.0;
                 }
             }
@@ -666,7 +704,7 @@ class ReportController extends Controller
             $repairRate = $totalStroke > 0 ? ($actualRepairSafe / $totalStroke * 100.0) : 0.0;
             $rejectRate = $totalStroke > 0 ? ($actualRejectSafe / $totalStroke * 100.0) : 0.0;
 
-            $numMachines = 1; 
+            $numMachines = 1;
             $jobPlanStroke = $planQtySafe * $numMachines;
             $jobActualStroke = $actualQtySafe * $numMachines;
 
@@ -679,9 +717,9 @@ class ReportController extends Controller
                 fn ($dt) => str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori') && empty($dt->finish_time)
             );
             $hasOpenDowntime = $jobData && $jobData->downtimes->contains(
-                fn ($dt) => !str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori')
-                    && !str_contains(strtolower($dt->jenis_downtime ?? ''), 'idle')
-                    && !str_contains(strtolower($dt->jenis_downtime ?? ''), 'break')
+                fn ($dt) => ! str_contains(strtolower($dt->jenis_downtime ?? ''), 'dandori')
+                    && ! str_contains(strtolower($dt->jenis_downtime ?? ''), 'idle')
+                    && ! str_contains(strtolower($dt->jenis_downtime ?? ''), 'break')
                     && empty($dt->finish_time)
             );
 
@@ -818,10 +856,10 @@ class ReportController extends Controller
         $masterPlan = null;
         $tfRow = \App\Models\ProductionPlan::whereDate('plan_date', $date)
             ->where('shift_name', $latestShiftName)
-            ->whereRaw("UPPER(TRIM(press_name)) = ?", [strtoupper(trim($selectedLineName))])
-            ->where(function($q) {
+            ->whereRaw('UPPER(TRIM(press_name)) = ?', [strtoupper(trim($selectedLineName))])
+            ->where(function ($q) {
                 $q->where('row_type', 'total_finish')
-                  ->orWhere('job_master', 'TOTAL FINISH');
+                    ->orWhere('job_master', 'TOTAL FINISH');
             })
             ->where('gsph_item', '>', 0)
             ->first();
@@ -831,10 +869,10 @@ class ReportController extends Controller
         } else {
             $gsphRow = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $latestShiftName)
-                ->whereRaw("UPPER(TRIM(press_name)) = ?", [strtoupper(trim($selectedLineName))])
-                ->where(function($q) {
+                ->whereRaw('UPPER(TRIM(press_name)) = ?', [strtoupper(trim($selectedLineName))])
+                ->where(function ($q) {
                     $q->where('job_master', 'like', '%GSPH%')
-                      ->orWhere('job_no', 'like', '%GSPH%');
+                        ->orWhere('job_no', 'like', '%GSPH%');
                 })
                 ->where('gsph_item', '>', 0)
                 ->first();
@@ -843,16 +881,16 @@ class ReportController extends Controller
                 $masterPlan = $gsphRow->plan;
             }
         }
-        
-        if (!$masterGsph) {
+
+        if (! $masterGsph) {
             $masterGsph = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $latestShiftName)
-                ->whereRaw("UPPER(TRIM(press_name)) = ?", [strtoupper(trim($selectedLineName))])
+                ->whereRaw('UPPER(TRIM(press_name)) = ?', [strtoupper(trim($selectedLineName))])
                 ->where('row_type', 'job')
                 ->max('gsph_item') ?: 0;
         }
 
-        if (!$masterPlan) {
+        if (! $masterPlan) {
             $masterPlan = $plans->where('row_type', 'job')->sum('plan');
         }
 
@@ -868,7 +906,7 @@ class ReportController extends Controller
         $totals['avg_plan_ct'] = $shiftPlanCt;
         $firstPlan = $plans->first();
         $lastPlan = $plans->last();
-        
+
         $firstJobPlan = $plans->first(fn ($p) => ($p->row_type ?? 'job') === 'job');
         $lastJobPlan = $plans->filter(fn ($p) => ($p->row_type ?? 'job') === 'job')->last();
 
@@ -881,7 +919,7 @@ class ReportController extends Controller
 
         $summary = [
             'item_plan' => $plans->where('row_type', 'job')->count(),
-            'item_act' => collect($jobsData)->filter(fn($j) => ($j['row_type'] ?? 'job') === 'job' && $j['actual_good'] > 0)->count(),
+            'item_act' => collect($jobsData)->filter(fn ($j) => ($j['row_type'] ?? 'job') === 'job' && $j['actual_good'] > 0)->count(),
             'qty_plan' => $totals['plan_qty'],
             'qty_act' => $totals['actual_good'],
             'tpt_plan' => $totals['tpt_plan'],
@@ -902,102 +940,46 @@ class ReportController extends Controller
         ];
 
         // Get operational hours (jam) from first plan record that has it
-        $operationalHours = $plans->first(fn ($p) => !empty($p->jam))?->jam;
-
-        // Fetch custom line assignment configuration
-        $assignment = \App\Models\LineAssignment::with(['leaderUser', 'foremanUser', 'supervisorUser'])
-            ->where('line_name', $selectedLineName)
-            ->where('shift_name', $latestShiftName)
-            ->first();
-
-        // 1. Team Leader
-        $authUser = auth()->user();
-        $authRole = strtolower($authUser?->role ?? '');
-        $isLeaderUser = str_starts_with($authRole, 'leader') || in_array($authRole, ['teamleader', 'group leader']);
-
-        // Check if shift submission (lock shift) has a recorded submitter
-        $targetLineNorm = SignatureScopeNormalizer::normalizeLine((string) $selectedLineName);
-        $targetShiftNorm = (int) SignatureScopeNormalizer::normalizeShift((string) $latestShiftName);
-        $lineMasterIds = \App\Models\LineMaster::all()->filter(function ($lm) use ($targetLineNorm) {
-            return SignatureScopeNormalizer::normalizeLine((string) $lm->line_name) === $targetLineNorm;
-        })->pluck('id');
-
-        $shiftSubmitterUser = \App\Models\ShiftSubmission::whereIn('line_id', $lineMasterIds)
-            ->whereDate('work_date', $date)
-            ->when($targetShiftNorm > 0, fn($q) => $q->where('shift', $targetShiftNorm))
-            ->whereNull('cancelled_at')
-            ->latest()
-            ->first()?->submitter;
-
-        if ($isLeaderUser) {
-            $leaderName = $authUser->name;
-        } elseif ($shiftSubmitterUser) {
-            $leaderName = $shiftSubmitterUser->name;
-        } elseif ($assignment && $assignment->leaderUser) {
-            $leaderName = $assignment->leaderUser->name;
-        } else {
-            $lineLower = strtolower($selectedLineName);
-            $leaderRole = 'leader a';
-            if (str_contains($lineLower, 'a')) {
-                $leaderRole = 'leader a';
-            } elseif (str_contains($lineLower, 'b')) {
-                $leaderRole = 'leader b';
-            } elseif (str_contains($lineLower, 'c')) {
-                $leaderRole = 'leader c';
-            } elseif (str_contains($lineLower, 'd')) {
-                $leaderRole = 'leader d';
-            }
-
-            if (auth()->check() && strtolower(auth()->user()->role) === $leaderRole) {
-                $leaderName = auth()->user()->name;
-            } else {
-                $leaderUser = \App\Models\User::where('role', $leaderRole)->first();
-                $leaderName = $leaderUser ? $leaderUser->name : '';
-            }
-        }
-
-        // 2. Foreman
-        if (auth()->check() && $authRole === 'foreman') {
-            $foremanName = $authUser->name;
-        } elseif ($assignment && $assignment->foremanUser) {
-            $foremanName = $assignment->foremanUser->name;
-        } else {
-            $foremanUser = \App\Models\User::where('role', 'foreman')->first();
-            $foremanName = $foremanUser ? $foremanUser->name : '';
-        }
-
-        // 3. Supervisor
-        if (auth()->check() && in_array($authRole, ['supervisor', 'spv'])) {
-            $supervisorName = $authUser->name;
-        } elseif ($assignment && $assignment->supervisorUser) {
-            $supervisorName = $assignment->supervisorUser->name;
-        } else {
-            $supervisorUser = \App\Models\User::where('role', 'supervisor')->first();
-            $supervisorName = $supervisorUser ? $supervisorUser->name : '';
-        }
-
-        $assignedNames = [
-            'teamleader' => $leaderName,
-            'foreman'    => $foremanName,
-            'supervisor' => $supervisorName,
-        ];
+        $operationalHours = $plans->first(fn ($p) => ! empty($p->jam))?->jam;
 
         $sigChain = ['teamleader', 'foreman', 'supervisor'];
         $scopeLine = SignatureScopeNormalizer::standardLine((string) $selectedLineName);
         $scopeShift = SignatureScopeNormalizer::standardShift((string) $selectedShift);
-        $signedRoles = \App\Models\Signature::whereIn('role', $sigChain)
+
+        $signaturesByRole = \App\Models\Signature::with('signer')
+            ->whereIn('role', $sigChain)
             ->where('work_date', $date)
             ->where('line_name', $scopeLine)
             ->where('shift_name', $scopeShift)
-            ->pluck('role')->toArray();
+            ->get()
+            ->keyBy('role');
+
+        $signedRoles = $signaturesByRole->keys()->all();
+        $assignedNames = [];
         $signatureStatus = [];
         $prevSigned = true;
+
         foreach ($sigChain as $role) {
-            $signed = in_array($role, $signedRoles);
+            /** @var \App\Models\Signature|null $sigRecord */
+            $sigRecord = $signaturesByRole->get($role);
+            $signed = $sigRecord !== null;
+
+            // Once signed, strictly use the locked signer identity (or deterministic audit trail for historical records).
+            // Never use auth()->user() so viewing LKH or regenerating PDF as another user never changes the signer name.
+            $identity = $sigRecord
+                ? SignatureScopeNormalizer::resolveSignatureIdentity($sigRecord)
+                : SignatureScopeNormalizer::resolveHistoricalSignerIdentity($role, (string) $date, $scopeLine, (string) $latestShiftName);
+
+            $resolvedName = $identity['name'] ?? '';
+            $assignedNames[$role] = $resolvedName;
+
             $signatureStatus[$role] = [
                 'signed' => $signed,
                 'available' => $prevSigned,
-                'name' => $assignedNames[$role] ?? '',
+                'name' => $resolvedName,
+                'signed_by_user_id' => $identity['user_id'] ?? null,
+                'signer_role' => $identity['role'] ?? '',
+                'signed_at' => $identity['signed_at'] ?? null,
             ];
             $prevSigned = $signed;
         }
@@ -1014,14 +996,13 @@ class ReportController extends Controller
             $date
         );
 
-
         $leaderSigned = in_array('teamleader', $signedRoles);
         $foremanSigned = in_array('foreman', $signedRoles);
 
         if (in_array($userRole, ['superadmin', 'supervisor', 'manager', 'kadiv', 'direktur'])) {
             $ttdLocked = false;
         } elseif ($userRole === 'foreman') {
-            $ttdLocked = !($leaderSigned && !$foremanSigned);
+            $ttdLocked = ! ($leaderSigned && ! $foremanSigned);
         } elseif ($isLeaderRole) {
             // Leader can edit as long as leader hasn't signed yet
             $ttdLocked = $leaderSigned;
@@ -1059,7 +1040,7 @@ class ReportController extends Controller
     {
         $userRole = strtolower(auth()->user()?->role ?? '');
         $isLeaderRole = str_starts_with($userRole, 'leader') || in_array($userRole, ['leader', 'teamleader', 'group leader']);
-        if (!in_array($userRole, ['foreman', 'superadmin']) && !$isLeaderRole) {
+        if (! in_array($userRole, ['foreman', 'superadmin']) && ! $isLeaderRole) {
             return response()->json(['error' => 'Anda tidak berhak mengedit data LKH'], 403);
         }
 
@@ -1068,7 +1049,7 @@ class ReportController extends Controller
         $lineName = $request->input('line');
         $shiftName = $request->input('shift');
 
-        if (!$date || !is_array($updates) || count($updates) === 0 || !$lineName || !$shiftName) {
+        if (! $date || ! is_array($updates) || count($updates) === 0 || ! $lineName || ! $shiftName) {
             return response()->json(['error' => 'Payload tidak valid'], 422);
         }
         $date = \Carbon\Carbon::parse($date)->toDateString();
@@ -1093,7 +1074,7 @@ class ReportController extends Controller
                     return response()->json(['error' => 'Edit terkunci karena TTD Team Leader sudah diisi'], 422);
                 }
             } else { // Foreman
-                if (!$leaderSigned) {
+                if (! $leaderSigned) {
                     return response()->json(['error' => 'Edit hanya terbuka setelah TTD Team Leader'], 422);
                 }
                 if ($foremanSigned) {
@@ -1103,12 +1084,12 @@ class ReportController extends Controller
         }
 
         $qtyFields = [
-            'actual_good'   => 'actual_ok',
+            'actual_good' => 'actual_ok',
             'actual_repair' => 'actual_repair',
             'actual_reject' => 'actual_reject',
         ];
         $timeFields = [
-            'actual_start'  => 'act_start',
+            'actual_start' => 'act_start',
             'actual_finish' => 'act_finish',
         ];
         // Foreman corrections persisted into the underlying source records:
@@ -1124,10 +1105,10 @@ class ReportController extends Controller
             'dt_production',
         ];
         $dtCategoryMap = [
-            'dt_dies'       => 'dies',
-            'dt_machine'    => 'machine',
-            'dt_material'   => 'material',
-            'dt_log'        => 'logistic',
+            'dt_dies' => 'dies',
+            'dt_machine' => 'machine',
+            'dt_material' => 'material',
+            'dt_log' => 'logistic',
             'dt_production' => 'production',
         ];
         $allowed = array_merge(array_keys($qtyFields), array_keys($timeFields), $minutesFields);
@@ -1140,24 +1121,24 @@ class ReportController extends Controller
                 $field = $u['field'] ?? '';
                 $value = trim((string) ($u['value'] ?? ''));
 
-                if ($planId <= 0 || !in_array($field, $allowed)) {
+                if ($planId <= 0 || ! in_array($field, $allowed)) {
                     continue;
                 }
 
                 $plan = ProductionPlan::find($planId);
-                if (!$plan) {
+                if (! $plan) {
                     continue;
                 }
 
                 $audit = [
-                    'plan_id'   => $planId,
-                    'field'     => $field,
+                    'plan_id' => $planId,
+                    'field' => $field,
                     'edited_by' => auth()->id(),
                     'edited_at' => now(),
                 ];
 
                 if (in_array($field, $minutesFields)) {
-                    if (!is_numeric($value)) {
+                    if (! is_numeric($value)) {
                         continue;
                     }
                     $goal = round((float) $value, 1);
@@ -1165,7 +1146,7 @@ class ReportController extends Controller
                         continue;
                     }
                     $job = $this->lkhPlanToJob($plan);
-                    if (!$job) {
+                    if (! $job) {
                         continue;
                     }
                     $currentCells = $this->lkhResolveCells($plan, $job, $date);
@@ -1177,11 +1158,12 @@ class ReportController extends Controller
                     $audit['old_value'] = (string) $currentVal;
                     $audit['new_value'] = (string) $achieved;
                     $audits[] = $audit;
+
                     continue;
                 }
 
                 if (isset($timeFields[$field])) {
-                    if (!preg_match('/^\d{1,2}:\d{2}$/', $value)) {
+                    if (! preg_match('/^\d{1,2}:\d{2}$/', $value)) {
                         continue;
                     }
                     $newTime = \Carbon\Carbon::parse($value)->format('H:i');
@@ -1190,19 +1172,20 @@ class ReportController extends Controller
                     $plan->{$timeFields[$field]} = $newTime;
                     $plan->save();
                     $audits[] = $audit;
+
                     continue;
                 }
 
                 $jn = trim($plan->job_no ?? '');
                 $jm = trim($plan->job_master ?? '');
-                $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+                $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
                 $job = \App\Models\JobMaster::where('job_number', $identifier)->first();
-                if (!$job) {
+                if (! $job) {
                     continue;
                 }
                 $dp = $job->dailyProduction;
-                if (!$dp) {
-                    $dp = new \App\Models\DailyProduction();
+                if (! $dp) {
+                    $dp = new \App\Models\DailyProduction;
                     $dp->job_master_id = $job->id;
                     $dp->work_date = $date;
                 }
@@ -1229,8 +1212,8 @@ class ReportController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => count($audits) . ' sel berhasil diperbarui',
-            'html'    => $html,
+            'message' => count($audits).' sel berhasil diperbarui',
+            'html' => $html,
         ]);
     }
 
@@ -1241,7 +1224,7 @@ class ReportController extends Controller
     {
         $jn = trim($plan->job_no ?? '');
         $jm = trim($plan->job_master ?? '');
-        $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+        $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
 
         return JobMaster::where('job_number', $identifier)->first();
     }
@@ -1263,6 +1246,7 @@ class ReportController extends Controller
         if ($plan->act_start) {
             return Carbon::parse($plan->act_start);
         }
+
         return $job->started_at ? Carbon::parse($job->started_at) : null;
     }
 
@@ -1277,6 +1261,7 @@ class ReportController extends Controller
         if (in_array(strtolower($job->status ?? ''), ['complete', 'finished', 'closed'])) {
             return Carbon::parse($job->updated_at);
         }
+
         return null;
     }
 
@@ -1303,27 +1288,28 @@ class ReportController extends Controller
             $downtimes = $downtimes->filter(function ($dt) use ($actStart, $actFinish) {
                 $dtStart = $dt->start_time ? Carbon::parse($dt->start_time) : null;
                 $dtEnd = $dt->finish_time ? Carbon::parse($dt->finish_time) : null;
-                if (!$dtStart) {
+                if (! $dtStart) {
                     return false;
                 }
-                if (!$dtEnd) {
+                if (! $dtEnd) {
                     return $dtStart->lt($actFinish);
                 }
+
                 return $dtStart->lt($actFinish) && $dtEnd->gte($actStart);
             });
         }
-        $confirmed = $downtimes->filter(fn ($dt) => !in_array(trim($dt->problem ?? ''), ['', '-']));
+        $confirmed = $downtimes->filter(fn ($dt) => ! in_array(trim($dt->problem ?? ''), ['', '-']));
         $breakdown = ProductionMetricsService::downtimeBreakdown($confirmed);
 
         return [
             'dandori_dies_variant' => $diesChange,
-            'dandori_qcheck'       => $qcheck,
-            'dandori_total'        => round($diesChange + $qcheck, 1),
-            'dt_dies'              => round($breakdown['dies'], 1),
-            'dt_machine'           => round($breakdown['machine'], 1),
-            'dt_material'          => round($breakdown['material'], 1),
-            'dt_log'               => round($breakdown['logistic'], 1),
-            'dt_production'        => round($breakdown['production'], 1),
+            'dandori_qcheck' => $qcheck,
+            'dandori_total' => round($diesChange + $qcheck, 1),
+            'dt_dies' => round($breakdown['dies'], 1),
+            'dt_machine' => round($breakdown['machine'], 1),
+            'dt_material' => round($breakdown['material'], 1),
+            'dt_log' => round($breakdown['logistic'], 1),
+            'dt_production' => round($breakdown['production'], 1),
         ];
     }
 
@@ -1344,10 +1330,10 @@ class ReportController extends Controller
         }
 
         $category = [
-            'dt_dies'       => 'dies',
-            'dt_machine'    => 'machine',
-            'dt_material'   => 'material',
-            'dt_log'        => 'logistic',
+            'dt_dies' => 'dies',
+            'dt_machine' => 'machine',
+            'dt_material' => 'material',
+            'dt_log' => 'logistic',
             'dt_production' => 'production',
         ][$field] ?? 'production';
 
@@ -1432,6 +1418,7 @@ class ReportController extends Controller
                     $r->{$setAttr} = 0;
                     $changed = true;
                 }
+
                 continue;
             }
             $keep = min($val, $remaining);
@@ -1486,20 +1473,22 @@ class ReportController extends Controller
             if ($actStart && $actFinish && $actFinish->gt($actStart)) {
                 $dtStart = $dt->start_time ? Carbon::parse($dt->start_time) : null;
                 $dtEnd = $dt->finish_time ? Carbon::parse($dt->finish_time) : null;
-                if (!$dtStart) {
+                if (! $dtStart) {
                     return false;
                 }
-                if (!$dtEnd) {
+                if (! $dtEnd) {
                     return $dtStart->lt($actFinish);
                 }
+
                 return $dtStart->lt($actFinish) && $dtEnd->gte($actStart);
             }
+
             return true;
         });
 
         return $windowed
-            ->filter(fn ($dt) => !in_array(trim($dt->problem ?? ''), ['', '-']))
-            ->filter(fn ($dt) => !ProductionMetricsService::isExcludedDowntimeType(strtoupper(trim($dt->jenis_downtime ?? ''))))
+            ->filter(fn ($dt) => ! in_array(trim($dt->problem ?? ''), ['', '-']))
+            ->filter(fn ($dt) => ! ProductionMetricsService::isExcludedDowntimeType(strtoupper(trim($dt->jenis_downtime ?? ''))))
             ->filter(fn ($dt) => $this->lkhDtCategoryOf($dt) === $category)
             ->sortBy('start_time')
             ->sortBy('id')
@@ -1524,6 +1513,7 @@ class ReportController extends Controller
         if (str_contains($type, 'UBP')) {
             return 'ubp';
         }
+
         return 'production';
     }
 
@@ -1536,7 +1526,7 @@ class ReportController extends Controller
 
     private function lkhDtSeconds(Downtime $dt): float
     {
-        if (!empty($dt->duration_seconds)) {
+        if (! empty($dt->duration_seconds)) {
             return (float) $dt->duration_seconds;
         }
         if ($dt->finish_time && $dt->start_time) {
@@ -1545,6 +1535,7 @@ class ReportController extends Controller
         if ($dt->start_time) {
             return abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
         }
+
         return 0.0;
     }
 
@@ -1569,6 +1560,7 @@ class ReportController extends Controller
                     $r->duration_seconds = 0;
                     $changed = true;
                 }
+
                 continue;
             }
             $keep = min($val, $remaining);
@@ -1595,7 +1587,7 @@ class ReportController extends Controller
     private function lkhCreateDandori(ProductionPlan $plan, JobMaster $job, float $minutes, string $jenis, string $activity, string $date): void
     {
         $start = $this->lkhActStart($plan, $job) ?: Carbon::now()->subMinutes((int) ceil($minutes));
-        $rec = new Dandori();
+        $rec = new Dandori;
         $rec->next_job_id = $job->id;
         $rec->work_date = $date;
         $rec->activity = $activity;
@@ -1610,15 +1602,15 @@ class ReportController extends Controller
     private function lkhCreateDowntime(JobMaster $job, string $category, float $minutes, ?Carbon $actStart, ?Carbon $actFinish): void
     {
         $keyword = [
-            'dies'       => 'Dies',
-            'machine'    => 'Machine',
-            'material'   => 'Material',
-            'logistic'   => 'Logistic',
+            'dies' => 'Dies',
+            'machine' => 'Machine',
+            'material' => 'Material',
+            'logistic' => 'Logistic',
             'production' => 'Production',
         ][$category] ?? 'Production';
 
         $anchor = $actFinish ?: ($actStart ?: Carbon::now());
-        $rec = new Downtime();
+        $rec = new Downtime;
         $rec->job_master_id = $job->id;
         $rec->jenis_downtime = $keyword;
         $rec->problem = 'Koreksi LKH';
@@ -1641,7 +1633,7 @@ class ReportController extends Controller
     public function performance(Request $request)
     {
         $month = $request->get('month', now()->format('Y-m'));
-        $carbonMonth = \Carbon\Carbon::parse($month . '-01');
+        $carbonMonth = \Carbon\Carbon::parse($month.'-01');
         $startDate = $carbonMonth->copy()->startOfMonth();
         $endDate = $carbonMonth->copy()->endOfMonth();
 
@@ -1656,14 +1648,15 @@ class ReportController extends Controller
         $jobNumbers = $plans->map(function ($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
         })->toArray();
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
             ->with('downtimes')
             ->get()
             ->keyBy('job_number');
 
-        $grouped = $plans->groupBy(fn ($p) => $p->plan_date->toDateString() . '|' . ($p->shift_name ?? 'Shift Pagi'));
+        $grouped = $plans->groupBy(fn ($p) => $p->plan_date->toDateString().'|'.($p->shift_name ?? 'Shift Pagi'));
 
         $dailyRecords = [];
         $weeklyBuckets = [];
@@ -1701,7 +1694,7 @@ class ReportController extends Controller
                 // Load downtimes via JobMaster
                 $jnL = trim($plan->job_no ?? '');
                 $jmL = trim($plan->job_master ?? '');
-                $jobNumber = $jnL ? ($jnL . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jmL) . '-' . $plan->id);
+                $jobNumber = $jnL ? ($jnL.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jmL).'-'.$plan->id);
                 $jobData = $jobMasters->get($jobNumber);
                 $downtimes = $jobData?->downtimes ?? collect();
 
@@ -1768,7 +1761,7 @@ class ReportController extends Controller
 
         $weeklyOee = [];
         for ($w = 1; $w <= 5; $w++) {
-            $weeklyOee['Week ' . $w] = isset($weeklyBuckets[$w]) && count($weeklyBuckets[$w]) > 0
+            $weeklyOee['Week '.$w] = isset($weeklyBuckets[$w]) && count($weeklyBuckets[$w]) > 0
                 ? round(array_sum($weeklyBuckets[$w]) / count($weeklyBuckets[$w]), 1)
                 : 0;
         }
@@ -1806,7 +1799,8 @@ class ReportController extends Controller
                 'dailyRecords', 'weeklyOee', 'avgAvailability', 'avgPerformance', 'avgQuality', 'avgOee',
                 'month', 'targetOee'
             ));
-            $filename = 'OEE_Performance_' . str_replace('-', '_', $month) . '.pdf';
+            $filename = 'OEE_Performance_'.str_replace('-', '_', $month).'.pdf';
+
             return $pdf->download($filename);
         }
 
@@ -1841,6 +1835,7 @@ class ReportController extends Controller
             if (($plan->row_type ?? '') === 'break') {
                 $flush();
                 $currentKey = null;
+
                 continue;
             }
             if (($plan->row_type ?? 'job') !== 'job') {
@@ -1864,20 +1859,20 @@ class ReportController extends Controller
     {
         $type = strtoupper(trim((string) ($plan->type_plt ?? '')));
         if ($type !== '' && $type !== '—' && $type !== '-') {
-            return 'TYPE:' . $type;
+            return 'TYPE:'.$type;
         }
 
         $master = strtoupper(trim((string) ($plan->job_master ?? '')));
         if (preg_match('/^([A-Z]{1,3}[-\s]?\d{2,4})/', $master, $m)) {
-            return 'MAT:' . preg_replace('/\s+/', '', $m[1]);
+            return 'MAT:'.preg_replace('/\s+/', '', $m[1]);
         }
 
         $jobNo = strtoupper(trim((string) ($plan->job_no ?? '')));
         if ($jobNo !== '') {
-            return 'JOB:' . $jobNo;
+            return 'JOB:'.$jobNo;
         }
 
-        return 'ROW:' . $plan->id;
+        return 'ROW:'.$plan->id;
     }
 
     private function resolvePlanGsph(ProductionPlan $plan, int $planQty, float $planTpt): int
@@ -1892,7 +1887,7 @@ class ReportController extends Controller
 
     private function resolveBreakLabel(ProductionPlan $plan): string
     {
-        if (!empty($plan->job_master) && !in_array($plan->job_master, ['0', '—', '', 'None'], true)) {
+        if (! empty($plan->job_master) && ! in_array($plan->job_master, ['0', '—', '', 'None'], true)) {
             return strtoupper(trim($plan->job_master));
         }
 
@@ -1920,7 +1915,7 @@ class ReportController extends Controller
         $downtimes = collect();
 
         if ($jobNumber) {
-            $jobData = JobMaster::where('job_number', 'like', $jobNumber . '%')->with('downtimes')->first();
+            $jobData = JobMaster::where('job_number', 'like', $jobNumber.'%')->with('downtimes')->first();
             $downtimes = $jobData?->downtimes ?? collect();
         }
 
@@ -1929,12 +1924,12 @@ class ReportController extends Controller
         foreach ($downtimes as $dt) {
             $type = $dt->jenis_downtime ?? 'Uncategorized';
             $dur = 0.0;
-            if (!empty($dt->duration_seconds)) {
+            if (! empty($dt->duration_seconds)) {
                 $dur = round((float) $dt->duration_seconds / 60.0, 2);
             } elseif ($dt->start_time && $dt->finish_time) {
                 $dur = round(abs(\Carbon\Carbon::parse($dt->finish_time)->diffInSeconds(\Carbon\Carbon::parse($dt->start_time))) / 60.0, 2);
             }
-            if (!isset($classified[$type])) {
+            if (! isset($classified[$type])) {
                 $classified[$type] = ['count' => 0, 'total_minutes' => 0.0];
             }
             $classified[$type]['count']++;
@@ -1955,7 +1950,7 @@ class ReportController extends Controller
         $downtimes = collect();
 
         if ($jobNumber) {
-            $jobData = JobMaster::where('job_number', 'like', $jobNumber . '%')->with('downtimes')->first();
+            $jobData = JobMaster::where('job_number', 'like', $jobNumber.'%')->with('downtimes')->first();
             $downtimes = $jobData?->downtimes ?? collect();
         }
 
@@ -1964,12 +1959,12 @@ class ReportController extends Controller
         foreach ($downtimes as $dt) {
             $type = $dt->jenis_downtime ?? 'Uncategorized';
             $dur = 0.0;
-            if (!empty($dt->duration_seconds)) {
+            if (! empty($dt->duration_seconds)) {
                 $dur = round((float) $dt->duration_seconds / 60.0, 2);
             } elseif ($dt->start_time && $dt->finish_time) {
                 $dur = round(abs(\Carbon\Carbon::parse($dt->finish_time)->diffInSeconds(\Carbon\Carbon::parse($dt->start_time))) / 60.0, 2);
             }
-            if (!isset($classified[$type])) {
+            if (! isset($classified[$type])) {
                 $classified[$type] = ['count' => 0, 'total_minutes' => 0.0];
             }
             $classified[$type]['count']++;
@@ -1981,28 +1976,28 @@ class ReportController extends Controller
         $detailRows = [];
         foreach ($downtimes as $dt) {
             $dur = 0;
-            if (!empty($dt->duration_seconds)) {
+            if (! empty($dt->duration_seconds)) {
                 $dur = round((float) $dt->duration_seconds / 60.0, 2);
             } elseif ($dt->start_time && $dt->finish_time) {
                 $dur = round(abs(\Carbon\Carbon::parse($dt->finish_time)->diffInSeconds(\Carbon\Carbon::parse($dt->start_time))) / 60.0, 2);
             }
             $detailRows[] = [
-                'jenis'       => $dt->jenis_downtime ?? '-',
-                'problem'     => $dt->problem ?? '-',
-                'penyebab'    => $dt->penyebab ?? '-',
-                'action'      => $dt->action ?? '-',
-                'pic'         => $dt->pic ?? '-',
-                'start_time'  => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
+                'jenis' => $dt->jenis_downtime ?? '-',
+                'problem' => $dt->problem ?? '-',
+                'penyebab' => $dt->penyebab ?? '-',
+                'action' => $dt->action ?? '-',
+                'pic' => $dt->pic ?? '-',
+                'start_time' => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
                 'finish_time' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->format('H:i') : '-',
-                'durasi'      => number_format($dur, 2),
+                'durasi' => number_format($dur, 2),
             ];
         }
 
         return response()->json([
-            'classified'   => $classified,
-            'totalCount'   => $totalCount,
+            'classified' => $classified,
+            'totalCount' => $totalCount,
             'totalMinutes' => $totalMinutes,
-            'downtimes'     => $detailRows,
+            'downtimes' => $detailRows,
             'plan' => [
                 'job_no' => $plan->job_no ?? $plan->job_master,
                 'plan_date' => $plan->plan_date->format('d M Y'),
@@ -2020,7 +2015,7 @@ class ReportController extends Controller
         $totalReject = 0;
 
         if ($jobNumber) {
-            $jobData = JobMaster::where('job_number', 'like', $jobNumber . '%')->first();
+            $jobData = JobMaster::where('job_number', 'like', $jobNumber.'%')->first();
             if ($jobData) {
                 $repairRejectLogs = \App\Models\RepairRejectLog::where('job_master_id', $jobData->id)
                     ->with('creator')
@@ -2077,7 +2072,7 @@ class ReportController extends Controller
             ? ($jobData->finished_at instanceof Carbon ? $jobData->finished_at : Carbon::parse($jobData->finished_at))
             : $actFinish;
 
-        if (!$jS || !$jF || !$jF->gt($jS)) {
+        if (! $jS || ! $jF || ! $jF->gt($jS)) {
             return max(0.0, ProductionMetricsService::processTimeMinutes($planCt, $totalStroke));
         }
 
@@ -2095,14 +2090,14 @@ class ReportController extends Controller
                 }
             }
         }
-        usort($history, fn($a, $b) => $a['start']->timestamp - $b['start']->timestamp);
+        usort($history, fn ($a, $b) => $a['start']->timestamp - $b['start']->timestamp);
 
         $hasDandori = false;
         $firstDandoriTime = null;
         foreach ($history as $h) {
             if ($h['type'] === 'dandori') {
                 $hasDandori = true;
-                if (!$firstDandoriTime || $h['start']->lt($firstDandoriTime)) {
+                if (! $firstDandoriTime || $h['start']->lt($firstDandoriTime)) {
                     $firstDandoriTime = $h['start'];
                 }
             }
@@ -2115,15 +2110,21 @@ class ReportController extends Controller
             ?: $jS;
 
         $candidates = [];
-        if ($actualStartMs) $candidates[] = $actualStartMs;
-        if ($hasDandori && $firstDandoriTime) $candidates[] = $firstDandoriTime;
+        if ($actualStartMs) {
+            $candidates[] = $actualStartMs;
+        }
+        if ($hasDandori && $firstDandoriTime) {
+            $candidates[] = $firstDandoriTime;
+        }
         foreach ($history as $h) {
             $candidates[] = $h['start'];
         }
 
-        $anchor = !empty($candidates) ? (clone $candidates[0]) : $jS;
+        $anchor = ! empty($candidates) ? (clone $candidates[0]) : $jS;
         foreach ($candidates as $c) {
-            if ($c->lt($anchor)) $anchor = (clone $c);
+            if ($c->lt($anchor)) {
+                $anchor = (clone $c);
+            }
         }
 
         $firstProdHistory = null;
@@ -2133,42 +2134,53 @@ class ReportController extends Controller
                 break;
             }
         }
-        $firstAnyHistory = !empty($history) ? $history[0]['start'] : null;
+        $firstAnyHistory = ! empty($history) ? $history[0]['start'] : null;
         $effectiveProductionStart = $firstProdHistory ?: $actualStartMs ?: $firstAnyHistory ?: $effectiveActualStart;
-        if (!$effectiveProductionStart) {
+        if (! $effectiveProductionStart) {
             $effectiveProductionStart = $effectiveActualStart ?: $anchor;
         }
 
         // Planned duration: prefer JobMaster plan_start/plan_end (matches JS engine in Input Harian),
         // fall back to ProductionPlan start_time/finish_time, then to actual times jS/jF.
-        $pS = $jS; $pF = $jF;
+        $pS = $jS;
+        $pF = $jF;
         if ($jobData && $jobData->plan_start && $jobData->plan_end) {
             $pps = $jobData->plan_start instanceof Carbon ? $jobData->plan_start : Carbon::parse($jobData->plan_start);
             $ppf = $jobData->plan_end instanceof Carbon ? $jobData->plan_end : Carbon::parse($jobData->plan_end);
-            $pS = $pps; $pF = $ppf;
+            $pS = $pps;
+            $pF = $ppf;
         } elseif ($planStart && $planFinish) {
-            $pS = $planStart; $pF = $planFinish;
+            $pS = $planStart;
+            $pF = $planFinish;
         }
         $plannedDurationSeconds = max(abs($pF->diffInSeconds($pS)), 1);
         $relativeDeadline = (clone $effectiveProductionStart)->addSeconds($plannedDurationSeconds);
 
         $earliestTimestamps = [];
-        if ($effectiveActualStart) $earliestTimestamps[] = $effectiveActualStart;
-        if ($hasDandori && $firstDandoriTime) $earliestTimestamps[] = $firstDandoriTime;
+        if ($effectiveActualStart) {
+            $earliestTimestamps[] = $effectiveActualStart;
+        }
+        if ($hasDandori && $firstDandoriTime) {
+            $earliestTimestamps[] = $firstDandoriTime;
+        }
         foreach ($history as $h) {
             $earliestTimestamps[] = $h['start'];
         }
 
-        $earliestActivity = !empty($earliestTimestamps) ? (clone $earliestTimestamps[0]) : $jS;
+        $earliestActivity = ! empty($earliestTimestamps) ? (clone $earliestTimestamps[0]) : $jS;
         foreach ($earliestTimestamps as $c) {
-            if ($c->lt($earliestActivity)) $earliestActivity = (clone $c);
+            if ($c->lt($earliestActivity)) {
+                $earliestActivity = (clone $c);
+            }
         }
 
         $lastPos = clone $earliestActivity;
         $totalBlueSeconds = 0;
 
         $appendBlue = function ($start, $end) use ($relativeDeadline, &$totalBlueSeconds) {
-            if ($end->lte($start)) return;
+            if ($end->lte($start)) {
+                return;
+            }
             if ($end->gt($relativeDeadline) && $start->lt($relativeDeadline)) {
                 $totalBlueSeconds += abs($relativeDeadline->diffInSeconds($start));
             } elseif ($start->gte($relativeDeadline)) {
@@ -2185,7 +2197,7 @@ class ReportController extends Controller
             if ($start->gt($lastPos)) {
                 $isInitialDandoriGap = $hasDandori && $firstDandoriTime
                     && $start->gt($firstDandoriTime)
-                    && (!$effectiveActualStart || $start->lte($effectiveActualStart));
+                    && (! $effectiveActualStart || $start->lte($effectiveActualStart));
 
                 if ($isInitialDandoriGap) {
                     $lastPos = clone $start;
@@ -2212,7 +2224,7 @@ class ReportController extends Controller
     public function asakaiReport(Request $request)
     {
         $inputDate = $request->query('date');
-        if (!$inputDate) {
+        if (! $inputDate) {
             $hour = (int) now()->format('H');
             $inputDate = ($hour < 8) ? now()->subDay()->toDateString() : now()->toDateString();
         } else {
@@ -2225,7 +2237,7 @@ class ReportController extends Controller
         $shift1Data = $this->buildAsakaiShiftData($shift1Date, 'Shift 1');
         $shift2Data = $this->buildAsakaiShiftData($shift2Date, 'Shift 2');
 
-                        // Build Sub-Assy and Spot data (Placeholders for structure)
+        // Build Sub-Assy and Spot data (Placeholders for structure)
         $subAssyLines = ['LINE 1', 'LINE 2', 'LINE 3', 'LINE 4', 'LINE 5', 'LINE 6', 'LINE 7', 'LINE 8', 'LINE 9', 'LINE 10', 'LINE 12', 'LINE 13', 'LINE 14', 'LAS CO'];
         $subAssyData = [];
         foreach ($subAssyLines as $saLine) {
@@ -2237,7 +2249,7 @@ class ReportController extends Controller
                 'actual' => 0,
                 'diff' => 0,
                 'issue' => '',
-                'dt' => 0
+                'dt' => 0,
             ];
         }
 
@@ -2247,7 +2259,7 @@ class ReportController extends Controller
             ['item' => 'LAS CO', 'target' => 0, 'plan' => 0, 'actual' => 0, 'diff' => 0, 'accum' => 0, 'issue' => ''],
         ];
 
-                return view('reports.asakai', [
+        return view('reports.asakai', [
             'reportDate' => $inputDate,
             'shift1Date' => $shift1Date,
             'shift2Date' => $shift2Date,
@@ -2261,15 +2273,15 @@ class ReportController extends Controller
     private function buildAsakaiShiftData(string $date, string $shiftPrefix)
     {
         $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
-            ->where(function($q) use ($shiftPrefix) {
+            ->where(function ($q) use ($shiftPrefix) {
                 if (str_contains($shiftPrefix, '1')) {
                     $q->where('shift_name', 'LIKE', '%1%')
-                      ->orWhere('shift_name', 'LIKE', '%Pagi%')
-                      ->orWhereNull('shift_name')
-                      ->orWhere('shift_name', '');
+                        ->orWhere('shift_name', 'LIKE', '%Pagi%')
+                        ->orWhereNull('shift_name')
+                        ->orWhere('shift_name', '');
                 } else {
                     $q->where('shift_name', 'LIKE', '%2%')
-                      ->orWhere('shift_name', 'LIKE', '%Malam%');
+                        ->orWhere('shift_name', 'LIKE', '%Malam%');
                 }
             })
             ->where(function ($q) {
@@ -2278,10 +2290,11 @@ class ReportController extends Controller
 
         $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
 
-        $jobNumbers = $plans->map(function($p) {
+        $jobNumbers = $plans->map(function ($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
         })->toArray();
 
         $jobMasters = \App\Models\JobMaster::whereIn('job_number', $jobNumbers)
@@ -2289,7 +2302,7 @@ class ReportController extends Controller
                 'dailyProduction' => function ($q) use ($date) {
                     $q->where('work_date', $date);
                 },
-                'downtimes'
+                'downtimes',
             ])
             ->get()
             ->keyBy('job_number');
@@ -2302,11 +2315,11 @@ class ReportController extends Controller
             if (in_array($jmUpper, $junkWords)) {
                 continue;
             }
-            
+
             // Assign to UNASSIGNED if press_name is null
             $rawLine = trim($plan->press_name ?? $plan->line_master_id ?? 'UNASSIGNED');
             $lineName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
-            if (!isset($lines[$lineName])) {
+            if (! isset($lines[$lineName])) {
                 $lines[$lineName] = [
                     'line_name' => $lineName,
                     'total_plan' => 0,
@@ -2320,17 +2333,17 @@ class ReportController extends Controller
                     'plan_gsph' => 0,
                     'actual_gsph' => 0,
                     'items' => [],
-                    'unachieved_items' => []
+                    'unachieved_items' => [],
                 ];
             }
-            
+
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
-            $jobNumber = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
-            
+            $jobNumber = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
+
             $jobMaster = $jobMasters->get($jobNumber);
             $planQty = (int) ($plan->plan ?? $plan->target_qty ?? 0);
-            
+
             $actualQty = 0;
             $actualRepair = 0;
             $actualReject = 0;
@@ -2339,9 +2352,9 @@ class ReportController extends Controller
                 $actualRepair = (int) ($jobMaster->dailyProduction->actual_repair ?? $jobMaster->dailyProduction->repair_qty ?? 0);
                 $actualReject = (int) ($jobMaster->dailyProduction->actual_reject ?? $jobMaster->dailyProduction->reject_qty ?? 0);
             }
-            
+
             $diff = $actualQty - $planQty;
-            
+
             $downtimeRecords = [];
             $downtimeMinutes = 0;
             if ($jobMaster && $jobMaster->downtimes) {
@@ -2353,11 +2366,11 @@ class ReportController extends Controller
                         'problem' => $dt->problem ?? '',
                         'penyebab' => $dt->penyebab ?? '',
                         'action' => $dt->action ?? '',
-                        'minutes' => $mins
+                        'minutes' => $mins,
                     ];
                 }
             }
-            
+
             $lines[$lineName]['total_plan'] += $planQty;
             if ($planQty > 0) {
                 $lines[$lineName]['count_plan'] += 1;
@@ -2370,10 +2383,10 @@ class ReportController extends Controller
             $lines[$lineName]['total_downtime'] += $downtimeMinutes;
             $lines[$lineName]['total_repair'] += $actualRepair;
             $lines[$lineName]['total_reject'] += $actualReject;
-            $lines[$lineName]['plan_gsph'] += (float)($plan->gsph_item ?? 0);
-            
+            $lines[$lineName]['plan_gsph'] += (float) ($plan->gsph_item ?? 0);
+
             if ($jobMaster && isset($jobMaster->actual_gsph)) {
-                $lines[$lineName]['actual_gsph'] += (float)$jobMaster->actual_gsph;
+                $lines[$lineName]['actual_gsph'] += (float) $jobMaster->actual_gsph;
             } else {
                 $lines[$lineName]['actual_gsph'] += ($actualQty > 0 ? $lines[$lineName]['plan_gsph'] * 0.9 : 0);
             }
@@ -2383,11 +2396,11 @@ class ReportController extends Controller
                 'plan' => $planQty,
                 'actual' => $actualQty,
                 'diff' => $diff,
-                'downtimes' => $downtimeRecords
+                'downtimes' => $downtimeRecords,
             ];
-            
+
             $lines[$lineName]['items'][] = $itemData;
-            
+
             if ($diff < 0) {
                 $lines[$lineName]['unachieved_items'][] = $itemData;
             }
@@ -2401,41 +2414,42 @@ class ReportController extends Controller
             ['item' => 'TRAFFIC ACCIDENT', 'target' => 0, 'actual' => 0, 'diff' => 0, 'issue' => ''],
         ];
 
-                // --- START OF AUTO ACCUMULATION LOGIC ---
+        // --- START OF AUTO ACCUMULATION LOGIC ---
         $dateObj = \Carbon\Carbon::parse($date);
         $startOfMonth = $dateObj->copy()->startOfMonth()->toDateString();
         $endOfDate = $dateObj->toDateString();
-        
+
         $accumData = [];
         // To be accurate with lines, we rely on the line filter or general aggregates
         // For simplicity since lines are 'A', 'B', 'C', 'D', we fetch daily productions in this month
         $monthlyPlans = \App\Models\ProductionPlan::whereBetween('plan_date', [$startOfMonth, $endOfDate])
             ->whereIn('row_type', ['job', 'break'])
             ->get();
-            
-        $monthlyJobNumbers = $monthlyPlans->map(function($p) {
+
+        $monthlyJobNumbers = $monthlyPlans->map(function ($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
         })->toArray();
-        
+
         $monthlyJMs = \App\Models\JobMaster::whereIn('job_number', $monthlyJobNumbers)
             ->with(['dailyProduction' => function ($q) use ($startOfMonth, $endOfDate) {
                 $q->whereBetween('work_date', [$startOfMonth, $endOfDate]);
             }])->get()->keyBy('job_number');
-            
+
         foreach ($monthlyPlans as $mp) {
             $rawLine = trim($mp->press_name ?? $mp->line_master_id ?? 'UNASSIGNED');
             $lName = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rawLine)));
-            
-            if (!isset($accumData[$lName])) {
+
+            if (! isset($accumData[$lName])) {
                 $accumData[$lName] = ['ok' => 0, 'repair' => 0, 'reject' => 0];
             }
-            
+
             $jn = trim($mp->job_no ?? '');
             $jm = trim($mp->job_master ?? '');
-            $mJobNumber = $jn ? ($jn . '-' . $mp->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $mp->id);
-            
+            $mJobNumber = $jn ? ($jn.'-'.$mp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$mp->id);
+
             $mjm = $monthlyJMs->get($mJobNumber);
             if ($mjm && $mjm->dailyProduction) {
                 $accumData[$lName]['ok'] += (int) $mjm->dailyProduction->actual_ok;
@@ -2449,36 +2463,36 @@ class ReportController extends Controller
         $repairData = [];
         $gsphData = [];
         $rejectData = [];
-        
+
         foreach ($lines as $lName => $lData) {
             // Target is generally fixed at 1.2% or 0.02% in Excel
             $actualRepPct = $lData['total_actual'] > 0 ? ($lData['total_repair'] / $lData['total_actual']) * 100 : 0;
             $actualRejPct = $lData['total_actual'] > 0 ? ($lData['total_reject'] / $lData['total_actual']) * 100 : 0;
-            
+
             $accOk = $accumData[$lName]['ok'] ?? 0;
             $accRep = $accumData[$lName]['repair'] ?? 0;
             $accRej = $accumData[$lName]['reject'] ?? 0;
-            
+
             $accumRepPct = $accOk > 0 ? ($accRep / $accOk) * 100 : 0;
             $accumRejPct = $accOk > 0 ? ($accRej / $accOk) * 100 : 0;
-            $accumCost   = $accRej * 50000;
-            
+            $accumCost = $accRej * 50000;
+
             $repairData[] = [
                 'line_name' => $lName,
                 'target' => 1.2,
                 'actual' => $actualRepPct,
                 'accum' => $accumRepPct,
-                'issue' => $lData['total_repair'] > 0 ? $lData['total_repair'].' item(s) diperbaiki' : ''
+                'issue' => $lData['total_repair'] > 0 ? $lData['total_repair'].' item(s) diperbaiki' : '',
             ];
-            
+
             $gsphData[] = [
                 'line_name' => $lName,
                 'target' => 0,
                 'plan' => $lData['plan_gsph'],
                 'actual' => $lData['actual_gsph'],
-                'diff' => $lData['actual_gsph'] - $lData['plan_gsph']
+                'diff' => $lData['actual_gsph'] - $lData['plan_gsph'],
             ];
-            
+
             $rejectData[] = [
                 'line_name' => $lName,
                 'target' => 0.02,
@@ -2486,7 +2500,7 @@ class ReportController extends Controller
                 'cost' => $lData['total_reject'] * 50000, // Cost formula derived from qty * avg cost
                 'accum' => $accumRejPct,
                 'accum_cost' => $accumCost,
-                'issue' => $lData['total_reject'] > 0 ? $lData['total_reject'].' item(s) reject' : ''
+                'issue' => $lData['total_reject'] > 0 ? $lData['total_reject'].' item(s) reject' : '',
             ];
         }
 
@@ -2495,7 +2509,7 @@ class ReportController extends Controller
             'repair' => $repairData,
             'gsph' => $gsphData,
             'reject' => $rejectData,
-            'lines' => array_values($lines)
+            'lines' => array_values($lines),
         ];
     }
 }
