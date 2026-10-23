@@ -3,11 +3,11 @@
 namespace App\Services;
 
 use App\Models\DailyProduction;
+use App\Models\Dandori;
 use App\Models\Downtime;
 use App\Models\JobMaster;
 use App\Models\LineMaster;
 use App\Models\ProductionPlan;
-use App\Models\Dandori;
 use App\Models\QCheck;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -34,10 +34,23 @@ class DashboardDetailService
             return [];
         }
 
+        // Scope to the latest shift revision for this press if multiple revisions exist
+        $shiftNames = $plans->pluck('shift_name')->filter()->unique();
+        if ($shiftNames->count() > 1) {
+            $latestShiftName = $plans->sortByDesc(fn ($p) => [
+                $p->updated_at ? $p->updated_at->timestamp : 0,
+                (int) $p->id,
+            ])->first()?->shift_name;
+            if ($latestShiftName) {
+                $plans = $plans->filter(fn ($p) => $p->shift_name === $latestShiftName)->values();
+            }
+        }
+
         $jobNumbers = $plans->map(function ($p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+
+            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
         })->toArray();
 
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
@@ -48,26 +61,26 @@ class DashboardDetailService
         foreach ($plans as $p) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
-            $identifier = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            $identifier = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
 
             if (! $jobMasters->has($identifier)) {
                 $insertJobs[] = [
-                    'job_number'  => $identifier,
-                    'job_name'    => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
-                    'line'        => $p->press_name ?? $lineName,
-                    'target_qty'  => (int) ($p->plan ?? 0),
+                    'job_number' => $identifier,
+                    'job_name' => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
+                    'line' => $p->press_name ?? $lineName,
+                    'target_qty' => (int) ($p->plan ?? 0),
                     'sequence_no' => $p->row_no ?? 1,
-                    'status'      => 'pending',
-                    'plan_start'  => $p->start_time ? Carbon::parse($date . ' ' . $p->start_time)->startOfMinute() : null,
-                    'plan_end'    => $p->finish_time ? Carbon::parse($date . ' ' . $p->finish_time)->startOfMinute() : null,
-                    'capacity'    => (int) ($p->qty_plt ?? 0),
-                    'created_at'  => now(),
-                    'updated_at'  => now(),
+                    'status' => 'pending',
+                    'plan_start' => $p->start_time ? Carbon::parse($date.' '.$p->start_time)->startOfMinute() : null,
+                    'plan_end' => $p->finish_time ? Carbon::parse($date.' '.$p->finish_time)->startOfMinute() : null,
+                    'capacity' => (int) ($p->qty_plt ?? 0),
+                    'created_at' => now(),
+                    'updated_at' => now(),
                 ];
             }
         }
 
-        if (!empty($insertJobs)) {
+        if (! empty($insertJobs)) {
             JobMaster::insertOrIgnore($insertJobs);
             $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
                 ->get()
@@ -81,13 +94,10 @@ class DashboardDetailService
             ->get()
             ->keyBy('job_master_id');
 
-        if ($dailyRecords->isEmpty()) {
-            $fallbackDate = Carbon::parse($workDate)->subDay()->toDateString();
-            $dailyRecords = DailyProduction::where('work_date', $fallbackDate)
-                ->whereIn('job_master_id', $jobIds)
-                ->get()
-                ->keyBy('job_master_id');
-        }
+        $sessionsMap = \App\Models\ProductionSession::whereIn('job_master_id', $jobIds)
+            ->where('work_date', $workDate)
+            ->get()
+            ->keyBy('job_master_id');
 
         $dandoriModels = Dandori::whereIn('next_job_id', $jobIds)->get();
 
@@ -110,42 +120,57 @@ class DashboardDetailService
             }
         }
 
-        $qcheckModels = QCheck::whereIn('job_master_id', $jobIds)
-            ->whereNotNull('start_time')
-            ->whereNotNull('finish_time')
-            ->get();
+        if (\Illuminate\Support\Facades\Schema::hasTable('q_checks')) {
+            $qcheckModels = QCheck::whereIn('job_master_id', $jobIds)
+                ->whereNotNull('start_time')
+                ->whereNotNull('finish_time')
+                ->get();
 
-        foreach ($qcheckModels as $qc) {
-            $firstCheckMinutes[$qc->job_master_id] = ($firstCheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
+            foreach ($qcheckModels as $qc) {
+                $firstCheckMinutes[$qc->job_master_id] = ($firstCheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
+            }
         }
 
         $downtimeData = Downtime::with('hambatanJalur')->whereIn('job_master_id', $jobIds)
-            ->whereNotNull('duration_seconds')
             ->get();
 
         $downtimeMinutes = [];
         $downtimeItems = [];
         foreach ($downtimeData as $dt) {
-            $jenis = strtolower($dt->jenis_downtime ?? '');
-            if (in_array($jenis, ['dandori', 'idle time', 'idle', 'break time'])) {
+            $typeUpper = strtoupper(trim($dt->jenis_downtime ?? ''));
+            if (ProductionMetricsService::isExcludedDowntimeType($typeUpper)) {
                 continue;
             }
-            $downtimeMinutes[$dt->job_master_id] = ($downtimeMinutes[$dt->job_master_id] ?? 0) + ($dt->duration_seconds / 60);
+
+            $durSeconds = 0.0;
+            if (! empty($dt->duration_seconds)) {
+                $durSeconds = (float) $dt->duration_seconds;
+            } elseif ($dt->finish_time && $dt->start_time) {
+                $durSeconds = (float) abs(Carbon::parse($dt->finish_time)->diffInSeconds(Carbon::parse($dt->start_time)));
+            } elseif ($dt->start_time) {
+                $durSeconds = (float) abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
+            }
+
+            if ($durSeconds <= 0) {
+                continue;
+            }
+
+            $downtimeMinutes[$dt->job_master_id] = ($downtimeMinutes[$dt->job_master_id] ?? 0) + ($durSeconds / 60);
 
             $startTimeFormatted = $dt->start_time ? Carbon::parse($dt->start_time)->format('H:i') : '-';
             $finishTimeFormatted = $dt->finish_time ? Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang';
             $downtimeItems[$dt->job_master_id][] = [
-                'id'              => $dt->id,
-                'jenis_downtime'  => strtoupper($dt->jenis_downtime ?: 'DOWNTIME'),
-                'problem'         => $dt->problem ?: '-',
-                'penyebab'        => $dt->penyebab ?: '-',
-                'tindakan'        => $dt->tindakan ?: '-',
-                'pic'             => $dt->pic ?: '-',
-                'start_time'      => $startTimeFormatted,
-                'finish_time'     => $finishTimeFormatted,
-                'duration_minute' => round($dt->duration_seconds / 60, 1),
-                'lhj_id'          => $dt->hambatanJalur?->id,
-                'lhj_status'      => $dt->hambatanJalur?->status,
+                'id' => $dt->id,
+                'jenis_downtime' => strtoupper($dt->jenis_downtime ?: 'DOWNTIME'),
+                'problem' => $dt->problem ?: '-',
+                'penyebab' => $dt->penyebab ?: '-',
+                'tindakan' => $dt->tindakan ?: ($dt->action ?: '-'),
+                'pic' => $dt->pic ?: '-',
+                'start_time' => $startTimeFormatted,
+                'finish_time' => $finishTimeFormatted,
+                'duration_minute' => round($durSeconds / 60, 1),
+                'lhj_id' => $dt->hambatanJalur?->id,
+                'lhj_status' => $dt->hambatanJalur?->status,
             ];
         }
 
@@ -159,27 +184,27 @@ class DashboardDetailService
         foreach ($repairRejectLogs as $rr) {
             $logType = strtolower(trim($rr->type ?? ''));
             $picName = $rr->creator?->name;
-            if (!$picName && !empty($rr->created_by)) {
+            if (! $picName && ! empty($rr->created_by)) {
                 $userRec = \App\Models\User::find($rr->created_by);
                 $picName = $userRec?->name;
             }
-            if (!$picName) {
+            if (! $picName) {
                 $picName = '-';
             }
 
             $timeFormatted = $rr->created_at ? Carbon::parse($rr->created_at)->format('H:i') : '-';
             $itemData = [
-                'id'              => $rr->id,
-                'type'            => strtoupper($logType),
-                'defect_name'     => $rr->defect_name ?: '-',
-                'qty'             => (int) ($rr->qty_a ?: 1),
+                'id' => $rr->id,
+                'type' => strtoupper($logType),
+                'defect_name' => $rr->defect_name ?: '-',
+                'qty' => (int) ($rr->qty_a ?: 1),
                 'repair_category' => $rr->repair_category ?: '-',
-                'area_problem'    => $rr->area_problem ?: '-',
-                'root_cause'      => $rr->root_cause ?: '-',
-                'countermeasure'  => $rr->countermeasure ?: '-',
-                'pic'             => $picName,
-                'time'            => $timeFormatted,
-                'images'          => $rr->images->map(fn ($i) => asset('uploads/' . $i->image_path))->values()->all(),
+                'area_problem' => $rr->area_problem ?: '-',
+                'root_cause' => $rr->root_cause ?: '-',
+                'countermeasure' => $rr->countermeasure ?: '-',
+                'pic' => $picName,
+                'time' => $timeFormatted,
+                'images' => $rr->images->map(fn ($i) => asset('uploads/'.$i->image_path))->values()->all(),
             ];
 
             if ($logType === 'repair') {
@@ -207,7 +232,7 @@ class DashboardDetailService
             $no++;
             $jn = trim($plan->job_no ?? '');
             $jm = trim($plan->job_master ?? '');
-            $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+            $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
 
             $job = $jobMasters->get($identifier);
             $daily = $job ? ($dailyRecords->get($job->id) ?? null) : null;
@@ -219,13 +244,13 @@ class DashboardDetailService
             }
 
             // Juga deteksi jika ada split item yang memiliki split_group sama
-            if (!empty($plan->split_group)) {
-                $siblingSplits = $plans->filter(fn($p) => $p->id !== $plan->id && $p->split_group === $plan->split_group);
+            if (! empty($plan->split_group)) {
+                $siblingSplits = $plans->filter(fn ($p) => $p->id !== $plan->id && $p->split_group === $plan->split_group);
                 $children = $children->merge($siblingSplits);
             }
 
             // Atau jika ada baris berurutan dengan JOB NO & JOB MASTER yang sama persis di line & shift ini
-            $sameJobs = $plans->filter(fn($p) => $p->id !== $plan->id && !empty($p->parent_job_id) && $p->parent_job_id === $plan->id);
+            $sameJobs = $plans->filter(fn ($p) => $p->id !== $plan->id && ! empty($p->parent_job_id) && $p->parent_job_id === $plan->id);
             $children = $children->merge($sameJobs)->unique('id');
 
             // Akumulasi Plan Qty
@@ -237,24 +262,34 @@ class DashboardDetailService
                 $planQty = (int) $plan->original_plan;
             }
 
-            // Akumulasi Actual Qty dari parent & children
-            $actualQty = $daily ? (int) $daily->actual_qty : 0;
-            $actualOk = $daily ? (int) $daily->actual_ok : 0;
-            $actualRepair = $daily ? (int) ($daily->actual_repair ?? 0) : 0;
-            $actualReject = $daily ? (int) ($daily->actual_reject ?? 0) : 0;
+            // Akumulasi Actual Qty dari parent & children (fallback ke plan actual jika DailyProduction belum ada)
+            $actualQty = $daily ? (int) $daily->actual_qty : (int) ($plan->ok ?? 0);
+            $actualOk = $daily ? (int) $daily->actual_ok : (int) ($plan->ok ?? 0);
+            $actualRepair = $daily ? (int) ($daily->actual_repair ?? 0) : (int) ($plan->repair ?? 0);
+            $actualReject = $daily ? (int) ($daily->actual_reject ?? 0) : (int) ($plan->reject ?? 0);
+            $runtimeSeconds = $daily ? (float) ($daily->runtime_seconds ?? 0) : 0.0;
 
             $jobId = $job?->id;
+            if ($runtimeSeconds <= 0 && $job) {
+                $session = $sessionsMap->get($job->id);
+                if ($session) {
+                    $runtimeSeconds = (float) ($session->total_seconds ?? 0);
+                    if ($session->status === 'running' && $session->start_time) {
+                        $runtimeSeconds += abs(Carbon::now()->diffInSeconds(Carbon::parse($session->start_time)));
+                    }
+                }
+            }
             $dandori = $jobId ? round($dandoriMinutes[$jobId] ?? 0, 1) : 0;
             $iqCheck = $jobId ? round($firstCheckMinutes[$jobId] ?? 0, 1) : 0;
             $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 1) : 0;
 
-            $isRunning = $job && in_array(strtolower($job->status), ['running', 'paused']);
+            $isRunning = $job && in_array(strtolower((string) $job->status), ['running', 'paused'], true);
             $latestFinishedAt = $job?->finished_at ? Carbon::parse($job->finished_at) : null;
 
             foreach ($children as $c) {
                 $cjn = trim($c->job_no ?? '');
                 $cjm = trim($c->job_master ?? '');
-                $cIdent = $cjn ? ($cjn . '-' . $c->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cjm) . '-' . $c->id);
+                $cIdent = $cjn ? ($cjn.'-'.$c->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$c->id);
                 $cJob = $jobMasters->get($cIdent);
                 if ($cJob) {
                     $cDaily = $dailyRecords->get($cJob->id);
@@ -263,18 +298,24 @@ class DashboardDetailService
                         $actualOk += (int) $cDaily->actual_ok;
                         $actualRepair += (int) ($cDaily->actual_repair ?? 0);
                         $actualReject += (int) ($cDaily->actual_reject ?? 0);
+                        $runtimeSeconds += (float) ($cDaily->runtime_seconds ?? 0);
+                    } else {
+                        $actualQty += (int) ($c->ok ?? 0);
+                        $actualOk += (int) ($c->ok ?? 0);
+                        $actualRepair += (int) ($c->repair ?? 0);
+                        $actualReject += (int) ($c->reject ?? 0);
                     }
                     $cJobId = $cJob->id;
                     $dandori += round($dandoriMinutes[$cJobId] ?? 0, 1);
                     $iqCheck += round($firstCheckMinutes[$cJobId] ?? 0, 1);
                     $downtime += round($downtimeMinutes[$cJobId] ?? 0, 1);
 
-                    if (in_array(strtolower($cJob->status), ['running', 'paused'])) {
+                    if (in_array(strtolower((string) $cJob->status), ['running', 'paused'], true)) {
                         $isRunning = true;
                     }
                     if ($cJob->finished_at) {
                         $cFin = Carbon::parse($cJob->finished_at);
-                        if (!$latestFinishedAt || $cFin->gt($latestFinishedAt)) {
+                        if (! $latestFinishedAt || $cFin->gt($latestFinishedAt)) {
                             $latestFinishedAt = $cFin;
                         }
                     }
@@ -282,7 +323,13 @@ class DashboardDetailService
             }
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
-            $pressTime = $ctDetik > 0 ? round(($actualQty * $ctDetik) / 60, 1) : 0;
+            if ($ctDetik > 0) {
+                $pressTime = round(($actualQty * $ctDetik) / 60, 1);
+            } elseif ($runtimeSeconds > 0) {
+                $pressTime = round($runtimeSeconds / 60, 1);
+            } else {
+                $pressTime = 0;
+            }
             $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
 
             // GSPH Actual: Total QTY Good / TPT * 60
@@ -297,7 +344,7 @@ class DashboardDetailService
                 }
             }
 
-            $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : '-';
+            $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : ($plan->act_finish ? substr((string) $plan->act_finish, 0, 5) : '-');
 
             $allDtList = [];
             $allRepairList = [];
@@ -317,7 +364,7 @@ class DashboardDetailService
             foreach ($children as $c) {
                 $cjn = trim($c->job_no ?? '');
                 $cjm = trim($c->job_master ?? '');
-                $cIdent = $cjn ? ($cjn . '-' . $c->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cjm) . '-' . $c->id);
+                $cIdent = $cjn ? ($cjn.'-'.$c->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$c->id);
                 $cJob = $jobMasters->get($cIdent);
                 if ($cJob) {
                     $cJobId = $cJob->id;
@@ -334,31 +381,31 @@ class DashboardDetailService
             }
 
             $rows[] = [
-                'no'               => $no,
-                'job_master_id'    => $jobId,
-                'is_running'       => $isRunning,
-                'job_number'       => $plan->job_no ?? '-',
-                'job_name'         => $plan->job_master ?? ($job?->job_name ?? '-'),
-                'p1'               => (bool) (($plan->p1 ?? false) ?: ($plan->a1 > 0) ?: ($plan->total_mesin >= 1)),
-                'p2'               => (bool) (($plan->p2 ?? false) ?: ($plan->a2 > 0) ?: ($plan->total_mesin >= 2)),
-                'p3'               => (bool) (($plan->p3 ?? false) ?: ($plan->a3 > 0) ?: ($plan->total_mesin >= 3)),
-                'p4'               => (bool) (($plan->p4 ?? false) ?: ($plan->a4 > 0) ?: ($plan->total_mesin >= 4)),
-                'plan_qty'         => $planQty,
-                'good'             => $actualOk,
-                'repair'           => $actualRepair,
-                'repair_list'      => $allRepairList,
-                'reject'           => $actualReject,
-                'reject_list'      => $allRejectList,
-                'press_time'       => $pressTime,
-                'dandori'          => $dandori,
-                'iq_check'         => $iqCheck,
-                'downtime'         => $downtime,
-                'downtime_list'    => $allDtList,
-                'tpt'              => $tpt,
-                'plan_finish'      => $planFinish ?: '-',
-                'actual_finish'    => $actualFinish,
-                'gsph_plan'        => (float) ($plan->gsph_item ?? 0),
-                'gsph_actual'      => $gsphActual,
+                'no' => $no,
+                'job_master_id' => $jobId,
+                'is_running' => $isRunning,
+                'job_number' => $plan->job_no ?? '-',
+                'job_name' => $plan->job_master ?? ($job?->job_name ?? '-'),
+                'p1' => (bool) (($plan->p1 ?? false) ?: ($plan->a1 > 0) ?: ($plan->total_mesin >= 1)),
+                'p2' => (bool) (($plan->p2 ?? false) ?: ($plan->a2 > 0) ?: ($plan->total_mesin >= 2)),
+                'p3' => (bool) (($plan->p3 ?? false) ?: ($plan->a3 > 0) ?: ($plan->total_mesin >= 3)),
+                'p4' => (bool) (($plan->p4 ?? false) ?: ($plan->a4 > 0) ?: ($plan->total_mesin >= 4)),
+                'plan_qty' => $planQty,
+                'good' => $actualOk,
+                'repair' => $actualRepair,
+                'repair_list' => $allRepairList,
+                'reject' => $actualReject,
+                'reject_list' => $allRejectList,
+                'press_time' => $pressTime,
+                'dandori' => $dandori,
+                'iq_check' => $iqCheck,
+                'downtime' => $downtime,
+                'downtime_list' => $allDtList,
+                'tpt' => $tpt,
+                'plan_finish' => $planFinish ?: '-',
+                'actual_finish' => $actualFinish,
+                'gsph_plan' => (float) ($plan->gsph_item ?? 0),
+                'gsph_actual' => $gsphActual,
             ];
         }
 
@@ -374,15 +421,24 @@ class DashboardDetailService
     }
 
     protected static array $plansCache = [];
+
     protected static ?Collection $allLineMasters = null;
+
     protected static array $resolvedDates = [];
+
+    public static function flushCache(): void
+    {
+        self::$plansCache = [];
+        self::$allLineMasters = null;
+        self::$resolvedDates = [];
+    }
 
     /**
      * Baris job untuk tanggal + shift tertentu (dimemoize agar tidak query berulang per line).
      */
     private function getPlansForDateAndShift(string $date, bool $isMorning)
     {
-        $cacheKey = $date . '_' . ($isMorning ? '1' : '2');
+        $cacheKey = $date.'_'.($isMorning ? '1' : '2');
         if (isset(self::$plansCache[$cacheKey])) {
             return self::$plansCache[$cacheKey];
         }
@@ -391,21 +447,28 @@ class DashboardDetailService
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')
-                      ->orWhere('shift_name', 'like', '%1%');
+                        ->orWhere(function ($sq) {
+                            $sq->where('shift_name', 'like', '%1%')
+                                ->where('shift_name', 'not like', '%Malam%');
+                        });
                 } else {
                     $q->where('shift_name', 'like', '%Malam%')
-                      ->orWhere('shift_name', 'like', '%2%');
+                        ->orWhere(function ($sq) {
+                            $sq->where('shift_name', 'like', '%2%')
+                                ->where('shift_name', 'not like', '%Pagi%');
+                        });
                 }
             })
             ->where('row_type', 'job')
             ->where(function ($q) {
                 $q->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                  ->orWhereNull('job_no');
+                    ->orWhereNull('job_no');
             })
             ->orderBy('row_no')
             ->get();
 
         self::$plansCache[$cacheKey] = $plans;
+
         return $plans;
     }
 
@@ -456,6 +519,7 @@ class DashboardDetailService
 
         if ($hasJobs) {
             self::$resolvedDates[$date] = $date;
+
             return $date;
         }
 

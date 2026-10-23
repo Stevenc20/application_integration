@@ -2,18 +2,22 @@
 
 namespace App\Services;
 
-use App\Models\LineMaster;
-use App\Models\JobMaster;
 use App\Models\Dandori;
 use App\Models\Downtime;
+use App\Models\JobMaster;
+use App\Models\LineMaster;
 use App\Models\ProductionSession;
 
 class LineStatusService
 {
-    public static function getStatuses(int $shift = 1): array
+    public static function getStatuses(int $shift = 1, ?string $date = null): array
     {
-        $shiftText = $shift === 1 ? 'Shift Pagi' : 'Shift Malam';
+        $h = (int) now()->format('H');
+        $m = (int) now()->format('i');
+        $timeInMin = $h * 60 + $m;
+        $activeWorkDate = $date ?: (($timeInMin < 450) ? now()->subDay()->toDateString() : now()->toDateString());
         $today = now()->toDateString();
+
         $activeLines = LineMaster::where('status', 'active')
             ->select('line_name')->distinct()->pluck('line_name');
 
@@ -21,30 +25,36 @@ class LineStatusService
             return [];
         }
 
-        // 1. All running/paused jobs grouped by line
+        // 1. All running/paused jobs grouped by normalized line key
         // Only consider jobs that belong to active plans on the current work date
-        $allRunningJobs = JobMaster::whereIn('line', $activeLines)
-            ->whereIn('status', ['running', 'paused'])
+        $allRunningJobsRaw = JobMaster::whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(status)'), ['running', 'paused'])
             ->get();
 
-        // Verify and filter out any orphaned running jobs that no longer exist in ProductionPlan for today
         $validRunningJobs = collect();
-        foreach ($allRunningJobs as $job) {
+        foreach ($allRunningJobsRaw as $job) {
             $plan = $job->production_plan;
-            $planDateStr = $plan && $plan->plan_date ? ($plan->plan_date instanceof \Carbon\Carbon ? $plan->plan_date->toDateString() : (string)$plan->plan_date) : null;
-            if (!$plan || $planDateStr !== $today) {
-                // Dangling/orphaned job from previous plan upload - auto close
-                $nowTs = now();
-                Downtime::where('job_master_id', $job->id)->whereNull('finish_time')->update(['finish_time' => $nowTs]);
-                Dandori::where('next_job_id', $job->id)->whereNull('finish_time')->update(['finish_time' => $nowTs]);
-                ProductionSession::where('job_master_id', $job->id)->where('status', 'running')->update(['status' => 'finished', 'finish_time' => $nowTs]);
-                $job->update(['status' => 'closed', 'finished_at' => $nowTs]);
+            $planDateStr = $plan && $plan->plan_date
+                ? ($plan->plan_date instanceof \Carbon\Carbon ? $plan->plan_date->toDateString() : substr((string) $plan->plan_date, 0, 10))
+                : null;
+
+            // Accept job if its plan matches activeWorkDate or today, or if it has an active session/daily on activeWorkDate
+            if ($plan && in_array($planDateStr, [$activeWorkDate, $today], true)) {
+                $validRunningJobs->push($job);
+
                 continue;
             }
-            $validRunningJobs->push($job);
+
+            if (! $plan) {
+                $hasTodayActivity = \App\Models\DailyProduction::where('job_master_id', $job->id)
+                    ->whereIn('work_date', [$activeWorkDate, $today])
+                    ->exists();
+                if ($hasTodayActivity) {
+                    $validRunningJobs->push($job);
+                }
+            }
         }
 
-        $allRunningJobs = $validRunningJobs->groupBy('line');
+        $jobsByNormalizedLine = $validRunningJobs->groupBy(fn ($job) => self::normalizeLineKey($job->line));
         $allJobIds = $validRunningJobs->pluck('id');
 
         // 2. Active downtimes (machine/process issues) across all jobs
@@ -52,7 +62,9 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $activeDowntimeJobIds = Downtime::whereIn('job_master_id', $allJobIds)
                 ->whereNull('finish_time')
-                ->whereNotIn('jenis_downtime', ['dandori', 'try out', 'tryout', 'break time'])
+                ->whereNotIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(COALESCE(jenis_downtime, "")))'), [
+                    'dandori', 'try out', 'tryout', 'break time', 'break', 'istirahat', '1st check', '1st_check', 'qcheck', 'q check',
+                ])
                 ->pluck('job_master_id')
                 ->toArray();
         }
@@ -62,7 +74,7 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $activeBreakJobIds = Downtime::whereIn('job_master_id', $allJobIds)
                 ->whereNull('finish_time')
-                ->where('jenis_downtime', 'break time')
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(COALESCE(jenis_downtime, "")))'), ['break time', 'break', 'istirahat'])
                 ->pluck('job_master_id')
                 ->toArray();
         }
@@ -72,7 +84,7 @@ class LineStatusService
         if ($allJobIds->isNotEmpty()) {
             $activeTryoutJobIds = Downtime::whereIn('job_master_id', $allJobIds)
                 ->whereNull('finish_time')
-                ->whereIn('jenis_downtime', ['try out', 'tryout'])
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(COALESCE(jenis_downtime, "")))'), ['try out', 'tryout'])
                 ->pluck('job_master_id')
                 ->toArray();
         }
@@ -87,67 +99,114 @@ class LineStatusService
                 ->toArray();
         }
 
-        // 6. Active dandoris across all running jobs (split 1st check vs setup)
+        // 6. Active dandoris & QCheck across all running jobs (split 1st check vs setup)
+        $firstCheckJobIds = [];
+        $setupJobIds = [];
         $linesWithFirstCheck = [];
         $linesWithSetup = [];
-        $allDandoris = collect();
         if ($allJobIds->isNotEmpty()) {
             $allDandoris = Dandori::whereIn('next_job_id', $allJobIds->toArray())
                 ->whereNull('finish_time')
                 ->get();
-        }
 
-        foreach ($allDandoris as $d) {
-            if (strtolower($d->jenis_dandori ?? '') === '1st_check' || strtolower($d->jenis_dandori ?? '') === '1st check') {
-                $linesWithFirstCheck[] = $d->line;
-            } else {
-                $linesWithSetup[] = $d->line;
+            foreach ($allDandoris as $d) {
+                $jenis = strtolower(trim($d->jenis_dandori ?? ''));
+                $act = strtoupper(trim($d->activity ?? ''));
+                $normLine = self::normalizeLineKey($d->line);
+                if ($jenis === '1st_check' || $jenis === '1st check' || $act === '1ST CHECK') {
+                    if ($d->next_job_id) {
+                        $firstCheckJobIds[] = $d->next_job_id;
+                    }
+                    if ($normLine !== '') {
+                        $linesWithFirstCheck[] = $normLine;
+                    }
+                } else {
+                    if ($d->next_job_id) {
+                        $setupJobIds[] = $d->next_job_id;
+                    }
+                    if ($normLine !== '') {
+                        $linesWithSetup[] = $normLine;
+                    }
+                }
+            }
+
+            $openDandoriDowntimes = Downtime::whereIn('job_master_id', $allJobIds->toArray())
+                ->whereNull('finish_time')
+                ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(COALESCE(jenis_downtime, "")))'), ['dandori', '1st check', '1st_check', 'qcheck', 'q check'])
+                ->get();
+
+            foreach ($openDandoriDowntimes as $ddt) {
+                $dtType = strtolower(trim($ddt->jenis_downtime ?? ''));
+                if (in_array($dtType, ['1st check', '1st_check', 'qcheck', 'q check'], true)) {
+                    $firstCheckJobIds[] = $ddt->job_master_id;
+                } else {
+                    $setupJobIds[] = $ddt->job_master_id;
+                }
+            }
+
+            if (\Illuminate\Support\Facades\Schema::hasTable('q_checks')) {
+                $openQChecks = \App\Models\QCheck::whereIn('job_master_id', $allJobIds->toArray())
+                    ->whereNotNull('start_time')
+                    ->whereNull('finish_time')
+                    ->pluck('job_master_id')
+                    ->toArray();
+                $firstCheckJobIds = array_merge($firstCheckJobIds, $openQChecks);
             }
         }
 
         $statuses = [];
         foreach ($activeLines as $line) {
-            $lineJobIds = $allRunningJobs->get($line, collect())->pluck('id')->toArray();
+            $normLine = self::normalizeLineKey($line);
+            $lineJobs = $jobsByNormalizedLine->get($normLine, collect());
+            $lineJobIds = $lineJobs->pluck('id')->toArray();
 
             // 1. DOWNTIME (machine/process issue)
             if (array_intersect($lineJobIds, $activeDowntimeJobIds)) {
                 $statuses[$line] = ['label' => 'DOWNTIME', 'color' => 'red', 'pulse' => true];
+
                 continue;
             }
 
             // 2. BREAKTIME
             if (array_intersect($lineJobIds, $activeBreakJobIds)) {
                 $statuses[$line] = ['label' => 'BREAKTIME', 'color' => 'yellow', 'pulse' => true];
+
                 continue;
             }
 
             // 3. TRYOUT
             if (array_intersect($lineJobIds, $activeTryoutJobIds)) {
                 $statuses[$line] = ['label' => 'TRYOUT', 'color' => 'blue', 'pulse' => true];
+
                 continue;
             }
 
             // 4. 1ST CHECK
-            if (in_array($line, $linesWithFirstCheck)) {
+            if (array_intersect($lineJobIds, $firstCheckJobIds) || in_array($normLine, $linesWithFirstCheck, true)) {
                 $statuses[$line] = ['label' => '1ST CHECK', 'color' => 'purple', 'pulse' => true];
+
                 continue;
             }
 
             // 5. SETUP (non-1st-check dandori)
-            if (in_array($line, $linesWithSetup)) {
+            if (array_intersect($lineJobIds, $setupJobIds) || in_array($normLine, $linesWithSetup, true)) {
                 $statuses[$line] = ['label' => 'SETUP', 'color' => 'amber', 'pulse' => true];
+
                 continue;
             }
 
-            // 6. PRODUCTION (running session)
-            if (array_intersect($lineJobIds, $activeSessionJobIds)) {
+            // 6. PRODUCTION (running session, or running job with started_at and no open pause/downtime)
+            $hasRunningJob = $lineJobs->contains(fn ($j) => strtolower((string) $j->status) === 'running' && ! empty($j->started_at));
+            if (array_intersect($lineJobIds, $activeSessionJobIds) || $hasRunningJob) {
                 $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
+
                 continue;
             }
 
             // 7. Running/paused job exists but no activity
-            if (!empty($lineJobIds)) {
+            if (! empty($lineJobIds)) {
                 $statuses[$line] = ['label' => 'NOT RUNNING', 'color' => 'gray', 'pulse' => false];
+
                 continue;
             }
 
@@ -156,5 +215,13 @@ class LineStatusService
         }
 
         return $statuses;
+    }
+
+    public static function normalizeLineKey(?string $value): string
+    {
+        $normalized = strtoupper(trim((string) $value));
+        $normalized = preg_replace('/^(PRESS|LINE)\s+/', '', $normalized);
+
+        return preg_replace('/[\s\-_.]+/', '', $normalized);
     }
 }

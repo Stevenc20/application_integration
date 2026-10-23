@@ -966,7 +966,7 @@ function fetchData(){
     Promise.all([
         fetch(`${MON_API_DATA}?date=${date}&shift=${shift}`).then(r=>r.json()),
         fetch(`${MON_API_DETAIL}?date=${date}&shift=${shift}`).then(r=>r.json()),
-        fetch(`${MON_API_STATUS}`).then(r=>r.json()),
+        fetch(`${MON_API_STATUS}?date=${date}&shift=${shift}`).then(r=>r.json()),
     ]).then(([kpi,det,sts])=>{
         const h=JSON.stringify(kpi.line_kpi)+JSON.stringify(kpi.line_meta)+JSON.stringify(det.detail)+JSON.stringify(sts.line_statuses);
         if(h===LAST_HASH) return;
@@ -986,12 +986,27 @@ function fetchData(){
     });
 }
 
+function normLineKey(v){
+    return String(v||'').toUpperCase().trim().replace(/^(PRESS|LINE)\s+/,'').replace(/[\s\-_.]+/g,'');
+}
+
+function resolveObjByLine(obj, line){
+    if(!obj) return undefined;
+    if(obj[line] !== undefined) return obj[line];
+    const target = normLineKey(line);
+    for(const k of Object.keys(obj)){
+        if(normLineKey(k) === target) return obj[k];
+    }
+    return undefined;
+}
+
 function kv(line,desc){
-    for(const k of(LINE_KPI[line]||[])) if(k.desc===desc) return k;
+    const arr = resolveObjByLine(LINE_KPI, line) || [];
+    for(const k of arr) if(k.desc===desc) return k;
     return null;
 }
 
-function meta(line,k){ return (LINE_META[line]||{})[k]||'-' }
+function meta(line,k){ return (resolveObjByLine(LINE_META, line)||{})[k]||'-' }
 
 function noPlan(line){
     const jp = meta(line,'jobPlan');
@@ -1334,7 +1349,7 @@ function updateAllCells(){
         if(!cell)return;
         const isLast = (li === LINES.length - 1);
         const borderCls = isLast ? '' : ' line-border-r';
-        const s=LINE_STATUSES[line];
+        const s=resolveObjByLine(LINE_STATUSES, line);
         if(s){
             const l=(s.label||'NOT RUNNING').toUpperCase();
             const cls=(l==='RUNNING'||l==='PRODUCTION'?'status-running':l==='BREAK'||l==='BREAKTIME'?'status-break':l==='DOWNTIME'||l==='TROUBLE'?'status-downtime':l==='TRYOUT'?'status-tryout':l==='1ST CHECK'?'status-1stcheck':l==='SETUP'?'status-setup':l==='IDLE'?'status-idle':'status-not-running') + borderCls;
@@ -1378,7 +1393,7 @@ function renderTable(){
 
     // ── SINGLE LINE (A/B/C/D) ──
     const line=selectedLine;
-    const lineKey = LINES.find(l => l === line || l === `PRESS ${line}` || l.endsWith(` ${line}`)) || line;
+    const lineKey = LINES.find(l => normLineKey(l) === normLineKey(line)) || line;
 
     // Calculate percentage
     const qtyKpi = kv(lineKey, 'QTY');
@@ -1387,7 +1402,7 @@ function renderTable(){
     const pct = planVal > 0 ? ((actVal / planVal) * 100).toFixed(2) : '0.00';
 
     const leftRows = ['JOB','QTY','GSPH','STROKE','REPAIR','REJECT','TOTAL_DT','DIES_T','PROD_T','MACH_T','MAT_T','LOG_T','OVERTIME'];
-    const rightRows = LINE_DETAIL[lineKey] || [];
+    const rightRows = resolveObjByLine(LINE_DETAIL, lineKey) || [];
 
     // CASE A: No detail jobs scheduled -> Make KPI table take 100% full width to prevent empty columns on the right
     if (rightRows.length === 0) {
@@ -1473,7 +1488,7 @@ function renderTable(){
         });
 
         // STATUS
-        const st = LINE_STATUSES[lineKey];
+        const st = resolveObjByLine(LINE_STATUSES, lineKey);
         let statusVal = '—';
         let statusClass = 'status-not-running';
         if (st) {
@@ -1568,7 +1583,7 @@ function renderTable(){
 
 
     // Build right side HTML (handled inside renderCaseB with fit/pagination)
-    const st = LINE_STATUSES[lineKey];
+    const st = resolveObjByLine(LINE_STATUSES, lineKey);
     let statusVal = '—';
     let statusClass = 'status-not-running';
     if (st) {

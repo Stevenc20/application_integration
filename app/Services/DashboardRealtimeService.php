@@ -31,7 +31,7 @@ class DashboardRealtimeService
 
         $shiftStartDt = $shift === 1
             ? Carbon::parse($date)->setTime(7, 30)
-            : Carbon::parse($date)->subDay()->setTime(21, 0);
+            : Carbon::parse($date)->setTime(21, 0);
         $shiftEndDt = $shift === 1
             ? Carbon::parse($date)->setTime(21, 0)
             : Carbon::parse($date)->addDay()->setTime(7, 30);
@@ -45,6 +45,18 @@ class DashboardRealtimeService
 
         if ($plans->isEmpty()) {
             return $this->emptyMetrics($lineName);
+        }
+
+        // Scope to the latest shift revision for this press if multiple revisions exist
+        $shiftNames = $plans->pluck('shift_name')->filter()->unique();
+        if ($shiftNames->count() > 1) {
+            $latestShiftName = $plans->sortByDesc(fn ($p) => [
+                $p->updated_at ? $p->updated_at->timestamp : 0,
+                (int) $p->id,
+            ])->first()?->shift_name;
+            if ($latestShiftName) {
+                $plans = $plans->filter(fn ($p) => $p->shift_name === $latestShiftName)->values();
+            }
         }
 
         $jobNumbers = $plans->map(function ($p) {
@@ -104,34 +116,28 @@ class DashboardRealtimeService
             ->whereIn('job_master_id', $jobIds)
             ->get();
 
-        if ($dailyRecords->isEmpty()) {
-            $fallbackDate = Carbon::parse($workDate)->subDay()->toDateString();
-            $dailyRecords = DailyProduction::with('jobMaster')
-                ->where('work_date', $fallbackDate)
-                ->whereIn('job_master_id', $jobIds)
-                ->get();
-        }
-
         $activeJobIds = $dailyRecords->pluck('job_master_id')->toArray();
         $missingJobs = $jobMasters->whereNotIn('id', $activeJobIds);
 
         if ($missingJobs->isNotEmpty()) {
             $missingJobIds = $missingJobs->pluck('id')->toArray();
 
-            // 1 query to get all existing dailies
-            $existingDailiesMap = DailyProduction::whereIn('job_master_id', $missingJobIds)
+            // 1 query to get existing dailies strictly for this work_date
+            $existingDailiesMap = DailyProduction::where('work_date', $workDate)
+                ->whereIn('job_master_id', $missingJobIds)
                 ->get()
                 ->keyBy('job_master_id');
 
-            // Find which jobs actually have no daily at all
+            // Find which jobs actually have no daily for this work_date
             $stillMissingIds = array_diff($missingJobIds, $existingDailiesMap->keys()->toArray());
 
             $logAggMap = collect();
             $downtimeSecsMap = collect();
 
             if (! empty($stillMissingIds)) {
-                // 1 query to aggregate production logs for all missing jobs
+                // 1 query to aggregate production logs for all missing jobs on this work_date
                 $logAggMap = \App\Models\ProductionLog::whereIn('job_master_id', $stillMissingIds)
+                    ->whereDate('created_at', $workDate)
                     ->groupBy('job_master_id')
                     ->selectRaw('job_master_id, COALESCE(SUM(ok_qty),0) as total_ok, COALESCE(SUM(repair_qty),0) as total_repair, COALESCE(SUM(reject_qty),0) as total_reject')
                     ->get()
@@ -157,14 +163,19 @@ class DashboardRealtimeService
                 } else {
                     $logAgg = $logAggMap->get($mj->id);
                     $dtSecs = (int) ($downtimeSecsMap->get($mj->id) ?? 0);
+                    $matchedPlan = $plansByIdentifier[$mj->job_number ?? ''] ?? null;
+
+                    $virtualOk = (int) ($logAgg?->total_ok ?? ($matchedPlan?->ok ?? 0));
+                    $virtualRepair = (int) ($logAgg?->total_repair ?? ($matchedPlan?->repair ?? 0));
+                    $virtualReject = (int) ($logAgg?->total_reject ?? ($matchedPlan?->reject ?? 0));
 
                     $virtual = new DailyProduction([
                         'job_master_id' => $mj->id,
                         'work_date' => $workDate,
-                        'actual_ok' => (int) ($logAgg?->total_ok ?? 0),
-                        'actual_qty' => (int) ($logAgg?->total_ok ?? 0),
-                        'actual_repair' => (int) ($logAgg?->total_repair ?? 0),
-                        'actual_reject' => (int) ($logAgg?->total_reject ?? 0),
+                        'actual_ok' => $virtualOk,
+                        'actual_qty' => $virtualOk,
+                        'actual_repair' => $virtualRepair,
+                        'actual_reject' => $virtualReject,
                         'runtime_seconds' => 0,
                         'downtime_seconds' => $dtSecs,
                         'line' => $lineName,
@@ -185,7 +196,7 @@ class DashboardRealtimeService
         $reject = (int) $dailyRecords->sum('actual_reject');
 
         $runningRecord = $dailyRecords->first(function ($dp) {
-            return $dp->jobMaster && in_array($dp->jobMaster->status, ['running', 'paused']);
+            return $dp->jobMaster && in_array(strtolower((string) $dp->jobMaster->status), ['running', 'paused'], true);
         });
 
         if (! $runningRecord) {
@@ -202,7 +213,9 @@ class DashboardRealtimeService
             })->first();
         }
 
-        $hasRunning = $runningRecord !== null && $runningRecord->jobMaster && $runningRecord->jobMaster->status === 'running';
+        $hasRunning = $runningRecord !== null
+            && $runningRecord->jobMaster
+            && in_array(strtolower((string) $runningRecord->jobMaster->status), ['running', 'paused'], true);
         $currOk = $hasRunning ? (int) $runningRecord->actual_ok : 0;
         $currRepair = $hasRunning ? (int) $runningRecord->actual_repair : 0;
         $currReject = $hasRunning ? (int) $runningRecord->actual_reject : 0;
@@ -217,7 +230,8 @@ class DashboardRealtimeService
         foreach ($dailyRecords as $dp) {
             $dpRuntime = (float) $dp->runtime_seconds;
             if ($dpRuntime <= 0 && $dp->jobMaster) {
-                if ($dp->jobMaster->status === 'running') {
+                $jmStatus = strtolower((string) $dp->jobMaster->status);
+                if ($jmStatus === 'running') {
                     $session = $sessionsMap->get($dp->job_master_id);
                     if ($session && $session->start_time) {
                         $dpRuntime = (float) $session->total_seconds;
@@ -227,7 +241,7 @@ class DashboardRealtimeService
                     } elseif ($dp->jobMaster->started_at) {
                         $dpRuntime = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
                     }
-                } elseif ($dp->jobMaster->status === 'paused') {
+                } elseif ($jmStatus === 'paused') {
                     $session = $sessionsMap->get($dp->job_master_id);
                     $dpRuntime = (float) ($session->total_seconds ?? 0);
                 } elseif ($dp->jobMaster->started_at) {
@@ -404,7 +418,7 @@ class DashboardRealtimeService
                 'countermeasure' => $rr->countermeasure ?: '-',
                 'pic' => $picName,
                 'time' => $timeFormatted,
-                'images' => $rr->images->map(fn ($i) => asset('uploads/' . $i->image_path))->values()->all(),
+                'images' => $rr->images->map(fn ($i) => asset('uploads/'.$i->image_path))->values()->all(),
             ];
 
             if ($logType === 'repair') {
@@ -526,6 +540,17 @@ class DashboardRealtimeService
             })
             ->get();
 
+        $qcheckByJob = [];
+        if (\Illuminate\Support\Facades\Schema::hasTable('q_checks')) {
+            $qcheckModels = \App\Models\QCheck::whereIn('job_master_id', $jobIds)
+                ->whereNotNull('start_time')
+                ->whereNotNull('finish_time')
+                ->get();
+            foreach ($qcheckModels as $qc) {
+                $qcheckByJob[$qc->job_master_id] = ($qcheckByJob[$qc->job_master_id] ?? 0.0) + (float) ($qc->duration ?? 0);
+            }
+        }
+
         $dandoriTotalMinutes = 0.0;
         $currDandoriMinutes = 0.0;
         foreach ($dandoriModels as $d) {
@@ -537,6 +562,12 @@ class DashboardRealtimeService
             $dandoriTotalMinutes += $dur;
             if ($runningRecord && $d->next_job_id === $runningRecord->job_master_id) {
                 $currDandoriMinutes += $dur;
+            }
+        }
+        foreach ($qcheckByJob as $qcJobId => $qcDur) {
+            $dandoriTotalMinutes += $qcDur;
+            if ($runningRecord && (int) $qcJobId === (int) $runningRecord->job_master_id) {
+                $currDandoriMinutes += $qcDur;
             }
         }
         $dandoriTotalMinutes = round($dandoriTotalMinutes, 1);
@@ -561,7 +592,7 @@ class DashboardRealtimeService
         foreach ($ordered as $dp) {
             $jm = $dp->jobMaster;
             $isRunningJob = $runningJobId && $dp->job_master_id == $runningJobId;
-            $hasStarted = ! empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
+            $hasStarted = ! empty($jm->started_at) || in_array(strtolower((string) $jm->status), ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed'], true);
             $hasProgress = ((int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject) > 0;
             // Include if processed up to running: include all before running that are processed or started; include running if it exists
             if ($isRunningJob) {
@@ -581,7 +612,7 @@ class DashboardRealtimeService
         if (empty($includedJobIds)) {
             foreach ($ordered as $dp) {
                 $jm = $dp->jobMaster;
-                $hasStarted = ! empty($jm->started_at) || in_array($jm->status, ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed']);
+                $hasStarted = ! empty($jm->started_at) || in_array(strtolower((string) $jm->status), ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed'], true);
                 $hasProgress = ((int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject) > 0;
                 if ($hasStarted || $hasProgress) {
                     $includedJobIds[] = $dp->job_master_id;
@@ -608,7 +639,8 @@ class DashboardRealtimeService
             }
             $dpRuntime = (float) $dp->runtime_seconds;
             if ($dpRuntime <= 0 && $dp->jobMaster) {
-                if ($dp->jobMaster->status === 'running') {
+                $jmStatus = strtolower((string) $dp->jobMaster->status);
+                if ($jmStatus === 'running') {
                     $session = $sessionsMap->get($dp->job_master_id);
                     if ($session && $session->start_time) {
                         $dpRuntime = (float) $session->total_seconds;
@@ -618,7 +650,7 @@ class DashboardRealtimeService
                     } elseif ($dp->jobMaster->started_at) {
                         $dpRuntime = abs(\Carbon\Carbon::now()->diffInSeconds(\Carbon\Carbon::parse($dp->jobMaster->started_at)));
                     }
-                } elseif ($dp->jobMaster->status === 'paused') {
+                } elseif ($jmStatus === 'paused') {
                     $session = $sessionsMap->get($dp->job_master_id);
                     $dpRuntime = (float) ($session->total_seconds ?? 0);
                 } elseif ($dp->jobMaster->started_at) {
@@ -648,6 +680,11 @@ class DashboardRealtimeService
                 if ($dur > 0) {
                     $dandoriCumMinutes += $dur;
                 }
+            }
+        }
+        foreach ($qcheckByJob as $qcJobId => $qcDur) {
+            if (in_array($qcJobId, $includedJobIds) && $qcDur > 0) {
+                $dandoriCumMinutes += $qcDur;
             }
         }
         $dandoriCumMinutes = round($dandoriCumMinutes, 1);
@@ -750,10 +787,38 @@ class DashboardRealtimeService
 
         $uniqueBasePlans = $plans->filter(fn ($p) => empty($p->parent_job_id));
         $totalJobs = $uniqueBasePlans->count();
-        $parentJobIds = $uniqueBasePlans->pluck('id')->filter()->toArray();
 
         // Finished jobs: count unique base plans whose parent or child jobs are finished
-        $finishedJobs = $dailyRecords->filter(fn ($dp) => $dp->jobMaster && in_array(strtolower($dp->jobMaster->status), ['finished', 'complete', 'closed']))->count();
+        $finishedStatuses = ['finished', 'complete', 'completed', 'closed', 'done'];
+        $finishedBaseCount = 0;
+        foreach ($uniqueBasePlans as $bp) {
+            $bjn = trim($bp->job_no ?? '');
+            $bjm = trim($bp->job_master ?? '');
+            $bIdent = $bjn ? ($bjn.'-'.$bp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($bjm).'-'.$bp->id);
+            $bJob = $jobMasters->get($bIdent);
+            $isBaseFinished = ($bJob && in_array(strtolower((string) $bJob->status), $finishedStatuses, true))
+                || in_array(strtolower((string) $bp->status), $finishedStatuses, true);
+
+            if (! $isBaseFinished) {
+                $childPlans = $plans->filter(fn ($cp) => ! empty($cp->parent_job_id) && (int) $cp->parent_job_id === (int) $bp->id);
+                foreach ($childPlans as $cp) {
+                    $cjn = trim($cp->job_no ?? '');
+                    $cjm = trim($cp->job_master ?? '');
+                    $cIdent = $cjn ? ($cjn.'-'.$cp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$cp->id);
+                    $cJob = $jobMasters->get($cIdent);
+                    if (($cJob && in_array(strtolower((string) $cJob->status), $finishedStatuses, true))
+                        || in_array(strtolower((string) $cp->status), $finishedStatuses, true)) {
+                        $isBaseFinished = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($isBaseFinished) {
+                $finishedBaseCount++;
+            }
+        }
+        $finishedJobs = $finishedBaseCount;
         if ($totalJobs > 0 && $finishedJobs > $totalJobs) {
             $finishedJobs = $totalJobs;
         }
@@ -887,10 +952,16 @@ class DashboardRealtimeService
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')
-                        ->orWhere('shift_name', 'like', '%1%');
+                        ->orWhere(function ($sq) {
+                            $sq->where('shift_name', 'like', '%1%')
+                                ->where('shift_name', 'not like', '%Malam%');
+                        });
                 } else {
                     $q->where('shift_name', 'like', '%Malam%')
-                        ->orWhere('shift_name', 'like', '%2%');
+                        ->orWhere(function ($sq) {
+                            $sq->where('shift_name', 'like', '%2%')
+                                ->where('shift_name', 'not like', '%Pagi%');
+                        });
                 }
             })
             ->where('row_type', 'job')
