@@ -291,22 +291,26 @@
             to { transform: translateY(-2px); }
         }
 
-        /* Dark mode Downtime Rows: Nuansa gelap tegas/pekat (dark slate-charcoal) */
+        /* Dark mode Downtime Rows: Nuansa olive/kuning gelap dengan teks kuning muda */
         body.dark .dt-row-bg td:not([class*="bg-"]) {
-            background-color: #0b1120 !important; /* Gelap pekat (sangat kontras dengan cell merah alert) */
-            color: #94a3b8 !important; /* Muted slate text agar angka/label non-downtime tidak menusuk mata */
+            background-color: #1c1f0a !important; /* Olive gelap */
+            color: #facc15 !important; /* Kuning muda */
             font-weight: 700 !important;
         }
         body.dark .dt-row-bg td.desc-cell {
-            background-color: #0f172a !important; /* Deep dark slate-900 */
-            color: #cbd5e1 !important;
+            background-color: #272b12 !important; /* Olive lebih terang sedikit untuk label */
+            color: #fbbf24 !important; /* Kuning muda kontras */
             font-weight: 800 !important;
         }
         body.dark .dt-row-bg:nth-child(even) td:not([class*="bg-"]) {
-            background-color: #080d1a !important; /* Striping gelap pekat */
+            background-color: #15170a !important; /* Olive lebih gelap untuk striping */
         }
         body.dark .dt-row-bg:nth-child(even) td.desc-cell {
-            background-color: #0c1322 !important;
+            background-color: #21230f !important;
+        }
+        body.dark .dt-row-bg td:not([class*="bg-"]) {
+            border-top-color: rgba(250, 204, 21, 0.25) !important;
+            border-bottom-color: rgba(250, 204, 21, 0.25) !important;
         }
 
         /* Saat ada downtime (cell merah), buat merah menyala terang berbingkai kontras tinggi */
