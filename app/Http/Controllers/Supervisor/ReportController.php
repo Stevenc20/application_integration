@@ -966,9 +966,27 @@ class ReportController extends Controller
 
             // Once signed, strictly use the locked signer identity (or deterministic audit trail for historical records).
             // Never use auth()->user() so viewing LKH or regenerating PDF as another user never changes the signer name.
-            $identity = $sigRecord
-                ? SignatureScopeNormalizer::resolveSignatureIdentity($sigRecord)
-                : SignatureScopeNormalizer::resolveHistoricalSignerIdentity($role, (string) $date, $scopeLine, (string) $latestShiftName);
+            if ($sigRecord) {
+                $identity = SignatureScopeNormalizer::resolveSignatureIdentity($sigRecord);
+                // Persist backfilled real identity onto historical signature records if missing or still holding a seeded placeholder
+                if (
+                    $identity['name'] !== '' &&
+                    (
+                        trim((string) $sigRecord->signer_name) === '' ||
+                        in_array((string) $sigRecord->signer_name, SignatureScopeNormalizer::seedDummyNames(), true)
+                    ) &&
+                    ! in_array($identity['name'], SignatureScopeNormalizer::seedDummyNames(), true)
+                ) {
+                    \App\Models\Signature::whereKey($sigRecord->id)->update([
+                        'signed_by_user_id' => $identity['user_id'] ?? $sigRecord->signed_by_user_id,
+                        'signer_name' => $identity['name'],
+                        'signer_role' => $identity['role'] ?: $sigRecord->signer_role,
+                        'signed_at' => $sigRecord->signed_at ?? $sigRecord->created_at ?? now(),
+                    ]);
+                }
+            } else {
+                $identity = SignatureScopeNormalizer::resolveHistoricalSignerIdentity($role, (string) $date, $scopeLine, (string) $latestShiftName);
+            }
 
             $resolvedName = $identity['name'] ?? '';
             $assignedNames[$role] = $resolvedName;

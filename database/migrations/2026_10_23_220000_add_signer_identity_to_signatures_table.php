@@ -58,26 +58,31 @@ return new class extends Migration
             return;
         }
 
-        $signatures = Signature::whereNull('signer_name')->get();
+        $seedNames = SignatureScopeNormalizer::seedDummyNames();
+        $signatures = Signature::whereNull('signer_name')
+            ->orWhereIn('signer_name', $seedNames)
+            ->get();
+
         foreach ($signatures as $sig) {
             $resolved = SignatureScopeNormalizer::resolveHistoricalSignerIdentity(
                 (string) $sig->role,
                 (string) $sig->work_date,
                 (string) ($sig->line_name ?? ''),
-                (string) ($sig->shift_name ?? '')
+                (string) ($sig->shift_name ?? ''),
+                $sig->updated_at ?? $sig->created_at
             );
 
             $updates = [];
             if ($sig->signed_at === null && $sig->created_at !== null) {
                 $updates['signed_at'] = $sig->created_at;
             }
-            if ($resolved['user_id'] !== null && $sig->signed_by_user_id === null) {
+            if ($resolved['user_id'] !== null && ($sig->signed_by_user_id === null || in_array($sig->signer_name, $seedNames, true))) {
                 $updates['signed_by_user_id'] = $resolved['user_id'];
             }
-            if ($resolved['name'] !== '' && ($sig->signer_name === null || $sig->signer_name === '')) {
+            if ($resolved['name'] !== '' && ($sig->signer_name === null || $sig->signer_name === '' || in_array($sig->signer_name, $seedNames, true))) {
                 $updates['signer_name'] = $resolved['name'];
             }
-            if ($resolved['role'] !== '' && ($sig->signer_role === null || $sig->signer_role === '')) {
+            if ($resolved['role'] !== '' && ($sig->signer_role === null || $sig->signer_role === '' || in_array($sig->signer_name, $seedNames, true))) {
                 $updates['signer_role'] = $resolved['role'];
             }
 

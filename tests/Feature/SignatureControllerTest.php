@@ -1094,4 +1094,97 @@ describe('LKH Signer Identity Lock (23 October 2026 Bugfix)', function () {
             ->and($posTlName)->toBeLessThan($posFmName)
             ->and($posFmName)->toBeLessThan($posSpvName);
     });
+
+    test('resolves Sapriadi (Supervisor) and Giyono (Team Leader) over seeded Eko Supervisor / Candra Leader on 23 October 2026', function () {
+        $line = sigCreateLineMaster('PRESS A');
+        sigMakePlan($line, '2026-10-23');
+        lkhGrantFeature('supervisor');
+        lkhGrantFeature('foreman');
+        lkhGrantFeature('leader');
+
+        // Seeded default dummy users created first (lowest IDs, just like DatabaseSeeder)
+        $candraSeeded = User::create([
+            'name' => 'Candra Leader',
+            'nrp' => '3456',
+            'password' => 'password',
+            'role' => 'leader a',
+            'is_active' => 1,
+        ]);
+        $dediSeeded = User::create([
+            'name' => 'Dedi Foreman',
+            'nrp' => '4567',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $ekoSeeded = User::create([
+            'name' => 'Eko Supervisor',
+            'nrp' => '5678',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+
+        // Real operational users created after seeder
+        $giyonoLeader = User::create([
+            'name' => 'Giyono',
+            'nrp' => 'TL-GIYONO',
+            'password' => 'password',
+            'role' => 'leader',
+            'is_active' => 1,
+        ]);
+        $sapriadiSpv = User::create([
+            'name' => 'Sapriadi',
+            'nrp' => 'SPV-SAPRIADI',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+
+        // Historical signatures created on 2026-10-23 before migration (or where seeded Eko was previously backfilled)
+        $tlSig = Signature::create([
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature_data' => 'data:image/png;base64,GIYONO_SIG',
+        ]);
+        $fmSig = Signature::create([
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature_data' => 'data:image/png;base64,FM_SIG',
+        ]);
+        $spvSig = Signature::create([
+            'role' => 'supervisor',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature_data' => 'data:image/png;base64,SAPRIADI_SIG',
+            'signed_by_user_id' => $ekoSeeded->id,
+            'signer_name' => 'Eko Supervisor',
+            'signer_role' => 'supervisor',
+        ]);
+
+        // Even when opened by Eko Supervisor or Dedi Foreman, LKH displays Giyono and Sapriadi
+        $response = $this->actingAs($ekoSeeded)
+            ->get(route('supervisor.reports.daily_production', [
+                'date' => '2026-10-23',
+                'line' => 'PRESS A',
+                'shift' => 'Shift Pagi',
+            ]))
+            ->assertOk();
+
+        $sigStatus = $response->viewData('signatureStatus');
+        expect($sigStatus['teamleader']['name'])->toBe('Giyono')
+            ->and($sigStatus['supervisor']['name'])->toBe('Sapriadi')
+            ->and($sigStatus['supervisor']['name'])->not->toBe('Eko Supervisor');
+
+        // And the DB record is self-healed to lock Sapriadi & Giyono permanently
+        expect($tlSig->fresh()->signer_name)->toBe('Giyono')
+            ->and($tlSig->fresh()->signed_by_user_id)->toBe($giyonoLeader->id)
+            ->and($spvSig->fresh()->signer_name)->toBe('Sapriadi')
+            ->and($spvSig->fresh()->signed_by_user_id)->toBe($sapriadiSpv->id);
+    });
 });

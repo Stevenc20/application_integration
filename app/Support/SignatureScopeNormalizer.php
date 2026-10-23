@@ -203,18 +203,32 @@ class SignatureScopeNormalizer
      *
      * @return array{user_id: int|null, name: string, role: string}
      */
-    public static function resolveHistoricalSignerIdentity(string $sigRole, string $workDate, string $lineName, string $shiftName): array
-    {
+    public static function resolveHistoricalSignerIdentity(
+        string $sigRole,
+        string $workDate,
+        string $lineName,
+        string $shiftName,
+        ?\Carbon\CarbonInterface $signatureTimestamp = null
+    ): array {
         $roleKey = strtolower(trim($sigRole));
         $targetLine = self::normalizeLine($lineName);
         $targetShift = self::normalizeShift($shiftName);
         $numericShift = (int) $targetShift;
+
+        // 0. Exact HTTP Audit Trail: NetworkAccessLog on POST signature/save matching role & timestamp
+        if (\Illuminate\Support\Facades\Schema::hasTable('network_access_logs')) {
+            $logIdentity = self::resolveSignerFromNetworkLog($roleKey, $workDate, $signatureTimestamp);
+            if ($logIdentity !== null) {
+                return $logIdentity;
+            }
+        }
 
         $lineMasterIds = \App\Models\LineMaster::all()->filter(function ($lm) use ($targetLine) {
             return self::normalizeLine((string) $lm->line_name) === $targetLine;
         })->pluck('id');
 
         $assignment = self::findAssignmentForScope($lineName, $shiftName);
+        $seedNames = self::seedDummyNames();
 
         if ($roleKey === 'teamleader') {
             // 1. Audit trail: ShiftSubmission (lock shift) on that exact line, date, and shift
@@ -246,9 +260,9 @@ class SignatureScopeNormalizer
                 ];
             }
 
-            // 3. LkhCorrection on that line + date + shift by a leader user
+            // 3. Operational Audit Trail on that line + date + shift: Dandori, JobFinishReason, LkhCorrection
             if ($lineMasterIds->isNotEmpty() && $workDate !== '') {
-                $planIds = \App\Models\ProductionPlan::whereIn('line_master_id', $lineMasterIds)
+                $plansOnScope = \App\Models\ProductionPlan::whereIn('line_master_id', $lineMasterIds)
                     ->whereDate('plan_date', $workDate)
                     ->get()
                     ->filter(function ($p) use ($targetShift) {
@@ -258,10 +272,11 @@ class SignatureScopeNormalizer
                         $pShift = $p->shift_name ? self::normalizeShift((string) $p->shift_name) : '1';
 
                         return $pShift === $targetShift;
-                    })
-                    ->pluck('id');
+                    });
 
-                if ($planIds->isNotEmpty()) {
+                $planIds = $plansOnScope->pluck('id');
+
+                if ($planIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('lkh_corrections')) {
                     $leaderCorrection = \App\Models\LkhCorrection::with('editor')
                         ->whereIn('plan_id', $planIds)
                         ->latest('edited_at')
@@ -280,19 +295,57 @@ class SignatureScopeNormalizer
                         ];
                     }
                 }
+
+                if ($planIds->isNotEmpty() && \Illuminate\Support\Facades\Schema::hasTable('job_finish_reasons')) {
+                    $finishReason = \App\Models\JobFinishReason::with('user')
+                        ->whereIn('production_plan_id', $planIds)
+                        ->whereNotNull('user_id')
+                        ->latest('id')
+                        ->get()
+                        ->first(function ($jfr) {
+                            $r = strtolower((string) ($jfr->user?->role ?? ''));
+
+                            return str_starts_with($r, 'leader') || in_array($r, ['teamleader', 'group leader']);
+                        });
+
+                    if ($finishReason && $finishReason->user) {
+                        return [
+                            'user_id' => (int) $finishReason->user->id,
+                            'name' => (string) $finishReason->user->name,
+                            'role' => (string) $finishReason->user->role,
+                        ];
+                    }
+                }
             }
 
-            // 4. Line-specific leader role (e.g. 'leader a', 'leader b', 'leader c', 'leader d')
+            // 4. Line-specific leader role (prefer real user over seeded dummy user)
             if ($targetLine !== '') {
                 $leaderRole = 'leader '.strtolower($targetLine);
-                $leaderUser = \App\Models\User::whereRaw('LOWER(role) = ?', [$leaderRole])->first();
-                if ($leaderUser) {
+                $leaderUsers = \App\Models\User::whereRaw('LOWER(role) = ?', [$leaderRole])
+                    ->orderByDesc('id')
+                    ->get();
+                $realLeader = $leaderUsers->first(fn ($u) => ! in_array($u->name, $seedNames, true));
+                if ($realLeader) {
                     return [
-                        'user_id' => (int) $leaderUser->id,
-                        'name' => (string) $leaderUser->name,
-                        'role' => (string) $leaderUser->role,
+                        'user_id' => (int) $realLeader->id,
+                        'name' => (string) $realLeader->name,
+                        'role' => (string) $realLeader->role,
                     ];
                 }
+            }
+
+            // 5. General leader role fallback (prefer real user over seeded dummy user)
+            $generalLeaders = \App\Models\User::where(function ($q) {
+                $q->whereRaw("LOWER(role) LIKE 'leader%'")
+                    ->orWhereRaw("LOWER(role) IN ('teamleader', 'group leader')");
+            })->orderByDesc('id')->get();
+            $realGeneralLeader = $generalLeaders->first(fn ($u) => ! in_array($u->name, $seedNames, true)) ?? $generalLeaders->first();
+            if ($realGeneralLeader) {
+                return [
+                    'user_id' => (int) $realGeneralLeader->id,
+                    'name' => (string) $realGeneralLeader->name,
+                    'role' => (string) $realGeneralLeader->role,
+                ];
             }
 
             return ['user_id' => null, 'name' => '', 'role' => ''];
@@ -340,8 +393,11 @@ class SignatureScopeNormalizer
                 ];
             }
 
-            // 3. Single Foreman user fallback (only if unambiguous / configured)
-            $foremanUser = \App\Models\User::whereRaw('LOWER(role) = ?', ['foreman'])->first();
+            // 3. Foreman user fallback (prefer real user over seeded 'Dedi Foreman')
+            $foremanUsers = \App\Models\User::whereRaw('LOWER(role) = ?', ['foreman'])
+                ->orderByDesc('id')
+                ->get();
+            $foremanUser = $foremanUsers->first(fn ($u) => ! in_array($u->name, $seedNames, true)) ?? $foremanUsers->first();
             if ($foremanUser) {
                 return [
                     'user_id' => (int) $foremanUser->id,
@@ -363,8 +419,11 @@ class SignatureScopeNormalizer
                 ];
             }
 
-            // 2. Supervisor user fallback
-            $supervisorUser = \App\Models\User::whereRaw('LOWER(role) IN (?, ?)', ['supervisor', 'spv'])->first();
+            // 2. Supervisor user fallback (prefer real user like Sapriadi over seeded 'Eko Supervisor')
+            $supervisorUsers = \App\Models\User::whereRaw('LOWER(role) IN (?, ?)', ['supervisor', 'spv'])
+                ->orderByDesc('id')
+                ->get();
+            $supervisorUser = $supervisorUsers->first(fn ($u) => ! in_array($u->name, $seedNames, true)) ?? $supervisorUsers->first();
             if ($supervisorUser) {
                 return [
                     'user_id' => (int) $supervisorUser->id,
@@ -400,16 +459,20 @@ class SignatureScopeNormalizer
             $role = $role !== '' ? $role : (string) $signerUser->role;
         }
 
-        if ($name === '') {
+        $seedNames = self::seedDummyNames();
+        if ($name === '' || in_array($name, $seedNames, true)) {
             $historical = self::resolveHistoricalSignerIdentity(
                 (string) $signature->role,
                 (string) $signature->work_date,
                 (string) ($signature->line_name ?? ''),
-                (string) ($signature->shift_name ?? '')
+                (string) ($signature->shift_name ?? ''),
+                $signature->updated_at ?? $signature->created_at
             );
-            $name = $historical['name'];
-            $userId = $userId ?? $historical['user_id'];
-            $role = $role !== '' ? $role : $historical['role'];
+            if ($historical['name'] !== '' && (! in_array($historical['name'], $seedNames, true) || $name === '')) {
+                $name = $historical['name'];
+                $userId = $historical['user_id'] ?? $userId;
+                $role = $historical['role'] !== '' ? $historical['role'] : $role;
+            }
         }
 
         return [
@@ -417,6 +480,87 @@ class SignatureScopeNormalizer
             'name' => $name,
             'role' => $role,
             'signed_at' => $signedAt,
+        ];
+    }
+
+    /**
+     * Match exact POST /signature/save request in NetworkAccessLog to identify the user who clicked saveSignature.
+     *
+     * @return array{user_id: int, name: string, role: string}|null
+     */
+    private static function resolveSignerFromNetworkLog(
+        string $roleKey,
+        string $workDate,
+        ?\Carbon\CarbonInterface $signatureTimestamp = null
+    ): ?array {
+        $query = \App\Models\NetworkAccessLog::with('user')
+            ->where('method', 'POST')
+            ->where('endpoint', 'like', '%signature/save%')
+            ->where('response_status', 200)
+            ->whereNotNull('user_id');
+
+        if ($signatureTimestamp) {
+            $startWindow = $signatureTimestamp->copy()->subSeconds(30);
+            $endWindow = $signatureTimestamp->copy()->addSeconds(30);
+            $logs = (clone $query)->whereBetween('created_at', [$startWindow, $endWindow])
+                ->orderByDesc('created_at')
+                ->get();
+
+            foreach ($logs as $log) {
+                if ($log->user && self::userMatchesSignatureRole($log->user, $roleKey)) {
+                    return [
+                        'user_id' => (int) $log->user->id,
+                        'name' => (string) $log->user->name,
+                        'role' => (string) $log->user->role,
+                    ];
+                }
+            }
+        }
+
+        if ($workDate !== '') {
+            $logsOnDate = (clone $query)->whereDate('created_at', $workDate)
+                ->orderByDesc('created_at')
+                ->get();
+
+            foreach ($logsOnDate as $log) {
+                if ($log->user && self::userMatchesSignatureRole($log->user, $roleKey)) {
+                    return [
+                        'user_id' => (int) $log->user->id,
+                        'name' => (string) $log->user->name,
+                        'role' => (string) $log->user->role,
+                    ];
+                }
+            }
+        }
+
+        return null;
+    }
+
+    private static function userMatchesSignatureRole(\App\Models\User $user, string $sigRole): bool
+    {
+        $userRole = strtolower((string) $user->role);
+
+        return match ($sigRole) {
+            'teamleader' => str_starts_with($userRole, 'leader') || in_array($userRole, ['leader', 'teamleader', 'group leader'], true),
+            'foreman' => $userRole === 'foreman',
+            'supervisor' => in_array($userRole, ['supervisor', 'spv'], true),
+            default => false,
+        };
+    }
+
+    /**
+     * Known default dummy names from DatabaseSeeder that should never take precedence over real users.
+     *
+     * @return list<string>
+     */
+    public static function seedDummyNames(): array
+    {
+        return [
+            'Candra Leader',
+            'Fajar Leader A',
+            'Guntur Leader B',
+            'Dedi Foreman',
+            'Eko Supervisor',
         ];
     }
 }
