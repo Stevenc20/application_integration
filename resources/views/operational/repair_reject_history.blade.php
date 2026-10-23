@@ -203,12 +203,12 @@
                                     @foreach($log->images->take(3) as $img)
                                         <img src="{{ asset('uploads/' . $img->image_path) }}" 
                                              onerror="this.src='/images/no-image.png'"
-                                             onclick='openImagePreview(@json($log->images->pluck('image_path')->map(fn($p) => asset("storage/".$p))->toArray()))'
+                                             onclick='openImagePreview(@json($log->images->pluck('image_path')->map(fn($p) => asset("uploads/".$p))->toArray()))'
                                              class="inline-block h-8 w-8 rounded-lg ring-2 ring-white object-cover cursor-pointer hover:scale-110 hover:z-10 transition duration-200" 
                                              alt="Defect image">
                                     @endforeach
                                     @if($log->images->count() > 3)
-                                        <div onclick='openImagePreview(@json($log->images->pluck("image_path")->map(fn($p) => asset("storage/".$p))->toArray()))'
+                                        <div onclick='openImagePreview(@json($log->images->pluck("image_path")->map(fn($p) => asset("uploads/".$p))->toArray()))'
                                              class="flex items-center justify-center h-8 w-8 rounded-lg ring-2 ring-white bg-slate-100 text-[10px] font-black text-slate-500 cursor-pointer hover:bg-slate-200 transition">
                                              +{{ $log->images->count() - 3 }}
                                         </div>

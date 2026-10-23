@@ -3489,6 +3489,9 @@ window.loadRRList = function (jobId) {
                         <span class="text-[9px] font-mono text-slate-500">${log.time}</span>
                     </div>
                     <p class="text-xs font-black text-white leading-none truncate" title="${log.defect_name}">${log.defect_name}</p>
+                    ${log.images && log.images.length > 0
+                        ? `<a href="${log.images[0]}" target="_blank" rel="noopener" class="block mt-1" title="Lihat foto evidence"><img src="${log.images[0]}" alt="Foto evidence" class="w-full h-16 object-cover rounded-lg border border-white/10"></a>`
+                        : `<span class="mt-1 text-[9px] font-bold text-amber-400">Tanpa foto</span>`}
                     <div class="flex items-center justify-between mt-1">
                         <span class="text-[10px] font-black ${isRepair ? 'text-orange-400' : 'text-red-400'}">Qty: ${log.qty_a}</span>
                         <span class="text-[9px] text-slate-500">${log.operator}</span>
@@ -3817,6 +3820,10 @@ window.submitRRModalForm = async function (event) {
 
         // Append actual selected files from our custom arrays (both part and tooling)
         const allFiles = [...(window.rrSelectedPartFiles || []), ...(window.rrSelectedToolingFiles || [])];
+        if (allFiles.length === 0) {
+            showToast('Minimal 1 foto evidence Part wajib diunggah.', 'danger');
+            return;
+        }
         allFiles.forEach(file => {
             formData.append('images[]', file);
         });
@@ -3852,7 +3859,12 @@ window.submitRRModalForm = async function (event) {
             } else {
                 const text = await resp.text();
                 console.error('R&R server error [' + resp.status + ']:', text);
-                showToast('Server error (' + resp.status + '): ' + text.substring(0, 200), 'danger');
+                let message = text;
+                try {
+                    const parsed = JSON.parse(text);
+                    message = parsed.errors?.images?.[0] || parsed.message || text;
+                } catch (e) {}
+                showToast(resp.status === 422 ? message : 'Server error (' + resp.status + '): ' + message.substring(0, 200), 'danger');
                 return;
             }
 

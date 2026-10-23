@@ -150,7 +150,7 @@ class DashboardDetailService
         }
 
         // ── REPAIR & REJECT LOGS ──
-        $repairRejectLogs = \App\Models\RepairRejectLog::with('creator')
+        $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'images'])
             ->whereIn('job_master_id', $jobIds)
             ->get();
 
@@ -179,6 +179,7 @@ class DashboardDetailService
                 'countermeasure'  => $rr->countermeasure ?: '-',
                 'pic'             => $picName,
                 'time'            => $timeFormatted,
+                'images'          => $rr->images->map(fn ($i) => asset('uploads/' . $i->image_path))->values()->all(),
             ];
 
             if ($logType === 'repair') {

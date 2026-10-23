@@ -10,8 +10,9 @@ use App\Models\LineMaster;
 use App\Models\ShiftSubmission;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 
 class RepairRejectController extends Controller
 {
@@ -109,6 +110,59 @@ class RepairRejectController extends Controller
 
 
     /**
+     * Simpan file foto evidence ke public/uploads dan catat ke repair_reject_images.
+     * Melempar ValidationException agar record tidak tersimpan tanpa foto.
+     */
+    private function saveUploadedImages(RepairRejectLog $log, array $files): int
+    {
+        $saved = 0;
+        $writtenPaths = [];
+
+        try {
+            foreach ($files as $file) {
+                $originalName = $file->getClientOriginalName();
+                $safeName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
+                $relPath = 'repair_reject/' . $log->id . '/' . $safeName;
+                $absPath = public_path('uploads/' . $relPath);
+                $dir = dirname($absPath);
+                if (!is_dir($dir)) {
+                    mkdir($dir, 0755, true);
+                }
+                copy($file->getRealPath(), $absPath);
+                if (!file_exists($absPath)) {
+                    throw new \RuntimeException("copy() reported success but file not found at: $absPath");
+                }
+                $writtenPaths[] = $absPath;
+                chmod($absPath, 0644);
+                RepairRejectImage::create([
+                    'repair_reject_log_id' => $log->id,
+                    'image_path'           => $relPath,
+                    'image_type'           => 'before',
+                ]);
+                $saved++;
+            }
+        } catch (\Throwable $e) {
+            foreach ($writtenPaths as $path) {
+                if (is_file($path)) {
+                    @unlink($path);
+                }
+            }
+            Log::error('RR image upload failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown'));
+            throw ValidationException::withMessages([
+                'images' => 'Foto evidence gagal disimpan. Silakan coba unggah ulang.',
+            ]);
+        }
+
+        if ($saved === 0) {
+            throw ValidationException::withMessages([
+                'images' => 'Minimal 1 foto evidence Repair/Reject wajib diunggah.',
+            ]);
+        }
+
+        return $saved;
+    }
+
+    /**
      * Simpan data Repair / Reject baru
      */
     public function store(Request $request)
@@ -126,50 +180,33 @@ class RepairRejectController extends Controller
             'area_problem'   => 'required|string|max:255',
             'root_cause'     => 'required|string',
             'countermeasure' => 'required|string',
-            'images.*'       => 'nullable|file|max:5120',
+            'images'         => 'required|array|min:1',
+            'images.*'       => 'required|file|image|max:5120',
+        ], [
+            'images.required' => 'Minimal 1 foto evidence Repair/Reject wajib diunggah.',
+            'images.min'      => 'Minimal 1 foto evidence Repair/Reject wajib diunggah.',
         ]);
 
         $validated['created_by'] = Auth::id();
+        $logData = array_diff_key($validated, ['images' => true]);
         $workDate = $request->get('date', now()->toDateString());
 
-        $log = RepairRejectLog::create($validated);
+        $log = DB::transaction(function () use ($validated, $logData, $request, $workDate) {
+            $log = RepairRejectLog::create($logData);
 
-        // Handle image uploads (manual copy — bypass Flysystem/FinfoMimeTypeDetector)
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $i => $file) {
-                try {
-                    $originalName = $file->getClientOriginalName();
-                    $safeName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
-                    $relPath = 'repair_reject/' . $log->id . '/' . $safeName;
-                    $absPath = public_path('uploads/' . $relPath);
-                    $dir = dirname($absPath);
-                    if (!is_dir($dir)) {
-                        mkdir($dir, 0755, true);
-                    }
-                    copy($file->getRealPath(), $absPath);
-                    if (!file_exists($absPath)) {
-                        throw new \RuntimeException("copy() reported success but file not found at: $absPath");
-                    }
-                    chmod($absPath, 0644);
-                    RepairRejectImage::create([
-                        'repair_reject_log_id' => $log->id,
-                        'image_path'           => $relPath,
-                        'image_type'           => 'before',
-                    ]);
-                } catch (\Throwable $e) {
-                    Log::error('RR store image[' . $i . '] failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
-                }
-            }
-        }
+            // Handle image uploads (manual copy — bypass Flysystem/FinfoMimeTypeDetector)
+            $this->saveUploadedImages($log, $request->file('images', []));
 
-        // Sync with ProductionService to update DailyProduction and create ProductionLog
-        $productionService = app(\App\Services\ProductionService::class);
-        $logData = [
-            'ok_qty' => 0,
-            'repair_qty' => $validated['type'] === 'repair' ? $validated['qty_a'] : 0,
-            'reject_qty' => $validated['type'] === 'reject' ? $validated['qty_a'] : 0,
-        ];
-        $productionService->saveProductionLog($validated['job_master_id'], $logData, $workDate);
+            // Sync with ProductionService to update DailyProduction and create ProductionLog
+            $productionService = app(\App\Services\ProductionService::class);
+            $productionService->saveProductionLog($validated['job_master_id'], [
+                'ok_qty' => 0,
+                'repair_qty' => $validated['type'] === 'repair' ? $validated['qty_a'] : 0,
+                'reject_qty' => $validated['type'] === 'reject' ? $validated['qty_a'] : 0,
+            ], $workDate);
+
+            return $log;
+        });
 
         return response()->json([
             'success' => true,
@@ -246,57 +283,44 @@ class RepairRejectController extends Controller
             'area_problem'   => 'required|string|max:255',
             'root_cause'     => 'required|string',
             'countermeasure' => 'required|string',
-            'images.*'       => 'nullable|file|max:5120',
+            'images'         => 'nullable|array',
+            'images.*'       => 'nullable|file|image|max:5120',
         ]);
 
-        $log->update($validated);
+        if (!$request->hasFile('images') && $log->images()->count() === 0) {
+            throw ValidationException::withMessages([
+                'images' => 'Minimal 1 foto evidence Repair/Reject wajib diunggah.',
+            ]);
+        }
 
-        // Handle image uploads (manual copy — bypass Flysystem/FinfoMimeTypeDetector)
-        if ($request->hasFile('images')) {
-            foreach ($request->file('images') as $i => $file) {
-                try {
-                    $originalName = $file->getClientOriginalName();
-                    $safeName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
-                    $relPath = 'repair_reject/' . $log->id . '/' . $safeName;
-                    $absPath = public_path('uploads/' . $relPath);
-                    $dir = dirname($absPath);
-                    if (!is_dir($dir)) {
-                        mkdir($dir, 0755, true);
-                    }
-                    copy($file->getRealPath(), $absPath);
-                    if (!file_exists($absPath)) {
-                        throw new \RuntimeException("copy() reported success but file not found at: $absPath");
-                    }
-                    chmod($absPath, 0644);
-                    RepairRejectImage::create([
-                        'repair_reject_log_id' => $log->id,
-                        'image_path'           => $relPath,
-                        'image_type'           => 'before',
-                    ]);
-                } catch (\Throwable $e) {
-                    Log::error('RR update image[' . $i . '] failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown') . ' | tmp: ' . ($file->getRealPath() ?? 'N/A'));
-                }
+        $logData = array_diff_key($validated, ['images' => true]);
+
+        DB::transaction(function () use ($request, $log, $validated, $logData, $oldQty) {
+            $log->update($logData);
+
+            // Required photo evidence is stored by saveUploadedImages()
+            if ($request->hasFile('images')) {
+                $this->saveUploadedImages($log, $request->file('images', []));
             }
-        }
 
-        // Update DailyProduction / ProductionLog with the difference in qty
-        $productionService = app(\App\Services\ProductionService::class);
-        $qtyDiff = $validated['qty_a'] - $oldQty;
-        $workDate = $request->get('date', now()->toDateString());
+            // Update DailyProduction / ProductionLog with the difference in qty
+            $productionService = app(\App\Services\ProductionService::class);
+            $qtyDiff = $validated['qty_a'] - $oldQty;
+            $workDate = $request->get('date', now()->toDateString());
 
-        if ($qtyDiff != 0) {
-            $logData = [
-                'ok_qty' => 0,
-                'repair_qty' => $log->type === 'repair' ? $qtyDiff : 0,
-                'reject_qty' => $log->type === 'reject' ? $qtyDiff : 0,
-            ];
-            $productionService->saveProductionLog($log->job_master_id, $logData, $workDate);
-        }
+            if ($qtyDiff != 0) {
+                $productionService->saveProductionLog($log->job_master_id, [
+                    'ok_qty' => 0,
+                    'repair_qty' => $log->type === 'repair' ? $qtyDiff : 0,
+                    'reject_qty' => $log->type === 'reject' ? $qtyDiff : 0,
+                ], $workDate);
+            }
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'Data ' . ucfirst($log->type) . ' berhasil diperbarui.',
-            'log'     => $log->load('images'),
+            'log'     => $log->fresh()->load('images'),
         ]);
     }
 }

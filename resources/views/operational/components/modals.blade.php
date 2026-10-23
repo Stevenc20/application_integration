@@ -300,7 +300,7 @@
             <input type="hidden" id="rrType" name="type" value="repair">
             <div class="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-xl">
                 <svg class="w-4 h-4 text-red-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                <span class="text-[10px] font-bold text-red-600 uppercase tracking-wider">Field bertanda <span class="text-red-500">*</span> wajib diisi. Data Repair/Reject harus dilengkapi sebelum disimpan.</span>
+                <span class="text-[10px] font-bold text-red-600 uppercase tracking-wider">Field bertanda <span class="text-red-500">*</span> wajib diisi. Minimal 1 foto evidence Part wajib dilampirkan sebelum disimpan.</span>
             </div>
             
             <div>
@@ -338,7 +338,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <!-- Column Part -->
                     <div class="space-y-2">
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Foto Evidence Part</label>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Foto Evidence Part <span class="text-red-500">*</span></label>
                         <div id="rrDragZonePart" class="relative group mt-1 flex flex-col justify-center px-4 py-5 border-2 border-gray-300 border-dashed rounded-xl hover:border-red-400 hover:bg-slate-50 transition cursor-pointer bg-slate-50/50">
                             <div class="space-y-1 text-center" onclick="document.getElementById('rrImagesPart').click()">
                                 <svg class="mx-auto h-8 w-8 text-slate-400 group-hover:text-red-400 transition" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">
@@ -366,7 +366,7 @@
 
                     <!-- Column Tooling -->
                     <div class="space-y-2">
-                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Foto Evidence Tooling</label>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Foto Evidence Tooling <span class="text-gray-400 font-medium normal-case tracking-normal">(opsional)</span></label>
                         <div id="rrDragZoneTooling" class="relative group mt-1 flex flex-col justify-center px-4 py-5 border-2 border-gray-300 border-dashed rounded-xl hover:border-red-400 hover:bg-slate-50 transition cursor-pointer bg-slate-50/50">
                             <div class="space-y-1 text-center" onclick="document.getElementById('rrImagesTooling').click()">
                                 <svg class="mx-auto h-8 w-8 text-slate-400 group-hover:text-red-400 transition" stroke="currentColor" fill="none" viewBox="0 0 48 48" aria-hidden="true">

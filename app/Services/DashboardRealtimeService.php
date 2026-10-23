@@ -372,7 +372,7 @@ class DashboardRealtimeService
             }
         }
 
-        $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'jobMaster'])
+        $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'jobMaster', 'images'])
             ->whereIn('job_master_id', $jobIds)
             ->where('created_at', '>=', $shiftStartDt)
             ->where('created_at', '<', $shiftEndDt)
@@ -404,6 +404,7 @@ class DashboardRealtimeService
                 'countermeasure' => $rr->countermeasure ?: '-',
                 'pic' => $picName,
                 'time' => $timeFormatted,
+                'images' => $rr->images->map(fn ($i) => asset('uploads/' . $i->image_path))->values()->all(),
             ];
 
             if ($logType === 'repair') {
@@ -438,6 +439,7 @@ class DashboardRealtimeService
                         'countermeasure' => '-',
                         'pic' => $fallbackPic,
                         'time' => '-',
+                        'images' => [],
                     ];
                 }
             }
@@ -465,6 +467,7 @@ class DashboardRealtimeService
                         'countermeasure' => '-',
                         'pic' => $fallbackPic,
                         'time' => '-',
+                        'images' => [],
                     ];
                 }
             }

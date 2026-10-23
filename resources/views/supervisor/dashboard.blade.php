@@ -1459,6 +1459,7 @@ function openKpiFromPressDetail(type, line){
             <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
             <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
             <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Foto</th>
             <th class="px-4 py-3 text-center border-b border-gray-200 w-20">Qty</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-100">
@@ -1466,9 +1467,10 @@ function openKpiFromPressDetail(type, line){
             <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
             <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
             <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-center">${(r.images && r.images.length) ? `<a href="${r.images[0]}" target="_blank" rel="noopener"><img src="${r.images[0]}" class="w-14 h-14 object-cover rounded-lg border border-gray-200 inline-block" alt="Foto evidence"></a>` : '<span class="text-[10px] font-bold text-amber-600">Tidak ada foto</span>'}</td>
             <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
           </tr>`).join('')}
-          <tr class="bg-gray-50"><td colspan="3" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+          <tr class="bg-gray-50"><td colspan="4" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
             <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td></tr>
           </tbody></table></div>`;
       } else if(typeData.type === 'dt_summary'){
@@ -1630,6 +1632,7 @@ function openKpiDetailModal(type, line){
             <th class="px-4 py-3 text-center border-b border-gray-200 w-12">No</th>
             <th class="px-4 py-3 text-left border-b border-gray-200">Item</th>
             <th class="px-4 py-3 text-left border-b border-gray-200">Problem</th>
+            <th class="px-4 py-3 text-center border-b border-gray-200 w-24">Foto</th>
             <th class="px-4 py-3 text-center border-b border-gray-200 w-20">Qty</th>
           </tr></thead>
           <tbody class="divide-y divide-gray-100">
@@ -1637,10 +1640,11 @@ function openKpiDetailModal(type, line){
             <td class="px-4 py-3 text-center text-gray-500">${r.no}</td>
             <td class="px-4 py-3 font-semibold text-gray-800">${r.item}</td>
             <td class="px-4 py-3 text-gray-600">${r.problem}</td>
+            <td class="px-4 py-3 text-center">${(r.images && r.images.length) ? `<a href="${r.images[0]}" target="_blank" rel="noopener"><img src="${r.images[0]}" class="w-14 h-14 object-cover rounded-lg border border-gray-200 inline-block" alt="Foto evidence"></a>` : '<span class="text-[10px] font-bold text-amber-600">Tidak ada foto</span>'}</td>
             <td class="px-4 py-3 text-center text-red-600 font-black">${r.qty}</td>
           </tr>`).join('')}
           <tr class="bg-gray-50">
-            <td colspan="3" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
+            <td colspan="4" class="px-4 py-3 text-right font-bold text-gray-700">TOTAL</td>
             <td class="px-4 py-3 text-center font-black text-gray-900">${lineData.total}</td>
           </tr>
           </tbody></table></div>`;
