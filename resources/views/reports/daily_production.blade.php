@@ -237,6 +237,8 @@
                             $isSigned = $sigState['signed'];
 
                             $userRole = strtolower(auth()->user()?->role ?? '');
+                            $authUserId = auth()->id();
+                            $authUserName = (string) (auth()->user()?->name ?? '');
                             $ownsThisRole = in_array($userRole, ['superadmin', 'manager', 'kadiv', 'direktur'])
                                 || ($roleKey === 'teamleader' && (str_starts_with($userRole, 'leader') || in_array($userRole, ['teamleader', 'group leader'])))
                                 || ($roleKey === 'foreman' && $userRole === 'foreman')
@@ -244,6 +246,12 @@
 
                             $authorizedScope = $authorizedScope ?? false;
                             $canInteract = $authorizedScope && $ownsThisRole;
+                            $signerUserId = $sigState['signed_by_user_id'] ?? null;
+                            $signerName = (string) ($sigState['name'] ?? '');
+                            $isSignerOwner = $userRole === 'superadmin'
+                                || ($signerUserId !== null && $authUserId !== null && (int) $signerUserId === (int) $authUserId)
+                                || ($signerUserId === null && $signerName !== '' && strcasecmp($signerName, $authUserName) === 0);
+                            $canDelete = $isSigned && $canInteract && $isSignerOwner;
                             $clickable = $canInteract && $sigState['available'] && !$isSigned;
                             $showLock = !$isSigned && !$clickable;
                         @endphp
@@ -269,7 +277,7 @@
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                     <span>@if($showLock) LOCKED @else Klik TTD @endif</span>
                                 </div>
-                                <button type="button" id="btn_delete_ttd_{{ $roleKey }}" class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center{{ $isSigned && $canInteract ? '' : ' hidden' }} transition-all no-print hover:scale-110 shadow-sm"
+                                <button type="button" id="btn_delete_ttd_{{ $roleKey }}" class="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-red-100 hover:bg-red-200 text-red-600 flex items-center justify-center{{ $canDelete ? '' : ' hidden' }} transition-all no-print hover:scale-110 shadow-sm"
                                         onclick="event.stopPropagation();deleteSignature('{{ $roleKey }}')" title="Hapus tanda tangan">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/></svg>
                                 </button>
@@ -603,6 +611,8 @@ const sigWorkDate = '{{ $date }}';
 const sigLineName = @json($selectedLineName);
 const sigShiftName = @json($selectedShift);
 const SIG_USER_ROLE = @json(strtolower(auth()->user()?->role ?? ''));
+const SIG_USER_ID = @json(auth()->id());
+const SIG_USER_NAME = @json((string) (auth()->user()?->name ?? ''));
 const SIG_IS_SUPERADMIN = SIG_USER_ROLE === 'superadmin';
 const SIG_AUTHORIZED = @json($authorizedScope ?? false);
 
@@ -611,6 +621,18 @@ function sigRoleOwned(role) {
     if (role === 'teamleader') return SIG_USER_ROLE.startsWith('leader') || SIG_USER_ROLE === 'teamleader' || SIG_USER_ROLE === 'group leader';
     if (role === 'foreman') return SIG_USER_ROLE === 'foreman';
     if (role === 'supervisor') return SIG_USER_ROLE === 'supervisor';
+    return false;
+}
+
+function sigCanDeleteRecord(role, signerUserId, signerName) {
+    if (!sigRoleOwned(role)) return false;
+    if (SIG_IS_SUPERADMIN) return true;
+    if (signerUserId !== null && signerUserId !== undefined && SIG_USER_ID !== null) {
+        return Number(signerUserId) === Number(SIG_USER_ID);
+    }
+    if (signerName && SIG_USER_NAME) {
+        return String(signerName).trim().toLowerCase() === String(SIG_USER_NAME).trim().toLowerCase();
+    }
     return false;
 }
 
@@ -746,24 +768,31 @@ function deleteSignature(role) {
     if (!sigRoleOwned(role)) { alert('Anda tidak berhak menghapus TTD ini'); return; }
     showConfirm('Hapus tanda tangan ' + role + '?').then(confirmed => {
         if (!confirmed) return;
-        const img = document.getElementById('img_ttd_' + role);
-        const placeholder = document.getElementById('placeholder_ttd_' + role);
-        const badge = document.getElementById('badge_ttd_' + role);
-        const delBtn = document.getElementById('btn_delete_ttd_' + role);
-        img.classList.add('hidden'); img.src = '';
-        placeholder.classList.remove('hidden');
-        badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span><span>UNSIGNED</span>';
-        badge.classList.remove('bg-emerald-50','text-emerald-700','border-emerald-200');
-        badge.classList.add('bg-gray-100','text-gray-400','border-gray-200');
-        delBtn.classList.add('hidden');
         fetch('{{ $sigDeleteUrl }}', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
             body: JSON.stringify({ role: role, work_date: sigWorkDate, line_name: sigLineName, shift_name: sigShiftName })
         })
-            .then(r => r.json())
-            .then(d => { refreshSignatureStatus(); })
-            .catch(() => {});
+            .then(r => {
+                if (!r.ok) return r.json().then(d => { throw new Error(d.error || 'Gagal menghapus tanda tangan'); });
+                return r.json();
+            })
+            .then(d => {
+                const img = document.getElementById('img_ttd_' + role);
+                const placeholder = document.getElementById('placeholder_ttd_' + role);
+                const badge = document.getElementById('badge_ttd_' + role);
+                const delBtn = document.getElementById('btn_delete_ttd_' + role);
+                img.classList.add('hidden'); img.src = '';
+                placeholder.classList.remove('hidden');
+                badge.innerHTML = '<span class="w-1.5 h-1.5 rounded-full bg-gray-400"></span><span>UNSIGNED</span>';
+                badge.classList.remove('bg-emerald-50','text-emerald-700','border-emerald-200');
+                badge.classList.add('bg-gray-100','text-gray-400','border-gray-200');
+                delBtn.classList.add('hidden');
+                refreshSignatureStatus();
+            })
+            .catch(err => {
+                alert(err.message);
+            });
     });
 }
 
@@ -803,6 +832,14 @@ function refreshSignatureStatus() {
                     if (showLock) card.classList.add('opacity-50');
                     else card.classList.remove('opacity-50');
                 }
+                const delBtn = document.getElementById('btn_delete_ttd_' + role);
+                if (delBtn) {
+                    if (s.signed && SIG_AUTHORIZED && sigCanDeleteRecord(role, s.signed_by_user_id, s.name)) {
+                        delBtn.classList.remove('hidden');
+                    } else {
+                        delBtn.classList.add('hidden');
+                    }
+                }
             });
         })
         .catch(() => {});
@@ -824,7 +861,14 @@ document.addEventListener('DOMContentLoaded', function() {
                     const nameInput = document.getElementById('ttd_{{ $role }}');
                     if (nameInput) nameInput.value = d.signer_name;
                 }
-                if (sigRoleOwned('{{ $role }}')) document.getElementById('btn_delete_ttd_{{ $role }}').classList.remove('hidden');
+                const delBtn = document.getElementById('btn_delete_ttd_{{ $role }}');
+                if (delBtn) {
+                    if (sigCanDeleteRecord('{{ $role }}', d.signed_by_user_id, d.signer_name)) {
+                        delBtn.classList.remove('hidden');
+                    } else {
+                        delBtn.classList.add('hidden');
+                    }
+                }
             }
         })
         .catch(() => {});

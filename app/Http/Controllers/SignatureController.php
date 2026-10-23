@@ -278,6 +278,46 @@ class SignatureController extends Controller
             ], 404);
         }
 
+        // Only the actual signer (or superadmin) can delete an existing signature
+        /** @var \App\Models\User|null $authUser */
+        $authUser = Auth::user();
+        $authUserId = $authUser ? (int) $authUser->id : null;
+        $isSuperadmin = $this->userRole() === 'superadmin';
+
+        if (! $isSuperadmin) {
+            $targetIdentity = SignatureScopeNormalizer::resolveSignatureIdentity($target);
+            $targetUserId = $targetIdentity['user_id'];
+            $targetName = $targetIdentity['name'];
+
+            if ($targetUserId !== null && $targetUserId !== $authUserId) {
+                return response()->json([
+                    'error' => 'Hanya penandatangan asli ('.($targetName ?: 'pemilik TTD').') yang dapat menghapus tanda tangan ini',
+                ], 403);
+            }
+            if ($targetUserId === null && $targetName !== '' && strcasecmp($targetName, (string) ($authUser?->name ?? '')) !== 0) {
+                return response()->json([
+                    'error' => 'Hanya penandatangan asli ('.$targetName.') yang dapat menghapus tanda tangan ini',
+                ], 403);
+            }
+
+            // Also prevent deleting if the next approval level in the chain has already signed
+            $chain = ['teamleader', 'foreman', 'supervisor'];
+            $currentIndex = array_search($request->role, $chain, true);
+            if ($currentIndex !== false && $currentIndex < count($chain) - 1) {
+                $nextRoles = array_slice($chain, $currentIndex + 1);
+                $nextSigned = Signature::whereIn('role', $nextRoles)
+                    ->where('work_date', $request->work_date)
+                    ->where('line_name', $standardLine)
+                    ->where('shift_name', $standardShift)
+                    ->exists();
+                if ($nextSigned) {
+                    return response()->json([
+                        'error' => 'Tanda tangan tidak dapat dihapus karena sudah disahkan oleh level berikutnya',
+                    ], 422);
+                }
+            }
+        }
+
         $target->delete();
 
         return response()->json(['success' => true]);

@@ -1204,4 +1204,147 @@ describe('LKH Signer Identity Lock (23 October 2026 Bugfix)', function () {
             ->and($spvSig->fresh()->signer_name)->toBe('Sapriadi')
             ->and($spvSig->fresh()->signed_by_user_id)->toBe($sapriadiSpv->id);
     });
+
+    test('only the actual signer (or superadmin) can delete a signature across Team Leader, Foreman, and Supervisor', function () {
+        $line = sigCreateLineMaster('PRESS A');
+        sigMakePlan($line, '2026-10-23');
+        lkhGrantFeature('supervisor');
+        lkhGrantFeature('foreman');
+        lkhGrantFeature('leader');
+
+        $giyonoLeader = User::create([
+            'name' => 'Giyono',
+            'nrp' => 'TL-GIYONO-DEL',
+            'password' => 'password',
+            'role' => 'leader a',
+            'is_active' => 1,
+        ]);
+        $otherLeader = User::create([
+            'name' => 'Tejo',
+            'nrp' => 'TL-TEJO-DEL',
+            'password' => 'password',
+            'role' => 'leader a',
+            'is_active' => 1,
+        ]);
+
+        $foremanActual = User::create([
+            'name' => 'Sukoyo',
+            'nrp' => 'FM-SUKOYO-DEL',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+        $otherForeman = User::create([
+            'name' => 'Dedi Foreman',
+            'nrp' => 'FM-DEDI-DEL',
+            'password' => 'password',
+            'role' => 'foreman',
+            'is_active' => 1,
+        ]);
+
+        $sapriadiSpv = User::create([
+            'name' => 'Sapriadi',
+            'nrp' => 'SPV-SAPRIADI-DEL',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+        $ekoSpv = User::create([
+            'name' => 'Eko Supervisor',
+            'nrp' => 'SPV-EKO-DEL',
+            'password' => 'password',
+            'role' => 'supervisor',
+            'is_active' => 1,
+        ]);
+
+        LineAssignment::create([
+            'line_name' => 'Line A',
+            'shift_name' => '1',
+            'leader_user_id' => $giyonoLeader->id,
+            'foreman_user_id' => $foremanActual->id,
+            'supervisor_user_id' => $sapriadiSpv->id,
+        ]);
+
+        // 1. Giyono signs Team Leader
+        $this->actingAs($giyonoLeader)->postJson('/signature/save', [
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,GIYONO_SIG',
+        ])->assertOk();
+
+        // Other Team Leader (Tejo) CANNOT delete Giyono's signature
+        $this->actingAs($otherLeader)->postJson('/signature/delete', [
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+        ])->assertStatus(403);
+
+        // 2. Sukoyo signs Foreman
+        $this->actingAs($foremanActual)->postJson('/signature/save', [
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,SUKOYO_SIG',
+        ])->assertOk();
+
+        // Other Foreman (Dedi) CANNOT delete Sukoyo's signature
+        $this->actingAs($otherForeman)->postJson('/signature/delete', [
+            'role' => 'foreman',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+        ])->assertStatus(403);
+
+        // Even Giyono (actual Team Leader signer) CANNOT delete his own signature once Foreman has already signed
+        $this->actingAs($giyonoLeader)->postJson('/signature/delete', [
+            'role' => 'teamleader',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+        ])->assertStatus(422);
+
+        // 3. Sapriadi signs Supervisor
+        $this->actingAs($sapriadiSpv)->postJson('/signature/save', [
+            'role' => 'supervisor',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+            'signature' => 'data:image/png;base64,SAPRIADI_SIG',
+        ])->assertOk();
+
+        // Eko Supervisor CANNOT delete Sapriadi's signature
+        $this->actingAs($ekoSpv)->postJson('/signature/delete', [
+            'role' => 'supervisor',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+        ])->assertStatus(403);
+
+        // And on the LKH page viewed by Eko Supervisor, the delete button for Supervisor is hidden
+        $ekoView = $this->actingAs($ekoSpv)
+            ->get(route('supervisor.reports.daily_production', [
+                'date' => '2026-10-23',
+                'line' => 'PRESS A',
+                'shift' => 'Shift Pagi',
+            ]))
+            ->assertOk()
+            ->getContent();
+
+        expect($ekoView)->toContain('id="btn_delete_ttd_supervisor"')
+            ->and(Signature::where('work_date', '2026-10-23')->count())->toBe(3);
+
+        // Sapriadi (actual Supervisor signer) CAN delete his own Supervisor signature
+        $this->actingAs($sapriadiSpv)->postJson('/signature/delete', [
+            'role' => 'supervisor',
+            'work_date' => '2026-10-23',
+            'line_name' => 'PRESS A',
+            'shift_name' => 'Shift Pagi',
+        ])->assertOk();
+
+        expect(Signature::where('work_date', '2026-10-23')->where('role', 'supervisor')->exists())->toBeFalse();
+    });
 });
