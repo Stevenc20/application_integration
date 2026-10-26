@@ -732,9 +732,19 @@
                                                 $dotColor = 'bg-emerald-500';
                                             }
                                         @endphp
-                                        <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border {{ $statusColor }} shadow-sm">
-                                            <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }}"></span>
-                                            <span class="text-[9px] font-black tracking-widest">{{ $statusLabel }}</span>
+                                        <div class="flex flex-col items-center gap-1.5">
+                                            <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border {{ $statusColor }} shadow-sm">
+                                                <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }}"></span>
+                                                <span class="text-[9px] font-black tracking-widest">{{ $statusLabel }}</span>
+                                            </div>
+                                            @if(!$isRecovery)
+                                                <button type="button" onclick="openRowDeleteModal({{ $plan->id }})" class="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white text-[9px] font-black uppercase tracking-wide transition-colors" title="Hapus item duplikat">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-8 0h10l-1 13H8L7 7z" />
+                                                    </svg>
+                                                    Hapus
+                                                </button>
+                                            @endif
                                         </div>
                                     </td>
                                 </tr>
@@ -1174,10 +1184,12 @@
                     <input type="checkbox" id="dupAllShift" class="w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
                     SEMUA SHIFT
                 </label>
-                <button type="button" onclick="loadDuplicateScan()" class="ml-auto px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[11px] font-black transition-all">
+                <button type="button" onclick="clearDuplicateResult(); loadDuplicateScan()" class="ml-auto px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-[11px] font-black transition-all">
                     PINDAI ULANG
                 </button>
             </div>
+
+            <div id="duplicateResult" role="status" aria-live="polite" class="hidden"></div>
 
             <div id="duplicateLoading" class="p-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
                 Memindai jadwal...
@@ -1201,6 +1213,67 @@
                 </p>
                 <button type="button" onclick="closeDuplicateModal()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-black transition-all shrink-0">
                     TUTUP
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+{{-- ROW DELETE MODAL --}}
+<div id="rowDeleteModal" class="fixed inset-0 z-[99999] hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeRowDeleteModal()"></div>
+    <div class="relative w-full max-w-2xl mx-4 animate-in fade-in zoom-in duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl max-h-[90vh] flex flex-col overflow-hidden">
+            <div class="px-6 py-5 border-b border-slate-100 flex items-start justify-between gap-4 shrink-0">
+                <div class="flex items-center gap-2">
+                    <span class="w-9 h-9 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 7h12M9 7V5h6v2m-8 0h10l-1 13H8L7 7z" />
+                        </svg>
+                    </span>
+                    <div>
+                        <h3 class="text-lg font-black text-slate-800 tracking-tight">HAPUS ITEM PRODUCTION PLAN</h3>
+                        <p class="text-[11px] text-slate-500">Hanya satu record yang dipilih yang akan dihapus. Pasangan duplikat tetap disimpan.</p>
+                    </div>
+                </div>
+                <button type="button" onclick="closeRowDeleteModal()" class="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 font-black transition-all shrink-0">&times;</button>
+            </div>
+
+            <div id="rowDeleteLoading" class="p-12 text-center text-slate-400 text-xs font-bold uppercase tracking-widest">
+                Memeriksa item...
+            </div>
+
+            <div id="rowDeleteBody" class="hidden flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/50">
+                <div id="rowDeleteWarning" class="hidden p-3 rounded-xl border text-[11px] font-semibold leading-relaxed"></div>
+                <div id="rowDeleteSummary" class="grid grid-cols-2 md:grid-cols-4 gap-2"></div>
+                <div id="rowDeletePeer"></div>
+                <div id="rowDeleteBlockers" class="hidden"></div>
+                <div id="rowDeleteForm" class="hidden space-y-3">
+                    <div>
+                        <label class="block text-[10px] font-black text-slate-600 uppercase">Alasan penghapusan <span class="text-rose-600">*</span></label>
+                        <textarea id="rowDeleteReason" rows="2" maxlength="500" placeholder="Contoh: hasil import ganda pada revisi PPC" class="mt-1 w-full rounded-xl border-slate-300 text-xs focus:ring-rose-500 focus:border-rose-500"></textarea>
+                    </div>
+                    <label class="flex items-start gap-2 text-[10px] font-bold text-slate-600 cursor-pointer select-none">
+                        <input type="checkbox" id="rowDeleteIdentity" class="mt-0.5 w-4 h-4 rounded border-slate-300 text-rose-600 focus:ring-rose-500">
+                        <span>Saya sudah memastikan record yang dihapus BUKAN satu-satunya jadwal job tersebut dan pasangan duplikat tetap disimpan.</span>
+                    </label>
+                    <label id="rowDeleteReviewWrap" class="hidden flex items-start gap-2 text-[10px] font-bold text-amber-700 cursor-pointer select-none">
+                        <input type="checkbox" id="rowDeleteReview" class="mt-0.5 w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500">
+                        <span>Saya sudah memeriksa perbedaan detail jadwal (finish time / split) dan tetap yakin ini duplikat.</span>
+                    </label>
+                </div>
+                <div id="rowDeleteError" class="hidden p-3 bg-rose-50 border border-rose-200 rounded-xl text-[11px] font-semibold text-rose-700"></div>
+            </div>
+
+            <div class="px-6 py-4 border-t border-slate-100 bg-white flex flex-wrap items-center justify-end gap-2 shrink-0">
+                <button type="button" onclick="closeRowDeleteModal()" class="px-5 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-xl text-xs font-black transition-all">
+                    TUTUP
+                </button>
+                <button type="button" id="rowDeleteCheckDuplicate" onclick="closeRowDeleteModal(); openDuplicateModal()" class="hidden px-5 py-2.5 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-black transition-all">
+                    BUKA CEK DUPLIKAT
+                </button>
+                <button type="button" id="rowDeleteSubmit" onclick="submitRowDelete()" disabled class="px-5 py-2.5 bg-rose-600 hover:bg-rose-700 disabled:bg-slate-200 disabled:text-slate-400 disabled:cursor-not-allowed text-white rounded-xl text-xs font-black transition-all">
+                    HAPUS RECORD
                 </button>
             </div>
         </div>
@@ -1884,9 +1957,29 @@ document.addEventListener('click', function(e) {
         return Number(value || 0).toLocaleString('id-ID');
     }
 
+    function clearDuplicateResult() {
+        const result = document.getElementById('duplicateResult');
+        if (!result) return;
+        result.className = 'hidden';
+        result.textContent = '';
+    }
+
+    function showDuplicateResult(type, message) {
+        const result = document.getElementById('duplicateResult');
+        if (!result) return;
+        const styles = {
+            success: 'mx-6 mt-4 p-3 rounded-xl text-xs font-bold border bg-emerald-50 text-emerald-700 border-emerald-200',
+            warning: 'mx-6 mt-4 p-3 rounded-xl text-xs font-bold border bg-amber-50 text-amber-700 border-amber-200',
+            error: 'mx-6 mt-4 p-3 rounded-xl text-xs font-bold border bg-rose-50 text-rose-700 border-rose-200',
+        };
+        result.className = styles[type] || styles.error;
+        result.textContent = message || '';
+    }
+
     function openDuplicateModal() {
         const modal = document.getElementById('duplicateModal');
         if (!modal) return;
+        clearDuplicateResult();
         modal.classList.remove('hidden');
         modal.classList.add('flex');
         loadDuplicateScan();
@@ -1988,6 +2081,12 @@ document.addEventListener('click', function(e) {
                 + '<div><span class="text-slate-400 font-bold uppercase">Repair</span><div class="font-black text-amber-600">' + dupNum(member.repair) + '</div></div>'
                 + '<div><span class="text-slate-400 font-bold uppercase">Reject</span><div class="font-black text-rose-600">' + dupNum(member.reject) + '</div></div>'
                 + '</div>'
+                + '<div class="mt-1 text-[10px] text-slate-500 font-semibold">Job No: ' + dupEsc(member.job_no || '-')
+                + ' &bull; ' + dupEsc(member.plan_date || '-')
+                + ' &bull; ' + dupEsc(member.shift_name || '-')
+                + ' &bull; ' + dupEsc(member.press_name || '-') + '</div>'
+                + '<div class="mt-1 text-[10px] font-black uppercase tracking-wide ' + (member.has_activity ? 'text-rose-600' : 'text-emerald-600') + '">'
+                + 'Status aktivitas: ' + (member.has_activity ? 'ADA' : 'TIDAK ADA') + '</div>'
                 + '<div class="mt-1 text-[10px] text-slate-400 font-semibold">Jam: ' + dupEsc(member.start_time || '-') + ' &ndash; ' + dupEsc(member.finish_time || '-')
                 + ' &bull; Row ' + dupEsc(member.row_no === null ? '-' : member.row_no)
                 + ' &bull; Sumber ' + dupEsc(member.source_type || 'ppc') + '</div>'
@@ -2169,20 +2268,338 @@ document.addEventListener('click', function(e) {
                 if (payload.blockers && payload.blockers.length) {
                     message += ' ' + payload.blockers.join(' ');
                 }
+                const failure = new Error(message);
+                failure.code = payload.code || '';
+                throw failure;
+            }
+
+            const deletedId = Number(payload.deleted_id || selectedId);
+            showToast(payload.message || 'Item duplikat berhasil dihapus.', 'success');
+            showDuplicateResult('success', payload.message || 'Item duplikat berhasil dihapus.');
+
+            const planningRow = document.querySelector('#planTableBody tr[data-id="' + deletedId + '"]');
+            if (planningRow) planningRow.remove();
+
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'HAPUS SEKARANG';
+            }
+
+            await loadDuplicateScan();
+        } catch (error) {
+            const warningCodes = ['blocked', 'needs_review', 'both_active', 'recovery_item', 'recovery_peer'];
+            const resultType = warningCodes.indexOf(error.code) !== -1 ? 'warning' : 'error';
+
+            if (errorEl) {
+                errorEl.textContent = error.message;
+                errorEl.classList.remove('hidden');
+            }
+            showDuplicateResult(resultType, error.message);
+            showToast(error.message, 'error');
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'HAPUS SEKARANG';
+            }
+        }
+    }
+
+    let ROW_DELETE_STATE = { plan: null, peers: [], peer: null, requiresReview: false, deletable: false };
+
+    function rowDeleteSummaryCard(label, value, colorClass) {
+        return '<div class="p-2.5 rounded-xl bg-white border border-slate-200">'
+            + '<div class="text-[9px] font-black uppercase tracking-wide text-slate-400">' + dupEsc(label) + '</div>'
+            + '<div class="mt-0.5 text-[11px] font-black ' + (colorClass || 'text-slate-700') + '">' + dupEsc(value) + '</div>'
+            + '</div>';
+    }
+
+    function closeRowDeleteModal() {
+        const modal = document.getElementById('rowDeleteModal');
+        if (!modal) return;
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+        ROW_DELETE_STATE = { plan: null, peers: [], peer: null, requiresReview: false, deletable: false };
+    }
+
+    async function openRowDeleteModal(planId) {
+        const modal = document.getElementById('rowDeleteModal');
+        const loading = document.getElementById('rowDeleteLoading');
+        const body = document.getElementById('rowDeleteBody');
+        const warning = document.getElementById('rowDeleteWarning');
+        const summary = document.getElementById('rowDeleteSummary');
+        const peer = document.getElementById('rowDeletePeer');
+        const blockers = document.getElementById('rowDeleteBlockers');
+        const form = document.getElementById('rowDeleteForm');
+        const error = document.getElementById('rowDeleteError');
+        const submit = document.getElementById('rowDeleteSubmit');
+        const check = document.getElementById('rowDeleteCheckDuplicate');
+        const reviewWrap = document.getElementById('rowDeleteReviewWrap');
+        const reason = document.getElementById('rowDeleteReason');
+        const identity = document.getElementById('rowDeleteIdentity');
+        const review = document.getElementById('rowDeleteReview');
+
+        if (!modal) return;
+
+        ROW_DELETE_STATE = { plan: null, peers: [], peer: null, requiresReview: false, deletable: false };
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        loading.classList.remove('hidden');
+        body.classList.add('hidden');
+        warning.classList.add('hidden');
+        warning.textContent = '';
+        summary.innerHTML = '';
+        peer.innerHTML = '';
+        blockers.classList.add('hidden');
+        blockers.innerHTML = '';
+        form.classList.add('hidden');
+        error.classList.add('hidden');
+        error.textContent = '';
+        submit.disabled = true;
+        submit.textContent = 'HAPUS RECORD';
+        submit.classList.remove('hidden');
+        check.classList.add('hidden');
+        reviewWrap.classList.add('hidden');
+        if (reason) reason.value = '';
+        if (identity) identity.checked = false;
+        if (review) review.checked = false;
+
+        try {
+            const response = await fetch(DUP_CONFIG.deleteUrl + '/' + planId, {
+                headers: { 'Accept': 'application/json' },
+            });
+            const payload = await response.json().catch(function () { return {}; });
+
+            if (!response.ok || !payload.success || !payload.data) {
+                throw new Error(payload.message || 'Gagal memeriksa item.');
+            }
+
+            loading.classList.add('hidden');
+            body.classList.remove('hidden');
+            renderRowDeleteDetail(payload.data);
+        } catch (fetchError) {
+            loading.classList.add('hidden');
+            body.classList.remove('hidden');
+            warning.textContent = fetchError.message;
+            warning.className = 'p-3 rounded-xl border bg-rose-50 text-rose-700 border-rose-200 text-[11px] font-semibold leading-relaxed';
+            warning.classList.remove('hidden');
+            submit.disabled = true;
+            submit.classList.add('hidden');
+        }
+    }
+
+    function renderRowDeleteDetail(detail) {
+        const plan = detail.plan || {};
+        const peers = Array.isArray(detail.peers) ? detail.peers : [];
+        const analysis = detail.analysis || null;
+        const summary = document.getElementById('rowDeleteSummary');
+        const peerEl = document.getElementById('rowDeletePeer');
+        const warning = document.getElementById('rowDeleteWarning');
+        const blockersEl = document.getElementById('rowDeleteBlockers');
+        const form = document.getElementById('rowDeleteForm');
+        const submit = document.getElementById('rowDeleteSubmit');
+        const check = document.getElementById('rowDeleteCheckDuplicate');
+        const reviewWrap = document.getElementById('rowDeleteReviewWrap');
+        const review = document.getElementById('rowDeleteReview');
+        const error = document.getElementById('rowDeleteError');
+
+        const candidates = peers.filter(function (item) {
+            return item.analysis && !item.analysis.is_recovery;
+        });
+        const exact = candidates.find(function (item) {
+            return !item.analysis.requires_review;
+        });
+        const chosen = exact || candidates[0] || null;
+        const requiresReview = !!(chosen && chosen.analysis.requires_review);
+        const rawBlockers = analysis && Array.isArray(analysis.blockers) ? analysis.blockers.slice() : [];
+
+        if (analysis && analysis.is_recovery) {
+            rawBlockers.push('Item berasal dari jadwal Recovery.');
+        }
+
+        const uniqueBlockers = rawBlockers.filter(function (item, index) {
+            return rawBlockers.indexOf(item) === index;
+        });
+
+        ROW_DELETE_STATE = {
+            plan: plan,
+            peers: peers,
+            peer: chosen ? chosen.plan : null,
+            requiresReview: requiresReview,
+            deletable: !!(analysis && analysis.deletable && chosen && uniqueBlockers.length === 0),
+        };
+
+        summary.innerHTML = [
+            rowDeleteSummaryCard('ID Record', '#' + (plan.id || '-')),
+            rowDeleteSummaryCard('Job No', plan.job_no || '-'),
+            rowDeleteSummaryCard('JobMaster', plan.job_master || '-'),
+            rowDeleteSummaryCard('Tanggal', plan.plan_date || '-'),
+            rowDeleteSummaryCard('Shift', plan.shift_name || '-'),
+            rowDeleteSummaryCard('Press', plan.press_name || '-'),
+            rowDeleteSummaryCard('Qty Plan', dupNum(plan.plan_qty), 'text-amber-600'),
+            rowDeleteSummaryCard('Status Produksi', plan.status || '-'),
+            rowDeleteSummaryCard('OK / Repair / Reject', dupNum(plan.ok) + ' / ' + dupNum(plan.repair) + ' / ' + dupNum(plan.reject)),
+            rowDeleteSummaryCard('Jam', (plan.start_time || '-') + ' - ' + (plan.finish_time || '-')),
+        ].join('');
+
+        if (chosen) {
+            const peerPlan = chosen.plan || {};
+            peerEl.innerHTML = '<div class="p-3 rounded-xl border border-emerald-200 bg-emerald-50 text-[11px] text-emerald-800 font-semibold leading-relaxed">'
+                + '<div class="font-black uppercase tracking-wide text-[10px] text-emerald-700">Pasangan duplikat yang dipertahankan</div>'
+                + '<div class="mt-1">#' + dupEsc(peerPlan.id || '-') + ' &bull; ' + dupEsc(peerPlan.job_no || peerPlan.job_master || '-')
+                + ' &bull; ' + dupEsc(peerPlan.start_time || '-') + ' &ndash; ' + dupEsc(peerPlan.finish_time || '-')
+                + (peers.length > 1 ? ' &bull; ' + peers.length + ' pasangan ditemukan, semuanya tetap disimpan' : '')
+                + '</div></div>';
+        } else {
+            peerEl.innerHTML = '';
+        }
+
+        if (!analysis) {
+            warning.textContent = 'Item ini belum terbukti sebagai duplikat. Periksa melalui CEK DUPLIKAT sebelum menghapus.';
+            warning.className = 'p-3 rounded-xl border bg-amber-50 text-amber-800 border-amber-200 text-[11px] font-semibold leading-relaxed';
+            warning.classList.remove('hidden');
+            check.classList.remove('hidden');
+            form.classList.add('hidden');
+            submit.disabled = true;
+            submit.classList.add('hidden');
+            return;
+        }
+
+        if (!chosen) {
+            warning.textContent = peers.length > 0
+                ? 'Pasangan duplikat berasal dari jadwal Recovery. Periksa kedua item melalui menu Recovery.'
+                : 'Item ini belum terbukti sebagai duplikat. Periksa melalui CEK DUPLIKAT sebelum menghapus.';
+            warning.className = 'p-3 rounded-xl border bg-amber-50 text-amber-800 border-amber-200 text-[11px] font-semibold leading-relaxed';
+            warning.classList.remove('hidden');
+            check.classList.toggle('hidden', peers.length > 0);
+            form.classList.add('hidden');
+            submit.disabled = true;
+            submit.classList.add('hidden');
+            return;
+        }
+
+        if (uniqueBlockers.length > 0 || !analysis.deletable) {
+            warning.textContent = 'Item ini tidak dapat dihapus karena masih terhubung dengan data produksi atau relasi yang dilindungi.';
+            warning.className = 'p-3 rounded-xl border bg-rose-50 text-rose-700 border-rose-200 text-[11px] font-semibold leading-relaxed';
+            warning.classList.remove('hidden');
+            blockersEl.innerHTML = uniqueBlockers.map(function (item) {
+                return '<div class="flex items-start gap-2 text-[10px] text-rose-700 font-semibold py-0.5"><span>&#10005;</span><span>' + dupEsc(item) + '</span></div>';
+            }).join('');
+            blockersEl.classList.remove('hidden');
+            form.classList.add('hidden');
+            submit.disabled = true;
+            submit.classList.add('hidden');
+            return;
+        }
+
+        warning.classList.add('hidden');
+        warning.textContent = '';
+        form.classList.remove('hidden');
+        submit.classList.remove('hidden');
+        submit.disabled = false;
+        check.classList.add('hidden');
+        error.classList.add('hidden');
+        error.textContent = '';
+
+        if (requiresReview) {
+            reviewWrap.classList.remove('hidden');
+        } else {
+            reviewWrap.classList.add('hidden');
+            if (review) review.checked = false;
+        }
+    }
+
+    async function submitRowDelete() {
+        const state = ROW_DELETE_STATE;
+        if (!state.plan || !state.peer) {
+            showToast('Item atau pasangan duplikat tidak ditemukan.', 'error');
+            return;
+        }
+        if (!state.deletable) {
+            showToast('Item ini belum dapat dihapus. Periksa kembali status dan relasi produksinya.', 'error');
+            return;
+        }
+
+        const reasonEl = document.getElementById('rowDeleteReason');
+        const identityEl = document.getElementById('rowDeleteIdentity');
+        const reviewEl = document.getElementById('rowDeleteReview');
+        const errorEl = document.getElementById('rowDeleteError');
+        const submit = document.getElementById('rowDeleteSubmit');
+        const reason = (reasonEl ? reasonEl.value : '').trim();
+
+        if (errorEl) {
+            errorEl.classList.add('hidden');
+            errorEl.textContent = '';
+        }
+
+        if (reason.length < 5) {
+            showToast('Alasan penghapusan minimal 5 karakter.', 'warning');
+            if (reasonEl) reasonEl.focus();
+            return;
+        }
+        if (!identityEl || !identityEl.checked) {
+            showToast('Centang konfirmasi identitas record terlebih dahulu.', 'warning');
+            return;
+        }
+        if (state.requiresReview && (!reviewEl || !reviewEl.checked)) {
+            showToast('Centang konfirmasi pemeriksaan detail jadwal terlebih dahulu.', 'warning');
+            return;
+        }
+
+        if (submit) {
+            submit.disabled = true;
+            submit.textContent = 'MENGHAPUS...';
+        }
+
+        try {
+            const response = await fetch(DUP_CONFIG.deleteUrl + '/' + state.plan.id, {
+                method: 'DELETE',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': DUP_CONFIG.csrf,
+                },
+                body: JSON.stringify({
+                    duplicate_of_id: state.peer.id,
+                    reason: reason,
+                    confirm_identity: true,
+                    confirm_review: !!(state.requiresReview && reviewEl && reviewEl.checked),
+                }),
+            });
+
+            const payload = await response.json().catch(function () { return {}; });
+
+            if (!response.ok || !payload.success) {
+                let message = payload.message || 'Gagal menghapus item duplikat.';
+                if (payload.errors) {
+                    const firstKey = Object.keys(payload.errors)[0];
+                    if (firstKey) message = payload.errors[firstKey][0];
+                }
+                if (payload.blockers && payload.blockers.length) {
+                    message += ' ' + payload.blockers.join(' ');
+                }
                 throw new Error(message);
             }
 
+            const deletedId = Number(payload.deleted_id || state.plan.id);
             showToast(payload.message || 'Item duplikat berhasil dihapus.', 'success');
-            setTimeout(function () { window.location.reload(); }, 900);
+
+            const row = document.querySelector('#planTableBody tr[data-id="' + deletedId + '"]');
+            if (row) row.remove();
+
+            closeRowDeleteModal();
+
+            const duplicateModal = document.getElementById('duplicateModal');
+            if (duplicateModal && !duplicateModal.classList.contains('hidden')) {
+                loadDuplicateScan();
+            }
         } catch (error) {
             if (errorEl) {
                 errorEl.textContent = error.message;
                 errorEl.classList.remove('hidden');
             }
             showToast(error.message, 'error');
-            if (submitBtn) {
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'HAPUS SEKARANG';
+            if (submit) {
+                submit.disabled = false;
+                submit.textContent = 'HAPUS RECORD';
             }
         }
     }

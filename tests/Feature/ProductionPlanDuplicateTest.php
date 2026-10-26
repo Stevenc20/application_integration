@@ -7,6 +7,7 @@ use App\Models\RecoveryItem;
 use App\Models\RecoverySchedule;
 use App\Models\User;
 use App\Services\ProductionPlanDuplicateService;
+use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
 uses(RefreshDatabase::class);
@@ -75,6 +76,23 @@ it('groups only items with an identical schedule slot', function () {
         ->and($memberIds)->not->toContain($otherPress->id);
 });
 
+it('keeps duplicate groups separated by plan date', function () {
+    $line = dupLine();
+    dupPlan($line);
+    dupPlan($line);
+    dupPlan($line, ['plan_date' => '2026-10-27']);
+    dupPlan($line, ['plan_date' => '2026-10-27']);
+
+    $groups = dupService()->scan(null, 'PRESS A', 'Pagi');
+
+    expect($groups)->toHaveCount(2)
+        ->and(collect($groups)->pluck('plan_date')->all())->toEqualCanonicalizing(['2026-10-26', '2026-10-27']);
+
+    foreach ($groups as $group) {
+        expect($group['count'])->toBe(2);
+    }
+});
+
 it('ignores break and total rows', function () {
     $line = dupLine();
     dupPlan($line, ['row_type' => 'break', 'job_no' => 'BREAK', 'job_master' => 'ISTIRAHAT']);
@@ -93,8 +111,12 @@ it('deletes only the selected duplicate and records the audit trail', function (
     $result = dupService()->deleteDuplicate($target->id, $kept->id, 'Import ganda revisi PPC', $user->id);
 
     expect($result['success'])->toBeTrue()
+        ->and($result['deleted_id'])->toBe($target->id)
+        ->and($result['kept_id'])->toBe($kept->id)
         ->and(ProductionPlan::find($target->id))->toBeNull()
         ->and(ProductionPlan::find($kept->id))->not->toBeNull();
+
+    expect(dupService()->scan('2026-10-26', 'PRESS A', 'Pagi'))->toBe([]);
 
     $audit = ProductionPlanDuplicateAudit::first();
 
@@ -105,6 +127,80 @@ it('deletes only the selected duplicate and records the audit trail', function (
         ->and($audit->reason)->toBe('Import ganda revisi PPC')
         ->and($audit->snapshot['job_no'])->toBe('DUP-1')
         ->and($audit->snapshot['duplicate_of_id'])->toBe($kept->id);
+});
+
+it('does not report success when the model delete is not applied', function () {
+    $line = dupLine();
+    $user = dupUser();
+    $target = dupPlan($line);
+    $peer = dupPlan($line);
+
+    ProductionPlan::deleting(function () {
+        return false;
+    });
+
+    try {
+        $result = dupService()->deleteDuplicate($target->id, $peer->id, 'Simulasi delete tidak diterapkan', $user->id);
+    } finally {
+        ProductionPlan::flushEventListeners();
+    }
+
+    expect($result['success'])->toBeFalse()
+        ->and($result['code'])->toBe('not_deleted')
+        ->and(ProductionPlan::find($target->id))->not->toBeNull()
+        ->and(ProductionPlan::find($peer->id))->not->toBeNull()
+        ->and(ProductionPlanDuplicateAudit::count())->toBe(0);
+});
+
+it('does not report success when the database rejects the delete', function () {
+    $line = dupLine();
+    $user = dupUser();
+    $target = dupPlan($line);
+    $peer = dupPlan($line);
+
+    ProductionPlan::deleting(function () use ($target) {
+        throw new QueryException(
+            'testing',
+            'delete from production_plans where id = ?',
+            [$target->id],
+            new RuntimeException('Simulasi kegagalan database')
+        );
+    });
+
+    try {
+        $result = dupService()->deleteDuplicate($target->id, $peer->id, 'Simulasi kegagalan database', $user->id);
+    } finally {
+        ProductionPlan::flushEventListeners();
+    }
+
+    expect($result['success'])->toBeFalse()
+        ->and($result['code'])->toBe('constraint')
+        ->and(ProductionPlan::find($target->id))->not->toBeNull()
+        ->and(ProductionPlan::find($peer->id))->not->toBeNull()
+        ->and(ProductionPlanDuplicateAudit::count())->toBe(0);
+});
+
+it('rolls back the delete when the audit trail cannot be saved', function () {
+    $line = dupLine();
+    $user = dupUser();
+    $target = dupPlan($line);
+    $peer = dupPlan($line);
+
+    ProductionPlanDuplicateAudit::creating(function () {
+        return false;
+    });
+
+    try {
+        $result = dupService()->deleteDuplicate($target->id, $peer->id, 'Simulasi audit gagal', $user->id);
+    } finally {
+        ProductionPlanDuplicateAudit::flushEventListeners();
+    }
+
+    expect($result['success'])->toBeFalse()
+        ->and($result['code'])->toBe('failed')
+        ->and(ProductionPlan::find($target->id))->not->toBeNull()
+        ->and(ProductionPlan::find($peer->id))->not->toBeNull()
+        ->and(ProductionPlanDuplicateAudit::count())->toBe(0);
 });
 
 it('blocks deletion when the item already has production activity', function () {
@@ -195,6 +291,32 @@ it('requires manual review confirmation when schedule details differ', function 
         ->and(ProductionPlan::find($peer->id))->not->toBeNull();
 });
 
+it('marks different split sessions as review and still deletes only the selected item after confirmation', function () {
+    $line = dupLine();
+    $user = dupUser();
+    $target = dupPlan($line, ['split_group' => 'G1', 'session_no' => 1]);
+    $peer = dupPlan($line, ['split_group' => 'G1', 'session_no' => 2]);
+
+    $groups = dupService()->scan('2026-10-26', 'PRESS A', 'Pagi');
+
+    expect($groups)->toHaveCount(1)
+        ->and($groups[0]['confidence'])->toBe('review')
+        ->and($groups[0]['count'])->toBe(2);
+
+    $first = dupService()->deleteDuplicate($target->id, $peer->id, 'Sesi split berbeda', $user->id);
+
+    expect($first['success'])->toBeFalse()
+        ->and($first['code'])->toBe('needs_review')
+        ->and(ProductionPlan::find($target->id))->not->toBeNull()
+        ->and(ProductionPlanDuplicateAudit::count())->toBe(0);
+
+    $second = dupService()->deleteDuplicate($target->id, $peer->id, 'Sesi split berbeda', $user->id, true);
+
+    expect($second['success'])->toBeTrue()
+        ->and(ProductionPlan::find($target->id))->toBeNull()
+        ->and(ProductionPlan::find($peer->id))->not->toBeNull();
+});
+
 it('exposes the duplicate scan and guarded delete endpoints', function () {
     $line = dupLine();
     $user = dupUser();
@@ -219,15 +341,86 @@ it('exposes the duplicate scan and guarded delete endpoints', function () {
             'confirm_identity' => true,
         ])
         ->assertOk()
-        ->assertJsonPath('success', true);
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('deleted_id', $target->id)
+        ->assertJsonPath('kept_id', $kept->id);
 
     expect(ProductionPlan::find($target->id))->toBeNull()
         ->and(ProductionPlan::find($kept->id))->not->toBeNull()
         ->and(ProductionPlanDuplicateAudit::count())->toBe(1);
+
+    $this->actingAs($user)
+        ->getJson(route('ppc.planning.production_plan.duplicates', [
+            'date' => '2026-10-26',
+            'press' => 'PRESS A',
+            'shift' => 'Pagi',
+        ]))
+        ->assertOk()
+        ->assertJsonPath('meta.group_count', 0)
+        ->assertJsonPath('data', []);
+});
+
+it('returns the selected row and its duplicate peer for the row delete modal', function () {
+    $line = dupLine();
+    $user = dupUser();
+    $target = dupPlan($line);
+    $peer = dupPlan($line);
+    $unique = dupPlan($line, ['start_time' => '13:00', 'finish_time' => '17:00']);
+
+    $this->actingAs($user)
+        ->getJson(route('ppc.planning.production_plan.duplicate_detail', $target->id))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.plan.id', $target->id)
+        ->assertJsonPath('data.plan.job_no', 'DUP-1')
+        ->assertJsonPath('data.plan.plan_date', '2026-10-26')
+        ->assertJsonPath('data.plan.shift_name', 'Shift Pagi')
+        ->assertJsonPath('data.plan.press_name', 'PRESS A')
+        ->assertJsonPath('data.plan.status', 'pending')
+        ->assertJsonPath('data.peers.0.plan.id', $peer->id)
+        ->assertJsonPath('data.analysis.deletable', true);
+
+    $this->actingAs($user)
+        ->getJson(route('ppc.planning.production_plan.duplicate_detail', $unique->id))
+        ->assertOk()
+        ->assertJsonPath('success', true)
+        ->assertJsonPath('data.plan.id', $unique->id)
+        ->assertJsonPath('data.peers', []);
+});
+
+it('returns a blocked response without deleting when the endpoint target has activity', function () {
+    $line = dupLine();
+    $user = dupUser();
+    $target = dupPlan($line, ['ok' => 10]);
+    $peer = dupPlan($line);
+
+    $this->actingAs($user)
+        ->deleteJson(route('ppc.planning.production_plan.duplicate_delete', $target->id), [
+            'duplicate_of_id' => $peer->id,
+            'reason' => 'Coba hapus item aktif lewat endpoint',
+            'confirm_identity' => true,
+        ])
+        ->assertStatus(422)
+        ->assertJsonPath('success', false)
+        ->assertJsonPath('code', 'blocked')
+        ->assertJsonPath('blockers.0', 'Item sudah memiliki aktivitas atau aktual produksi.');
+
+    $this->actingAs($user)
+        ->getJson(route('ppc.planning.production_plan.duplicate_detail', $target->id))
+        ->assertOk()
+        ->assertJsonPath('data.analysis.deletable', false)
+        ->assertJsonPath('data.analysis.blockers.0', 'Item sudah memiliki aktivitas atau aktual produksi.');
+
+    expect(ProductionPlan::find($target->id))->not->toBeNull()
+        ->and(ProductionPlan::find($peer->id))->not->toBeNull()
+        ->and(ProductionPlanDuplicateAudit::count())->toBe(0);
 });
 
 it('renders the duplicate checker entry point on the planning page', function () {
+    $line = dupLine();
     $user = dupUser();
+    $target = dupPlan($line);
+    dupPlan($line);
 
     $this->actingAs($user)
         ->get(route('ppc.planning.production_plan', [
@@ -237,7 +430,14 @@ it('renders the duplicate checker entry point on the planning page', function ()
         ]))
         ->assertOk()
         ->assertSee('CEK DUPLIKAT', false)
-        ->assertSee('duplicateModal', false);
+        ->assertSee('duplicateModal', false)
+        ->assertSee('Job No:', false)
+        ->assertSee('Status aktivitas:', false)
+        ->assertSee('#planTableBody tr[data-id=', false)
+        ->assertSee('openRowDeleteModal('.$target->id.')', false)
+        ->assertSee('rowDeleteModal', false)
+        ->assertSee('HAPUS ITEM PRODUCTION PLAN', false)
+        ->assertSee('BUKA CEK DUPLIKAT', false);
 });
 
 it('rejects the delete endpoint without reason and identity confirmation', function () {

@@ -120,7 +120,7 @@ class ProductionPlanDuplicateService
      * Delete exactly one selected duplicate. The peer is only used to prove the
      * pair shares the same schedule slot; it is never deleted.
      *
-     * @return array{success: bool, code: string, message: string, blockers?: array<int, string>}
+     * @return array{success: bool, code: string, message: string, blockers?: array<int, string>, deleted_id?: int, kept_id?: int}
      */
     public function deleteDuplicate(
         int $planId,
@@ -170,32 +170,48 @@ class ProductionPlanDuplicateService
             return $this->failure('both_active', 'Kedua item sudah memiliki progres produksi. Pemeriksaan manual diperlukan; tidak ada item yang dihapus.', ['Kedua item memiliki aktivitas produksi.']);
         }
 
-        $snapshot = $plan->toArray();
-        $snapshot['duplicate_of_id'] = $peer->id;
-        $snapshot['duplicate_of_job_no'] = $peer->job_no;
-        $snapshot['duplicate_of_job_master'] = $peer->job_master;
+        $deleted = false;
 
         try {
-            DB::transaction(function () use ($plan, $peer, $reason, $userId, $snapshot) {
-                ProductionPlanDuplicateAudit::create([
-                    'production_plan_id' => $plan->id,
+            $deleted = DB::transaction(function () use ($planId, $peer, $reason, $userId) {
+                $lockedPlan = ProductionPlan::whereKey($planId)->lockForUpdate()->first();
+
+                if (! $lockedPlan) {
+                    return false;
+                }
+
+                $snapshot = $lockedPlan->toArray();
+                $snapshot['duplicate_of_id'] = $peer->id;
+                $snapshot['duplicate_of_job_no'] = $peer->job_no;
+                $snapshot['duplicate_of_job_master'] = $peer->job_master;
+
+                if (! $lockedPlan->delete() || ProductionPlan::whereKey($planId)->exists()) {
+                    return false;
+                }
+
+                $audit = ProductionPlanDuplicateAudit::create([
+                    'production_plan_id' => $planId,
                     'duplicate_of_id' => $peer->id,
                     'action' => 'deleted',
-                    'job_no' => $plan->job_no,
-                    'job_master' => $plan->job_master,
-                    'plan_date' => $plan->plan_date,
-                    'shift_name' => $plan->shift_name,
-                    'press_name' => $plan->press_name,
-                    'start_time' => $plan->start_time,
-                    'finish_time' => $plan->finish_time,
-                    'plan_qty' => (float) ($plan->plan ?? $plan->target_qty ?? 0),
+                    'job_no' => $lockedPlan->job_no,
+                    'job_master' => $lockedPlan->job_master,
+                    'plan_date' => $lockedPlan->plan_date,
+                    'shift_name' => $lockedPlan->shift_name,
+                    'press_name' => $lockedPlan->press_name,
+                    'start_time' => $lockedPlan->start_time,
+                    'finish_time' => $lockedPlan->finish_time,
+                    'plan_qty' => (float) ($lockedPlan->plan ?? $lockedPlan->target_qty ?? 0),
                     'reason' => $reason,
                     'snapshot' => $snapshot,
                     'deleted_by' => $userId,
                     'deleted_at' => now(),
                 ]);
 
-                $plan->delete();
+                if (! $audit->exists) {
+                    throw new \RuntimeException('Audit penghapusan duplikat gagal disimpan.');
+                }
+
+                return true;
             });
         } catch (QueryException $e) {
             return $this->failure('constraint', 'Item tidak dapat dihapus karena masih direferensikan oleh data lain. Periksa relasi produksi/recovery terlebih dahulu.');
@@ -205,10 +221,16 @@ class ProductionPlanDuplicateService
             return $this->failure('failed', 'Terjadi kesalahan saat menghapus item. Tidak ada data yang diubah.');
         }
 
+        if (! $deleted || ProductionPlan::whereKey($planId)->exists()) {
+            return $this->failure('not_deleted', 'Item tidak terhapus dan tidak ada perubahan data yang disimpan. Muat ulang daftar lalu coba lagi.');
+        }
+
         return [
             'success' => true,
             'code' => 'deleted',
-            'message' => 'Item duplikat berhasil dihapus. Pasangan duplikat tetap dipertahankan.',
+            'message' => 'Item duplikat #'.$planId.' berhasil dihapus. Pasangan duplikat #'.$peerId.' tetap dipertahankan.',
+            'deleted_id' => $planId,
+            'kept_id' => $peerId,
         ];
     }
 
