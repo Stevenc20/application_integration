@@ -16,6 +16,7 @@ Use App\Http\Controllers\Operational\InputHarianController;
 use App\Http\Controllers\Operational\DandoriController;
 use App\Http\Controllers\PullAheadController;
 use App\Http\Controllers\Ppc\ProductionPlanController;
+use App\Http\Controllers\Ppc\ProductionPlanDuplicateController;
 use App\Http\Controllers\Planning\ProductionLineController;
 use App\Http\Controllers\Ppc\RundownController;
 use App\Http\Controllers\Ppc\RundownPressController;
@@ -714,6 +715,12 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(func
         Route::post('/production-plan/move',           [ProductionPlanController::class, 'movePlanItem'])->name('production_plan.move');
         Route::post('/production-plan/force-overflow', [ProductionPlanController::class, 'forceOverflow'])->name('production_plan.force_overflow');
         Route::post('/production-plan/{id}/recalculate',[ProductionPlanController::class, 'recalculate'])->name('production_plan.recalculate');
+
+        // Duplicate detection (read-only) + guarded single-item delete
+        Route::get('/production-plan/duplicates',       [ProductionPlanDuplicateController::class, 'index'])->name('production_plan.duplicates');
+        Route::get('/production-plan/duplicates/{id}',  [ProductionPlanDuplicateController::class, 'show'])->name('production_plan.duplicate_detail');
+        Route::delete('/production-plan/duplicates/{id}',[ProductionPlanDuplicateController::class, 'destroy'])->name('production_plan.duplicate_delete');
+
         Route::get('/production-plan/{id}',            [ProductionPlanController::class, 'show']   )->name('production_plan.show');
         Route::put('/production-plan/{id}',            [ProductionPlanController::class, 'update'] )->name('production_plan.update');
         Route::delete('/production-plan/{id}',         [ProductionPlanController::class, 'destroy'])->name('production_plan.destroy');
