@@ -373,7 +373,7 @@
                             </div>
                             <div class="flex flex-col gap-0.5">
                                 <span class="label">PIC</span>
-                                <span class="value">{{ $item->signer?->name ?? $item->pic_hambatan ?? '-' }}</span>
+                                <span class="value">{{ $item->pic_hambatan ?? $item->signer?->name ?? '-' }}</span>
                             </div>
                             <div class="flex flex-col gap-0.5">
                                 <span class="label">Waktu</span>

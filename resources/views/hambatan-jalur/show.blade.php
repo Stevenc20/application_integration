@@ -372,7 +372,7 @@
             {{-- PIC HAMBATAN --}}
             <tr>
                 <td class="hj-label">PIC<br>HAMBATAN</td>
-                <td colspan="2" class="hj-value">@if($item->signature_image && $item->signer){{ $item->signer->name }} ({{ $item->signer->nrp }})@else{{ $item->pic_hambatan ?? '________________________' }}@endif</td>
+                <td colspan="2" class="hj-value">{{ $item->pic_hambatan ?? '________________________' }}</td>
             </tr>
             {{-- WAKTU --}}
             <tr>
