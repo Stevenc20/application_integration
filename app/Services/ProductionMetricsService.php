@@ -262,4 +262,36 @@ class ProductionMetricsService
             || str_contains($type, 'Q CHECK')
             || str_contains($type, 'QUALITY');
     }
+
+    /**
+     * Resolves the current production date (Work Date).
+     * Manufacturing operational shifts:
+     * - Shift Pagi: 07:30 - 21:00 (work_date = current calendar date)
+     * - Shift Malam: 21:00 - 07:30 (work_date = starting calendar date; between 00:00 - 07:29, work_date is yesterday)
+     */
+    public static function currentProductionDate(?\Carbon\CarbonInterface $now = null): string
+    {
+        $time = $now ? \Carbon\Carbon::parse($now) : \Carbon\Carbon::now();
+        $minutes = $time->hour * 60 + $time->minute;
+
+        // Cutoff at 07:30 (450 minutes)
+        return $minutes < 450 ? $time->copy()->subDay()->toDateString() : $time->toDateString();
+    }
+
+    /**
+     * Resolves the active production shift name.
+     * Shift Pagi: 07:30 - 21:00 (450 - 1259 minutes)
+     * Shift Malam: 21:00 - 07:30 (< 450 or >= 1260 minutes)
+     */
+    public static function currentProductionShift(?\Carbon\CarbonInterface $now = null): string
+    {
+        $time = $now ? \Carbon\Carbon::parse($now) : \Carbon\Carbon::now();
+        $minutes = $time->hour * 60 + $time->minute;
+
+        if ($minutes >= 450 && $minutes < 1260) {
+            return 'Shift Pagi';
+        }
+
+        return 'Shift Malam';
+    }
 }

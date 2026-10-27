@@ -8,6 +8,7 @@ use App\Models\JobMaster;
 use App\Models\Downtime;
 use App\Models\DailyProduction;
 use App\Models\ProductionSession;
+use App\Services\ProductionMetricsService;
 use App\Services\ProductionService;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -20,12 +21,11 @@ class AutoBreakTime extends Command
     public function handle(ProductionService $productionService): int
     {
         $now = Carbon::now();
-        $today = $now->toDateString();
-        $currentHour = (int) $now->format('H');
+        $productionDate = ProductionMetricsService::currentProductionDate($now);
         $currentDay = strtolower($now->format('l'));
         $currentMinutes = $now->hour * 60 + $now->minute;
 
-        $shiftName = ($currentHour >= 7 && $currentHour < 19) ? 'Shift Pagi' : 'Shift Malam';
+        $shiftName = ProductionMetricsService::currentProductionShift($now);
 
         $breaks = MasterBreakTime::where('is_active', true)
             ->where(function ($q) use ($currentDay) {
@@ -41,8 +41,8 @@ class AutoBreakTime extends Command
         }
 
         $runningJobs = JobMaster::whereIn('status', ['running', 'paused'])
-            ->whereHas('productionSessions', function ($q) use ($today) {
-                $q->where('work_date', $today)->whereIn('status', ['running', 'paused']);
+            ->whereHas('productionSessions', function ($q) use ($productionDate) {
+                $q->where('work_date', $productionDate)->whereIn('status', ['running', 'paused']);
             })
             ->get();
 
@@ -52,6 +52,8 @@ class AutoBreakTime extends Command
 
         $breakCount = 0;
         foreach ($runningJobs as $job) {
+            $effectiveWorkDate = $productionService->resolveWorkDate($job->id, $productionDate);
+
             $activeBreak = Downtime::where('job_master_id', $job->id)
                 ->whereNull('finish_time')
                 ->where('jenis_downtime', 'break time')
@@ -83,7 +85,7 @@ class AutoBreakTime extends Command
                 ]);
 
                 $session = ProductionSession::where('job_master_id', $job->id)
-                    ->whereDate('work_date', $today)
+                    ->whereDate('work_date', $effectiveWorkDate)
                     ->where('status', 'running')
                     ->first();
                 if ($session) {
@@ -104,18 +106,28 @@ class AutoBreakTime extends Command
                     'duration_seconds' => $duration,
                 ]);
 
+                $windowStart = Carbon::parse($effectiveWorkDate)->setTime(7, 0, 0);
+                $windowEnd = Carbon::parse($effectiveWorkDate)->addDay()->setTime(7, 30, 0);
+
                 $totalDowntime = Downtime::where('job_master_id', $job->id)
-                    ->whereDate('created_at', $today)
                     ->where('jenis_downtime', '!=', 'dandori')
+                    ->where(function ($q) use ($windowStart, $windowEnd, $effectiveWorkDate) {
+                        $q->whereBetween('start_time', [$windowStart, $windowEnd])
+                          ->orWhere(function ($sub) use ($windowStart, $windowEnd) {
+                              $sub->whereNull('start_time')
+                                  ->whereBetween('created_at', [$windowStart, $windowEnd]);
+                          })
+                          ->orWhereDate('created_at', $effectiveWorkDate);
+                    })
                     ->sum('duration_seconds');
 
                 DailyProduction::updateOrCreate(
-                    ['job_master_id' => $job->id, 'work_date' => $today],
+                    ['job_master_id' => $job->id, 'work_date' => $effectiveWorkDate],
                     ['downtime_seconds' => $totalDowntime]
                 );
 
                 $session = ProductionSession::where('job_master_id', $job->id)
-                    ->whereDate('work_date', $today)
+                    ->whereDate('work_date', $effectiveWorkDate)
                     ->where('status', 'paused')
                     ->first();
                 if ($session) {

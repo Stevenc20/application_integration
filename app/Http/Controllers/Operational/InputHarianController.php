@@ -32,7 +32,7 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
             $result = $this->productionService->saveProductionLog($id, $request->all(), $workDate);
 
             return response()->json([
@@ -81,18 +81,14 @@ class InputHarianController extends Controller
         }
 
         // LOGIKA TANGGAL PRODUKSI (Work Date) & SHIFT - Shift Pagi: 07:30-21:00 | Shift Malam: 21:00-07:30
-        $h = (int) now()->format('H');
-        $m = (int) now()->format('i');
-        $timeInMin = $h * 60 + $m;
-        $hour = $h;
-        $date = $request->get('date') ?: (($timeInMin < 450) ? now()->subDay()->toDateString() : now()->toDateString());
+        $date = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
 
         $autoShift = $this->getShift(); // 07:30 - 21:00 -> Shift Pagi, selain itu -> Shift Malam
         $currentShift = $request->filled('shift') ? $request->get('shift') : $autoShift;
 
         // SAFEGUARD: hanya izinkan akses ke tanggal produksi aktif (hari ini atau kemarin jika sebelum 07:30)
         // Data tanggal lewat sudah otomatis di-cleanup oleh scheduler dan tersimpan di Production Analytics
-        $activeDate = ($timeInMin < 450) ? now()->subDay()->toDateString() : now()->toDateString();
+        $activeDate = \App\Services\ProductionMetricsService::currentProductionDate();
         if ($request->has('date') && $request->get('date') < $activeDate) {
             return redirect()->route('operational.input_harian', array_merge(
                 $request->except('date'),
@@ -277,7 +273,8 @@ class InputHarianController extends Controller
         // 4. DATE-AWARE ACTIVE JOB
         // Historical only when ALL job items in this date/shift have been processed (have DailyProduction).
         $isHistorical = false;
-        if ($date !== now()->toDateString()) {
+        $currentWorkDate = \App\Services\ProductionMetricsService::currentProductionDate();
+        if ($date < $currentWorkDate) {
             $allPlans = \App\Models\ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $latestShiftName)
                 ->where('row_type', 'job')
@@ -640,7 +637,7 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
-            $workDate = now()->toDateString();
+            $workDate = \App\Services\ProductionMetricsService::currentProductionDate();
             $downtime = $this->productionService->startDandori($id, $workDate);
             return response()->json(['success' => true, 'downtime' => $downtime]);
         } catch (\Throwable $e) {
@@ -652,7 +649,7 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
             $downtime = $this->productionService->startDandori($id, $workDate);
             return response()->json(['success' => true, 'downtime' => $downtime]);
         } catch (\Throwable $e) {
@@ -664,7 +661,7 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($jobId);
         try {
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
             $this->productionService->cancelDandori($jobId, $workDate);
             return response()->json(['success' => true, 'message' => 'Dandori berhasil dibatalkan dan job kembali standby.']);
         } catch (\Throwable $e) {
@@ -679,7 +676,7 @@ class InputHarianController extends Controller
             // Close any open 1st check before finishing dandori
             $this->productionService->finishFirstCheck($jobId);
 
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
             $this->productionService->finishDandori($jobId, $workDate);
 
             // Clear cache was_in_first_check if any exists
@@ -695,7 +692,7 @@ class InputHarianController extends Controller
     {
         $this->guardLockedShift($id);
         try {
-            $workDate = $request->get('date') ?: now()->toDateString();
+            $workDate = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
             $dandori = $this->productionService->startFirstCheck($id, $workDate);
             return response()->json(['success' => true, 'dandori' => $dandori]);
         } catch (\Throwable $e) {
@@ -789,9 +786,10 @@ class InputHarianController extends Controller
     public function status(int|string $id)
     {
         $job = JobMaster::find($id);
+        $workDate = $this->productionService->resolveWorkDate($id);
         
         $session = ProductionSession::where('job_master_id', $id)
-            ->whereDate('work_date', now()->toDateString())
+            ->whereDate('work_date', $workDate)
             ->first();
 
         // Use base total_seconds. Javascript will calculate and add the running diff.
@@ -874,7 +872,7 @@ class InputHarianController extends Controller
             }
         }
 
-        $date = $date ?: now()->toDateString();
+        $date = $date ?: \App\Services\ProductionMetricsService::currentProductionDate();
         $shift = $shift ?: $this->getShiftFromRequest();
         $shiftVal = str_contains(strtoupper($shift), 'MALAM') ? 2 : 1;
 
@@ -947,7 +945,7 @@ class InputHarianController extends Controller
     public function activeJob(Request $request)
     {
         $lineFilter = $request->get('line');
-        $date = $request->get('date') ?: now()->toDateString();
+        $date = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
         $normalizedLine = '';
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
@@ -1043,7 +1041,7 @@ class InputHarianController extends Controller
             $lineParam = 'Handwork';
         }
 
-        $workDate = $session ? $session->work_date : now()->toDateString();
+        $workDate = $session ? $session->work_date : \App\Services\ProductionMetricsService::currentProductionDate();
         if ($plan) {
             $urlParams = [
                 'line'  => $lineParam,
@@ -1182,7 +1180,7 @@ class InputHarianController extends Controller
 
     public function getQty(Request $request, int|string $id)
     {
-        $date = $request->get('date') ?: now()->toDateString();
+        $date = $request->get('date') ?: $this->productionService->resolveWorkDate($id);
         $daily = DailyProduction::where('job_master_id', $id)
             ->where('work_date', $date)
             ->first();
@@ -1198,7 +1196,7 @@ class InputHarianController extends Controller
     public function submitShift(Request $request, int|string $lineId)
     {
         try {
-            $date = $request->get('date', now()->toDateString());
+            $date = $request->get('date', \App\Services\ProductionMetricsService::currentProductionDate());
             $comment = $request->input('comment');
             [$lineMaster, $shiftMasterId, $shiftName, $shiftValue] = $this->resolveSubmitContext($request, $lineId);
 
@@ -1583,7 +1581,7 @@ class InputHarianController extends Controller
     public function cancelShift(Request $request, int|string $lineId)
     {
         try {
-            $date = $request->get('date', now()->toDateString());
+            $date = $request->get('date', \App\Services\ProductionMetricsService::currentProductionDate());
             $comment = $request->input('comment');
             [$lineMaster, $shiftMasterId, $shiftName, $shiftValue] = $this->resolveSubmitContext($request, $lineId);
 

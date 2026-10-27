@@ -19,15 +19,38 @@ use App\Services\DashboardRealtimeService;
 class ProductionService
 {
     /**
+     * Resolve the work date for a job context.
+     * Checks if there's an active/existing ProductionSession for this job.
+     * Otherwise falls back to current production work date (considering night shift cutoff).
+     */
+    public function resolveWorkDate(?int $jobId = null, ?string $fallbackDate = null): string
+    {
+        if ($fallbackDate) {
+            return $fallbackDate;
+        }
+
+        if ($jobId) {
+            $sessionDate = ProductionSession::where('job_master_id', $jobId)
+                ->orderByDesc('id')
+                ->value('work_date');
+            if ($sessionDate) {
+                return $sessionDate;
+            }
+        }
+
+        return ProductionMetricsService::currentProductionDate();
+    }
+    /**
      * Start a job and its session.
      */
-    public function startJob(int $jobId, bool $enqueueOnly = false)
+    public function startJob(int $jobId, bool $enqueueOnly = false, ?string $workDate = null)
     {
-        return DB::transaction(function () use ($jobId, $enqueueOnly) {
+        return DB::transaction(function () use ($jobId, $enqueueOnly, $workDate) {
+            $effectiveWorkDate = $this->resolveWorkDate($jobId, $workDate);
             $session = ProductionSession::firstOrCreate(
                 [
                     'job_master_id' => $jobId,
-                    'work_date' => now()->toDateString()
+                    'work_date' => $effectiveWorkDate
                 ]
             );
 
@@ -94,7 +117,7 @@ class ProductionService
     public function startDandori(int $jobId, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $workDate) {
-            $workDate = $workDate ?: now()->toDateString();
+            $workDate = $this->resolveWorkDate($jobId, $workDate);
             $job = JobMaster::findOrFail($jobId);
             
             // Auto cut-off: Stop and complete any other running job on the same line
@@ -186,7 +209,7 @@ class ProductionService
     {
         return DB::transaction(function () use ($jobId, $workDate) {
             $job = JobMaster::findOrFail($jobId);
-            $workDate = $workDate ?: now()->toDateString();
+            $workDate = $this->resolveWorkDate($jobId, $workDate);
 
             // 1. Hapus downtime dandori yang masih berjalan (finish_time is null)
             Downtime::where('job_master_id', $jobId)
@@ -233,7 +256,7 @@ class ProductionService
     {
         return DB::transaction(function () use ($jobId, $workDate) {
             $now = now();
-            $targetDate = $workDate ?: now()->toDateString();
+            $targetDate = $this->resolveWorkDate($jobId, $workDate);
             $downtimes = Downtime::where('job_master_id', $jobId)
                 ->where('jenis_downtime', 'dandori')
                 ->whereNull('finish_time')
@@ -291,7 +314,7 @@ class ProductionService
     public function startFirstCheck(int $jobId, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $workDate) {
-            $workDate = $workDate ?: now()->toDateString();
+            $workDate = $this->resolveWorkDate($jobId, $workDate);
             $job = JobMaster::findOrFail($jobId);
             $now = now();
 
@@ -360,7 +383,7 @@ class ProductionService
     public function saveProductionLog(int $jobId, array $data, ?string $workDate = null)
     {
         return DB::transaction(function () use ($jobId, $data, $workDate) {
-            $workDate = $workDate ?: now()->toDateString();
+            $workDate = $this->resolveWorkDate($jobId, $workDate);
 
             $job = JobMaster::find($jobId);
             if ($job && in_array(strtolower($job->status), ['complete', 'finished', 'closed', 'done'])) {
@@ -446,10 +469,11 @@ class ProductionService
     public function pauseJob(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
+            $workDate = $this->resolveWorkDate($jobId);
             $runtime = $this->calculateRuntime($jobId);
 
             $session = ProductionSession::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
+                ->whereDate('work_date', $workDate)
                 ->first();
 
             if ($session) {
@@ -463,7 +487,7 @@ class ProductionService
             $this->syncPlanStatus($jobId, 'paused');
 
             DailyProduction::updateOrCreate(
-                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()],
+                ['job_master_id' => $jobId, 'work_date' => $workDate],
                 ['runtime_seconds' => $runtime]
             );
 
@@ -479,8 +503,9 @@ class ProductionService
     public function resumeJob(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
+            $workDate = $this->resolveWorkDate($jobId);
             $session = ProductionSession::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
+                ->whereDate('work_date', $workDate)
                 ->first();
 
             if ($session) {
@@ -504,8 +529,9 @@ class ProductionService
     public function restartJob(int $jobId)
     {
         return DB::transaction(function () use ($jobId) {
+            $workDate = $this->resolveWorkDate($jobId);
             $session = ProductionSession::firstOrCreate(
-                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()]
+                ['job_master_id' => $jobId, 'work_date' => $workDate]
             );
 
             $session->total_seconds = 0;
@@ -523,7 +549,7 @@ class ProductionService
             $this->syncPlanStatus($jobId, 'running');
 
             DailyProduction::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
+                ->whereDate('work_date', $workDate)
                 ->update(['runtime_seconds' => 0]);
 
             $this->signalDashboard($jobId);
@@ -538,6 +564,8 @@ class ProductionService
     public function finishJob(int $jobId, int|string|null $nextJobId = null, bool $skipIdle = false, int|float|null $finalOk = null, int|float|null $finalRepair = null, int|float|null $finalReject = null, array $skippedActions = [], ?string $reasonNotAchieved = null)
     {
         return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions, $reasonNotAchieved) {
+            $workDate = $this->resolveWorkDate($jobId);
+
             // Auto-close any active downtimes for this job
             Downtime::where('job_master_id', $jobId)
                 ->whereNull('finish_time')
@@ -546,7 +574,7 @@ class ProductionService
             $runtime = $this->calculateRuntime($jobId);
 
             $session = ProductionSession::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
+                ->whereDate('work_date', $workDate)
                 ->first();
 
             if ($session) {
@@ -566,7 +594,7 @@ class ProductionService
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
                 // Finalisasi: replace semua log dengan nilai final
                 ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', now()->toDateString())
+                    ->whereDate('created_at', $workDate)
                     ->delete();
                 ProductionLog::create([
                     'job_master_id' => $jobId,
@@ -578,13 +606,13 @@ class ProductionService
                 $totalRepair = $finalRepair ?? 0;
                 $totalReject = $finalReject ?? 0;
             } else {
-                $totalOk     = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', now()->toDateString())->sum('ok_qty');
-                $totalRepair = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', now()->toDateString())->sum('repair_qty');
-                $totalReject = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', now()->toDateString())->sum('reject_qty');
+                $totalOk     = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('ok_qty');
+                $totalRepair = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('repair_qty');
+                $totalReject = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('reject_qty');
             }
 
             DailyProduction::updateOrCreate(
-                ['job_master_id' => $jobId, 'work_date' => now()->toDateString()],
+                ['job_master_id' => $jobId, 'work_date' => $workDate],
                 [
                     'runtime_seconds' => $runtime,
                     'actual_ok'       => $totalOk,
@@ -659,7 +687,7 @@ class ProductionService
                                 'user_id' => Auth::id(),
                                 'line_id' => $lineId,
                                 'line_name' => $lineName,
-                                'work_date' => now()->toDateString(),
+                                'work_date' => $workDate,
                                 'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
                                 'target_qty' => (int) $planQty,
                                 'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
@@ -702,7 +730,7 @@ class ProductionService
                                 'user_id' => Auth::id(),
                                 'line_id' => $lineId,
                                 'line_name' => $lineName,
-                                'work_date' => now()->toDateString(),
+                                'work_date' => $workDate,
                                 'shift' => request()->header('X-Shift') ?: request('shift') ?: $this->getShift(),
                                 'target_qty' => (int) $planQty,
                                 'actual_ok' => (int) ($finalOk ?? $totalOk ?? 0),
@@ -973,14 +1001,15 @@ class ProductionService
             if (!$downtime) return false;
 
             $jobId = $downtime->job_master_id;
+            $workDate = $this->resolveWorkDate($jobId);
             $downtime->delete();
 
             $totalDowntime = Downtime::where('job_master_id', $jobId)
-                ->whereDate('created_at', now()->toDateString())
+                ->whereDate('created_at', $workDate)
                 ->sum('duration_seconds');
 
             DailyProduction::where('job_master_id', $jobId)
-                ->whereDate('work_date', now()->toDateString())
+                ->whereDate('work_date', $workDate)
                 ->update(['downtime_seconds' => $totalDowntime]);
 
             $this->signalDashboard($jobId);
@@ -994,8 +1023,9 @@ class ProductionService
      */
     public function calculateRuntime(int $jobId)
     {
+        $workDate = $this->resolveWorkDate($jobId);
         $session = ProductionSession::where('job_master_id', $jobId)
-            ->whereDate('work_date', now()->toDateString())
+            ->whereDate('work_date', $workDate)
             ->first();
 
         if (!$session) return 0;
@@ -1042,7 +1072,7 @@ class ProductionService
                 }
             }
 
-            $workDate = $workDate ?: now()->toDateString();
+            $workDate = $workDate ?: $this->resolveWorkDate($jobId);
             $shiftName = $shiftName ?: $this->getShift();
 
             $sessionForDowntime = ProductionSession::where('job_master_id', $jobId)
@@ -1131,7 +1161,7 @@ class ProductionService
         
         // Cek sesi aktif untuk mendapatkan work_date yang sebenarnya
         $session = \App\Models\ProductionSession::where('job_master_id', $jobId)->orderByDesc('id')->first();
-        $targetDate = $session?->work_date ?: now()->toDateString();
+        $targetDate = $session?->work_date ?: ProductionMetricsService::currentProductionDate();
 
         $plan = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
             ->where('row_type', 'job')
@@ -1160,7 +1190,7 @@ class ProductionService
 
     private function createRecoveryItem(?\App\Models\ProductionPlan $plan, JobMaster $job, int|float $actualOk, float $recoveryQty, string $status, bool $isUnresolvable = false)
     {
-        $date = now()->toDateString();
+        $date = $this->resolveWorkDate($job->id);
         $shiftName = $this->getShift();
         $schedule = \App\Models\RecoverySchedule::firstOrCreate(
             [
@@ -1319,8 +1349,9 @@ class ProductionService
 
             // Jika salah satu kuantitas bernilai null, ambil secara dinamis dari database harian
             if ($ok === null || $repair === null || $reject === null) {
+                $workDate = $this->resolveWorkDate($jobId);
                 $daily = \App\Models\DailyProduction::where('job_master_id', $jobId)
-                    ->whereDate('work_date', now()->toDateString())
+                    ->whereDate('work_date', $workDate)
                     ->first();
                 if ($daily) {
                     $ok = $ok ?? $daily->actual_qty;
@@ -1328,11 +1359,11 @@ class ProductionService
                     $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
                 } else {
                     $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', now())->sum('ok_qty');
+                        ->whereDate('created_at', $workDate)->sum('ok_qty');
                     $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', now())->sum('repair_qty');
+                        ->whereDate('created_at', $workDate)->sum('repair_qty');
                     $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', now())->sum('reject_qty');
+                        ->whereDate('created_at', $workDate)->sum('reject_qty');
                 }
             }
 

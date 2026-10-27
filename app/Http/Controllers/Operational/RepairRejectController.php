@@ -29,7 +29,7 @@ class RepairRejectController extends Controller
 
         $shift = request()->header('X-Shift') ?: request('shift', $this->getShift());
         $shiftVal = str_contains(strtoupper($shift), 'MALAM') ? 2 : 1;
-        $date = request()->header('X-Date') ?: request('date', now()->toDateString());
+        $date = request()->header('X-Date') ?: request('date', \App\Services\ProductionMetricsService::currentProductionDate());
 
         $locked = ShiftSubmission::where([
             'line_id' => $lineMaster->id,

@@ -21,14 +21,10 @@ class ItemCheckController extends Controller
         if ($filterDate) {
             $targetDate = Carbon::parse($filterDate);
         } else {
-            // Jam 00:00 - 07:59 adalah jam lembur / kelanjutan Shift Malam kemarin.
-            // Cek apakah tanggal hari ini sudah memiliki data schedule, jika belum ada, pakai tanggal kemarin.
-            if ($hour < 8) {
-                $hasTodaySchedule = ProductionSchedule::whereDate('tanggal_produksi', Carbon::today())->exists();
-                $targetDate = $hasTodaySchedule ? Carbon::today() : Carbon::yesterday();
-            } else {
-                $targetDate = Carbon::today();
-            }
+            // Cutoff jam kerja adalah pukul 07:30 (Work Date standar).
+            // Sebelum jam 07:30 pagi, targetDate tetap tanggal kemarin (Shift Malam).
+            $workDateStr = \App\Services\ProductionMetricsService::currentProductionDate();
+            $targetDate = Carbon::parse($workDateStr);
         }
         
         // Lakukan sinkronisasi jadwal Produksi riil (dari db_integration) otomatis jika melihat hari ini atau shift malam aktif

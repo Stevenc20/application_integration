@@ -83,14 +83,14 @@ class ReportController extends Controller
         // 2. Date Filter
         $date = $request->get('date');
         if (! $date) {
-            $hour = (int) now()->format('H');
-            $date = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
+            $date = \App\Services\ProductionMetricsService::currentProductionDate();
         } else {
             $date = \Carbon\Carbon::parse($date)->toDateString();
         }
 
         // 3. Shift Filter
-        $selectedShift = $request->get('shift', 'Shift Pagi');
+        $defaultShift = \App\Services\ProductionMetricsService::currentProductionShift();
+        $selectedShift = $request->get('shift', $defaultShift);
 
         // Find the latest revision shift name if applicable
         $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
