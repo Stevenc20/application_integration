@@ -1429,4 +1429,130 @@ class ProductionPlanController extends Controller
 
         return response()->json(['success' => false, 'message' => 'Action tidak dikenali.']);
     }
+
+    /**
+     * Hapus item cut off yang dipilih oleh PPC.
+     * Item yang sudah memiliki aktivitas produksi atau relasi terlindungi akan ditolak.
+     */
+    public function destroyCutOff(Request $request)
+    {
+        $planIds = $request->input('plan_ids', []);
+
+        if (empty($planIds) || ! is_array($planIds)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Tidak ada item cut off yang dipilih.',
+            ], 422);
+        }
+
+        $plans = ProductionPlan::whereIn('id', $planIds)->get();
+
+        if ($plans->isEmpty()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Item yang dipilih tidak ditemukan.',
+            ], 404);
+        }
+
+        $mergeService = app(\App\Services\PpcScheduleMergeService::class);
+        $duplicateService = app(\App\Services\ProductionPlanDuplicateService::class);
+        $timelineGenerator = app(TimelineGenerationService::class);
+
+        $blocked = [];
+        $deletablePlans = [];
+
+        foreach ($plans as $plan) {
+            $reason = null;
+
+            // 1. Cek aktivitas produksi langsung atau aktual
+            if ($mergeService->planHasProductionActivity($plan)) {
+                $reason = 'Item sudah memiliki aktivitas atau progres aktual produksi.';
+            } else {
+                // 2. Cek relasi operasional melalui referenceBlockers duplicateService
+                $detail = $duplicateService->detail((int) $plan->id);
+                if ($detail && ! empty($detail['analysis']['blockers'])) {
+                    // Filter blocker agar tidak melarang hanya karena source_type recovery jika belum ada aktivitas
+                    $customBlockers = array_filter($detail['analysis']['blockers'], function ($b) {
+                        return ! str_contains($b, 'bukan pending');
+                    });
+                    if (! empty($customBlockers)) {
+                        $reason = implode(' ', $customBlockers);
+                    }
+                }
+            }
+
+            if ($reason !== null) {
+                $blocked[] = [
+                    'id' => $plan->id,
+                    'job_no' => $plan->job_no ?: '—',
+                    'job_master' => $plan->job_master ?: '—',
+                    'reason' => $reason,
+                ];
+            } else {
+                $deletablePlans[] = $plan;
+            }
+        }
+
+        // Jika ada item yang diblokir, batalkan dan jelaskan kepada user
+        if (! empty($blocked)) {
+            $blockedDescriptions = array_map(function ($b) {
+                return "Job {$b['job_no']} ({$b['job_master']}): {$b['reason']}";
+            }, $blocked);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Beberapa item tidak dapat dihapus karena memiliki aktivitas produksi atau relasi aktif: '.implode('; ', $blockedDescriptions),
+                'blocked' => $blocked,
+            ], 422);
+        }
+
+        $sectionsToRegenerate = [];
+        $deletedIds = [];
+
+        DB::transaction(function () use ($deletablePlans, &$deletedIds, &$sectionsToRegenerate) {
+            foreach ($deletablePlans as $plan) {
+                $planId = $plan->id;
+                $deletedIds[] = $planId;
+
+                // Catat section yang terdampak untuk regenerasi timeline
+                $secKey = $plan->plan_date.'|'.$plan->shift_name.'|'.$plan->press_name;
+                $sectionsToRegenerate[$secKey] = [
+                    'date' => $plan->plan_date ? Carbon::parse($plan->plan_date)->toDateString() : null,
+                    'shift' => $plan->shift_name,
+                    'press' => $plan->press_name,
+                ];
+
+                // Hapus RecoveryItem terkait jika belum diproses
+                RecoveryItem::where('production_plan_id', $planId)
+                    ->whereIn('status', ['waiting_approval', 'pending'])
+                    ->delete();
+
+                // Hapus JobMaster jika linked dan belum ada aktivitas
+                $mergeService = app(\App\Services\PpcScheduleMergeService::class);
+                $linkedJob = $mergeService->findLinkedJobMaster($planId);
+                if ($linkedJob && ! $mergeService->jobHasActivity($linkedJob)) {
+                    $linkedJob->delete();
+                }
+
+                $plan->delete();
+            }
+        });
+
+        // Regenerasi timeline section yang terpengaruh
+        foreach ($sectionsToRegenerate as $sec) {
+            if ($sec['date'] && $sec['shift'] && $sec['press']) {
+                try {
+                    $timelineGenerator->regenerateSection($sec['date'], $sec['shift'], $sec['press']);
+                } catch (\Throwable $e) {
+                    Log::warning('Cut-off delete timeline regeneration failed: '.$e->getMessage());
+                }
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => count($deletedIds).' item cut off berhasil dihapus.',
+            'deleted_ids' => $deletedIds,
+        ]);
+    }
 }

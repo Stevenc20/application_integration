@@ -714,6 +714,7 @@ Route::middleware(['auth', 'role:ppc'])->prefix('ppc')->name('ppc.')->group(func
         Route::post('/production-plan/reorder',        [ProductionPlanController::class, 'reorder'])->name('production_plan.reorder');
         Route::post('/production-plan/move',           [ProductionPlanController::class, 'movePlanItem'])->name('production_plan.move');
         Route::post('/production-plan/force-overflow', [ProductionPlanController::class, 'forceOverflow'])->name('production_plan.force_overflow');
+        Route::post('/production-plan/destroy-cutoff',  [ProductionPlanController::class, 'destroyCutOff'])->name('production_plan.destroy_cutoff');
         Route::post('/production-plan/{id}/recalculate',[ProductionPlanController::class, 'recalculate'])->name('production_plan.recalculate');
 
         // Duplicate detection (read-only) + guarded single-item delete

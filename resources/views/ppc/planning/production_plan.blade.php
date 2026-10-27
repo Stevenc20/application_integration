@@ -298,6 +298,17 @@
                 </div>
             </div>
             <div class="flex items-center gap-2">
+                <button type="button"
+                        id="btnHapusCutOff-{{ Str::slug($press) }}"
+                        onclick="openCutOffDeleteModal('{{ $press }}')"
+                        disabled
+                        class="px-3 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-sm flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                    <span>HAPUS</span>
+                    <span id="badgeHapusCutOff-{{ Str::slug($press) }}" class="hidden px-1.5 py-0.2 bg-white/20 rounded-full text-[10px]">0</span>
+                </button>
                 @if($isExtendedShift)
                 <button onclick="showOverrideModal(this)"
                         class="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-xs font-bold transition-all shrink-0 shadow-sm">
@@ -345,10 +356,16 @@
                         $ct = (float)($item->ct_detik ?? 0);
                         $estDurasi = $ct > 0 ? (int)ceil(($ct * $recoveryQty) / 60.0) . ' mnt' : '—';
                     @endphp
-                    <tr class="hover:bg-red-50/50">
+                    <tr class="hover:bg-red-50/50" id="cutoff-row-{{ $item->id }}">
                         <td class="px-2 py-1.5 text-center">
                             <input type="checkbox" class="overflow-checkbox overflow-checkbox-{{ Str::slug($press) }}"
-                                   value="{{ $item->id }}" data-plan-id="{{ $item->id }}">
+                                   value="{{ $item->id }}" data-plan-id="{{ $item->id }}"
+                                   data-job-no="{{ $item->job_no }}"
+                                   data-job-master="{{ $item->job_master }}"
+                                   data-plan-qty="{{ number_format($planQty) }}"
+                                   data-row-no="{{ $item->row_no }}"
+                                   data-press="{{ $press }}"
+                                   onchange="handleOverflowCheckboxChange('{{ $press }}')">
                         </td>
                         <td class="px-2 py-1.5 text-left font-medium text-red-900">{{ $item->job_no }}</td>
                         <td class="px-2 py-1.5 text-left text-red-800">{{ $item->job_master }}</td>
@@ -1595,6 +1612,44 @@ document.addEventListener('click', function(e) {
     </div>
 </div>
 
+{{-- MODAL KONFIRMASI HAPUS CUT OFF --}}
+<div id="cutOffDeleteModal" class="fixed inset-0 z-[99999] hidden flex items-center justify-center">
+    <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeCutOffDeleteModal()"></div>
+    <div class="relative w-full max-w-lg mx-4 animate-in fade-in zoom-in duration-300">
+        <div class="bg-white rounded-3xl shadow-2xl p-6 sm:p-8">
+            <div class="flex items-center gap-4 mb-4">
+                <div class="w-12 h-12 bg-rose-100 rounded-2xl flex items-center justify-center text-rose-600 shrink-0">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                </div>
+                <div>
+                    <h3 class="text-lg font-black text-slate-800">KONFIRMASI HAPUS CUT OFF</h3>
+                    <p class="text-xs text-slate-500">Item berikut akan dihapus dari jadwal cut off. Item dengan aktivitas produksi akan ditolak otomatis.</p>
+                </div>
+            </div>
+
+            <div class="my-4 max-h-56 overflow-y-auto border border-slate-200 rounded-2xl p-3 bg-slate-50/70">
+                <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-2">Item Terpilih (<span id="cutOffDeleteCount">0</span>):</div>
+                <ul id="cutOffDeleteList" class="space-y-2 text-xs">
+                    <!-- Populated by JS -->
+                </ul>
+            </div>
+
+            <div id="cutOffDeleteError" class="hidden mb-4 p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-semibold">
+                <!-- Error msg -->
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button type="button" onclick="closeCutOffDeleteModal()" class="flex-1 px-4 py-2.5 rounded-xl border border-slate-200 text-sm font-bold text-slate-600 hover:bg-slate-50 transition-colors">BATAL</button>
+                <button type="button" id="btnConfirmCutOffDelete" onclick="executeCutOffDelete()" class="flex-1 px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-sm font-bold transition-all shadow-lg shadow-rose-200 flex items-center justify-center gap-2">
+                    <span id="cutOffDeleteBtnText">HAPUS SEKARANG</span>
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {{-- CONFIRM MODAL (Tailwind, gantikan confirm() native) --}}
 <div id="confirmModal" class="fixed inset-0 z-[99999] hidden flex items-center justify-center">
     <div class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm" onclick="closeConfirm()"></div>
@@ -1735,6 +1790,164 @@ document.addEventListener('click', function(e) {
     function toggleAllOverflow(checkbox, press) {
         const slug = press.toLowerCase().replace(/\s+/g, '-');
         document.querySelectorAll('.overflow-checkbox-' + slug).forEach(cb => cb.checked = checkbox.checked);
+        handleOverflowCheckboxChange(press);
+    }
+
+    function handleOverflowCheckboxChange(press) {
+        const slug = press.toLowerCase().replace(/\s+/g, '-');
+        const checked = document.querySelectorAll('.overflow-checkbox-' + slug + ':checked');
+        const btn = document.getElementById('btnHapusCutOff-' + slug);
+        const badge = document.getElementById('badgeHapusCutOff-' + slug);
+
+        if (!btn) return;
+
+        if (checked.length > 0) {
+            btn.disabled = false;
+            if (badge) {
+                badge.textContent = checked.length;
+                badge.classList.remove('hidden');
+            }
+        } else {
+            btn.disabled = true;
+            if (badge) {
+                badge.textContent = '0';
+                badge.classList.add('hidden');
+            }
+        }
+    }
+
+    let _cutOffSelectedItems = [];
+    let _cutOffActivePress = null;
+
+    function openCutOffDeleteModal(press) {
+        const slug = press.toLowerCase().replace(/\s+/g, '-');
+        const checked = Array.from(document.querySelectorAll('.overflow-checkbox-' + slug + ':checked'));
+        if (checked.length === 0) {
+            showToast('Pilih setidaknya satu item cut off yang ingin dihapus.', 'error');
+            return;
+        }
+
+        _cutOffActivePress = press;
+        _cutOffSelectedItems = checked.map(cb => ({
+            id: cb.value,
+            jobNo: cb.dataset.jobNo || '—',
+            jobMaster: cb.dataset.jobMaster || '—',
+            planQty: cb.dataset.planQty || '0',
+            rowNo: cb.dataset.rowNo || '—',
+            press: cb.dataset.press || press,
+        }));
+
+        document.getElementById('cutOffDeleteCount').textContent = _cutOffSelectedItems.length;
+        const listEl = document.getElementById('cutOffDeleteList');
+        listEl.innerHTML = _cutOffSelectedItems.map(item => `
+            <li class="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200/80 shadow-xs">
+                <div class="flex flex-col">
+                    <span class="font-bold text-slate-800">${item.jobNo}</span>
+                    <span class="text-[11px] text-slate-500">${item.jobMaster}</span>
+                </div>
+                <div class="text-right">
+                    <span class="font-semibold text-slate-700">${item.planQty} pcs</span>
+                    <span class="text-[10px] text-slate-400 block">Posisi #${item.rowNo}</span>
+                </div>
+            </li>
+        `).join('');
+
+        const errEl = document.getElementById('cutOffDeleteError');
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+
+        const btn = document.getElementById('btnConfirmCutOffDelete');
+        btn.disabled = false;
+        document.getElementById('cutOffDeleteBtnText').textContent = 'HAPUS SEKARANG';
+
+        const modal = document.getElementById('cutOffDeleteModal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+    }
+
+    function closeCutOffDeleteModal() {
+        const modal = document.getElementById('cutOffDeleteModal');
+        modal.classList.remove('flex');
+        modal.classList.add('hidden');
+        _cutOffSelectedItems = [];
+        _cutOffActivePress = null;
+    }
+
+    function executeCutOffDelete() {
+        if (!_cutOffSelectedItems || _cutOffSelectedItems.length === 0) {
+            showToast('Tidak ada item cut off yang dipilih.', 'error');
+            return;
+        }
+
+        const btn = document.getElementById('btnConfirmCutOffDelete');
+        const btnText = document.getElementById('cutOffDeleteBtnText');
+        const errEl = document.getElementById('cutOffDeleteError');
+
+        btn.disabled = true;
+        btnText.textContent = 'MENGHAPUS...';
+        errEl.classList.add('hidden');
+        errEl.textContent = '';
+
+        const planIds = _cutOffSelectedItems.map(item => item.id);
+
+        fetch('{{ route("ppc.planning.production_plan.destroy_cutoff") }}', {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': '{{ csrf_token() }}',
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify({ plan_ids: planIds })
+        })
+        .then(r => r.json().then(data => ({ status: r.status, ok: r.ok, body: data })))
+        .then(res => {
+            if (res.ok && res.body.success) {
+                showToast(res.body.message || 'Item cut off berhasil dihapus.', 'success');
+                closeCutOffDeleteModal();
+
+                // Hapus baris dari DOM cut off table
+                const deletedIds = res.body.deleted_ids || planIds;
+                deletedIds.forEach(id => {
+                    const row = document.getElementById('cutoff-row-' + id);
+                    if (row) row.remove();
+                    // Hapus juga dari timeline jika ada
+                    const timelineRow = document.querySelector(`tr[data-plan-id="${id}"]`);
+                    if (timelineRow) timelineRow.remove();
+                });
+
+                // Perbarui status tombol dan badge
+                if (_cutOffActivePress) {
+                    handleOverflowCheckboxChange(_cutOffActivePress);
+                }
+
+                // Cek sisa item di section cut off
+                const pressSection = document.querySelector(`[data-press="${_cutOffActivePress}"]`);
+                if (pressSection) {
+                    const remainingRows = pressSection.querySelectorAll('tbody tr');
+                    if (remainingRows.length === 0) {
+                        pressSection.remove();
+                    }
+                }
+
+                // Jika seluruh cut off habis, refresh pelan atau biarkan rapi
+                setTimeout(() => {
+                    location.reload();
+                }, 600);
+            } else {
+                btn.disabled = false;
+                btnText.textContent = 'HAPUS SEKARANG';
+                errEl.textContent = res.body.message || 'Gagal menghapus item cut off.';
+                errEl.classList.remove('hidden');
+                showToast(res.body.message || 'Gagal menghapus item.', 'error');
+            }
+        })
+        .catch(err => {
+            btn.disabled = false;
+            btnText.textContent = 'HAPUS SEKARANG';
+            errEl.textContent = 'Terjadi kesalahan sistem saat memproses penghapusan.';
+            errEl.classList.remove('hidden');
+            showToast('Terjadi kesalahan jaringan atau server.', 'error');
+        });
     }
 
     function showOverrideModal(btn) {
