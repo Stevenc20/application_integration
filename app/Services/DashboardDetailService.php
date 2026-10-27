@@ -267,18 +267,8 @@ class DashboardDetailService
             $actualOk = $daily ? (int) $daily->actual_ok : (int) ($plan->ok ?? 0);
             $actualRepair = $daily ? (int) ($daily->actual_repair ?? 0) : (int) ($plan->repair ?? 0);
             $actualReject = $daily ? (int) ($daily->actual_reject ?? 0) : (int) ($plan->reject ?? 0);
-            $runtimeSeconds = $daily ? (float) ($daily->runtime_seconds ?? 0) : 0.0;
-
+            $runtimeSeconds = $this->resolveRuntimeSeconds($job, $daily, $sessionsMap);
             $jobId = $job?->id;
-            if ($runtimeSeconds <= 0 && $job) {
-                $session = $sessionsMap->get($job->id);
-                if ($session) {
-                    $runtimeSeconds = (float) ($session->total_seconds ?? 0);
-                    if ($session->status === 'running' && $session->start_time) {
-                        $runtimeSeconds += abs(Carbon::now()->diffInSeconds(Carbon::parse($session->start_time)));
-                    }
-                }
-            }
             $dandori = $jobId ? round($dandoriMinutes[$jobId] ?? 0, 1) : 0;
             $iqCheck = $jobId ? round($firstCheckMinutes[$jobId] ?? 0, 1) : 0;
             $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 1) : 0;
@@ -298,7 +288,6 @@ class DashboardDetailService
                         $actualOk += (int) $cDaily->actual_ok;
                         $actualRepair += (int) ($cDaily->actual_repair ?? 0);
                         $actualReject += (int) ($cDaily->actual_reject ?? 0);
-                        $runtimeSeconds += (float) ($cDaily->runtime_seconds ?? 0);
                     } else {
                         $actualQty += (int) ($c->ok ?? 0);
                         $actualOk += (int) ($c->ok ?? 0);
@@ -306,6 +295,7 @@ class DashboardDetailService
                         $actualReject += (int) ($c->reject ?? 0);
                     }
                     $cJobId = $cJob->id;
+                    $runtimeSeconds += $this->resolveRuntimeSeconds($cJob, $cDaily, $sessionsMap);
                     $dandori += round($dandoriMinutes[$cJobId] ?? 0, 1);
                     $iqCheck += round($firstCheckMinutes[$cJobId] ?? 0, 1);
                     $downtime += round($downtimeMinutes[$cJobId] ?? 0, 1);
@@ -323,10 +313,10 @@ class DashboardDetailService
             }
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
-            if ($ctDetik > 0) {
-                $pressTime = round(($actualQty * $ctDetik) / 60, 1);
-            } elseif ($runtimeSeconds > 0) {
+            if ($runtimeSeconds > 0) {
                 $pressTime = round($runtimeSeconds / 60, 1);
+            } elseif ($ctDetik > 0) {
+                $pressTime = round(($actualQty * $ctDetik) / 60, 1);
             } else {
                 $pressTime = 0;
             }
@@ -410,6 +400,35 @@ class DashboardDetailService
         }
 
         return $rows;
+    }
+
+    private function resolveRuntimeSeconds(?JobMaster $job, ?DailyProduction $daily, Collection $sessionsMap): float
+    {
+        $seconds = $daily ? (float) ($daily->runtime_seconds ?? 0) : 0.0;
+        if ($seconds > 0 || ! $job) {
+            return max(0.0, $seconds);
+        }
+
+        $status = strtolower((string) $job->status);
+        $session = $sessionsMap->get($job->id);
+
+        if ($status === 'running') {
+            if ($session && $session->start_time) {
+                $seconds = (float) ($session->total_seconds ?? 0);
+                if ($session->status === 'running') {
+                    $seconds += abs(Carbon::now()->diffInSeconds(Carbon::parse($session->start_time)));
+                }
+            } elseif ($job->started_at) {
+                $seconds = abs(Carbon::now()->diffInSeconds(Carbon::parse($job->started_at)));
+            }
+        } elseif ($status === 'paused') {
+            $seconds = (float) ($session->total_seconds ?? 0);
+        } elseif ($job->started_at) {
+            $endAt = $job->finished_at ?: Carbon::now();
+            $seconds = abs(Carbon::parse($endAt)->diffInSeconds(Carbon::parse($job->started_at)));
+        }
+
+        return max(0.0, $seconds);
     }
 
     private function normalizePressName(?string $value): string

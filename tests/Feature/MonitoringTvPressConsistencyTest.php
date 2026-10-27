@@ -198,6 +198,60 @@ it('preserves Press A reference baseline logic across KPI, Detail, and Status', 
         ->and($detail[1]['downtime'])->toBe(5.0);
 });
 
+it('uses actual runtime instead of theoretical CT so Detail GSPH matches KPI current', function () {
+    $date = '2026-10-23';
+    Carbon::setTestNow(Carbon::parse($date.' 10:30:00'));
+
+    $lineA = LineMaster::where('line_code', 'PA')->first();
+
+    $plan = ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'row_no' => 1,
+        'row_type' => 'job',
+        'job_no' => 'GT-2001',
+        'job_master' => 'PART A1',
+        'plan' => 300,
+        'ct_detik' => 10.0,
+        'gsph_item' => 217,
+        'start_time' => '08:00',
+        'finish_time' => '12:00',
+        'status' => 'running',
+    ]);
+
+    $job = JobMaster::create([
+        'job_number' => 'GT-2001-'.$plan->id,
+        'job_name' => 'PART A1',
+        'line' => 'PRESS A',
+        'target_qty' => 300,
+        'sequence_no' => 1,
+        'status' => 'running',
+        'started_at' => Carbon::parse($date.' 09:30:00'),
+    ]);
+
+    DailyProduction::create([
+        'job_master_id' => $job->id,
+        'work_date' => $date,
+        'line' => 'PRESS A',
+        'shift' => 'Shift Pagi',
+        'actual_ok' => 217,
+        'actual_qty' => 217,
+        'runtime_seconds' => 3600,
+    ]);
+
+    $realtime = app(DashboardRealtimeService::class)->getLineMetrics('Line A', $date, 1);
+    $detail = app(DashboardDetailService::class)->getLineDetail('Line A', $date, 1);
+    $kpiByDesc = collect($realtime['kpi'])->keyBy('desc');
+
+    expect($kpiByDesc['GSPH']['current'])->toBe('217')
+        ->and($detail)->toHaveCount(1)
+        ->and($detail[0]['press_time'])->toBe(60.0)
+        ->and($detail[0]['tpt'])->toBe(60.0)
+        ->and($detail[0]['gsph_actual'])->toBe(217);
+});
+
 it('ensures Press D is 100% consistent between Input Harian and Monitoring TV across all parameters including paused jobs, QCheck, open downtime, and break splits', function () {
     $date = '2026-10-23';
     Carbon::setTestNow(Carbon::parse($date.' 14:30:00'));
