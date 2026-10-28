@@ -1982,7 +1982,7 @@ window.openKpiModalFromMonitor = function(type, line) {
     const rows = lineData?.rows || [];
 
     if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian kendala untuk ${type} di ${line}.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian kendala untuk ${type} di ${line}.</td></tr>`;
     } else {
         let html = '';
         rows.forEach((r, idx) => {
@@ -2000,25 +2000,38 @@ window.openKpiModalFromMonitor = function(type, line) {
                     </a>
                 `;
             }
+
+            let fotoHtml = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
+            if (r.image_url) {
+                fotoHtml = `
+                    <a href="${r.image_url}" target="_blank" rel="noopener" style="display:inline-block; transition:transform 0.15s;" title="Lihat Foto Bukti Downtime">
+                        <img src="${r.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.1);" alt="Foto Downtime">
+                    </a>
+                `;
+            }
+
             html += `
-                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 12px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
-                    <td style="padding: 12px 12px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
+                <tr style="background:#ffffff !important; border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                    <td style="background:#ffffff !important; padding: 12px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${r.no || (idx + 1)}</td>
+                    <td style="background:#ffffff !important; padding: 12px 12px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
                         <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em;">${r.jenis || type}</span>
                     </td>
-                    <td style="padding: 12px 14px; font-weight: 700; color: #0f172a; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 12px 14px; font-weight: 700; color: #0f172a; vertical-align:top;">
                         <div style="font-size:13px; line-height:1.4;">${r.problem || '-'}</div>
                         <div style="font-size:11px; color:#2563eb; margin-top:4px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 7px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || '-'}</div>
                     </td>
-                    <td style="padding: 12px 14px; color: #334155; font-size: 12px; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 12px 14px; color: #334155; font-size: 12px; vertical-align:top;">
                         <div style="margin-bottom:4px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${r.penyebab || '-'}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan:</span> <span style="font-weight:600;">${r.action || '-'}</span></div>
                     </td>
-                    <td style="padding: 12px 10px; text-align: center; color: #334155; font-weight: 700; font-size: 12px; vertical-align:top;">${r.pic || '-'}</td>
-                    <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 10px 8px; text-align: center; vertical-align:middle;">
+                        ${fotoHtml}
+                    </td>
+                    <td style="background:#ffffff !important; padding: 12px 10px; text-align: center; color: #334155; font-weight: 700; font-size: 12px; vertical-align:top;">${r.pic || '-'}</td>
+                    <td style="background:#ffffff !important; padding: 12px 10px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
                         <div style="font-size:13px;">${r.durasi || 0} m</div>
                     </td>
-                    <td style="padding: 12px 10px; text-align: center; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 12px 10px; text-align: center; vertical-align:top;">
                         ${lhjBtn}
                     </td>
                 </tr>
@@ -2060,7 +2073,7 @@ window.openDtDetailModal = function(rowIndex) {
     const list = item.downtime_list || [];
 
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada rincian downtime khusus untuk item ini.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:20px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada rincian downtime khusus untuk item ini.</td></tr>`;
     } else {
         let html = '';
         list.forEach((dt, idx) => {
@@ -2078,25 +2091,37 @@ window.openDtDetailModal = function(rowIndex) {
                     </a>
                 `;
             }
+
+            let fotoHtml = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
+            if (dt.image_url) {
+                fotoHtml = `
+                    <a href="${dt.image_url}" target="_blank" rel="noopener" style="display:inline-block; transition:transform 0.15s;" title="Lihat Foto Bukti Downtime">
+                        <img src="${dt.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.1);" alt="Foto Downtime">
+                    </a>
+                `;
+            }
+
             html += `
-                <tr style="border-bottom: 1px solid #e2e8f0; font-size: 13px;">
-                    <td style="padding: 12px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
-                    <td style="padding: 12px 12px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
+                <tr style="background:#ffffff !important; border-bottom: 1px solid #e2e8f0; font-size: 13px;">
+                    <td style="background:#ffffff !important; padding: 12px 10px; font-weight: 700; color: #1e293b; text-align: center; vertical-align:top;">${idx + 1}</td>
+                    <td style="background:#ffffff !important; padding: 12px 12px; font-weight: 800; color: #b91c1c; text-align: center; vertical-align:top;">
                         <span style="background: #fee2e2; padding: 4px 8px; border-radius: 6px; font-size: 11px; display:inline-block; letter-spacing:0.02em;">${dt.jenis_downtime}</span>
                     </td>
-                    <td style="padding: 12px 14px; font-weight: 700; color: #0f172a; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 12px 14px; font-weight: 700; color: #0f172a; vertical-align:top;">
                         <div style="font-size:13px; line-height:1.4;">${dt.problem}</div>
                     </td>
-                    <td style="padding: 12px 14px; color: #334155; font-size: 12px; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 12px 14px; color: #334155; font-size: 12px; vertical-align:top;">
                         <div style="margin-bottom:4px;"><span style="color:#64748b; font-weight:700;">Penyebab:</span> <span style="font-weight:600;">${dt.penyebab}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan:</span> <span style="font-weight:600;">${dt.tindakan}</span></div>
                     </td>
-                    <td style="padding: 12px 10px; text-align: center; color: #334155; font-weight: 700; font-size: 12px; vertical-align:top;">${dt.pic}</td>
-                    <td style="padding: 12px 10px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
-                        <div style="font-size:13px;">${dt.duration_minute} m</div>
-                        <div style="font-size: 10px; color: #64748b; font-weight: 600; margin-top:2px;">${dt.start_time} - ${dt.finish_time}</div>
+                    <td style="background:#ffffff !important; padding: 10px 8px; text-align: center; vertical-align:middle;">
+                        ${fotoHtml}
                     </td>
-                    <td style="padding: 12px 10px; text-align: center; vertical-align:top;">
+                    <td style="background:#ffffff !important; padding: 12px 10px; text-align: center; color: #334155; font-weight: 700; font-size: 12px; vertical-align:top;">${dt.pic}</td>
+                    <td style="background:#ffffff !important; padding: 12px 10px; text-align: center; font-weight: 900; color: #b91c1c; vertical-align:top;">
+                        <div style="font-size:13px;">${dt.duration_minute} m</div>
+                    </td>
+                    <td style="background:#ffffff !important; padding: 12px 10px; text-align: center; vertical-align:top;">
                         ${lhjBtn}
                     </td>
                 </tr>
@@ -2146,16 +2171,29 @@ window.openDefectDetailModal = function(rowIndex, type) {
 
     const tbody = document.getElementById('defectModalTableBody');
     if (list.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px; font-weight:600;">Belum ada rincian log defect ${type.toUpperCase()} yang dicatat untuk item ini.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px; font-weight:600;">Belum ada rincian log defect ${type.toUpperCase()} yang dicatat untuk item ini.</td></tr>`;
     } else {
         let html = '';
         list.forEach((rr, idx) => {
             const rowBadgeBg = isReject ? '#fee2e2' : '#fef3c7';
             const rowBadgeColor = isReject ? '#b91c1c' : '#b45309';
             const picDisplay = rr.pic || rr.operator || rr.created_by_name || '-';
+
+            let fotoHtml = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
+            if (rr.images && rr.images.length > 0) {
+                fotoHtml = `
+                    <div style="display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;">
+                        ${rr.images.map(img => `
+                            <a href="${img}" target="_blank" rel="noopener" style="display:inline-block;" title="Lihat Foto Bukti">
+                                <img src="${img}" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="Foto Defect">
+                            </a>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             html += `
                 <tr style="border-bottom: 1px solid #cbd5e1;">
-                    <td style="text-align: center;">${idx + 1}</td>
                     <td style="text-align: center;">
                         <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 4px 8px; border-radius: 6px; font-size: clamp(10px, 0.75vw, 12px); display:inline-block; letter-spacing:0.02em; font-weight:900;">${rr.type}</span>
                     </td>
@@ -2171,8 +2209,10 @@ window.openDefectDetailModal = function(rowIndex, type) {
                         <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Root Cause:</span> <span style="font-weight:600;">${rr.root_cause || '-'}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan / Action:</span> <span style="font-weight:600;">${rr.countermeasure || '-'}</span></div>
                     </td>
+                    <td style="text-align: center; vertical-align: middle;">
+                        ${fotoHtml}
+                    </td>
                     <td style="text-align: center; color: #0f172a; font-weight: 800; word-break: break-word;">${picDisplay}</td>
-                    <td style="text-align: center; color: #64748b; font-weight: 700;">${rr.time || '-'}</td>
                 </tr>
             `;
         });
@@ -2220,16 +2260,29 @@ window.openDefectKpiModal = function(type, line) {
 
     const tbody = document.getElementById('defectModalTableBody');
     if (rows.length === 0) {
-        tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian defect ${typeUpper} di ${line}.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:24px; color:#94a3b8; font-size:13px; font-weight:600;">Tidak ada catatan rincian defect ${typeUpper} di ${line}.</td></tr>`;
     } else {
         let html = '';
         rows.forEach((r, idx) => {
             const rowBadgeBg = isReject ? '#fee2e2' : '#fef3c7';
             const rowBadgeColor = isReject ? '#b91c1c' : '#b45309';
             const picDisplay = r.pic || r.operator || r.created_by_name || '-';
+
+            let fotoHtml = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
+            if (r.images && r.images.length > 0) {
+                fotoHtml = `
+                    <div style="display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;">
+                        ${r.images.map(img => `
+                            <a href="${img}" target="_blank" rel="noopener" style="display:inline-block;" title="Lihat Foto Bukti">
+                                <img src="${img}" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="Foto Defect">
+                            </a>
+                        `).join('')}
+                    </div>
+                `;
+            }
+
             html += `
                 <tr style="border-bottom: 1px solid #cbd5e1;">
-                    <td style="text-align: center;">${r.no || (idx + 1)}</td>
                     <td style="text-align: center;">
                         <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 4px 8px; border-radius: 6px; font-size: clamp(10px, 0.75vw, 12px); display:inline-block; letter-spacing:0.02em; font-weight:900;">${r.type || typeUpper}</span>
                     </td>
@@ -2246,8 +2299,10 @@ window.openDefectKpiModal = function(type, line) {
                         <div style="margin-bottom:6px;"><span style="color:#64748b; font-weight:700;">Root Cause:</span> <span style="font-weight:600;">${r.root_cause || '-'}</span></div>
                         <div><span style="color:#16a34a; font-weight:700;">Tindakan / Action:</span> <span style="font-weight:600;">${r.countermeasure || '-'}</span></div>
                     </td>
+                    <td style="text-align: center; vertical-align: middle;">
+                        ${fotoHtml}
+                    </td>
                     <td style="text-align: center; color: #0f172a; font-weight: 800; word-break: break-word;">${picDisplay}</td>
-                    <td style="text-align: center; color: #64748b; font-weight: 700;">${r.time || '-'}</td>
                 </tr>
             `;
         });
@@ -2304,11 +2359,12 @@ document.addEventListener('keydown', function(e) {
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
                         <th style="padding:12px 10px; text-align:center; width:45px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
                         <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Kategori</th>
-                        <th style="padding:12px 14px; width:260px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
-                        <th style="padding:12px 14px; width:360px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
+                        <th style="padding:12px 14px; width:250px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Problem / Kendala</th>
+                        <th style="padding:12px 14px; width:330px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Penyebab & Tindakan</th>
+                        <th style="padding:12px 10px; text-align:center; width:90px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Foto</th>
                         <th style="padding:12px 12px; text-align:center; width:95px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC</th>
-                        <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Durasi</th>
-                        <th style="padding:12px 12px; text-align:center; width:120px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">LHJ</th>
+                        <th style="padding:12px 12px; text-align:center; width:90px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Durasi</th>
+                        <th style="padding:12px 12px; text-align:center; width:110px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">LHJ</th>
                     </tr>
                 </thead>
                 <tbody id="dtModalTableBody" style="line-height:1.5;">
@@ -2352,13 +2408,12 @@ document.addEventListener('keydown', function(e) {
             <table class="modal-table" style="width:100%; min-width:1100px; border-collapse:separate; border-spacing:0; text-align:left; table-layout:fixed;">
                 <thead>
                     <tr style="background:#f1f5f9; font-size:12px; font-weight:900; color:#334155; text-transform:uppercase; letter-spacing:0.04em;">
-                        <th style="padding:12px 10px; text-align:center; width:45px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">No</th>
-                        <th style="padding:12px 12px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Tipe</th>
+                        <th style="padding:12px 12px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-left:1px solid #cbd5e1; border-top-left-radius:10px;">Tipe</th>
                         <th style="padding:12px 14px; width:260px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Jenis Defect & Area</th>
                         <th style="padding:12px 12px; text-align:center; width:80px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Qty</th>
                         <th style="padding:12px 14px; width:380px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Root Cause & Countermeasure</th>
-                        <th style="padding:12px 12px; text-align:center; width:135px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">PIC / Input</th>
-                        <th style="padding:12px 12px; text-align:center; width:95px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">Waktu</th>
+                        <th style="padding:12px 10px; text-align:center; width:100px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1;">Foto</th>
+                        <th style="padding:12px 12px; text-align:center; width:135px; border-top:1px solid #cbd5e1; border-bottom:2px solid #cbd5e1; border-right:1px solid #cbd5e1; border-top-right-radius:10px;">PIC / Input</th>
                     </tr>
                 </thead>
                 <tbody id="defectModalTableBody" style="line-height:1.5;">

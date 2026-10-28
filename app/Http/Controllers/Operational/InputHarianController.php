@@ -1138,7 +1138,23 @@ class InputHarianController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         }
 
-        $downtime->update($request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']));
+        $fields = $request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']);
+
+        if ($request->hasFile('foto')) {
+            $file = $request->file('foto');
+            $safeName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $file->getClientOriginalName());
+            $relPath = 'downtime/' . $downtime->id . '/' . $safeName;
+            $absPath = public_path('uploads/' . $relPath);
+            $dir = dirname($absPath);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0755, true);
+            }
+            copy($file->getRealPath(), $absPath);
+            chmod($absPath, 0644);
+            $fields['image_path'] = $relPath;
+        }
+
+        $downtime->update($fields);
 
         $this->productionService->syncHambatanJalur($downtime);
 

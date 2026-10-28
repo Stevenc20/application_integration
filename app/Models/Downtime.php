@@ -13,6 +13,7 @@ class Downtime extends Model
         'penyebab',
         'action',
         'pic',
+        'image_path',
         'start_time',
         'finish_time',
         'duration_seconds',

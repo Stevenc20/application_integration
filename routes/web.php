@@ -540,7 +540,7 @@ Route::middleware(['auth'])
     Route::get('/job/{job_id}/downtimes', [InputHarianController::class, 'getDowntimes'])->name('job.downtimes');
     Route::post('/job/{job_id}/downtime/start', [InputHarianController::class, 'startDowntime'])->name('job.downtime.start');
     Route::post('/downtime/{id}/finish', [InputHarianController::class, 'finishDowntime'])->name('downtime.finish');
-    Route::put('/downtime/{id}/update', [InputHarianController::class, 'updateDowntime'])->name('downtime.update');
+    Route::match(['put', 'post'], '/downtime/{id}/update', [InputHarianController::class, 'updateDowntime'])->name('downtime.update');
     Route::delete('/downtime/{id}/delete', [InputHarianController::class, 'deleteDowntime'])->name('downtime.delete');
 
     /*

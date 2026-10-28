@@ -154,22 +154,36 @@
                         </select>
                     </div>
                     <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Problem</label>
-                        <input type="text" id="dtProblem" placeholder="Masalah yang terjadi..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Penyebab</label>
-                        <input type="text" id="dtPenyebab" placeholder="Penyebab masalah..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
-                    </div>
-                    <div>
-                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Action</label>
-                        <input type="text" id="dtAction" placeholder="Tindakan yang diambil..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Foto Evidence Downtime <span class="text-red-500">*</span></label>
+                        <div class="flex items-center gap-2">
+                            <input type="file" id="dtFotoInput" accept="image/*" class="hidden" onchange="previewDtFoto(event)">
+                            <button type="button" onclick="document.getElementById('dtFotoInput').click()" class="flex-1 px-3 py-2 border border-dashed border-gray-300 rounded-xl text-xs font-bold text-gray-600 hover:bg-gray-100 flex items-center justify-center gap-1.5 transition">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <span id="dtFotoLabel">Unggah Foto</span>
+                            </button>
+                            <div id="dtFotoPreviewContainer" class="hidden relative w-10 h-10 rounded-lg overflow-hidden border border-gray-200 shrink-0">
+                                <img id="dtFotoPreviewImg" src="" class="w-full h-full object-cover">
+                                <button type="button" onclick="removeDtFoto()" class="absolute inset-0 bg-black/40 text-white flex items-center justify-center text-xs opacity-0 hover:opacity-100 transition">&times;</button>
+                            </div>
+                        </div>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">PIC</label>
                         <input type="text" id="dtPIC" placeholder="Nama penanggung jawab..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
                     </div>
-                    <div class="flex items-end gap-2">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Problem (Boleh Diisi Nanti)</label>
+                        <input type="text" id="dtProblem" placeholder="Masalah yang terjadi..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Penyebab (Boleh Diisi Nanti)</label>
+                        <input type="text" id="dtPenyebab" placeholder="Penyebab masalah..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">Action (Boleh Diisi Nanti)</label>
+                        <input type="text" id="dtAction" placeholder="Tindakan yang diambil..." class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 outline-none transition">
+                    </div>
+                    <div class="flex items-end gap-2 lg:col-span-3">
                         <button id="dtBtnSave" onclick="saveDowntime()" class="flex-1 px-4 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm shadow-lg shadow-blue-100 transition-all flex items-center justify-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v12a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"/></svg>
                             <span id="dtBtnText">Simpan Laporan</span>
@@ -178,7 +192,7 @@
                             Batal
                         </button>
                         <button type="button" id="dtBtnLater" onclick="submitDowntimeLater()" class="px-5 py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-sm transition-all shadow-sm">
-                            Isi Nanti
+                            Tutup & Lengkapi Keterangan Nanti
                         </button>
                     </div>
                 </div>

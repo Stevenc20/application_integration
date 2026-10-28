@@ -2372,6 +2372,40 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
     }
 }
 
+window.dtSelectedFotoFile = null;
+
+window.previewDtFoto = function(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    window.dtSelectedFotoFile = file;
+
+    const previewContainer = document.getElementById('dtFotoPreviewContainer');
+    const previewImg = document.getElementById('dtFotoPreviewImg');
+    const label = document.getElementById('dtFotoLabel');
+
+    if (previewImg) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            previewImg.src = e.target.result;
+            if (previewContainer) previewContainer.classList.remove('hidden');
+            if (label) label.textContent = 'Ganti Foto';
+        };
+        reader.readAsDataURL(file);
+    }
+};
+
+window.removeDtFoto = function() {
+    window.dtSelectedFotoFile = null;
+    const input = document.getElementById('dtFotoInput');
+    if (input) input.value = '';
+    const previewContainer = document.getElementById('dtFotoPreviewContainer');
+    if (previewContainer) previewContainer.classList.add('hidden');
+    const previewImg = document.getElementById('dtFotoPreviewImg');
+    if (previewImg) previewImg.src = '';
+    const label = document.getElementById('dtFotoLabel');
+    if (label) label.textContent = 'Unggah Foto';
+};
+
 function cancelDowntimeEdit() {
     const dtEditId = document.getElementById('dtEditId');
     const dtJenis = document.getElementById('dtJenis');
@@ -2394,6 +2428,7 @@ function cancelDowntimeEdit() {
     if (dtBtnText) dtBtnText.innerText = 'Simpan Laporan';
     if (dtBtnCancelEdit) dtBtnCancelEdit.classList.add('hidden');
     if (formArea) formArea.classList.add('hidden');
+    window.removeDtFoto();
 }
 
 function editDowntimeFromIndex(index) {
@@ -2423,6 +2458,17 @@ function editDowntimeFromIndex(index) {
         if (dtAction) dtAction.value = dt.action || '';
         if (dtPIC) dtPIC.value = dt.pic || window.ProductionConfig?.userName || '';
         if (dtBtnCancelEdit) dtBtnCancelEdit.classList.remove('hidden');
+
+        // Existing image preview if already uploaded
+        window.removeDtFoto();
+        if (dt.image_path) {
+            const previewContainer = document.getElementById('dtFotoPreviewContainer');
+            const previewImg = document.getElementById('dtFotoPreviewImg');
+            const label = document.getElementById('dtFotoLabel');
+            if (previewImg) previewImg.src = `/uploads/${dt.image_path}`;
+            if (previewContainer) previewContainer.classList.remove('hidden');
+            if (label) label.textContent = 'Ganti Foto';
+        }
 
         // Show the form area
         const formArea = document.getElementById('dtFormTitle')?.closest('.bg-gray-50');
@@ -2468,19 +2514,29 @@ function saveDowntime(andCloseModal = false) {
         return;
     }
 
+    const currentCandidate = window.currentDowntimesList?.find(dt => dt.id == id);
+    const hasExistingFoto = currentCandidate && currentCandidate.image_path;
+    if (!hasExistingFoto && !window.dtSelectedFotoFile) {
+        showToast('Wajib mengunggah foto evidence downtime sebelum menyimpan.', 'warning');
+        return;
+    }
+
     let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
     if (!problemVal) {
         // Fallback default so it doesn't stay as missing or '-'
         problemVal = jenis ? jenis.toUpperCase() : '-';
     }
 
-    let data = {
-        jenis_downtime: jenis,
-        problem: problemVal,
-        penyebab: (document.getElementById('dtPenyebab')?.value || '').trim(),
-        action: (document.getElementById('dtAction')?.value || '').trim(),
-        pic: (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim()
-    };
+    const formData = new FormData();
+    formData.append('_method', 'PUT');
+    formData.append('jenis_downtime', jenis);
+    formData.append('problem', problemVal);
+    formData.append('penyebab', (document.getElementById('dtPenyebab')?.value || '').trim());
+    formData.append('action', (document.getElementById('dtAction')?.value || '').trim());
+    formData.append('pic', (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim());
+    if (window.dtSelectedFotoFile) {
+        formData.append('foto', window.dtSelectedFotoFile);
+    }
 
     const saveBtn = document.getElementById('dtBtnSave');
     if (saveBtn) {
@@ -2489,13 +2545,12 @@ function saveDowntime(andCloseModal = false) {
     }
 
     fetch(`/operational/downtime/${id}/update`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-CSRF-TOKEN': window.ProductionConfig.csrfToken
         },
-        body: JSON.stringify(data)
+        body: formData
     })
     .then(res => {
         if (!res.ok) {
@@ -2678,18 +2733,28 @@ function submitDowntimeLater() {
         return;
     }
 
+    const currentCandidate = window.currentDowntimesList?.find(dt => dt.id == id);
+    const hasExistingFoto = currentCandidate && currentCandidate.image_path;
+    if (!hasExistingFoto && !window.dtSelectedFotoFile) {
+        showToast('Wajib mengunggah foto evidence downtime terlebih dahulu.', 'warning');
+        return;
+    }
+
     let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
     if (!problemVal) {
         problemVal = jenis ? jenis.toUpperCase() : '-';
     }
 
-    const data = {
-        jenis_downtime: jenis,
-        problem: problemVal,
-        penyebab: (document.getElementById('dtPenyebab')?.value || '').trim(),
-        action: (document.getElementById('dtAction')?.value || '').trim(),
-        pic: (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim()
-    };
+    const formData = new FormData();
+    formData.append('_method', 'PUT');
+    formData.append('jenis_downtime', jenis);
+    formData.append('problem', problemVal);
+    formData.append('penyebab', (document.getElementById('dtPenyebab')?.value || '').trim());
+    formData.append('action', (document.getElementById('dtAction')?.value || '').trim());
+    formData.append('pic', (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim());
+    if (window.dtSelectedFotoFile) {
+        formData.append('foto', window.dtSelectedFotoFile);
+    }
 
     const laterBtn = document.getElementById('dtBtnLater');
     const origText = laterBtn ? laterBtn.innerHTML : 'Isi Nanti';
@@ -2699,13 +2764,12 @@ function submitDowntimeLater() {
     }
 
     fetch(`/operational/downtime/${id}/update`, {
-        method: 'PUT',
+        method: 'POST',
         headers: {
-            'Content-Type': 'application/json',
             'Accept': 'application/json',
             'X-CSRF-TOKEN': window.ProductionConfig.csrfToken
         },
-        body: JSON.stringify(data)
+        body: formData
     })
     .then(res => {
         if (!res.ok) {
@@ -2781,6 +2845,12 @@ function closeDowntimeModal() {
             if (!jenis) {
                 showToast('Wajib memilih Jenis Downtime terlebih dahulu sebelum menutup.', 'warning');
                 document.getElementById('dtJenis')?.focus();
+                return;
+            }
+            const currentCandidate = window.currentDowntimesList?.find(dt => dt.id == id);
+            const hasExistingFoto = currentCandidate && currentCandidate.image_path;
+            if (!hasExistingFoto && !window.dtSelectedFotoFile) {
+                showToast('Wajib mengunggah foto evidence downtime terlebih dahulu sebelum menutup.', 'warning');
                 return;
             }
             // Jika jenis sudah dipilih, simpan via submitDowntimeLater

@@ -159,6 +159,7 @@ class DashboardDetailService
 
             $startTimeFormatted = $dt->start_time ? Carbon::parse($dt->start_time)->format('H:i') : '-';
             $finishTimeFormatted = $dt->finish_time ? Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang';
+            $imageUrl = $dt->image_path ? asset('uploads/'.$dt->image_path) : null;
             $downtimeItems[$dt->job_master_id][] = [
                 'id' => $dt->id,
                 'jenis_downtime' => strtoupper($dt->jenis_downtime ?: 'DOWNTIME'),
@@ -166,6 +167,7 @@ class DashboardDetailService
                 'penyebab' => $dt->penyebab ?: '-',
                 'tindakan' => $dt->tindakan ?: ($dt->action ?: '-'),
                 'pic' => $dt->pic ?: '-',
+                'image_url' => $imageUrl,
                 'start_time' => $startTimeFormatted,
                 'finish_time' => $finishTimeFormatted,
                 'duration_minute' => round($durSeconds / 60, 1),
