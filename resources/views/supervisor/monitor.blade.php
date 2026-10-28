@@ -232,8 +232,7 @@
             font-weight: 900 !important;
         }
 
-        /* REJECT: solid red across PLAN, CURR, ACTUAL (same family as DOWNTIME) */
-        #row-REJECT td.val-plan,
+        /* REJECT: solid red across CURR, ACTUAL (same family as DOWNTIME). PLAN has standard styling */
         #row-REJECT td.val-curr,
         #row-REJECT td.val-actual {
             background-color: #ef4444 !important;
@@ -242,8 +241,7 @@
             border-color: #b91c1c !important;
         }
 
-        /* REPAIR: solid yellow across PLAN, CURR, ACTUAL */
-        #row-REPAIR td.val-plan,
+        /* REPAIR: solid yellow across CURR, ACTUAL. PLAN has standard styling */
         #row-REPAIR td.val-curr,
         #row-REPAIR td.val-actual {
             background-color: #facc15 !important;
@@ -253,7 +251,6 @@
         }
 
         /* Keep REJECT/REPAIR readable and clearly separated in dark mode */
-        body.dark #row-REJECT td.val-plan,
         body.dark #row-REJECT td.val-curr,
         body.dark #row-REJECT td.val-actual {
             background-color: #dc2626 !important;
@@ -263,7 +260,6 @@
             text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
         }
 
-        body.dark #row-REPAIR td.val-plan,
         body.dark #row-REPAIR td.val-curr,
         body.dark #row-REPAIR td.val-actual {
             background-color: #eab308 !important;
@@ -1303,7 +1299,7 @@ function buildRightBody(rows, maxRows, overallPlan){
             let rejectAttr = '';
             let rejectContent = j.reject;
             if (Number(j.reject) > 0) {
-                rejectSt = 'font-weight:900; color:#dc2626!important; background:#fee2e2; cursor:pointer; text-decoration:underline;';
+                rejectSt = 'font-weight:900; color:#ffffff!important; background:#dc2626!important; cursor:pointer; text-decoration:underline;';
                 rejectAttr = `onclick="openDefectDetailModal(${i}, 'reject')" title="Klik untuk lihat rincian Reject (${j.reject} pcs)"`;
                 rejectContent = `${j.reject} <span style="font-size:0.6vw;">🔍</span>`;
             }

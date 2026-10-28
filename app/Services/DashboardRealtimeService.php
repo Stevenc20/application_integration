@@ -826,14 +826,61 @@ class DashboardRealtimeService
         }
         $jobActual = $finishedJobs.'/'.$totalJobs;
 
-        $totalStroke = $ok + $repair + $reject;
+        // Hitung pemakaian mesin per plan/item (cocokkan kolom Excel A-1 sampai A-4 atau fallback total_mesin)
+        $resolveMachineCount = function ($planItem): int {
+            if (! $planItem) {
+                return 1;
+            }
+            $activeFromCols = 0;
+            foreach (['a1', 'a2', 'a3', 'a4'] as $col) {
+                if (isset($planItem->{$col}) && (float) $planItem->{$col} > 0) {
+                    $activeFromCols++;
+                }
+            }
+            if ($activeFromCols > 0) {
+                return $activeFromCols;
+            }
+            $tm = (int) ($planItem->total_mesin ?? 0);
 
-        $currStroke = $hasRunning ? ($currOk + $currRepair + $currReject) : '-';
+            return $tm > 0 ? $tm : 1;
+        };
+
+        // Plan Stroke kumulatif = Total Qty Plan * jumlah mesin yang dipakai tiap item
+        $planStrokeTotal = 0;
+        foreach ($uniqueBasePlans as $bp) {
+            $mCount = $resolveMachineCount($bp);
+            $planStrokeTotal += ((int) ($bp->plan ?? 0)) * $mCount;
+        }
+
+        // Actual Stroke = Total Qty (ok + repair + reject) * jumlah mesin yang dipakai
+        $totalStroke = 0;
+        foreach ($dailyRecords as $dp) {
+            $matchedPlan = null;
+            if ($dp->jobMaster) {
+                $matchedPlan = $plansByIdentifier[$dp->jobMaster->job_number ?? ''] ?? null;
+            }
+            $mCount = $resolveMachineCount($matchedPlan);
+            $itemTotalQty = (int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject;
+            $totalStroke += ($itemTotalQty * $mCount);
+        }
+
+        // Current Stroke untuk item berjalan
+        $currStroke = '-';
+        if ($hasRunning && $runningRecord) {
+            $matchedPlan = null;
+            if ($runningRecord->jobMaster) {
+                $matchedPlan = $plansByIdentifier[$runningRecord->jobMaster->job_number ?? ''] ?? null;
+            }
+            $currMCount = $resolveMachineCount($matchedPlan);
+            $currTotalQty = (int) $currOk + (int) $currRepair + (int) $currReject;
+            $currStroke = (string) ($currTotalQty * $currMCount);
+        }
 
         $meta = [
             'job' => $jobName,
             'jobPlan' => (string) $totalJobs,
             'jobActual' => $jobActual,
+            'strokePlan' => (string) $planStrokeTotal,
             'stroke' => (string) $totalStroke,
             'currStroke' => (string) $currStroke,
         ];

@@ -800,7 +800,8 @@ class ScheduleBackupService
             $snapRowType,
             $snapJobNo,
             $snapJobMaster,
-            $snapRowNo
+            $snapRowNo,
+            $snapPlan
         ) {
             // Do not steal a live plan that already corresponds by ID to another snapshot row
             if ($snapshotById->has($live->id)) {
@@ -815,6 +816,23 @@ class ScheduleBackupService
             }
             if ((string) $live->row_type !== $snapRowType) {
                 return false;
+            }
+
+            // For breaktime rows, allow matching by break label and start/finish time or row_no
+            if ($snapRowType === 'break') {
+                $snapStart = trim((string) ($snapPlan['start_time'] ?? ''));
+                $snapFinish = trim((string) ($snapPlan['finish_time'] ?? ''));
+                $liveStart = trim((string) ($live->start_time ?? ''));
+                $liveFinish = trim((string) ($live->finish_time ?? ''));
+
+                $snapLabel = $snapJobNo !== '' ? $snapJobNo : $snapJobMaster;
+                $liveJobNo = strtoupper(trim((string) $live->job_no));
+                $liveJobMaster = strtoupper(trim((string) $live->job_master));
+                $liveLabel = $liveJobNo !== '' ? $liveJobNo : $liveJobMaster;
+
+                if ($snapLabel !== '' && $liveLabel === $snapLabel && $snapStart === $liveStart && $snapFinish === $liveFinish) {
+                    return true;
+                }
             }
 
             return strtoupper(trim((string) $live->job_no)) === $snapJobNo
