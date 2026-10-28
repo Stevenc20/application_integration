@@ -1201,61 +1201,78 @@ class InputHarianController extends Controller
 
         $fields = $request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']);
 
-        // Helper aman untuk menyimpan file upload menggunakan disk 'uploads' / public fallback
+        // Helper aman dan konsisten untuk menyimpan file upload downtime
         $saveDowntimeFile = function ($file, string $category) use ($downtime) {
             $originalName = $file->getClientOriginalName();
             $safeName = time() . '_' . uniqid() . '_' . $category . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
             $subDir = 'downtime/' . $downtime->id;
             $relPath = $subDir . '/' . $safeName;
 
-            // 1. Coba simpan menggunakan Storage disk 'uploads'
+            // Pastikan direktori tujuan tersedia dan dapat ditulis pada disk yang aktif
+            // Prioritas 1: Gunakan Storage disk 'public' (standar Laravel: storage/app/public)
             try {
-                $stored = \Illuminate\Support\Facades\Storage::disk('uploads')->putFileAs($subDir, $file, $safeName);
-                if ($stored) {
-                    $absPath = public_path('uploads/' . $relPath);
-                    if (file_exists($absPath)) {
-                        @chmod($absPath, 0664);
+                if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($subDir)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($subDir);
+                }
+                $storedPublic = \Illuminate\Support\Facades\Storage::disk('public')->putFileAs($subDir, $file, $safeName);
+                if ($storedPublic) {
+                    $pubAbsPath = storage_path('app/public/' . $relPath);
+                    if (file_exists($pubAbsPath)) {
+                        @chmod($pubAbsPath, 0664);
+                    }
+                    return $relPath;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Storage disk public putFileAs failed: ' . $e->getMessage() . ', trying uploads disk/direct fallback.');
+            }
+
+            // Prioritas 2: Gunakan Storage disk 'uploads' (public/uploads) jika direktori public/uploads writable
+            try {
+                if (!\Illuminate\Support\Facades\Storage::disk('uploads')->exists($subDir)) {
+                    \Illuminate\Support\Facades\Storage::disk('uploads')->makeDirectory($subDir);
+                }
+                $storedUploads = \Illuminate\Support\Facades\Storage::disk('uploads')->putFileAs($subDir, $file, $safeName);
+                if ($storedUploads) {
+                    $uplAbsPath = public_path('uploads/' . $relPath);
+                    if (file_exists($uplAbsPath)) {
+                        @chmod($uplAbsPath, 0664);
+                    }
+                    return $relPath;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Storage disk uploads putFileAs failed: ' . $e->getMessage() . ', trying direct copy fallback.');
+            }
+
+            // Prioritas 3: Direct fallback copy via file_get_contents / copy
+            $candidates = [
+                storage_path('app/public/' . $relPath),
+                public_path('uploads/' . $relPath),
+            ];
+
+            foreach ($candidates as $targetAbsPath) {
+                $targetDir = dirname($targetAbsPath);
+                if (!is_dir($targetDir)) {
+                    @mkdir($targetDir, 0775, true);
+                }
+                if (is_dir($targetDir) && is_writable($targetDir)) {
+                    $copied = false;
+                    if (file_exists($file->getRealPath())) {
+                        $copied = @copy($file->getRealPath(), $targetAbsPath);
+                    }
+                    if (!$copied) {
+                        $content = @file_get_contents($file->getRealPath());
+                        if ($content !== false) {
+                            $copied = @file_put_contents($targetAbsPath, $content) !== false;
+                        }
+                    }
+                    if ($copied && file_exists($targetAbsPath)) {
+                        @chmod($targetAbsPath, 0664);
                         return $relPath;
                     }
                 }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Storage disk uploads error, trying direct public_path: ' . $e->getMessage());
             }
 
-            // 2. Fallback direct disk creation dengan pengecekan permission & try-catch eksplisit
-            $absPath = public_path('uploads/' . $relPath);
-            $dir = dirname($absPath);
-
-            if (!\Illuminate\Support\Facades\File::isDirectory($dir)) {
-                $created = @\Illuminate\Support\Facades\File::makeDirectory($dir, 0775, true, true);
-                if (!$created && !is_dir($dir)) {
-                    \Illuminate\Support\Facades\Log::error("mkdir failed on: {$dir}");
-                    throw new \RuntimeException("Gagal membuat direktori penyimpanan foto: {$dir}. Periksa hak akses direktori.");
-                }
-            }
-
-            if (file_exists($absPath)) {
-                @unlink($absPath);
-            }
-
-            $moved = false;
-            try {
-                $file->move($dir, $safeName);
-                $moved = file_exists($absPath);
-            } catch (\Throwable $e) {
-                // Fallback copy jika move gagal lintas mount/container
-                if (file_exists($file->getRealPath())) {
-                    $copied = @copy($file->getRealPath(), $absPath);
-                    $moved = $copied && file_exists($absPath);
-                }
-            }
-
-            if (!$moved) {
-                throw new \RuntimeException("Gagal menyimpan file foto {$category}. File tidak dapat disalin ke server.");
-            }
-
-            @chmod($absPath, 0664);
-            return $relPath;
+            throw new \RuntimeException("Gagal menyimpan file foto {$category}. Direktori server tidak dapat ditulis. Pastikan permission storage/app/public atau public/uploads dapat diakses proses PHP.");
         };
 
         try {

@@ -90,16 +90,24 @@ class DowntimePhotoAndValidationTest extends TestCase
         $this->assertNotNull($this->downtime->image_path_tooling);
         $this->assertEquals($this->downtime->image_path_part, $this->downtime->image_path);
 
-        $absPartPath = public_path('uploads/' . $this->downtime->image_path_part);
-        $absToolingPath = public_path('uploads/' . $this->downtime->image_path_tooling);
+        $this->assertNotNull($this->downtime->image_url_part);
+        $this->assertNotNull($this->downtime->image_url_tooling);
 
-        $this->assertFileExists($absPartPath);
-        $this->assertFileExists($absToolingPath);
+        $exists = file_exists(storage_path('app/public/' . $this->downtime->image_path_part))
+               || file_exists(public_path('uploads/' . $this->downtime->image_path_part));
+        $this->assertTrue($exists, 'Part image must exist in storage/app/public or public/uploads');
+
+        $existsTooling = file_exists(storage_path('app/public/' . $this->downtime->image_path_tooling))
+                      || file_exists(public_path('uploads/' . $this->downtime->image_path_tooling));
+        $this->assertTrue($existsTooling, 'Tooling image must exist in storage/app/public or public/uploads');
 
         // Cleanup test images
-        @unlink($absPartPath);
-        @unlink($absToolingPath);
-        @rmdir(dirname($absPartPath));
+        @unlink(storage_path('app/public/' . $this->downtime->image_path_part));
+        @unlink(storage_path('app/public/' . $this->downtime->image_path_tooling));
+        @unlink(public_path('uploads/' . $this->downtime->image_path_part));
+        @unlink(public_path('uploads/' . $this->downtime->image_path_tooling));
+        @rmdir(dirname(storage_path('app/public/' . $this->downtime->image_path_part)));
+        @rmdir(dirname(public_path('uploads/' . $this->downtime->image_path_part)));
     }
 
     public function test_updating_downtime_allows_empty_photos_when_closing_or_filling_later(): void
@@ -154,11 +162,16 @@ class DowntimePhotoAndValidationTest extends TestCase
         $secondPath = $this->downtime->image_path_part;
 
         $this->assertNotNull($secondPath);
-        $this->assertFileExists(public_path('uploads/' . $secondPath));
+        $existsSecond = file_exists(storage_path('app/public/' . $secondPath))
+                     || file_exists(public_path('uploads/' . $secondPath));
+        $this->assertTrue($existsSecond, 'Second uploaded image must exist');
 
         // Cleanup
+        @unlink(storage_path('app/public/' . $firstPath));
+        @unlink(storage_path('app/public/' . $secondPath));
         @unlink(public_path('uploads/' . $firstPath));
         @unlink(public_path('uploads/' . $secondPath));
+        @rmdir(dirname(storage_path('app/public/' . $secondPath)));
         @rmdir(dirname(public_path('uploads/' . $secondPath)));
     }
 }
