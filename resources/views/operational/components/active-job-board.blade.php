@@ -60,17 +60,15 @@
                 }
             }
 
-            @php
-                $activeShiftName = request('shift', $currentShift ?? 'Shift Pagi');
-                [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $activeShiftName);
-                $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)
-                    ->whereNull('finish_time')
-                    ->where('start_time', '>=', $curShiftStart)
-                    ->where('start_time', '<', $curShiftEnd)
-                    ->orderByDesc('start_time')
-                    ->first();
-                $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
-            @endphp
+            $activeShiftName = request('shift', $currentShift ?? 'Shift Pagi');
+            [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $activeShiftName);
+            $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)
+                ->whereNull('finish_time')
+                ->where('start_time', '>=', $curShiftStart)
+                ->where('start_time', '<', $curShiftEnd)
+                ->orderByDesc('start_time')
+                ->first();
+            $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
 
             $openFirstCheck = \App\Models\Dandori::where('next_job_id', $activeJob->id)
                 ->whereNull('finish_time')
