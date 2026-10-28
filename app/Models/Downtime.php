@@ -14,6 +14,8 @@ class Downtime extends Model
         'action',
         'pic',
         'image_path',
+        'image_path_part',
+        'image_path_tooling',
         'start_time',
         'finish_time',
         'duration_seconds',

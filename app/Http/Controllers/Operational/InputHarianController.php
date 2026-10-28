@@ -1167,18 +1167,50 @@ class InputHarianController extends Controller
 
         $fields = $request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']);
 
-        if ($request->hasFile('foto')) {
-            $file = $request->file('foto');
-            $safeName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $file->getClientOriginalName());
+        // Helper aman untuk menyimpan file upload dengan pencegahan error mkdir & path sanitasi
+        $saveDowntimeFile = function ($file, string $category) use ($downtime) {
+            $originalName = $file->getClientOriginalName();
+            $safeName = time() . '_' . uniqid() . '_' . $category . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
             $relPath = 'downtime/' . $downtime->id . '/' . $safeName;
             $absPath = public_path('uploads/' . $relPath);
             $dir = dirname($absPath);
-            if (!is_dir($dir)) {
-                mkdir($dir, 0755, true);
+
+            if (!\Illuminate\Support\Facades\File::isDirectory($dir)) {
+                \Illuminate\Support\Facades\File::makeDirectory($dir, 0755, true, true);
             }
-            copy($file->getRealPath(), $absPath);
-            chmod($absPath, 0644);
-            $fields['image_path'] = $relPath;
+
+            if (file_exists($absPath)) {
+                @unlink($absPath);
+            }
+
+            // Gunakan move upload atau File::copy untuk fleksibilitas environment PHP
+            $file->move($dir, $safeName);
+            @chmod($absPath, 0644);
+
+            return $relPath;
+        };
+
+        // 1. Foto Part
+        if ($request->hasFile('foto_part')) {
+            $partPath = $saveDowntimeFile($request->file('foto_part'), 'part');
+            $fields['image_path_part'] = $partPath;
+            $fields['image_path'] = $partPath; // Backward-compatibility
+        }
+
+        // 2. Foto Tooling
+        if ($request->hasFile('foto_tooling')) {
+            $toolingPath = $saveDowntimeFile($request->file('foto_tooling'), 'tooling');
+            $fields['image_path_tooling'] = $toolingPath;
+            if (empty($fields['image_path'])) {
+                $fields['image_path'] = $toolingPath; // Fallback jika foto part tidak ada
+            }
+        }
+
+        // 3. Fallback foto legacy jika dikirim via key 'foto'
+        if ($request->hasFile('foto') && empty($fields['image_path_part'])) {
+            $legacyPath = $saveDowntimeFile($request->file('foto'), 'part');
+            $fields['image_path_part'] = $legacyPath;
+            $fields['image_path'] = $legacyPath;
         }
 
         $downtime->update($fields);

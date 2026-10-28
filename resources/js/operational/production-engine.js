@@ -2372,38 +2372,63 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
     }
 }
 
-window.dtSelectedFotoFile = null;
+window.dtSelectedPartFile = null;
+window.dtSelectedToolingFile = null;
 
-window.previewDtFoto = function(event) {
+window.previewDtCategoryFoto = function(event, category) {
     const file = event.target.files?.[0];
     if (!file) return;
-    window.dtSelectedFotoFile = file;
 
-    const previewContainer = document.getElementById('dtFotoPreviewContainer');
-    const previewImg = document.getElementById('dtFotoPreviewImg');
-    const label = document.getElementById('dtFotoLabel');
+    if (category === 'part') {
+        window.dtSelectedPartFile = file;
+    } else {
+        window.dtSelectedToolingFile = file;
+    }
+
+    const catCap = category === 'part' ? 'Part' : 'Tooling';
+    const previewContainer = document.getElementById(`dtFoto${catCap}PreviewContainer`);
+    const previewImg = document.getElementById(`dtFoto${catCap}PreviewImg`);
+    const label = document.getElementById(`dtFoto${catCap}Label`);
 
     if (previewImg) {
         const reader = new FileReader();
         reader.onload = function(e) {
             previewImg.src = e.target.result;
             if (previewContainer) previewContainer.classList.remove('hidden');
-            if (label) label.textContent = 'Ganti Foto';
+            if (label) label.textContent = 'Ganti File';
         };
         reader.readAsDataURL(file);
     }
 };
 
-window.removeDtFoto = function() {
-    window.dtSelectedFotoFile = null;
-    const input = document.getElementById('dtFotoInput');
-    if (input) input.value = '';
-    const previewContainer = document.getElementById('dtFotoPreviewContainer');
+window.removeDtCategoryFoto = function(category) {
+    const catCap = category === 'part' ? 'Part' : 'Tooling';
+    if (category === 'part') {
+        window.dtSelectedPartFile = null;
+    } else {
+        window.dtSelectedToolingFile = null;
+    }
+
+    const fileInput = document.getElementById(`dtFoto${catCap}Input`);
+    if (fileInput) fileInput.value = '';
+    const camInput = document.getElementById(`dtCamera${catCap}Input`);
+    if (camInput) camInput.value = '';
+
+    const previewContainer = document.getElementById(`dtFoto${catCap}PreviewContainer`);
     if (previewContainer) previewContainer.classList.add('hidden');
-    const previewImg = document.getElementById('dtFotoPreviewImg');
+    const previewImg = document.getElementById(`dtFoto${catCap}PreviewImg`);
     if (previewImg) previewImg.src = '';
-    const label = document.getElementById('dtFotoLabel');
-    if (label) label.textContent = 'Unggah Foto';
+    const label = document.getElementById(`dtFoto${catCap}Label`);
+    if (label) label.textContent = 'Pilih File';
+};
+
+window.previewDtFoto = function(event) {
+    window.previewDtCategoryFoto(event, 'part');
+};
+
+window.removeDtFoto = function() {
+    window.removeDtCategoryFoto('part');
+    window.removeDtCategoryFoto('tooling');
 };
 
 function cancelDowntimeEdit() {
@@ -2461,13 +2486,22 @@ function editDowntimeFromIndex(index) {
 
         // Existing image preview if already uploaded
         window.removeDtFoto();
-        if (dt.image_path) {
-            const previewContainer = document.getElementById('dtFotoPreviewContainer');
-            const previewImg = document.getElementById('dtFotoPreviewImg');
-            const label = document.getElementById('dtFotoLabel');
-            if (previewImg) previewImg.src = `/uploads/${dt.image_path}`;
+        const partPath = dt.image_path_part || dt.image_path;
+        if (partPath) {
+            const previewContainer = document.getElementById('dtFotoPartPreviewContainer');
+            const previewImg = document.getElementById('dtFotoPartPreviewImg');
+            const label = document.getElementById('dtFotoPartLabel');
+            if (previewImg) previewImg.src = `/uploads/${partPath}`;
             if (previewContainer) previewContainer.classList.remove('hidden');
-            if (label) label.textContent = 'Ganti Foto';
+            if (label) label.textContent = 'Ganti File';
+        }
+        if (dt.image_path_tooling) {
+            const previewContainer = document.getElementById('dtFotoToolingPreviewContainer');
+            const previewImg = document.getElementById('dtFotoToolingPreviewImg');
+            const label = document.getElementById('dtFotoToolingLabel');
+            if (previewImg) previewImg.src = `/uploads/${dt.image_path_tooling}`;
+            if (previewContainer) previewContainer.classList.remove('hidden');
+            if (label) label.textContent = 'Ganti File';
         }
 
         // Show the form area
@@ -2509,15 +2543,8 @@ function saveDowntime(andCloseModal = false) {
 
     const jenis = (document.getElementById('dtJenis')?.value || '').trim();
     if (!jenis) {
-        showToast('Pilih jenis downtime terlebih dahulu.', 'warning');
+        showToast('Wajib memilih Jenis Downtime terlebih dahulu.', 'warning');
         document.getElementById('dtJenis')?.focus();
-        return;
-    }
-
-    const currentCandidate = window.currentDowntimesList?.find(dt => dt.id == id);
-    const hasExistingFoto = currentCandidate && currentCandidate.image_path;
-    if (!hasExistingFoto && !window.dtSelectedFotoFile) {
-        showToast('Wajib mengunggah foto evidence downtime sebelum menyimpan.', 'warning');
         return;
     }
 
@@ -2534,8 +2561,11 @@ function saveDowntime(andCloseModal = false) {
     formData.append('penyebab', (document.getElementById('dtPenyebab')?.value || '').trim());
     formData.append('action', (document.getElementById('dtAction')?.value || '').trim());
     formData.append('pic', (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim());
-    if (window.dtSelectedFotoFile) {
-        formData.append('foto', window.dtSelectedFotoFile);
+    if (window.dtSelectedPartFile) {
+        formData.append('foto_part', window.dtSelectedPartFile);
+    }
+    if (window.dtSelectedToolingFile) {
+        formData.append('foto_tooling', window.dtSelectedToolingFile);
     }
 
     const saveBtn = document.getElementById('dtBtnSave');
@@ -2663,6 +2693,16 @@ function renderDowntimeTable() {
             rawProblem = rawProblem.substring(9).trim();
         }
 
+        const partImg = dt.image_path_part || dt.image_path;
+        const toolingImg = dt.image_path_tooling;
+        let thumbsHtml = '';
+        if (partImg) {
+            thumbsHtml += `<a href="/uploads/${partImg}" target="_blank" rel="noopener" class="inline-block relative group" title="Foto Part"><img src="/uploads/${partImg}" class="w-7 h-7 object-cover rounded-md border border-slate-200 shadow-xs"><span class="absolute -top-1 -right-1 bg-blue-600 text-white text-[7px] font-black px-1 rounded-full uppercase">P</span></a>`;
+        }
+        if (toolingImg) {
+            thumbsHtml += `<a href="/uploads/${toolingImg}" target="_blank" rel="noopener" class="inline-block relative group" title="Foto Tooling"><img src="/uploads/${toolingImg}" class="w-7 h-7 object-cover rounded-md border border-slate-200 shadow-xs"><span class="absolute -top-1 -right-1 bg-orange-600 text-white text-[7px] font-black px-1 rounded-full uppercase">T</span></a>`;
+        }
+
         return `<tr class="hover:bg-slate-50 transition-colors ${isMissingDetail ? 'bg-red-50/50' : ''}">
                 <td class="px-4 py-3">${jenisBadge}</td>
                 <td class="px-4 py-3 text-xs">
@@ -2674,6 +2714,7 @@ function renderDowntimeTable() {
                         </span>` : ''}
                     </div>
                     <div class="text-[10px] text-slate-500 uppercase">${dt.penyebab || '-'}</div>
+                    ${thumbsHtml ? `<div class="flex items-center gap-1.5 mt-1.5">${thumbsHtml}</div>` : ''}
                 </td>
                 <td class="px-4 py-3 text-xs font-medium text-slate-600">${dt.pic || '-'}</td>
                 <td class="px-4 py-3 font-mono text-xs text-slate-600">${start} - ${end}</td>
@@ -2734,11 +2775,6 @@ function submitDowntimeLater() {
     }
 
     const currentCandidate = window.currentDowntimesList?.find(dt => dt.id == id);
-    const hasExistingFoto = currentCandidate && currentCandidate.image_path;
-    if (!hasExistingFoto && !window.dtSelectedFotoFile) {
-        showToast('Wajib mengunggah foto evidence downtime terlebih dahulu.', 'warning');
-        return;
-    }
 
     let problemVal = (document.getElementById('dtProblem')?.value || '').trim();
     if (!problemVal) {
@@ -2752,8 +2788,11 @@ function submitDowntimeLater() {
     formData.append('penyebab', (document.getElementById('dtPenyebab')?.value || '').trim());
     formData.append('action', (document.getElementById('dtAction')?.value || '').trim());
     formData.append('pic', (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim());
-    if (window.dtSelectedFotoFile) {
-        formData.append('foto', window.dtSelectedFotoFile);
+    if (window.dtSelectedPartFile) {
+        formData.append('foto_part', window.dtSelectedPartFile);
+    }
+    if (window.dtSelectedToolingFile) {
+        formData.append('foto_tooling', window.dtSelectedToolingFile);
     }
 
     const laterBtn = document.getElementById('dtBtnLater');

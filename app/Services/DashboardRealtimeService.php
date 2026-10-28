@@ -354,7 +354,8 @@ class DashboardRealtimeService
             $dur = round($this->downtimeDurationSeconds($dt) / 60, 1);
             $rawJob = $dt->jobMaster?->job_name ?? '-';
             $jobName = $shortJob($rawJob);
-            $imageUrl = $dt->image_path ? asset('uploads/'.$dt->image_path) : null;
+            $effectiveImage = $dt->image_path_part ?: ($dt->image_path_tooling ?: $dt->image_path);
+            $imageUrl = $effectiveImage ? asset('uploads/'.$effectiveImage) : null;
             $row = [
                 'id' => $dt->id,
                 'no' => count($dtRows) + 1,
@@ -367,6 +368,8 @@ class DashboardRealtimeService
                 'tindakan' => $dt->tindakan ?? ($dt->action ?? '-'),
                 'pic' => $dt->pic ?? '-',
                 'image_url' => $imageUrl,
+                'image_url_part' => $dt->image_path_part ? asset('uploads/'.$dt->image_path_part) : null,
+                'image_url_tooling' => $dt->image_path_tooling ? asset('uploads/'.$dt->image_path_tooling) : null,
                 'durasi' => $dur,
                 'start_time' => $dt->start_time ? \Carbon\Carbon::parse($dt->start_time)->format('H:i') : '-',
                 'finish_time' => $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time)->format('H:i') : 'Sekarang',
