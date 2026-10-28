@@ -119,6 +119,12 @@ class InputHarianController extends Controller
         // SYNC: Pastikan JobMaster terupdate dari Jadwal
         $this->syncPlanToJobMaster($date, $currentShift);
 
+        // RECONCILE: Pastikan sesi shift sebelumnya yang masih running di-transisikan secara aman
+        // (job target selesai -> ditutup; job belum selesai -> di-pause aman, timer runtime dibekukan)
+        if ($currentShift !== 'all') {
+            app(\App\Services\ProductionShiftTransitionService::class)->transitionShiftSafely($lineFilter, $latestShiftName, $date);
+        }
+
         // 2. QUERY UTAMA: Langsung dari ProductionPlan (Source of Truth)
         $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
             ->whereIn('row_type', ['job', 'break'])
@@ -387,16 +393,37 @@ class InputHarianController extends Controller
                 }
 
                 // 2. Fallback: Jika filter status/search membuat $plans tidak memuat job yang running di line ini,
-                // TETAP temukan active job di line ini agar operator console / active job board tidak hilang!
+                // TETAP temukan active job di line ini HANYA jika memang sesuai dengan shift & tanggal yang sedang aktif,
+                // untuk mencegah job Shift Pagi bocor/nyangkut ke antrean Shift Malam!
                 if ($activeJobs->isEmpty()) {
-                    $activeJobs = $baseActiveQuery()
+                    $fallbackQuery = $baseActiveQuery()
                         ->with([
                             'dailyProduction' => function ($q) use ($date) {
                                 $q->where('work_date', $date);
                             },
                             'downtimes',
                             'dandoris'
-                        ])
+                        ]);
+
+                    // Jika shift saat ini spesifik (misal Shift Malam atau Shift Pagi), batasi fallback hanya ke job milik shift tersebut
+                    if ($currentShift !== 'all' && !empty($latestShiftName)) {
+                        $fallbackQuery->where(function($fq) use ($date, $latestShiftName) {
+                            $fq->whereExists(function($sub) use ($date, $latestShiftName) {
+                                $sub->select(DB::raw(1))
+                                    ->from('production_plans')
+                                    ->whereColumn('production_plans.job_no', 'job_masters.job_number')
+                                    ->whereDate('production_plans.plan_date', $date)
+                                    ->where('production_plans.shift_name', $latestShiftName);
+                            })->orWhereRaw("EXISTS (
+                                SELECT 1 FROM production_plans pp
+                                WHERE pp.id = CAST(SUBSTRING_INDEX(job_masters.job_number, '-', -1) AS UNSIGNED)
+                                  AND pp.plan_date = ?
+                                  AND pp.shift_name = ?
+                            )", [$date, $latestShiftName]);
+                        });
+                    }
+
+                    $activeJobs = $fallbackQuery
                         ->orderByRaw("CASE 
                             WHEN EXISTS (
                                 SELECT 1 FROM downtimes 

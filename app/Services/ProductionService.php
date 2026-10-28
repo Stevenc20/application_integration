@@ -1324,11 +1324,29 @@ class ProductionService
             }
         }
 
-        // Fallback to old query
-        return JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
+        // Fallback to old query, tetapi batasi agar tetap di shift yang sama bila plan terdeteksi
+        $fallbackQuery = JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
             ->where('line', $current->line)
-            ->where('id', '!=', $currentJobId)
-            ->orderBy('sequence_no')
+            ->where('id', '!=', $currentJobId);
+
+        if (isset($currentPlan) && $currentPlan) {
+            $fallbackQuery->where(function($fq) use ($currentPlan) {
+                $fq->whereExists(function($sub) use ($currentPlan) {
+                    $sub->select(DB::raw(1))
+                        ->from('production_plans')
+                        ->whereColumn('production_plans.job_no', 'job_masters.job_number')
+                        ->whereDate('production_plans.plan_date', $currentPlan->plan_date)
+                        ->where('production_plans.shift_name', $currentPlan->shift_name);
+                })->orWhereRaw("EXISTS (
+                    SELECT 1 FROM production_plans pp
+                    WHERE pp.id = CAST(SUBSTRING_INDEX(job_masters.job_number, '-', -1) AS UNSIGNED)
+                      AND pp.plan_date = ?
+                      AND pp.shift_name = ?
+                )", [$currentPlan->plan_date, $currentPlan->shift_name]);
+            });
+        }
+
+        return $fallbackQuery->orderBy('sequence_no')
             ->orderBy('id')
             ->first();
     }
