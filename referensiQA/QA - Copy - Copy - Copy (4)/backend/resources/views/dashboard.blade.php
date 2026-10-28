@@ -1016,11 +1016,22 @@
     @php
         $operatorSchedules = collect();
         if(auth()->user()->role === 'Operator') {
-            $filterDate = \Carbon\Carbon::today();
             $user = auth()->user();
+            $hour = (int) now()->format('H');
+            $min = (int) now()->format('i');
+            $isNightTransition = ($hour < 7 || ($hour === 7 && $min < 30));
+            $filterDate = $isNightTransition ? \Carbon\Carbon::yesterday() : \Carbon\Carbon::today();
             
             $schedulesQuery = \App\Models\ProductionSchedule::with(['itemChecks'])
-                            ->whereDate('tanggal_produksi', $filterDate)
+                            ->where(function($q) use ($filterDate, $isNightTransition) {
+                                $q->whereDate('tanggal_produksi', $filterDate);
+                                if ($isNightTransition) {
+                                    $q->orWhere(function($sub) {
+                                        $sub->whereDate('tanggal_produksi', \Carbon\Carbon::today())
+                                            ->where('shift', 'like', '%Malam%');
+                                    });
+                                }
+                            })
                             ->orderByRaw('ISNULL(row_no), row_no ASC');
                             
             if (!empty($user->assigned_line) && $user->assigned_line !== 'Semua Line') {

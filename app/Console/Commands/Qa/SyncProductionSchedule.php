@@ -39,8 +39,11 @@ class SyncProductionSchedule extends Command
             $datesToSync[] = $today;
 
             // Jika masih dalam jam kerja Shift Malam (00:00 - 08:00 pagi),
-            // sertakan juga tanggal kemarin agar schedule shift malam & aktualnya tetap sinkron dan tidak hilang
-            if (now()->hour < 8) {
+            // atau tanggal produksi aktif adalah kemarin, sertakan juga tanggal kemarin
+            $workDateStr = \App\Services\ProductionMetricsService::currentProductionDate();
+            $workDate = Carbon::parse($workDateStr);
+
+            if (now()->hour < 8 || $workDate->isYesterday()) {
                 $datesToSync[] = Carbon::yesterday();
             }
         }

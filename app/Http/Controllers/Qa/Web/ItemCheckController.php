@@ -14,7 +14,6 @@ class ItemCheckController extends Controller
     public function index(Request $request)
     {
         // Work Date resolution: Shift Malam (21:00 - 07:30) melintasi tengah malam.
-        // Jika jam < 08:00 pagi dan filter date tidak eksplisit diisi, default ke tanggal kemarin (hari mulai shift malam).
         $filterDate = $request->query('date');
         $hour = (int) now()->format('H');
 
@@ -27,8 +26,9 @@ class ItemCheckController extends Controller
             $targetDate = Carbon::parse($workDateStr);
         }
         
-        // Lakukan sinkronisasi jadwal Produksi riil (dari db_integration) otomatis jika melihat hari ini atau shift malam aktif
-        if ($targetDate->isToday() || ($hour < 8 && $targetDate->isYesterday())) {
+        // Lakukan sinkronisasi jadwal Produksi riil (dari db_integration) otomatis
+        // Baik untuk hari ini maupun saat shift malam (kemarin) yang masih aktif berjalan
+        if ($targetDate->isToday() || $targetDate->isYesterday() || $hour < 8) {
             \Illuminate\Support\Facades\Artisan::call('qa:sync-schedule');
         }
 
@@ -36,10 +36,13 @@ class ItemCheckController extends Controller
                         ->where(function($query) use ($targetDate, $filterDate, $hour) {
                             $query->whereDate('tanggal_produksi', $targetDate);
                             // Fallback jika belum filter tanggal manual dan sedang jam 00:00 - 08:00 pagi:
-                            // tampilkan juga jadwal Shift Malam tanggal kemarin agar tidak hilang saat lewat tengah malam
-                            if (!$filterDate && $hour < 8 && $targetDate->isToday()) {
+                            // tampilkan juga jadwal Shift Malam tanggal kemarin atau hari ini agar tidak hilang saat lewat tengah malam
+                            if (!$filterDate && $hour < 8) {
                                 $query->orWhere(function($sub) {
                                     $sub->whereDate('tanggal_produksi', Carbon::yesterday())
+                                        ->where('shift_name', 'like', '%Malam%');
+                                })->orWhere(function($sub) {
+                                    $sub->whereDate('tanggal_produksi', Carbon::today())
                                         ->where('shift_name', 'like', '%Malam%');
                                 });
                             }
@@ -52,7 +55,8 @@ class ItemCheckController extends Controller
                             $query->whereNotIn('status', ['finished', 'approved', 'locked'])
                                   ->orWhereDate('created_at', $targetDate);
                             if (!$filterDate && $hour < 8) {
-                                $query->orWhereDate('created_at', Carbon::yesterday());
+                                $query->orWhereDate('created_at', Carbon::yesterday())
+                                      ->orWhereDate('created_at', Carbon::today());
                             }
                         })
                         ->latest();
@@ -166,8 +170,11 @@ class ItemCheckController extends Controller
         
         // Prevent operators from cheating by doing past schedules outside of active work cycle
         $hour = (int) now()->format('H');
+        $currentWorkDate = \App\Services\ProductionMetricsService::currentProductionDate();
         $isCurrentShiftMalam = ($hour < 8 && Carbon::parse($schedule->tanggal_produksi)->isYesterday());
-        if ($schedule->tanggal_produksi && !Carbon::parse($schedule->tanggal_produksi)->isToday() && !$isCurrentShiftMalam) {
+        $isCurrentWorkDate = Carbon::parse($schedule->tanggal_produksi)->toDateString() === $currentWorkDate;
+
+        if ($schedule->tanggal_produksi && !Carbon::parse($schedule->tanggal_produksi)->isToday() && !$isCurrentShiftMalam && !$isCurrentWorkDate) {
             return redirect()->back()->with('error', 'Gagal Memulai: Anda tidak dapat memulai inspeksi untuk jadwal yang bukan jadwal aktif hari ini. Jika jadwal ini terlewat, PPC akan membuat jadwal baru.');
         }
 

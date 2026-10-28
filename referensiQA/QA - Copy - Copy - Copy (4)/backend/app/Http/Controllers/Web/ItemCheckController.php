@@ -14,25 +14,19 @@ class ItemCheckController extends Controller
     public function index(Request $request)
     {
         // Work Date resolution: Shift Malam (21:00 - 07:30) melintasi tengah malam.
-        // Jika jam < 08:00 pagi dan filter date tidak eksplisit diisi, default ke tanggal kemarin (hari mulai shift malam).
         $filterDate = $request->query('date');
         $hour = (int) now()->format('H');
 
         if ($filterDate) {
             $targetDate = Carbon::parse($filterDate);
         } else {
-            // Jam 00:00 - 07:59 adalah jam lembur / kelanjutan Shift Malam kemarin.
-            // Cek apakah tanggal hari ini sudah memiliki data schedule, jika belum ada, pakai tanggal kemarin.
-            if ($hour < 8) {
-                $hasTodaySchedule = ProductionSchedule::whereDate('tanggal_produksi', Carbon::today())->exists();
-                $targetDate = $hasTodaySchedule ? Carbon::today() : Carbon::yesterday();
-            } else {
-                $targetDate = Carbon::today();
-            }
+            // Cutoff jam kerja adalah pukul 07:30 (Work Date standar).
+            // Sebelum jam 07:30 pagi, targetDate tetap tanggal kemarin (Shift Malam).
+            $targetDate = ($hour < 7 || ($hour === 7 && (int)now()->format('i') < 30)) ? Carbon::yesterday() : Carbon::today();
         }
         
-        // Lakukan sinkronisasi jadwal Produksi riil (dari db_integration) otomatis jika melihat hari ini atau shift malam aktif
-        if ($targetDate->isToday() || ($hour < 8 && $targetDate->isYesterday())) {
+        // Lakukan sinkronisasi jadwal Produksi riil (dari db_integration) otomatis
+        if ($targetDate->isToday() || $targetDate->isYesterday() || $hour < 8) {
             \Illuminate\Support\Facades\Artisan::call('qa:sync-schedule');
         }
 
@@ -40,10 +34,13 @@ class ItemCheckController extends Controller
                         ->where(function($query) use ($targetDate, $filterDate, $hour) {
                             $query->whereDate('tanggal_produksi', $targetDate);
                             // Fallback jika belum filter tanggal manual dan sedang jam 00:00 - 08:00 pagi:
-                            // tampilkan juga jadwal Shift Malam tanggal kemarin agar tidak hilang saat lewat tengah malam
-                            if (!$filterDate && $hour < 8 && $targetDate->isToday()) {
+                            // tampilkan juga jadwal Shift Malam tanggal kemarin atau hari ini agar tidak hilang saat lewat tengah malam
+                            if (!$filterDate && $hour < 8) {
                                 $query->orWhere(function($sub) {
                                     $sub->whereDate('tanggal_produksi', Carbon::yesterday())
+                                        ->where('shift_name', 'like', '%Malam%');
+                                })->orWhere(function($sub) {
+                                    $sub->whereDate('tanggal_produksi', Carbon::today())
                                         ->where('shift_name', 'like', '%Malam%');
                                 });
                             }
@@ -56,7 +53,8 @@ class ItemCheckController extends Controller
                             $query->whereNotIn('status', ['finished', 'approved', 'locked'])
                                   ->orWhereDate('created_at', $targetDate);
                             if (!$filterDate && $hour < 8) {
-                                $query->orWhereDate('created_at', Carbon::yesterday());
+                                $query->orWhereDate('created_at', Carbon::yesterday())
+                                      ->orWhereDate('created_at', Carbon::today());
                             }
                         })
                         ->latest();
@@ -171,7 +169,8 @@ class ItemCheckController extends Controller
         // Prevent operators from cheating by doing past schedules outside of active work cycle
         $hour = (int) now()->format('H');
         $isCurrentShiftMalam = ($hour < 8 && Carbon::parse($schedule->tanggal_produksi)->isYesterday());
-        if ($schedule->tanggal_produksi && !Carbon::parse($schedule->tanggal_produksi)->isToday() && !$isCurrentShiftMalam) {
+        $isYesterdayShift = Carbon::parse($schedule->tanggal_produksi)->isYesterday();
+        if ($schedule->tanggal_produksi && !Carbon::parse($schedule->tanggal_produksi)->isToday() && !$isCurrentShiftMalam && !$isYesterdayShift) {
             return redirect()->back()->with('error', 'Gagal Memulai: Anda tidak dapat memulai inspeksi untuk jadwal yang bukan jadwal aktif hari ini. Jika jadwal ini terlewat, PPC akan membuat jadwal baru.');
         }
 
