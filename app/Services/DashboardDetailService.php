@@ -206,7 +206,7 @@ class DashboardDetailService
                 'countermeasure' => $rr->countermeasure ?: '-',
                 'pic' => $picName,
                 'time' => $timeFormatted,
-                'images' => $rr->images->map(fn ($i) => asset('uploads/'.$i->image_path))->values()->all(),
+                'images' => $rr->images->map(fn ($i) => $i->url ?: asset('uploads/'.$i->image_path))->values()->all(),
             ];
 
             if ($logType === 'repair') {
