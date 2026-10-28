@@ -291,7 +291,12 @@ function _isInBreakWindow(now) {
     const schedule = window._breakSchedule || [];
     const mins = now.getHours() * 60 + now.getMinutes();
     for (const b of schedule) {
-        if (mins >= b.startMin && mins < b.endMin) return b;
+        if (b.startMin > b.endMin) {
+            // Lintas tengah malam (e.g. 23:30 - 00:30)
+            if (mins >= b.startMin || mins < b.endMin) return b;
+        } else {
+            if (mins >= b.startMin && mins < b.endMin) return b;
+        }
     }
     return null;
 }

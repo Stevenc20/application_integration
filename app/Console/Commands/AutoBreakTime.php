@@ -22,19 +22,10 @@ class AutoBreakTime extends Command
     {
         $now = Carbon::now();
         $productionDate = ProductionMetricsService::currentProductionDate($now);
-        $currentDay = strtolower($now->format('l'));
+        $shiftName = ProductionMetricsService::currentProductionShift($now);
         $currentMinutes = $now->hour * 60 + $now->minute;
 
-        $shiftName = ProductionMetricsService::currentProductionShift($now);
-
-        $breaks = MasterBreakTime::where('is_active', true)
-            ->where(function ($q) use ($currentDay) {
-                $q->where('hari', $currentDay)->orWhere('hari', 'semua');
-            })
-            ->where(function ($q) use ($shiftName) {
-                $q->where('shift', $shiftName)->orWhereNull('shift');
-            })
-            ->get();
+        $breaks = MasterBreakTime::getApplicableBreaks($productionDate, $shiftName);
 
         if ($breaks->isEmpty()) {
             return 0;
@@ -65,7 +56,11 @@ class AutoBreakTime extends Command
             foreach ($breaks as $b) {
                 $startMin = MasterBreakTime::timeToMinutes(substr($b->waktu_mulai, 0, 5));
                 $endMin = MasterBreakTime::timeToMinutes(substr($b->waktu_selesai, 0, 5));
-                if ($currentMinutes >= $startMin && $currentMinutes < $endMin) {
+                $matches = ($startMin > $endMin)
+                    ? ($currentMinutes >= $startMin || $currentMinutes < $endMin)
+                    : ($currentMinutes >= $startMin && $currentMinutes < $endMin);
+
+                if ($matches) {
                     $inBreakWindow = true;
                     $matchedBreak = $b;
                     break;
@@ -89,10 +84,22 @@ class AutoBreakTime extends Command
                     ->where('status', 'running')
                     ->first();
                 if ($session) {
-                    $session->update(['status' => 'paused', 'pause_time' => $now]);
+                    $runtime = $productionService->calculateRuntime($job->id);
+                    $session->update([
+                        'total_seconds' => $runtime,
+                        'status' => 'paused',
+                        'pause_time' => $now
+                    ]);
+                    DailyProduction::updateOrCreate(
+                        ['job_master_id' => $job->id, 'work_date' => $effectiveWorkDate],
+                        ['runtime_seconds' => $runtime]
+                    );
                 }
 
                 JobMaster::where('id', $job->id)->update(['status' => 'paused']);
+                if ($job->line) {
+                    \App\Services\DashboardRealtimeService::signalUpdate($job->line);
+                }
 
                 $this->log('AUTO BREAK START', $job->job_number, $matchedBreak->label, $now->format('H:i:s'));
                 $breakCount++;
@@ -131,10 +138,17 @@ class AutoBreakTime extends Command
                     ->where('status', 'paused')
                     ->first();
                 if ($session) {
-                    $session->update(['status' => 'running', 'start_time' => $now]);
+                    $session->update([
+                        'status' => 'running',
+                        'start_time' => $now,
+                        'pause_time' => null
+                    ]);
                 }
 
                 JobMaster::where('id', $job->id)->update(['status' => 'running']);
+                if ($job->line) {
+                    \App\Services\DashboardRealtimeService::signalUpdate($job->line);
+                }
 
                 $this->log('AUTO BREAK END', $job->job_number, $activeBreak->problem, $now->format('H:i:s'));
                 $breakCount++;

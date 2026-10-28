@@ -55,4 +55,64 @@ class MasterBreakTime extends Model
 
         return sprintf('%02d:%02d', $h, $m);
     }
+
+    /**
+     * Resolve applicable break schedules for a given date and shift name.
+     * This is the single source of truth used by PPC, Input Harian, and Background schedulers.
+     */
+    public static function getApplicableBreaks(string $date, string $shiftName, ?string $hari = null): \Illuminate\Database\Eloquent\Collection
+    {
+        $dayKey = self::resolveDayKey($date, $hari);
+        $normalizedShift = self::normalizeShiftKey($shiftName);
+
+        return self::where('is_active', true)
+            ->where(function ($q) use ($dayKey) {
+                $q->where('hari', $dayKey)->orWhere('hari', 'semua');
+            })
+            ->where(function ($q) use ($normalizedShift) {
+                $q->whereNull('shift')
+                  ->orWhere('shift', '')
+                  ->orWhere('shift', $normalizedShift)
+                  ->orWhere('shift', 'LIKE', '%' . $normalizedShift . '%');
+            })
+            ->orderBy('sort_order')
+            ->orderBy('waktu_mulai')
+            ->get();
+    }
+
+    public static function resolveDayKey(string $date, ?string $hari = null): string
+    {
+        if ($hari) {
+            return self::normalizeDayName($hari);
+        }
+
+        $carbonDay = strtolower(\Carbon\Carbon::parse($date)->locale('id')->isoFormat('dddd'));
+        return self::normalizeDayName($carbonDay);
+    }
+
+    public static function normalizeDayName(string $day): string
+    {
+        $normalized = strtolower(trim($day));
+        $normalized = preg_replace('/\s+(pagi|malam|shift\s*(pagi|malam)?)$/i', '', $normalized);
+        $enToId = [
+            'monday' => 'senin', 'tuesday' => 'selasa', 'wednesday' => 'rabu',
+            'thursday' => 'kamis', 'friday' => 'jumat', 'saturday' => 'sabtu', 'sunday' => 'minggu',
+        ];
+        if (isset($enToId[$normalized])) {
+            return $enToId[$normalized];
+        }
+        if (in_array($normalized, ['senin', 'selasa', 'rabu', 'kamis', 'jumat', 'sabtu', 'minggu', 'semua'], true)) {
+            return $normalized;
+        }
+        return $normalized;
+    }
+
+    public static function normalizeShiftKey(string $shiftName): string
+    {
+        $s = strtolower(trim($shiftName));
+        if (str_contains($s, 'malam') || str_contains($s, '2')) {
+            return 'Shift Malam';
+        }
+        return 'Shift Pagi';
+    }
 }
