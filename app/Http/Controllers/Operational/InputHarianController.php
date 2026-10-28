@@ -993,7 +993,32 @@ class InputHarianController extends Controller
             return $actualTotal > 0 || !empty($jm->started_at);
         };
 
-        $jobMaster = $jmQuery->orderByRaw("CASE 
+        $jobMaster = $jmQuery->where(function($q) use ($date, $request) {
+                $requestedShift = $request->get('shift');
+                if ($requestedShift && $requestedShift !== 'all') {
+                    $q->whereExists(function($sub) use ($date, $requestedShift) {
+                        $sub->select(DB::raw(1))
+                            ->from('production_plans')
+                            ->whereColumn('production_plans.job_no', 'job_masters.job_number')
+                            ->whereDate('production_plans.plan_date', $date)
+                            ->where('production_plans.shift_name', 'like', "{$requestedShift}%");
+                    })->orWhere(function($sub) use ($date, $requestedShift) {
+                        $planIds = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                            ->where('shift_name', 'like', "{$requestedShift}%")
+                            ->pluck('id')
+                            ->toArray();
+                        if (!empty($planIds)) {
+                            $sub->where(function($inQ) use ($planIds) {
+                                foreach ($planIds as $pid) {
+                                    $inQ->orWhere('job_number', 'LIKE', "%-{$pid}");
+                                }
+                            });
+                        } else {
+                            $sub->whereRaw('0 = 1');
+                        }
+                    });
+                }
+            })->orderByRaw("CASE 
                 WHEN EXISTS (
                     SELECT 1 FROM downtimes 
                     WHERE downtimes.job_master_id = job_masters.id 
@@ -1106,11 +1131,20 @@ class InputHarianController extends Controller
     DOWNTIME MANAGEMENT
     ====================================================
     */
-    public function getDowntimes(int|string $job_id)
+    public function getDowntimes(Request $request, int|string $job_id)
     {
-        $downtimes = Downtime::where('job_master_id', $job_id)
-            ->orderBy('created_at', 'desc')
-            ->get();
+        $query = Downtime::where('job_master_id', $job_id);
+
+        $shift = $request->query('shift');
+        $date = $request->query('date');
+
+        if ($date && $shift && $shift !== 'all') {
+            [$shiftStart, $shiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $shift);
+            $query->where('start_time', '>=', $shiftStart)
+                  ->where('start_time', '<', $shiftEnd);
+        }
+
+        $downtimes = $query->orderBy('created_at', 'desc')->get();
 
         return response()->json($downtimes);
     }

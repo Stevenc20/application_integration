@@ -2727,7 +2727,10 @@ function renderDowntimeTable() {
 }
 
 function loadDowntimes(jobId) {
-    fetch(`/operational/job/${jobId}/downtimes`).then(res => res.json()).then(data => {
+    const config = window.ProductionConfig || {};
+    const dateParam = encodeURIComponent(config.currentDate || '');
+    const shiftParam = encodeURIComponent(config.currentShift || '');
+    fetch(`/operational/job/${jobId}/downtimes?date=${dateParam}&shift=${shiftParam}`).then(res => res.json()).then(data => {
         const filteredData = data.filter(dt => dt.jenis_downtime.toLowerCase() !== 'dandori');
         window.currentDowntimesList = filteredData;
         renderDowntimeTable();
@@ -3126,7 +3129,9 @@ function checkSyncStatus() {
     if (_isModalOpen()) return;
     const config = window.ProductionConfig;
     const line = config.currentLine || '';
-    fetch(`/operational/active-job?line=${encodeURIComponent(line)}`, { headers: { 'Accept': 'application/json' } }).then(res => res.json()).then(data => {
+    const shift = config.currentShift || '';
+    const date = config.currentDate || '';
+    fetch(`/operational/active-job?line=${encodeURIComponent(line)}&shift=${encodeURIComponent(shift)}&date=${encodeURIComponent(date)}`, { headers: { 'Accept': 'application/json' } }).then(res => res.json()).then(data => {
         if (window._isReloading) return;
         if (_isModalOpen()) return;
         if ((data.running && data.id !== config.currentActiveId) || (!data.running && config.currentActiveId !== null)) {

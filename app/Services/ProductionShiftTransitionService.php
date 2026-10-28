@@ -25,8 +25,13 @@ class ProductionShiftTransitionService
         $activeShift = $currentShiftName ?: ProductionMetricsService::currentProductionShift($now);
         $activeDate = $workDate ?: ProductionMetricsService::currentProductionDate($now);
 
-        // Hanya periksa job yang berstatus 'running' (sesi yang aktif berjalan saat shift berganti)
-        $query = JobMaster::where(DB::raw('LOWER(status)'), 'running')
+        // Periksa job yang berstatus 'running' atau memiliki downtime gantung tanpa finish_time
+        $query = JobMaster::where(function ($q) {
+                $q->where(DB::raw('LOWER(status)'), 'running')
+                  ->orWhereHas('downtimes', function ($dq) {
+                      $dq->whereNull('finish_time');
+                  });
+            })
             ->with([
                 'dailyProduction' => fn ($q) => $q->where('work_date', $activeDate),
                 'productionSessions' => fn ($q) => $q->where('status', 'running'),

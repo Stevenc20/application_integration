@@ -60,8 +60,17 @@
                 }
             }
 
-            $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)->whereNull('finish_time')->orderByDesc('start_time')->first();
-            $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
+            @php
+                $activeShiftName = request('shift', $currentShift ?? 'Shift Pagi');
+                [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $activeShiftName);
+                $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)
+                    ->whereNull('finish_time')
+                    ->where('start_time', '>=', $curShiftStart)
+                    ->where('start_time', '<', $curShiftEnd)
+                    ->orderByDesc('start_time')
+                    ->first();
+                $hasActiveNonDandoriDt = $activeDowntime && !in_array(strtolower($activeDowntime->jenis_downtime), ['dandori']);
+            @endphp
 
             $openFirstCheck = \App\Models\Dandori::where('next_job_id', $activeJob->id)
                 ->whereNull('finish_time')
@@ -529,7 +538,9 @@
             <!-- Operator Console (Right Area) -->
             <div class="lg:col-span-3">
                 @php
-                    $activeDowntime = $activeJob->downtimes->whereNull('finish_time')->sortByDesc('start_time')->first();
+                    $activeDowntime = $activeJob->downtimes->whereNull('finish_time')
+                        ->filter(fn($dt) => $dt->start_time >= $curShiftStart && $dt->start_time < $curShiftEnd)
+                        ->sortByDesc('start_time')->first();
                     $dtType = $activeDowntime ? strtolower($activeDowntime->jenis_downtime) : '';
                     $alertBg = 'bg-red-500/10 border-red-500/30';
                     $alertText = 'text-red-500';

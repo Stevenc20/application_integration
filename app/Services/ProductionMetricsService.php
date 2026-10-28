@@ -279,6 +279,25 @@ class ProductionMetricsService
     }
 
     /**
+     * Resolves start and end DateTime boundaries for a given work date and shift.
+     * Shift Pagi: $workDate 07:30 to $workDate 21:00
+     * Shift Malam: $workDate 21:00 to ($workDate + 1 day) 07:30
+     */
+    public static function shiftWindow(string $workDate, string|int $shift): array
+    {
+        $isMorning = (int) $shift === 1 || str_contains(strtolower((string) $shift), 'pagi');
+        if ($isMorning) {
+            $start = \Carbon\Carbon::parse($workDate)->setTime(7, 30);
+            $end = \Carbon\Carbon::parse($workDate)->setTime(21, 0);
+        } else {
+            $start = \Carbon\Carbon::parse($workDate)->setTime(21, 0);
+            $end = \Carbon\Carbon::parse($workDate)->addDay()->setTime(7, 30);
+        }
+
+        return [$start, $end];
+    }
+
+    /**
      * Resolves the active production shift name.
      * Shift Pagi: 07:30 - 21:00 (450 - 1259 minutes)
      * Shift Malam: 21:00 - 07:30 (< 450 or >= 1260 minutes)

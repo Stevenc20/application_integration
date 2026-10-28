@@ -428,7 +428,10 @@ window.runningDowntimes = {
     @foreach($jobs as $job)
         @php $jd = $job->job_data; @endphp
         @if($jd)
-            @foreach($jd->downtimes->whereNull('finish_time') as $rdt)
+            @php
+                [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $currentShift);
+            @endphp
+            @foreach($jd->downtimes->whereNull('finish_time')->filter(fn($dt) => $dt->start_time >= $curShiftStart && $dt->start_time < $curShiftEnd) as $rdt)
                 @php 
                     $dtTypeLower = strtolower($rdt->jenis_downtime);
                     $btnType = 'downtime';
@@ -461,7 +464,10 @@ window.runningDowntimes = {
     
     {{-- FORCE INCLUDE ACTIVE JOB RUNNING DOWNTIMES IF NOT IN PAGINATED LIST --}}
     @if(isset($activeJob) && !(is_object($jobs) && method_exists($jobs, 'getCollection') ? $jobs->getCollection() : $jobs)->pluck('job_data.id')->contains($activeJob->id))
-        @foreach($activeJob->downtimes->whereNull('finish_time') as $rdt)
+        @php
+            [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $currentShift);
+        @endphp
+        @foreach($activeJob->downtimes->whereNull('finish_time')->filter(fn($dt) => $dt->start_time >= $curShiftStart && $dt->start_time < $curShiftEnd) as $rdt)
             @php 
                 $dtTypeLower = strtolower($rdt->jenis_downtime);
                 $btnType = 'downtime';
