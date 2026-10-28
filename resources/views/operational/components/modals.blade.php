@@ -27,12 +27,29 @@
                     <input type="number" id="final-ok" value="0" oninput="updateFinishModalShortageAlert()" class="w-full bg-transparent font-black text-blue-700 outline-none text-lg">
                 </div>
                 <div class="bg-orange-50 p-3 rounded-xl border border-orange-100">
-                    <label class="block text-[10px] font-black text-orange-400 uppercase mb-1">Repair</label>
-                    <input type="number" id="final-repair" value="0" oninput="updateFinishModalShortageAlert()" class="w-full bg-transparent font-black text-orange-700 outline-none text-lg">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[10px] font-black text-orange-400 uppercase">Repair</label>
+                        <span class="text-[9px] font-black text-orange-500 uppercase tracking-wider bg-orange-100/60 px-1.5 py-0.5 rounded">Terkunci</span>
+                    </div>
+                    <input type="number" id="final-repair" value="0" readonly tabindex="-1" class="w-full bg-transparent font-black text-orange-700 outline-none text-lg cursor-not-allowed select-none opacity-90" title="Jumlah Repair hanya dihitung dari form Lapor Repair dengan foto bukti">
                 </div>
                 <div class="bg-red-50 p-3 rounded-xl border border-red-100">
-                    <label class="block text-[10px] font-black text-red-400 uppercase mb-1">Reject</label>
-                    <input type="number" id="final-reject" value="0" oninput="updateFinishModalShortageAlert()" class="w-full bg-transparent font-black text-red-700 outline-none text-lg">
+                    <div class="flex items-center justify-between mb-1">
+                        <label class="block text-[10px] font-black text-red-400 uppercase">Reject</label>
+                        <span class="text-[9px] font-black text-red-500 uppercase tracking-wider bg-red-100/60 px-1.5 py-0.5 rounded">Terkunci</span>
+                    </div>
+                    <input type="number" id="final-reject" value="0" readonly tabindex="-1" class="w-full bg-transparent font-black text-red-700 outline-none text-lg cursor-not-allowed select-none opacity-90" title="Jumlah Reject hanya dihitung dari form Lapor Reject dengan foto bukti">
+                </div>
+            </div>
+            <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-500 flex items-center justify-between">
+                <span>Ada Repair / Reject belum dilaporkan?</span>
+                <div class="flex items-center gap-1.5">
+                    <button type="button" onclick="closeFinishModal(); window.openRRInputModal ? window.openRRInputModal(window.currentFinishId, 'repair', 1) : null;" class="px-2.5 py-1 bg-orange-500 hover:bg-orange-600 text-white font-black text-[10px] rounded-lg shadow-sm transition">
+                        + Lapor Repair
+                    </button>
+                    <button type="button" onclick="closeFinishModal(); window.openRRInputModal ? window.openRRInputModal(window.currentFinishId, 'reject', 1) : null;" class="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-black text-[10px] rounded-lg shadow-sm transition">
+                        + Lapor Reject
+                    </button>
                 </div>
             </div>
 

@@ -1422,11 +1422,18 @@ class InputHarianController extends Controller
                     }
 
                     foreach ($jm->repairRejects ?? [] as $rr) {
+                        $key = $rr->type === 'reject' ? 'reject' : 'repair';
+                        $missingFields = [];
                         if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
-                            $key = $rr->type === 'reject' ? 'reject' : 'repair';
+                            $missingFields[] = 'area_problem/root_cause/countermeasure belum lengkap';
+                        }
+                        if ($rr->images()->count() === 0) {
+                            $missingFields[] = 'Foto bukti (evidence) ' . ucfirst($key) . ' wajib diunggah';
+                        }
+                        if (!empty($missingFields)) {
                             $issues[$key][] = [
                                 'item'          => $itemName,
-                                'issue'         => 'area_problem/root_cause/countermeasure belum lengkap',
+                                'issue'         => implode(' & ', $missingFields),
                                 'job_master_id' => $jm->id,
                                 'plan_id'       => $planId,
                             ];

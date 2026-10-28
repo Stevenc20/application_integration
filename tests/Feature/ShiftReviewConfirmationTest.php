@@ -73,7 +73,7 @@ class ShiftReviewConfirmationTest extends TestCase
         $date = now()->format('Y-m-d');
         $jm = $this->seedJobAndPlan('JOB-COMPLETE', $date);
         $this->seedRepair($jm->id, $date);
-        RepairRejectLog::create([
+        $rr = RepairRejectLog::create([
             'job_master_id' => $jm->id,
             'type' => 'repair',
             'defect_name' => 'Ceacat',
@@ -81,6 +81,11 @@ class ShiftReviewConfirmationTest extends TestCase
             'area_problem' => 'sp1',
             'root_cause' => 'rc',
             'countermeasure' => 'cm',
+        ]);
+        \App\Models\RepairRejectImage::create([
+            'repair_reject_log_id' => $rr->id,
+            'image_path' => 'repair_reject/test.webp',
+            'image_type' => 'before',
         ]);
 
         $resp = $this->submit();
@@ -103,7 +108,7 @@ class ShiftReviewConfirmationTest extends TestCase
         $date = now()->format('Y-m-d');
         $jm = $this->seedJobAndPlan('JOB-NODAILY', $date);
         ProductionLog::create(['job_master_id' => $jm->id, 'ok_qty' => 0, 'repair_qty' => 55, 'reject_qty' => 0, 'created_at' => now()]);
-        RepairRejectLog::create([
+        $rr = RepairRejectLog::create([
             'job_master_id' => $jm->id,
             'type' => 'repair',
             'defect_name' => 'Ceacat',
@@ -111,6 +116,11 @@ class ShiftReviewConfirmationTest extends TestCase
             'area_problem' => 'sp1',
             'root_cause' => 'rc',
             'countermeasure' => 'cm',
+        ]);
+        \App\Models\RepairRejectImage::create([
+            'repair_reject_log_id' => $rr->id,
+            'image_path' => 'repair_reject/test.webp',
+            'image_type' => 'before',
         ]);
 
         $resp = $this->submit();

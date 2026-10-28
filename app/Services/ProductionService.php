@@ -9,6 +9,7 @@ use App\Models\Downtime;
 use App\Models\Dandori;
 use App\Models\ProductionLog;
 use App\Models\HambatanJalur;
+use App\Models\RepairRejectLog;
 use App\Models\JobFinishReason;
 use App\Models\LineMaster;
 use Carbon\Carbon;
@@ -592,19 +593,32 @@ class ProductionService
             $this->syncPlanStatus($jobId, 'complete');
 
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
-                // Finalisasi: replace semua log dengan nilai final
+                // Finalisasi: ambil nilai repair & reject yang valid dari form R&R (harus punya foto evidence)
+                $loggedRepair = (int) RepairRejectLog::where('job_master_id', $jobId)
+                    ->where('type', 'repair')
+                    ->whereDate('created_at', $workDate)
+                    ->sum('qty_a');
+                $loggedReject = (int) RepairRejectLog::where('job_master_id', $jobId)
+                    ->where('type', 'reject')
+                    ->whereDate('created_at', $workDate)
+                    ->sum('qty_a');
+
+                $resolvedRepair = $loggedRepair > 0 ? $loggedRepair : ($finalRepair ?? 0);
+                $resolvedReject = $loggedReject > 0 ? $loggedReject : ($finalReject ?? 0);
+
+                // Replace semua log dengan nilai final yang terverifikasi
                 ProductionLog::where('job_master_id', $jobId)
                     ->whereDate('created_at', $workDate)
                     ->delete();
                 ProductionLog::create([
                     'job_master_id' => $jobId,
                     'ok_qty'        => $finalOk ?? 0,
-                    'repair_qty'    => $finalRepair ?? 0,
-                    'reject_qty'    => $finalReject ?? 0,
+                    'repair_qty'    => $resolvedRepair,
+                    'reject_qty'    => $resolvedReject,
                 ]);
                 $totalOk     = $finalOk ?? 0;
-                $totalRepair = $finalRepair ?? 0;
-                $totalReject = $finalReject ?? 0;
+                $totalRepair = $resolvedRepair;
+                $totalReject = $resolvedReject;
             } else {
                 $totalOk     = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('ok_qty');
                 $totalRepair = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('repair_qty');
