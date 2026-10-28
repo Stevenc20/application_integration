@@ -65,6 +65,8 @@ class PpcScheduleMergeService
 
             $retainedPlanIds = [];
             $usedPlanIds = [];
+            $deleted = [];
+            $protectedFromDeletion = [];
             $added = [];
             $updated = [];
             $unchanged = [];
@@ -104,9 +106,9 @@ class PpcScheduleMergeService
                 $importedSectionKeys[$this->sectionKeyFrom($cleanShift, $pressName)] = true;
 
                 foreach ($sheetData['rows'] as $item) {
-                    $rawJobMaster = $this->safeVal($item['job_master'], '');
-                    $rawJobNo = $this->safeVal($item['job_no'], '');
-                    $rawKeterangan = $this->safeVal($item['keterangan'], '');
+                    $rawJobMaster = $this->safeVal($item['job_master'] ?? null, '');
+                    $rawJobNo = $this->safeVal($item['job_no'] ?? null, '');
+                    $rawKeterangan = $this->safeVal($item['keterangan'] ?? null, '');
                     $upperJobMaster = strtoupper(trim((string) $rawJobMaster));
                     $upperJobNo = strtoupper(trim((string) $rawJobNo));
                     $upperKeterangan = strtoupper((string) $rawKeterangan);
@@ -116,15 +118,53 @@ class PpcScheduleMergeService
                     $metaLabels = [
                         'TOTAL STROKE', 'TOTAL  STROKE', 'TOTAL TPT', 'TARGET GSPH', 'GSPH',
                         'GSPH TOTAL', 'GSPH ITEM', 'PLAN STROKE', 'TOTAL PCS', 'TOTAL PROD', 'TOTAL',
-                        'PLAN', 'DELETE', 'DELETE PLAN SHIFT 1',
+                        'PLAN',
                     ];
+
+                    // Explicit deletion instruction is indicated in Keterangan (e.g. "Delete Plan Shift 1", "Delete (Material T/a)")
+                    // or explicit Delete instruction marker with "PLAN" or specific delete reason.
+                    $hasDeleteInstruction = str_contains($upperKeterangan, 'DELETE')
+                        || str_contains($upperKeterangan, 'HAPUS')
+                        || str_starts_with($upperJobMaster, 'DELETE PLAN')
+                        || str_starts_with($upperJobNo, 'DELETE PLAN');
+
+                    if ($hasDeleteInstruction) {
+                        $targetJobNo = !str_starts_with($upperJobNo, 'DELETE') ? $cleanJobNoCandidate = strtoupper(trim((string) $rawJobNo)) : '';
+                        $targetJobMaster = !str_starts_with($upperJobMaster, 'DELETE') ? strtoupper(trim((string) $rawJobMaster)) : '';
+
+                        $planToDelete = null;
+                        if ($targetJobNo !== '') {
+                            $planToDelete = $this->popCandidatePlan($indexes['byJobNoQueue'], $cleanShift.'||'.$lineId.'||'.$targetJobNo, $usedPlanIds);
+                        }
+                        if (!$planToDelete && $targetJobMaster !== '') {
+                            $planToDelete = $this->popCandidatePlan($indexes['byJobMasterQueue'], $cleanShift.'||'.$lineId.'||'.$targetJobMaster, $usedPlanIds);
+                        }
+
+                        if ($planToDelete) {
+                            $usedPlanIds[(int) $planToDelete->id] = true;
+                            if ($this->planHasProductionActivity($planToDelete)) {
+                                $retainedPlanIds[] = $planToDelete->id;
+                                $protectedFromDeletion[] = array_merge($this->snapshotPlan($planToDelete), [
+                                    'reason' => 'Protected: already has production activity',
+                                ]);
+                                Log::info("[PPC IMPORT MERGE] Plan ID {$planToDelete->id} ({$planToDelete->job_no}) marked for deletion by revision but protected due to existing activity.");
+                            } else {
+                                $deletedSnapshot = array_merge($this->snapshotPlan($planToDelete), [
+                                    'reason' => $rawKeterangan ?: 'Deleted via revision instruction',
+                                ]);
+                                $this->deleteUnstartedPlanAndJobMaster($planToDelete);
+                                $deleted[] = $deletedSnapshot;
+                                Log::info("[PPC IMPORT MERGE] Plan ID {$planToDelete->id} ({$planToDelete->job_no}) safely deleted via revision instruction: {$rawKeterangan}");
+                            }
+                        }
+                        continue;
+                    }
 
                     $isMeta = str_starts_with(trim((string) $rawJobMaster), ':')
                         || $upperJobMaster === 'JOB MASTER'
                         || $upperJobNo === 'JOB NO.'
                         || in_array($upperJobMaster, $metaLabels, true)
-                        || in_array($upperJobNo, $metaLabels, true)
-                        || str_contains($upperKeterangan, 'DELETE');
+                        || in_array($upperJobNo, $metaLabels, true);
 
                     if ($isMeta) {
                         continue;
@@ -257,7 +297,8 @@ class PpcScheduleMergeService
                         $cleanJobMaster,
                         $cleanJobNo,
                         $finalRowNo,
-                        $cleanStart
+                        $cleanStart,
+                        $usedPlanIds
                     );
 
                     if ($matchedPlan && isset($usedPlanIds[(int) $matchedPlan->id])) {
@@ -318,6 +359,8 @@ class PpcScheduleMergeService
                 'added' => count($added),
                 'updated' => count($updated),
                 'unchanged' => count($unchanged),
+                'deleted' => count($deleted),
+                'protected_from_deletion' => count($protectedFromDeletion),
                 'not_in_revision' => count($notInRevision),
                 'rows_imported' => $imported,
             ];
@@ -328,6 +371,8 @@ class PpcScheduleMergeService
                 'added' => $added,
                 'updated' => $updated,
                 'unchanged' => $unchanged,
+                'deleted' => $deleted,
+                'protected_from_deletion' => $protectedFromDeletion,
                 'not_in_revision' => $notInRevision,
             ], $userId);
 
@@ -346,12 +391,16 @@ class PpcScheduleMergeService
                 'added' => $added,
                 'updated' => $updated,
                 'unchanged' => $unchanged,
+                'deleted' => $deleted,
+                'protected_from_deletion' => $protectedFromDeletion,
                 'not_in_revision' => $notInRevision,
                 'preview' => [
                     'counts' => $counts,
                     'added' => $added,
                     'updated' => $updated,
                     'unchanged' => $unchanged,
+                    'deleted' => $deleted,
+                    'protected_from_deletion' => $protectedFromDeletion,
                     'not_in_revision' => $notInRevision,
                 ],
             ];
@@ -418,8 +467,34 @@ class PpcScheduleMergeService
             ->first(fn (JobMaster $jobMaster) => str_ends_with((string) $jobMaster->job_number, "-{$planId}"));
     }
 
+    private function popCandidatePlan(array &$queueMap, string $key, array $usedPlanIds): ?ProductionPlan
+    {
+        if (empty($queueMap[$key])) {
+            return null;
+        }
+
+        while (!empty($queueMap[$key])) {
+            $candidate = array_shift($queueMap[$key]);
+            if ($candidate && !isset($usedPlanIds[(int) $candidate->id])) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    private function deleteUnstartedPlanAndJobMaster(ProductionPlan $plan): void
+    {
+        $planId = (int) $plan->id;
+        $jobMaster = $this->findLinkedJobMaster($planId);
+        if ($jobMaster && !$this->jobHasActivity($jobMaster)) {
+            $jobMaster->delete();
+        }
+        $plan->delete();
+    }
+
     private function matchExistingPlan(
-        array $indexes,
+        array &$indexes,
         string $rowType,
         string $matchKeyWithRow,
         string $shiftName,
@@ -427,48 +502,53 @@ class PpcScheduleMergeService
         string $cleanJobMaster,
         string $cleanJobNo,
         $finalRowNo,
-        string $cleanStart
+        string $cleanStart,
+        array $usedPlanIds
     ): ?ProductionPlan {
         if ($rowType === 'break') {
             $break = $indexes['byKey'][$matchKeyWithRow][0] ?? null;
-            if ($break) {
+            if ($break && !isset($usedPlanIds[(int) $break->id])) {
                 return $break;
             }
 
             $breakLabelKey = $shiftName.'||'.$lineId.'||break||'.$cleanJobNo;
+            $break = $this->popCandidatePlan($indexes['byBreakLabelQueue'], $breakLabelKey, $usedPlanIds);
+            if ($break) {
+                return $break;
+            }
 
             return $this->firstUnique($indexes['byBreakLabel'], $breakLabelKey);
         }
 
         $primary = $indexes['byKey'][$matchKeyWithRow][0] ?? null;
-        if ($primary) {
+        if ($primary && !isset($usedPlanIds[(int) $primary->id])) {
             return $primary;
         }
 
         if ($cleanJobNo !== '' && ! in_array($cleanJobNo, ['-', 'BREAK'], true)) {
             $noStartKey = $shiftName.'||'.$lineId.'||'.$cleanJobNo.'||'.$cleanStart;
             $match = $this->firstUnique($indexes['byJobNoStart'], $noStartKey);
-            if ($match) {
+            if ($match && !isset($usedPlanIds[(int) $match->id])) {
                 return $match;
             }
 
             $noKey = $shiftName.'||'.$lineId.'||'.$cleanJobNo;
             $match = $this->firstUnique($indexes['byJobNo'], $noKey);
-            if ($match) {
+            if ($match && !isset($usedPlanIds[(int) $match->id])) {
                 return $match;
             }
         }
 
         if ($cleanJobMaster !== '' && $cleanJobMaster !== 'BREAK') {
             $jobMasterKey = $shiftName.'||'.$lineId.'||'.$cleanJobMaster;
-            $match = $this->firstUnique($indexes['byJobMaster'], $jobMasterKey);
-            if ($match) {
+            $looseKey = $jobMasterKey.'||'.(int) $finalRowNo;
+            $match = $this->firstUnique($indexes['byLooseKey'], $looseKey);
+            if ($match && !isset($usedPlanIds[(int) $match->id])) {
                 return $match;
             }
 
-            $looseKey = $jobMasterKey.'||'.(int) $finalRowNo;
-            $match = $this->firstUnique($indexes['byLooseKey'], $looseKey);
-            if ($match) {
+            $match = $this->firstUnique($indexes['byJobMaster'], $jobMasterKey);
+            if ($match && !isset($usedPlanIds[(int) $match->id])) {
                 return $match;
             }
         }
@@ -489,10 +569,13 @@ class PpcScheduleMergeService
     {
         $byKey = [];
         $byJobNo = [];
+        $byJobNoQueue = [];
         $byJobNoStart = [];
         $byJobMaster = [];
+        $byJobMasterQueue = [];
         $byLooseKey = [];
         $byBreakLabel = [];
+        $byBreakLabelQueue = [];
 
         foreach ($existingPlans as $plan) {
             $cleanShift = $this->cleanShift($plan->shift_name);
@@ -507,6 +590,7 @@ class PpcScheduleMergeService
                 $byKey[$breakKey][] = $plan;
                 if ($breakLabel !== '') {
                     $byBreakLabel[$cleanShift.'||'.$lineId.'||break||'.$breakLabel][] = $plan;
+                    $byBreakLabelQueue[$cleanShift.'||'.$lineId.'||break||'.$breakLabel][] = $plan;
                 }
 
                 continue;
@@ -517,16 +601,28 @@ class PpcScheduleMergeService
 
             if ($jobNo !== '' && ! in_array($jobNo, ['-', 'TOTAL FINISH', 'TOTAL FNISH', 'FINISH'], true)) {
                 $byJobNo[$cleanShift.'||'.$lineId.'||'.$jobNo][] = $plan;
+                $byJobNoQueue[$cleanShift.'||'.$lineId.'||'.$jobNo][] = $plan;
                 $byJobNoStart[$cleanShift.'||'.$lineId.'||'.$jobNo.'||'.trim((string) $plan->start_time)][] = $plan;
             }
 
             if ($jobMaster !== '') {
                 $byJobMaster[$cleanShift.'||'.$lineId.'||'.$jobMaster][] = $plan;
+                $byJobMasterQueue[$cleanShift.'||'.$lineId.'||'.$jobMaster][] = $plan;
                 $byLooseKey[$cleanShift.'||'.$lineId.'||'.$jobMaster.'||'.(int) $plan->row_no][] = $plan;
             }
         }
 
-        return compact('byKey', 'byJobNo', 'byJobNoStart', 'byJobMaster', 'byLooseKey', 'byBreakLabel');
+        return compact(
+            'byKey',
+            'byJobNo',
+            'byJobNoQueue',
+            'byJobNoStart',
+            'byJobMaster',
+            'byJobMasterQueue',
+            'byLooseKey',
+            'byBreakLabel',
+            'byBreakLabelQueue'
+        );
     }
 
     private function syncJobMasterSchedule(ProductionPlan $plan, array &$jobsByPlanId, string $parsedDate): void

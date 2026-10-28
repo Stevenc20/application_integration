@@ -30,6 +30,9 @@
                     <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200">Updated: {{ $importPreview['counts']['updated'] ?? 0 }}</span>
                     <span class="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">Unchanged: {{ $importPreview['counts']['unchanged'] ?? 0 }}</span>
                     <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-200">Not in revision: {{ $importPreview['counts']['not_in_revision'] ?? 0 }}</span>
+                    @if(!empty($importPreview['counts']['deleted']))
+                    <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-800 ring-1 ring-red-300">Deleted by instruction: {{ $importPreview['counts']['deleted'] }}</span>
+                    @endif
                 </div>
             </div>
 
@@ -103,6 +106,19 @@
                             @endforelse
                         </div>
                     </details>
+                    @if(!empty($importPreview['deleted']))
+                    <details class="mt-3">
+                        <summary class="cursor-pointer text-xs font-black text-red-700">Dihapus via Instruksi Revisi ({{ count($importPreview['deleted']) }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @foreach($importPreview['deleted'] as $item)
+                            <div class="text-[11px] text-red-600 flex items-center justify-between gap-2 border-b border-red-50 pb-1">
+                                <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> (Row {{ $item['row_no'] ?? '-' }})</span>
+                                <span class="shrink-0 text-[10px] text-red-500 italic">{{ $item['reason'] ?? 'Delete Instruction' }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                    </details>
+                    @endif
                 </div>
             </div>
         </div>
