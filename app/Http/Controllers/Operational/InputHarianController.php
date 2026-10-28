@@ -1201,50 +1201,92 @@ class InputHarianController extends Controller
 
         $fields = $request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']);
 
-        // Helper aman untuk menyimpan file upload dengan pencegahan error mkdir & path sanitasi
+        // Helper aman untuk menyimpan file upload menggunakan disk 'uploads' / public fallback
         $saveDowntimeFile = function ($file, string $category) use ($downtime) {
             $originalName = $file->getClientOriginalName();
             $safeName = time() . '_' . uniqid() . '_' . $category . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
-            $relPath = 'downtime/' . $downtime->id . '/' . $safeName;
+            $subDir = 'downtime/' . $downtime->id;
+            $relPath = $subDir . '/' . $safeName;
+
+            // 1. Coba simpan menggunakan Storage disk 'uploads'
+            try {
+                $stored = \Illuminate\Support\Facades\Storage::disk('uploads')->putFileAs($subDir, $file, $safeName);
+                if ($stored) {
+                    $absPath = public_path('uploads/' . $relPath);
+                    if (file_exists($absPath)) {
+                        @chmod($absPath, 0664);
+                        return $relPath;
+                    }
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Storage disk uploads error, trying direct public_path: ' . $e->getMessage());
+            }
+
+            // 2. Fallback direct disk creation dengan pengecekan permission & try-catch eksplisit
             $absPath = public_path('uploads/' . $relPath);
             $dir = dirname($absPath);
 
             if (!\Illuminate\Support\Facades\File::isDirectory($dir)) {
-                \Illuminate\Support\Facades\File::makeDirectory($dir, 0755, true, true);
+                $created = @\Illuminate\Support\Facades\File::makeDirectory($dir, 0775, true, true);
+                if (!$created && !is_dir($dir)) {
+                    \Illuminate\Support\Facades\Log::error("mkdir failed on: {$dir}");
+                    throw new \RuntimeException("Gagal membuat direktori penyimpanan foto: {$dir}. Periksa hak akses direktori.");
+                }
             }
 
             if (file_exists($absPath)) {
                 @unlink($absPath);
             }
 
-            // Gunakan move upload atau File::copy untuk fleksibilitas environment PHP
-            $file->move($dir, $safeName);
-            @chmod($absPath, 0644);
+            $moved = false;
+            try {
+                $file->move($dir, $safeName);
+                $moved = file_exists($absPath);
+            } catch (\Throwable $e) {
+                // Fallback copy jika move gagal lintas mount/container
+                if (file_exists($file->getRealPath())) {
+                    $copied = @copy($file->getRealPath(), $absPath);
+                    $moved = $copied && file_exists($absPath);
+                }
+            }
 
+            if (!$moved) {
+                throw new \RuntimeException("Gagal menyimpan file foto {$category}. File tidak dapat disalin ke server.");
+            }
+
+            @chmod($absPath, 0664);
             return $relPath;
         };
 
-        // 1. Foto Part
-        if ($request->hasFile('foto_part')) {
-            $partPath = $saveDowntimeFile($request->file('foto_part'), 'part');
-            $fields['image_path_part'] = $partPath;
-            $fields['image_path'] = $partPath; // Backward-compatibility
-        }
-
-        // 2. Foto Tooling
-        if ($request->hasFile('foto_tooling')) {
-            $toolingPath = $saveDowntimeFile($request->file('foto_tooling'), 'tooling');
-            $fields['image_path_tooling'] = $toolingPath;
-            if (empty($fields['image_path'])) {
-                $fields['image_path'] = $toolingPath; // Fallback jika foto part tidak ada
+        try {
+            // 1. Foto Part
+            if ($request->hasFile('foto_part')) {
+                $partPath = $saveDowntimeFile($request->file('foto_part'), 'part');
+                $fields['image_path_part'] = $partPath;
+                $fields['image_path'] = $partPath; // Backward-compatibility
             }
-        }
 
-        // 3. Fallback foto legacy jika dikirim via key 'foto'
-        if ($request->hasFile('foto') && empty($fields['image_path_part'])) {
-            $legacyPath = $saveDowntimeFile($request->file('foto'), 'part');
-            $fields['image_path_part'] = $legacyPath;
-            $fields['image_path'] = $legacyPath;
+            // 2. Foto Tooling
+            if ($request->hasFile('foto_tooling')) {
+                $toolingPath = $saveDowntimeFile($request->file('foto_tooling'), 'tooling');
+                $fields['image_path_tooling'] = $toolingPath;
+                if (empty($fields['image_path'])) {
+                    $fields['image_path'] = $toolingPath; // Fallback jika foto part tidak ada
+                }
+            }
+
+            // 3. Fallback foto legacy jika dikirim via key 'foto'
+            if ($request->hasFile('foto') && empty($fields['image_path_part'])) {
+                $legacyPath = $saveDowntimeFile($request->file('foto'), 'part');
+                $fields['image_path_part'] = $legacyPath;
+                $fields['image_path'] = $legacyPath;
+            }
+        } catch (\Throwable $e) {
+            \Illuminate\Support\Facades\Log::error('Downtime photo upload error: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage() ?: 'Gagal menyimpan foto downtime. Silakan periksa ukuran file dan coba lagi.'
+            ], 422);
         }
 
         $downtime->update($fields);

@@ -121,4 +121,44 @@ class DowntimePhotoAndValidationTest extends TestCase
         $this->assertNull($this->downtime->image_path_part);
         $this->assertNull($this->downtime->image_path_tooling);
     }
+
+    public function test_updating_downtime_handles_reupload_and_replaces_previous_photo(): void
+    {
+        // First upload
+        $partTmp1 = tempnam(sys_get_temp_dir(), 'test_part1');
+        file_put_contents($partTmp1, 'fake-part-1');
+        $partFile1 = new UploadedFile($partTmp1, 'part_v1.jpg', 'image/jpeg', null, true);
+
+        $res1 = $this->postJson("/operational/downtime/{$this->downtime->id}/update", [
+            '_method' => 'PUT',
+            'jenis_downtime' => 'mesin',
+            'foto_part' => $partFile1,
+        ]);
+        $res1->assertStatus(200);
+        $this->downtime->refresh();
+        $firstPath = $this->downtime->image_path_part;
+        $this->assertNotNull($firstPath);
+
+        // Second upload (re-upload)
+        $partTmp2 = tempnam(sys_get_temp_dir(), 'test_part2');
+        file_put_contents($partTmp2, 'fake-part-2');
+        $partFile2 = new UploadedFile($partTmp2, 'part_v2.jpg', 'image/jpeg', null, true);
+
+        $res2 = $this->postJson("/operational/downtime/{$this->downtime->id}/update", [
+            '_method' => 'PUT',
+            'jenis_downtime' => 'mesin',
+            'foto_part' => $partFile2,
+        ]);
+        $res2->assertStatus(200);
+        $this->downtime->refresh();
+        $secondPath = $this->downtime->image_path_part;
+
+        $this->assertNotNull($secondPath);
+        $this->assertFileExists(public_path('uploads/' . $secondPath));
+
+        // Cleanup
+        @unlink(public_path('uploads/' . $firstPath));
+        @unlink(public_path('uploads/' . $secondPath));
+        @rmdir(dirname(public_path('uploads/' . $secondPath)));
+    }
 }
