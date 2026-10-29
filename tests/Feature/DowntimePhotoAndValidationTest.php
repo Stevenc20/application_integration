@@ -331,8 +331,10 @@ class DowntimePhotoAndValidationTest extends TestCase
         ]);
         $this->actingAs($superadmin);
 
-        $file = UploadedFile::fake()->create('evidence.webp', 150, 'image/webp');
+        $partFile = UploadedFile::fake()->create('part_evidence.webp', 150, 'image/webp');
+        $toolingFile = UploadedFile::fake()->create('tooling_evidence.webp', 150, 'image/webp');
 
+        // Test with both Part and Tooling photos
         $response = $this->postJson('/operational/repair-reject', [
             'job_master_id' => $this->job->id,
             'type' => 'repair',
@@ -341,7 +343,7 @@ class DowntimePhotoAndValidationTest extends TestCase
             'area_problem' => 'Top Surface',
             'root_cause' => 'Burr on tooling',
             'countermeasure' => 'Polish tool surface',
-            'images' => [$file],
+            'images' => [$partFile, $toolingFile],
         ]);
 
         $response->assertStatus(200);
@@ -355,7 +357,42 @@ class DowntimePhotoAndValidationTest extends TestCase
 
         $log = \App\Models\RepairRejectLog::where('job_master_id', $this->job->id)->first();
         $this->assertNotNull($log);
+        $this->assertCount(2, $log->images);
+        foreach ($log->images as $img) {
+            $this->assertStringStartsWith('repair_reject/' . $log->id . '/', $img->image_path);
+            $this->assertNotEmpty($img->url);
+        }
+    }
+
+    public function test_repair_reject_stores_with_long_path_without_sql_truncation(): void
+    {
+        $superadmin = User::factory()->create([
+            'role' => 'superadmin',
+        ]);
+        $this->actingAs($superadmin);
+
+        // Name with long string
+        $longFileName = str_repeat('long_part_name_', 10) . '.png';
+        $file = UploadedFile::fake()->create($longFileName, 200, 'image/png');
+
+        $response = $this->postJson('/operational/repair-reject', [
+            'job_master_id' => $this->job->id,
+            'type' => 'repair',
+            'defect_name' => 'Dent Part',
+            'qty_a' => 1,
+            'area_problem' => 'Flange',
+            'root_cause' => 'Debris on die',
+            'countermeasure' => 'Clean die',
+            'images' => [$file],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $log = \App\Models\RepairRejectLog::where('defect_name', 'Dent Part')->first();
+        $this->assertNotNull($log);
         $this->assertCount(1, $log->images);
-        $this->assertStringStartsWith('repair_reject/' . $log->id . '/', $log->images->first()->image_path);
+        $savedPath = $log->images->first()->image_path;
+        $this->assertGreaterThan(100, strlen($savedPath));
     }
 }
