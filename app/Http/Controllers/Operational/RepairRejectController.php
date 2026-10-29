@@ -257,7 +257,7 @@ class RepairRejectController extends Controller
                     'operator'      => $log->creator?->name ?? '-',
                     'time'          => $log->created_at->format('H:i'),
                     'date'          => $log->created_at->format('d M Y'),
-                    'images'        => $log->images->map(fn($i) => $i->url ?: asset('uploads/' . $i->image_path))->toArray(),
+                    'images'        => $log->images->map(fn($i) => $i->url ?: ('/uploads/' . ltrim($i->image_path, '/')))->toArray(),
                 ];
             });
 

@@ -1144,3 +1144,37 @@ Route::get('/emergency-reset-dandori/{line?}', function($line = 'A') {
         'jobs_reset_to_pending' => $updatedJobs
     ]);
 });
+
+// ── SECURE /storage/{path} FALLBACK ROUTE ──
+// Memastikan file di storage/app/public atau public/storage dapat diakses secara aman
+// tanpa terkena 403 Forbidden ServeFile ketika symbolic link belum aktif di web server.
+Route::get('storage/{path}', function (string $path) {
+    // Prevent directory traversal attacks
+    if (str_contains($path, '..') || str_starts_with($path, '/') || str_starts_with($path, '\\')) {
+        abort(404);
+    }
+
+    $candidates = [
+        storage_path('app/public/' . $path),
+        public_path('storage/' . $path),
+        public_path('uploads/' . $path),
+    ];
+
+    $file = null;
+    foreach ($candidates as $cand) {
+        if (file_exists($cand) && is_file($cand)) {
+            $file = $cand;
+            break;
+        }
+    }
+
+    if (!$file) {
+        abort(404);
+    }
+
+    $mime = mime_content_type($file) ?: 'application/octet-stream';
+    return response()->file($file, [
+        'Content-Type' => $mime,
+        'Cache-Control' => 'public, max-age=86400',
+    ]);
+})->where('path', '.*')->name('storage.file');

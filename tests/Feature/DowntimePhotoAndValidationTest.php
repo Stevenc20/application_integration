@@ -297,4 +297,30 @@ class DowntimePhotoAndValidationTest extends TestCase
         $resolved127 = \App\Models\Downtime::resolveImageUrl('http://127.0.0.1:8000/uploads/downtime/1/test.jpg');
         $this->assertEquals('/uploads/downtime/1/test.jpg', $resolved127);
     }
+
+    public function test_storage_fallback_route_serves_existing_file_without_403(): void
+    {
+        // Place a test file in storage/app/public/downtime/test_serve.txt
+        $testDir = storage_path('app/public/downtime');
+        if (!is_dir($testDir)) {
+            @mkdir($testDir, 0775, true);
+        }
+        $testFilePath = $testDir . '/test_serve.txt';
+        file_put_contents($testFilePath, 'valid-media-test-content');
+
+        $response = $this->get('/storage/downtime/test_serve.txt');
+        $response->assertStatus(200);
+        $this->assertEquals('valid-media-test-content', file_get_contents($response->baseResponse->getFile()->getPathname()));
+
+        @unlink($testFilePath);
+    }
+
+    public function test_repair_reject_image_url_returns_relative_uploads_path(): void
+    {
+        $img = new \App\Models\RepairRejectImage([
+            'image_path' => 'repair_reject/1/evidence.jpg',
+            'image_type' => 'before',
+        ]);
+        $this->assertEquals('/uploads/repair_reject/1/evidence.jpg', $img->url);
+    }
 }

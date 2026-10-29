@@ -1217,25 +1217,7 @@ class InputHarianController extends Controller
             $subDir = 'downtime/' . $downtime->id;
             $relPath = $subDir . '/' . $safeName;
 
-            // Pastikan direktori tujuan tersedia dan dapat ditulis pada disk yang aktif
-            // Prioritas 1: Gunakan Storage disk 'public' (standar Laravel: storage/app/public)
-            try {
-                if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($subDir)) {
-                    \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($subDir);
-                }
-                $storedPublic = \Illuminate\Support\Facades\Storage::disk('public')->putFileAs($subDir, $file, $safeName);
-                if ($storedPublic) {
-                    $pubAbsPath = storage_path('app/public/' . $relPath);
-                    if (file_exists($pubAbsPath)) {
-                        @chmod($pubAbsPath, 0664);
-                    }
-                    return $relPath;
-                }
-            } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Storage disk public putFileAs failed: ' . $e->getMessage() . ', trying uploads disk/direct fallback.');
-            }
-
-            // Prioritas 2: Gunakan Storage disk 'uploads' (public/uploads) jika direktori public/uploads writable
+            // Prioritas 1: Simpan ke disk 'uploads' (public/uploads) yang langsung disajikan web server tanpa symlink/serve block
             try {
                 if (!\Illuminate\Support\Facades\Storage::disk('uploads')->exists($subDir)) {
                     \Illuminate\Support\Facades\Storage::disk('uploads')->makeDirectory($subDir);
@@ -1249,13 +1231,30 @@ class InputHarianController extends Controller
                     return $relPath;
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Storage disk uploads putFileAs failed: ' . $e->getMessage() . ', trying direct copy fallback.');
+                \Illuminate\Support\Facades\Log::warning('Storage disk uploads putFileAs failed: ' . $e->getMessage() . ', trying public disk fallback.');
             }
 
-            // Prioritas 3: Direct fallback copy via file_get_contents / copy
+            // Prioritas 2: Simpan ke Storage disk 'public' (storage/app/public)
+            try {
+                if (!\Illuminate\Support\Facades\Storage::disk('public')->exists($subDir)) {
+                    \Illuminate\Support\Facades\Storage::disk('public')->makeDirectory($subDir);
+                }
+                $storedPublic = \Illuminate\Support\Facades\Storage::disk('public')->putFileAs($subDir, $file, $safeName);
+                if ($storedPublic) {
+                    $pubAbsPath = storage_path('app/public/' . $relPath);
+                    if (file_exists($pubAbsPath)) {
+                        @chmod($pubAbsPath, 0664);
+                    }
+                    return $relPath;
+                }
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('Storage disk public putFileAs failed: ' . $e->getMessage() . ', trying direct copy fallback.');
+            }
+
+            // Prioritas 3: Direct fallback copy ke public/uploads lalu storage/app/public
             $candidates = [
-                storage_path('app/public/' . $relPath),
                 public_path('uploads/' . $relPath),
+                storage_path('app/public/' . $relPath),
             ];
 
             foreach ($candidates as $targetAbsPath) {
@@ -1281,7 +1280,7 @@ class InputHarianController extends Controller
                 }
             }
 
-            throw new \RuntimeException("Gagal menyimpan file foto {$category}. Direktori server tidak dapat ditulis. Pastikan permission storage/app/public atau public/uploads dapat diakses proses PHP.");
+            throw new \RuntimeException("Gagal menyimpan file foto {$category}. Direktori server tidak dapat ditulis. Pastikan permission public/uploads atau storage/app/public dapat diakses proses PHP.");
         };
 
         try {
