@@ -130,6 +130,54 @@ class DowntimePhotoAndValidationTest extends TestCase
         $this->assertNull($this->downtime->image_path_tooling);
     }
 
+    public function test_updating_downtime_with_only_part_photo(): void
+    {
+        $partTmp = tempnam(sys_get_temp_dir(), 'test_part_only');
+        file_put_contents($partTmp, 'fake-part-only');
+        $partFile = new UploadedFile($partTmp, 'only_part.jpg', 'image/jpeg', null, true);
+
+        $response = $this->postJson("/operational/downtime/{$this->downtime->id}/update", [
+            '_method' => 'PUT',
+            'jenis_downtime' => 'mesin',
+            'problem' => 'PART PROBLEM',
+            'foto_part' => $partFile,
+        ]);
+
+        $response->assertStatus(200);
+        $this->downtime->refresh();
+        $this->assertNotNull($this->downtime->image_path_part);
+        $this->assertNull($this->downtime->image_path_tooling);
+        $this->assertNotNull($this->downtime->image_url_part);
+
+        // Cleanup
+        @unlink(storage_path('app/public/' . $this->downtime->image_path_part));
+        @unlink(public_path('uploads/' . $this->downtime->image_path_part));
+    }
+
+    public function test_updating_downtime_with_only_tooling_photo(): void
+    {
+        $toolingTmp = tempnam(sys_get_temp_dir(), 'test_tooling_only');
+        file_put_contents($toolingTmp, 'fake-tooling-only');
+        $toolingFile = new UploadedFile($toolingTmp, 'only_tooling.jpg', 'image/jpeg', null, true);
+
+        $response = $this->postJson("/operational/downtime/{$this->downtime->id}/update", [
+            '_method' => 'PUT',
+            'jenis_downtime' => 'dies',
+            'problem' => 'TOOLING PROBLEM',
+            'foto_tooling' => $toolingFile,
+        ]);
+
+        $response->assertStatus(200);
+        $this->downtime->refresh();
+        $this->assertNull($this->downtime->image_path_part);
+        $this->assertNotNull($this->downtime->image_path_tooling);
+        $this->assertNotNull($this->downtime->image_url_tooling);
+
+        // Cleanup
+        @unlink(storage_path('app/public/' . $this->downtime->image_path_tooling));
+        @unlink(public_path('uploads/' . $this->downtime->image_path_tooling));
+    }
+
     public function test_updating_downtime_handles_reupload_and_replaces_previous_photo(): void
     {
         // First upload

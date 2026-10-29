@@ -76,6 +76,9 @@ class AutoBreakTime extends Command
                     'action' => '-',
                     'pic' => 'AUTO BREAK',
                     'source' => 'AUTO',
+                    'image_path' => null,
+                    'image_path_part' => null,
+                    'image_path_tooling' => null,
                     'start_time' => $now,
                 ]);
 

@@ -1306,6 +1306,17 @@ class InputHarianController extends Controller
             ], 422);
         }
 
+        // Pastikan kolom foto diset null jika tidak ada pada record dan belum terisi agar aman dari database non-nullable/no-default
+        if (!isset($fields['image_path_part']) && $downtime->image_path_part === null) {
+            $fields['image_path_part'] = null;
+        }
+        if (!isset($fields['image_path_tooling']) && $downtime->image_path_tooling === null) {
+            $fields['image_path_tooling'] = null;
+        }
+        if (!isset($fields['image_path']) && $downtime->image_path === null) {
+            $fields['image_path'] = null;
+        }
+
         $downtime->update($fields);
 
         $this->productionService->syncHambatanJalur($downtime);

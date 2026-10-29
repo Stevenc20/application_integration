@@ -6,6 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 
 class Downtime extends Model
 {
+    protected $attributes = [
+        'image_path' => null,
+        'image_path_part' => null,
+        'image_path_tooling' => null,
+    ];
+
     protected $fillable = [
         'job_master_id',
         'jenis_downtime',

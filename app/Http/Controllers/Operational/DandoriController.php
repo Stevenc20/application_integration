@@ -139,7 +139,10 @@ class DandoriController extends Controller
                 'start_time' => $now,
                 'penyebab' => '-',
                 'action' => '-',
-                'pic' => Auth::user()?->name ?? 'OPERATOR'
+                'pic' => Auth::user()?->name ?? 'OPERATOR',
+                'image_path' => null,
+                'image_path_part' => null,
+                'image_path_tooling' => null,
             ]);
         }
 

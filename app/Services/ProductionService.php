@@ -175,7 +175,10 @@ class ProductionService
                     'start_time' => $now,
                     'penyebab' => '-',
                     'action' => '-',
-                    'pic' => 'OPERATOR'
+                    'pic' => 'OPERATOR',
+                    'image_path' => null,
+                    'image_path_part' => null,
+                    'image_path_tooling' => null,
                 ]);
             }
 
@@ -854,6 +857,9 @@ class ProductionService
                 'action' => $data['action'] ?? null,
                 'pic' => $data['pic'] ?? null,
                 'source' => $data['source'] ?? null,
+                'image_path' => null,
+                'image_path_part' => null,
+                'image_path_tooling' => null,
                 'start_time' => now()
             ]);
 
