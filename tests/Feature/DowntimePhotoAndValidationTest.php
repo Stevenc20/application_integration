@@ -248,4 +248,41 @@ class DowntimePhotoAndValidationTest extends TestCase
         $this->assertEquals('mesin', $this->downtime->jenis_downtime);
         $this->assertEquals('MESIN', $this->downtime->problem);
     }
+
+    public function test_get_downtimes_endpoint_returns_appended_image_urls(): void
+    {
+        $this->downtime->update([
+            'jenis_downtime' => 'dies',
+            'problem' => 'Dies Crack',
+            'image_path_part' => 'downtime/' . $this->downtime->id . '/part_test.jpg',
+            'image_path_tooling' => 'downtime/' . $this->downtime->id . '/tooling_test.png',
+        ]);
+
+        $response = $this->getJson("/operational/job/{$this->job->id}/downtimes");
+        $response->assertStatus(200);
+
+        $data = $response->json();
+        $this->assertNotEmpty($data);
+        $first = $data[0];
+
+        $this->assertArrayHasKey('image_url_part', $first);
+        $this->assertArrayHasKey('image_url_tooling', $first);
+        $this->assertArrayHasKey('image_url', $first);
+        $this->assertNotNull($first['image_url_part']);
+        $this->assertNotNull($first['image_url_tooling']);
+        $this->assertStringContainsString('part_test.jpg', $first['image_url_part']);
+        $this->assertStringContainsString('tooling_test.png', $first['image_url_tooling']);
+    }
+
+    public function test_updating_downtime_fails_validation_when_jenis_downtime_is_missing(): void
+    {
+        $response = $this->postJson("/operational/downtime/{$this->downtime->id}/update", [
+            '_method' => 'PUT',
+            'jenis_downtime' => '',
+            'problem' => 'Some Problem',
+        ]);
+
+        $response->assertStatus(422);
+        $response->assertJsonValidationErrors(['jenis_downtime']);
+    }
 }

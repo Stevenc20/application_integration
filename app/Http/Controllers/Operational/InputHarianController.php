@@ -1199,6 +1199,15 @@ class InputHarianController extends Controller
             return response()->json(['success' => false, 'message' => $e->getMessage()], 403);
         }
 
+        $request->validate([
+            'jenis_downtime' => 'required|string|not_in:downtime',
+            'foto_part' => 'nullable|file|max:10240',
+            'foto_tooling' => 'nullable|file|max:10240',
+        ], [
+            'jenis_downtime.required' => 'Wajib memilih jenis downtime terlebih dahulu.',
+            'jenis_downtime.not_in' => 'Wajib memilih jenis downtime yang valid.',
+        ]);
+
         $fields = $request->only(['jenis_downtime', 'problem', 'penyebab', 'action', 'pic']);
 
         // Helper aman dan konsisten untuk menyimpan file upload downtime

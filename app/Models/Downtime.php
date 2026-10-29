@@ -12,6 +12,12 @@ class Downtime extends Model
         'image_path_tooling' => null,
     ];
 
+    protected $appends = [
+        'image_url',
+        'image_url_part',
+        'image_url_tooling',
+    ];
+
     protected $fillable = [
         'job_master_id',
         'jenis_downtime',

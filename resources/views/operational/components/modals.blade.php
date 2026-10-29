@@ -169,6 +169,12 @@
                             <option value="others">Others</option>
                             <option value="break time" hidden>Break Time</option>
                         </select>
+                        <p id="dtJenisError" class="hidden text-[11px] font-bold text-red-600 mt-1 flex items-center gap-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 flex-shrink-0 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                            <span id="dtJenisErrorText">Wajib memilih jenis downtime terlebih dahulu</span>
+                        </p>
                     </div>
                     <div>
                         <label class="block text-[10px] font-black text-gray-400 uppercase mb-1">PIC</label>
