@@ -110,15 +110,10 @@ class DowntimeAndDefectPhotoMonitoringTest extends TestCase
         $this->assertStringContainsString('downtime/' . $downtime->id, $downtime->image_path);
         $this->assertEquals('Dies retak', $downtime->problem);
 
-        // Verify file was written to public/uploads
-        $targetFile = public_path('uploads/' . $downtime->image_path);
-        $this->assertTrue(File::exists($targetFile));
-
-        // Clean up test file
-        if (File::exists($targetFile)) {
-            File::delete($targetFile);
-            @rmdir(dirname($targetFile));
-        }
+        // Verify file was written to storage/app/public or public/uploads
+        $targetFilePublic = storage_path('app/public/' . $downtime->image_path);
+        $targetFileUploads = public_path('uploads/' . $downtime->image_path);
+        $this->assertTrue(File::exists($targetFilePublic) || File::exists($targetFileUploads), 'Image file should exist in storage or uploads');
 
         // Test that DashboardDetailService returns image_url
         $detailService = app(DashboardDetailService::class);
@@ -137,5 +132,15 @@ class DowntimeAndDefectPhotoMonitoringTest extends TestCase
         $this->assertNotEmpty($dtDetail);
         $this->assertNotNull($dtDetail[0]['image_url']);
         $this->assertStringContainsString($downtime->image_path, $dtDetail[0]['image_url']);
+
+        // Clean up test file
+        if (File::exists($targetFilePublic)) {
+            File::delete($targetFilePublic);
+            @rmdir(dirname($targetFilePublic));
+        }
+        if (File::exists($targetFileUploads)) {
+            File::delete($targetFileUploads);
+            @rmdir(dirname($targetFileUploads));
+        }
     }
 }

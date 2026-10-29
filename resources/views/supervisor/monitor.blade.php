@@ -1997,12 +1997,34 @@ window.openKpiModalFromMonitor = function(type, line) {
                 `;
             }
 
+            let fotoItems = [];
+            const resolveImgUrl = (pathOrUrl) => {
+                if (!pathOrUrl) return null;
+                if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl;
+                const clean = pathOrUrl.replace(/^\/+/, '');
+                return `/uploads/${clean}`;
+            };
+            if (r.image_url_part || r.image_path_part) {
+                fotoItems.push({ url: r.image_url_part || resolveImgUrl(r.image_path_part), tag: 'PART', color: '#2563eb' });
+            }
+            if (r.image_url_tooling || r.image_path_tooling) {
+                fotoItems.push({ url: r.image_url_tooling || resolveImgUrl(r.image_path_tooling), tag: 'TOOLING', color: '#ea580c' });
+            }
+            if (fotoItems.length === 0 && (r.image_url || r.image_path)) {
+                fotoItems.push({ url: r.image_url || resolveImgUrl(r.image_path), tag: 'FOTO', color: '#64748b' });
+            }
+
             let fotoHtml = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
-            if (r.image_url) {
+            if (fotoItems.length > 0) {
                 fotoHtml = `
-                    <a href="${r.image_url}" target="_blank" rel="noopener" style="display:inline-block; transition:transform 0.15s;" title="Lihat Foto Bukti Downtime">
-                        <img src="${r.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.1);" alt="Foto Downtime">
-                    </a>
+                    <div style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap;">
+                        ${fotoItems.map(item => `
+                            <a href="${item.url}" target="_blank" rel="noopener" style="position:relative; display:inline-block; transition:transform 0.15s;" title="Lihat Foto ${item.tag}">
+                                <img src="${item.url}" onerror="this.onerror=null; if(!this.src.includes('/storage/')) this.src=this.src.replace('/uploads/', '/storage/');" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="${item.tag}">
+                                <span style="position:absolute; top:-4px; right:-4px; background:${item.color}; color:#ffffff; font-size:8px; font-weight:900; padding:1px 4px; border-radius:4px; line-height:1; letter-spacing:0.02em;">${item.tag[0]}</span>
+                            </a>
+                        `).join('')}
+                    </div>
                 `;
             }
 
@@ -2088,12 +2110,34 @@ window.openDtDetailModal = function(rowIndex) {
                 `;
             }
 
+            let fotoItems = [];
+            const resolveImgUrl = (pathOrUrl) => {
+                if (!pathOrUrl) return null;
+                if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) return pathOrUrl;
+                const clean = pathOrUrl.replace(/^\/+/, '');
+                return `/uploads/${clean}`;
+            };
+            if (dt.image_url_part || dt.image_path_part) {
+                fotoItems.push({ url: dt.image_url_part || resolveImgUrl(dt.image_path_part), tag: 'PART', color: '#2563eb' });
+            }
+            if (dt.image_url_tooling || dt.image_path_tooling) {
+                fotoItems.push({ url: dt.image_url_tooling || resolveImgUrl(dt.image_path_tooling), tag: 'TOOLING', color: '#ea580c' });
+            }
+            if (fotoItems.length === 0 && (dt.image_url || dt.image_path)) {
+                fotoItems.push({ url: dt.image_url || resolveImgUrl(dt.image_path), tag: 'FOTO', color: '#64748b' });
+            }
+
             let fotoHtml = '<span style="color:#94a3b8; font-size:11px; font-weight:600;">—</span>';
-            if (dt.image_url) {
+            if (fotoItems.length > 0) {
                 fotoHtml = `
-                    <a href="${dt.image_url}" target="_blank" rel="noopener" style="display:inline-block; transition:transform 0.15s;" title="Lihat Foto Bukti Downtime">
-                        <img src="${dt.image_url}" style="width:48px; height:48px; object-fit:cover; border-radius:8px; border:1px solid #cbd5e1; box-shadow:0 1px 3px rgba(0,0,0,0.1);" alt="Foto Downtime">
-                    </a>
+                    <div style="display:flex; align-items:center; justify-content:center; gap:6px; flex-wrap:wrap;">
+                        ${fotoItems.map(item => `
+                            <a href="${item.url}" target="_blank" rel="noopener" style="position:relative; display:inline-block; transition:transform 0.15s;" title="Lihat Foto ${item.tag}">
+                                <img src="${item.url}" onerror="this.onerror=null; if(!this.src.includes('/storage/')) this.src=this.src.replace('/uploads/', '/storage/');" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="${item.tag}">
+                                <span style="position:absolute; top:-4px; right:-4px; background:${item.color}; color:#ffffff; font-size:8px; font-weight:900; padding:1px 4px; border-radius:4px; line-height:1; letter-spacing:0.02em;">${item.tag[0]}</span>
+                            </a>
+                        `).join('')}
+                    </div>
                 `;
             }
 
@@ -2181,7 +2225,7 @@ window.openDefectDetailModal = function(rowIndex, type) {
                     <div style="display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;">
                         ${rr.images.map(img => `
                             <a href="${img}" target="_blank" rel="noopener" style="display:inline-block;" title="Lihat Foto Bukti">
-                                <img src="${img}" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="Foto Defect">
+                                <img src="${img}" onerror="this.onerror=null; if(!this.src.includes('/storage/')) this.src=this.src.replace('/uploads/', '/storage/');" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="Foto Defect">
                             </a>
                         `).join('')}
                     </div>
@@ -2270,7 +2314,7 @@ window.openDefectKpiModal = function(type, line) {
                     <div style="display:flex; align-items:center; justify-content:center; gap:4px; flex-wrap:wrap;">
                         ${r.images.map(img => `
                             <a href="${img}" target="_blank" rel="noopener" style="display:inline-block;" title="Lihat Foto Bukti">
-                                <img src="${img}" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="Foto Defect">
+                                <img src="${img}" onerror="this.onerror=null; if(!this.src.includes('/storage/')) this.src=this.src.replace('/uploads/', '/storage/');" style="width:44px; height:44px; object-fit:cover; border-radius:6px; border:1px solid #cbd5e1; box-shadow:0 1px 2px rgba(0,0,0,0.08);" alt="Foto Defect">
                             </a>
                         `).join('')}
                     </div>
