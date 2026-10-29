@@ -323,4 +323,39 @@ class DowntimePhotoAndValidationTest extends TestCase
         ]);
         $this->assertEquals('/uploads/repair_reject/1/evidence.jpg', $img->url);
     }
+
+    public function test_repair_reject_stores_webp_image_successfully(): void
+    {
+        $superadmin = User::factory()->create([
+            'role' => 'superadmin',
+        ]);
+        $this->actingAs($superadmin);
+
+        $file = UploadedFile::fake()->create('evidence.webp', 150, 'image/webp');
+
+        $response = $this->postJson('/operational/repair-reject', [
+            'job_master_id' => $this->job->id,
+            'type' => 'repair',
+            'defect_name' => 'Scratch Part',
+            'qty_a' => 2,
+            'area_problem' => 'Top Surface',
+            'root_cause' => 'Burr on tooling',
+            'countermeasure' => 'Polish tool surface',
+            'images' => [$file],
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('repair_reject_logs', [
+            'job_master_id' => $this->job->id,
+            'type' => 'repair',
+            'defect_name' => 'Scratch Part',
+        ]);
+
+        $log = \App\Models\RepairRejectLog::where('job_master_id', $this->job->id)->first();
+        $this->assertNotNull($log);
+        $this->assertCount(1, $log->images);
+        $this->assertStringStartsWith('repair_reject/' . $log->id . '/', $log->images->first()->image_path);
+    }
 }

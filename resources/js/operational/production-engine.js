@@ -3220,7 +3220,7 @@ function closeFinishModal() {
 function showToast(m, t) {
     const toast = document.getElementById('toast');
     if (!toast) return;
-    toast.className = `fixed top-5 right-5 z-[9999] min-w-[260px] px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all duration-300 transform bg-${t === 'danger' ? 'red-600' : (t === 'info' ? 'blue-600' : 'green-600')}`;
+    toast.className = `fixed top-5 right-5 z-[99999] min-w-[260px] px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all duration-300 transform bg-${t === 'danger' ? 'red-600' : (t === 'info' ? 'blue-600' : 'green-600')}`;
     toast.innerText = m;
     toast.classList.remove('hidden', 'opacity-0');
     setTimeout(() => { toast.classList.add('opacity-0'); setTimeout(() => toast.classList.add('hidden'), 300); }, 2500);
@@ -4132,7 +4132,12 @@ window.submitRRModalForm = async function (event) {
                 let message = text;
                 try {
                     const parsed = JSON.parse(text);
-                    message = parsed.errors?.images?.[0] || parsed.message || text;
+                    if (parsed.errors) {
+                        const errorValues = Object.values(parsed.errors).flat();
+                        message = errorValues[0] || parsed.message || text;
+                    } else {
+                        message = parsed.message || text;
+                    }
                 } catch (e) {}
                 showToast(resp.status === 422 ? message : 'Server error (' + resp.status + '): ' + message.substring(0, 200), 'danger');
                 return;

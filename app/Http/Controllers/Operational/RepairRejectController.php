@@ -120,23 +120,74 @@ class RepairRejectController extends Controller
 
         try {
             foreach ($files as $file) {
+                if (!$file || !$file->isValid()) {
+                    continue;
+                }
+
                 $originalName = $file->getClientOriginalName();
                 $safeName = time() . '_' . uniqid() . '_' . preg_replace('/[^a-zA-Z0-9_.-]/', '', $originalName);
-                $relPath = 'repair_reject/' . $log->id . '/' . $safeName;
-                $absPath = public_path('uploads/' . $relPath);
-                $dir = dirname($absPath);
-                if (!is_dir($dir)) {
-                    mkdir($dir, 0755, true);
+                $subDir = 'repair_reject/' . $log->id;
+                $relPath = $subDir . '/' . $safeName;
+                $savedRelPath = null;
+
+                // Priority 1: Storage disk 'uploads' (public/uploads)
+                try {
+                    if (!\Illuminate\Support\Facades\Storage::disk('uploads')->exists($subDir)) {
+                        \Illuminate\Support\Facades\Storage::disk('uploads')->makeDirectory($subDir);
+                    }
+                    $stored = \Illuminate\Support\Facades\Storage::disk('uploads')->putFileAs($subDir, $file, $safeName);
+                    if ($stored) {
+                        $savedRelPath = $relPath;
+                        $uplAbs = public_path('uploads/' . $relPath);
+                        if (file_exists($uplAbs)) {
+                            @chmod($uplAbs, 0664);
+                            $writtenPaths[] = $uplAbs;
+                        }
+                    }
+                } catch (\Throwable $storageEx) {
+                    Log::warning('RR Storage::disk(uploads) putFileAs failed: ' . $storageEx->getMessage());
                 }
-                copy($file->getRealPath(), $absPath);
-                if (!file_exists($absPath)) {
-                    throw new \RuntimeException("copy() reported success but file not found at: $absPath");
+
+                // Priority 2: Direct fallback to public/uploads or storage/app/public
+                if (!$savedRelPath) {
+                    $candidates = [
+                        public_path('uploads/' . $relPath),
+                        storage_path('app/public/' . $relPath),
+                    ];
+                    foreach ($candidates as $targetAbsPath) {
+                        $targetDir = dirname($targetAbsPath);
+                        if (!is_dir($targetDir)) {
+                            @mkdir($targetDir, 0775, true);
+                        }
+                        if (is_dir($targetDir) && is_writable($targetDir)) {
+                            $copied = false;
+                            $realPath = $file->getRealPath();
+                            if ($realPath && file_exists($realPath)) {
+                                $copied = @copy($realPath, $targetAbsPath);
+                            }
+                            if (!$copied && $realPath && file_exists($realPath)) {
+                                $content = @file_get_contents($realPath);
+                                if ($content !== false) {
+                                    $copied = @file_put_contents($targetAbsPath, $content) !== false;
+                                }
+                            }
+                            if ($copied && file_exists($targetAbsPath)) {
+                                @chmod($targetAbsPath, 0664);
+                                $writtenPaths[] = $targetAbsPath;
+                                $savedRelPath = $relPath;
+                                break;
+                            }
+                        }
+                    }
                 }
-                $writtenPaths[] = $absPath;
-                chmod($absPath, 0644);
+
+                if (!$savedRelPath) {
+                    throw new \RuntimeException("Gagal menyimpan file {$originalName} ke storage server. Periksa permission public/uploads.");
+                }
+
                 RepairRejectImage::create([
                     'repair_reject_log_id' => $log->id,
-                    'image_path'           => $relPath,
+                    'image_path'           => $savedRelPath,
                     'image_type'           => 'before',
                 ]);
                 $saved++;
@@ -149,7 +200,7 @@ class RepairRejectController extends Controller
             }
             Log::error('RR image upload failed: ' . $e->getMessage() . ' | file: ' . ($file->getClientOriginalName() ?? 'unknown'));
             throw ValidationException::withMessages([
-                'images' => 'Foto evidence gagal disimpan. Silakan coba unggah ulang.',
+                'images' => 'Foto evidence gagal disimpan: ' . $e->getMessage(),
             ]);
         }
 
@@ -181,7 +232,7 @@ class RepairRejectController extends Controller
             'root_cause'     => 'required|string',
             'countermeasure' => 'required|string',
             'images'         => 'required|array|min:1',
-            'images.*'       => 'required|file|image|max:5120',
+            'images.*'       => 'required|file|max:10240',
         ], [
             'images.required' => 'Minimal 1 foto evidence Repair/Reject wajib diunggah.',
             'images.min'      => 'Minimal 1 foto evidence Repair/Reject wajib diunggah.',
@@ -284,7 +335,7 @@ class RepairRejectController extends Controller
             'root_cause'     => 'required|string',
             'countermeasure' => 'required|string',
             'images'         => 'nullable|array',
-            'images.*'       => 'nullable|file|image|max:5120',
+            'images.*'       => 'nullable|file|max:10240',
         ]);
 
         if (!$request->hasFile('images') && $log->images()->count() === 0) {

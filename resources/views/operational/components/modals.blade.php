@@ -299,7 +299,7 @@
     </div>
 </div>
 
-<div id="toast" class="fixed top-5 right-5 z-[9999] hidden min-w-[260px] px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all"></div>
+<div id="toast" class="fixed top-5 right-5 z-[99999] hidden min-w-[260px] px-5 py-3 rounded-xl shadow-2xl text-white font-medium transition-all"></div>
 
 {{-- SHIFT VALIDATION MODAL --}}
 <div id="shiftValidationModal" class="fixed inset-0 z-50 hidden items-center justify-center p-4">
