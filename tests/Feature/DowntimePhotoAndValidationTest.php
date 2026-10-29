@@ -272,6 +272,9 @@ class DowntimePhotoAndValidationTest extends TestCase
         $this->assertNotNull($first['image_url_tooling']);
         $this->assertStringContainsString('part_test.jpg', $first['image_url_part']);
         $this->assertStringContainsString('tooling_test.png', $first['image_url_tooling']);
+        // Relative URL check to prevent Mixed Content
+        $this->assertStringStartsWith('/', $first['image_url_part']);
+        $this->assertStringStartsWith('/', $first['image_url_tooling']);
     }
 
     public function test_updating_downtime_fails_validation_when_jenis_downtime_is_missing(): void
@@ -284,5 +287,14 @@ class DowntimePhotoAndValidationTest extends TestCase
 
         $response->assertStatus(422);
         $response->assertJsonValidationErrors(['jenis_downtime']);
+    }
+
+    public function test_resolve_image_url_converts_localhost_to_root_relative(): void
+    {
+        $resolved = \App\Models\Downtime::resolveImageUrl('http://localhost/uploads/downtime/1/test.jpg');
+        $this->assertEquals('/uploads/downtime/1/test.jpg', $resolved);
+
+        $resolved127 = \App\Models\Downtime::resolveImageUrl('http://127.0.0.1:8000/uploads/downtime/1/test.jpg');
+        $this->assertEquals('/uploads/downtime/1/test.jpg', $resolved127);
     }
 }

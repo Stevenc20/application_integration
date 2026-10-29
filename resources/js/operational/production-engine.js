@@ -2356,6 +2356,47 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
             if (dtAction) dtAction.value = dt.action || '';
             if (dtPIC) dtPIC.value = dt.pic || window.ProductionConfig.userName || '';
             if (formArea) formArea.classList.remove('hidden');
+
+            // Tampilkan preview foto yang sudah tersimpan jika ada
+            window.removeDtFoto();
+            const partUrl = resolveDowntimeImageUrl(dt, 'part');
+            if (partUrl) {
+                const previewContainer = document.getElementById('dtFotoPartPreviewContainer');
+                const previewImg = document.getElementById('dtFotoPartPreviewImg');
+                const label = document.getElementById('dtFotoPartLabel');
+                if (previewImg) {
+                    previewImg.src = partUrl;
+                    previewImg.onerror = function() {
+                        this.onerror = null;
+                        if (this.src.includes('/uploads/')) {
+                            this.src = this.src.replace('/uploads/', '/storage/');
+                        } else if (this.src.includes('/storage/')) {
+                            this.src = this.src.replace('/storage/', '/uploads/');
+                        }
+                    };
+                }
+                if (previewContainer) previewContainer.classList.remove('hidden');
+                if (label) label.textContent = 'Ganti File';
+            }
+            const toolingUrl = resolveDowntimeImageUrl(dt, 'tooling');
+            if (toolingUrl) {
+                const previewContainer = document.getElementById('dtFotoToolingPreviewContainer');
+                const previewImg = document.getElementById('dtFotoToolingPreviewImg');
+                const label = document.getElementById('dtFotoToolingLabel');
+                if (previewImg) {
+                    previewImg.src = toolingUrl;
+                    previewImg.onerror = function() {
+                        this.onerror = null;
+                        if (this.src.includes('/uploads/')) {
+                            this.src = this.src.replace('/uploads/', '/storage/');
+                        } else if (this.src.includes('/storage/')) {
+                            this.src = this.src.replace('/storage/', '/uploads/');
+                        }
+                    };
+                }
+                if (previewContainer) previewContainer.classList.remove('hidden');
+                if (label) label.textContent = 'Ganti File';
+            }
         } else {
             // Opened directly (e.g. from "Cek List Downtime" button)
             cancelDowntimeEdit();
@@ -2459,21 +2500,30 @@ function clearDtJenisError() {
     }
 }
 
+function normalizeImageUrl(url) {
+    if (!url) return '';
+    // Jika URL mengandung host localhost/127.0.0.1, ubah menjadi relative path agar tidak mixed content / gagal load di production
+    if (url.startsWith('http://localhost') || url.startsWith('https://localhost') || url.startsWith('http://127.0.0.1') || url.startsWith('https://127.0.0.1')) {
+        return url.replace(/^https?:\/\/[^\/]+/, '');
+    }
+    return url;
+}
+
 function resolveDowntimeImageUrl(dt, category = 'part') {
     if (!dt) return '';
     if (category === 'part') {
-        if (dt.image_url_part) return dt.image_url_part;
-        if (dt.image_url) return dt.image_url;
+        if (dt.image_url_part) return normalizeImageUrl(dt.image_url_part);
+        if (dt.image_url) return normalizeImageUrl(dt.image_url);
         const path = dt.image_path_part || dt.image_path;
         if (!path) return '';
-        if (path.startsWith('http://') || path.startsWith('https://')) return path;
+        if (path.startsWith('http://') || path.startsWith('https://')) return normalizeImageUrl(path);
         const clean = path.replace(/^\/+/, '');
         return clean.startsWith('uploads/') || clean.startsWith('storage/') ? `/${clean}` : `/uploads/${clean}`;
     } else {
-        if (dt.image_url_tooling) return dt.image_url_tooling;
+        if (dt.image_url_tooling) return normalizeImageUrl(dt.image_url_tooling);
         const path = dt.image_path_tooling;
         if (!path) return '';
-        if (path.startsWith('http://') || path.startsWith('https://')) return path;
+        if (path.startsWith('http://') || path.startsWith('https://')) return normalizeImageUrl(path);
         const clean = path.replace(/^\/+/, '');
         return clean.startsWith('uploads/') || clean.startsWith('storage/') ? `/${clean}` : `/uploads/${clean}`;
     }
@@ -2656,7 +2706,10 @@ function saveDowntime(andCloseModal = false) {
     })
     .then(res => {
         if (!res.ok) {
-            return res.json().then(err => { throw new Error(err.message || 'Gagal menyimpan laporan'); });
+            return res.json().then(err => {
+                const msg = err.errors ? Object.values(err.errors).flat().join('\n') : (err.message || 'Gagal menyimpan laporan');
+                throw new Error(msg);
+            });
         }
         return res.json();
     })
@@ -2894,7 +2947,10 @@ function submitDowntimeLater() {
     })
     .then(res => {
         if (!res.ok) {
-            return res.json().then(err => { throw new Error(err.message || 'Gagal menyimpan jenis downtime'); });
+            return res.json().then(err => {
+                const msg = err.errors ? Object.values(err.errors).flat().join('\n') : (err.message || 'Gagal menyimpan jenis downtime');
+                throw new Error(msg);
+            });
         }
         return res.json();
     })

@@ -44,7 +44,7 @@ class Downtime extends Model
     }
 
     /**
-     * Resolve full public URL for a given relative image path.
+     * Resolve public URL or root-relative path for a given relative image path.
      */
     public static function resolveImageUrl(?string $path): ?string
     {
@@ -52,24 +52,29 @@ class Downtime extends Model
             return null;
         }
         if (str_starts_with($path, 'http://') || str_starts_with($path, 'https://')) {
+            // Jika URL adalah localhost namun diakses di environment lain/HTTPS, jadikan root-relative
+            $parsed = parse_url($path);
+            if (isset($parsed['host']) && in_array(strtolower($parsed['host']), ['localhost', '127.0.0.1'])) {
+                return ($parsed['path'] ?? '') . (isset($parsed['query']) ? '?' . $parsed['query'] : '');
+            }
             return $path;
         }
 
         $clean = ltrim($path, '/');
         // Check in public/uploads
         if (file_exists(public_path('uploads/' . $clean))) {
-            return asset('uploads/' . $clean);
+            return '/uploads/' . $clean;
         }
         // Check in public/storage
         if (file_exists(public_path('storage/' . $clean))) {
-            return asset('storage/' . $clean);
+            return '/storage/' . $clean;
         }
         // Check in storage/app/public
         if (file_exists(storage_path('app/public/' . $clean))) {
-            return asset('storage/' . $clean);
+            return '/storage/' . $clean;
         }
 
-        return asset('uploads/' . $clean);
+        return '/uploads/' . $clean;
     }
 
     public function getImageUrlAttribute(): ?string

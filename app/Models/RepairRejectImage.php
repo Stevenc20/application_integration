@@ -22,18 +22,18 @@ class RepairRejectImage extends Model
         $clean = ltrim($path, '/');
         // Cek di public/uploads
         if (file_exists(public_path('uploads/' . $clean))) {
-            return asset('uploads/' . $clean);
+            return '/uploads/' . $clean;
         }
         // Cek di public/storage
         if (file_exists(public_path('storage/' . $clean))) {
-            return asset('storage/' . $clean);
+            return '/storage/' . $clean;
         }
         // Cek di storage/app/public
         if (file_exists(storage_path('app/public/' . $clean))) {
-            return asset('storage/' . $clean);
+            return '/storage/' . $clean;
         }
         // Default ke uploads
-        return asset('uploads/' . $clean);
+        return '/uploads/' . $clean;
     }
 
     public function repairRejectLog()
