@@ -2599,9 +2599,15 @@ function saveDowntime(andCloseModal = false) {
         if (window.currentDowntimesList) {
             const idx = window.currentDowntimesList.findIndex(d => d.id == id);
             if (idx !== -1) {
+                const updatedItem = res.downtime || {};
                 window.currentDowntimesList[idx] = {
                     ...window.currentDowntimesList[idx],
-                    ...data
+                    jenis_downtime: jenis,
+                    problem: problemVal,
+                    penyebab: (document.getElementById('dtPenyebab')?.value || '').trim(),
+                    action: (document.getElementById('dtAction')?.value || '').trim(),
+                    pic: (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim(),
+                    ...updatedItem
                 };
                 renderDowntimeTable();
             }
@@ -2831,9 +2837,15 @@ function submitDowntimeLater() {
         if (window.currentDowntimesList) {
             const idx = window.currentDowntimesList.findIndex(d => d.id == id);
             if (idx !== -1) {
+                const updatedItem = res.downtime || {};
                 window.currentDowntimesList[idx] = {
                     ...window.currentDowntimesList[idx],
-                    ...data
+                    jenis_downtime: jenis,
+                    problem: problemVal,
+                    penyebab: (document.getElementById('dtPenyebab')?.value || '').trim(),
+                    action: (document.getElementById('dtAction')?.value || '').trim(),
+                    pic: (document.getElementById('dtPIC')?.value || window.ProductionConfig?.userName || '').trim(),
+                    ...updatedItem
                 };
                 renderDowntimeTable();
             }
@@ -2889,13 +2901,7 @@ function closeDowntimeModal() {
                 document.getElementById('dtJenis')?.focus();
                 return;
             }
-            const currentCandidate = window.currentDowntimesList?.find(dt => dt.id == id);
-            const hasExistingFoto = currentCandidate && currentCandidate.image_path;
-            if (!hasExistingFoto && !window.dtSelectedFotoFile) {
-                showToast('Wajib mengunggah foto evidence downtime terlebih dahulu sebelum menutup.', 'warning');
-                return;
-            }
-            // Jika jenis sudah dipilih, simpan via submitDowntimeLater
+            // Foto bersifat opsional, simpan perubahan via submitDowntimeLater
             submitDowntimeLater();
             return;
         }

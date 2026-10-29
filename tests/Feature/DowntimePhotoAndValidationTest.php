@@ -222,4 +222,30 @@ class DowntimePhotoAndValidationTest extends TestCase
         @rmdir(dirname(storage_path('app/public/' . $secondPath)));
         @rmdir(dirname(public_path('uploads/' . $secondPath)));
     }
+
+    public function test_updating_downtime_with_type_and_empty_problem_fills_default_problem_and_returns_downtime(): void
+    {
+        $response = $this->postJson("/operational/downtime/{$this->downtime->id}/update", [
+            '_method' => 'PUT',
+            'jenis_downtime' => 'mesin',
+            'problem' => 'MESIN',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+        ]);
+        $response->assertJsonStructure([
+            'success',
+            'downtime' => [
+                'id',
+                'jenis_downtime',
+                'problem',
+            ],
+        ]);
+
+        $this->downtime->refresh();
+        $this->assertEquals('mesin', $this->downtime->jenis_downtime);
+        $this->assertEquals('MESIN', $this->downtime->problem);
+    }
 }
