@@ -299,7 +299,16 @@
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200">@fmtQty($job['total_plt'] ?? 0)</td>
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200 text-center font-semibold text-gray-700" title="{{ $job['job_no'] ?? '' }}">{{ $job['job_no'] ?? '-' }}</td>
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200 bg-amber-50/40 font-black text-amber-800">@fmtQty($job['plan_qty'] ?? 0)</td>
-                                    <td class="lkh-cell py-2 px-2 border-r border-gray-200 bg-emerald-50/40 font-black text-emerald-800">@fmtQty($job['actual_good'] ?? 0)</td>
+                                    <td class="lkh-cell py-2 px-2 border-r border-gray-200 bg-emerald-50/40 font-black text-emerald-800">
+                                        <div class="flex flex-col items-center justify-center">
+                                            <span>@fmtQty($job['actual_good'] ?? 0)</span>
+                                            @if(($job['actual_good'] ?? 0) > ($job['plan_qty'] ?? 0) && ($job['plan_qty'] ?? 0) > 0)
+                                                <span class="inline-flex items-center px-1.5 py-0.2 text-[8px] font-black rounded bg-emerald-600 text-white shadow-xs" title="Over Plan +{{ ($job['actual_good'] ?? 0) - ($job['plan_qty'] ?? 0) }} pcs">
+                                                    +{{ ($job['actual_good'] ?? 0) - ($job['plan_qty'] ?? 0) }}
+                                                </span>
+                                            @endif
+                                        </div>
+                                    </td>
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200 text-amber-700 font-bold">@fmtQty($job['actual_repair'] ?? 0)</td>
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200 text-red-600 font-bold">@fmtQty($job['actual_reject'] ?? 0)</td>
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200">@fmtQty($job['total_mesin'] ?? 0)</td>
@@ -327,7 +336,11 @@
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200 font-bold text-red-800">@fmtMin($dtProdVal)</td>
                                     <td class="lkh-cell py-2 px-2 border-r border-gray-200 font-bold text-red-900">@fmtMin($dtTotalVal)</td>
                                     <td class="lkh-cell py-2 px-2">
-                                        <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-black border {{ $statusClass }}">{{ $status }}</span>
+                                        @if(($job['actual_good'] ?? 0) > ($job['plan_qty'] ?? 0) && ($job['plan_qty'] ?? 0) > 0)
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-black border bg-indigo-100 text-indigo-800 border-indigo-200" title="Over Plan +{{ ($job['actual_good'] ?? 0) - ($job['plan_qty'] ?? 0) }} pcs">OVER PLAN</span>
+                                        @else
+                                            <span class="inline-flex px-2 py-0.5 rounded-full text-[10px] font-black border {{ $statusClass }}">{{ $status }}</span>
+                                        @endif
                                     </td>
                                 </tr>
                             @endif

@@ -1030,6 +1030,11 @@ class ReportController extends Controller
             $ttdLocked = true;
         }
 
+        $revisions = \App\Models\ScheduleRevision::whereDate('plan_date', $date)
+            ->with('creator')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
         return compact(
             'jobsData',
             'totals',
@@ -1046,7 +1051,8 @@ class ReportController extends Controller
             'canEdit',
             'ttdLocked',
             'userRole',
-            'authorizedScope'
+            'authorizedScope',
+            'revisions'
         );
     }
 

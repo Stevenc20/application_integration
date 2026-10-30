@@ -401,16 +401,6 @@ class ProductionService
             }
             $maxTarget = (int) ($plan?->plan ?? $job?->target_qty ?? 0);
 
-            $incomingOk = (int) ($data['ok_qty'] ?? 0);
-            if ($incomingOk > 0 && $maxTarget > 0) {
-                $currentOk = (int) ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', $workDate)->sum('ok_qty');
-                if (($currentOk + $incomingOk) > $maxTarget) {
-                    $sisa = max(0, $maxTarget - $currentOk);
-                    throw new \InvalidArgumentException("Target Plan maksimal {$maxTarget} PCS! Total OK tidak boleh melebihi target (Sisa: {$sisa} PCS).");
-                }
-            }
-
             $log = ProductionLog::create([
                 'job_master_id' => $jobId,
                 'ok_qty' => $data['ok_qty'] ?? 0,

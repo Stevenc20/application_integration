@@ -1979,9 +1979,11 @@ window.updateFinishModalShortageAlert = function () {
     const id = window.currentFinishId;
     const alertBox = document.getElementById('finishShortageAlert');
     const descEl = document.getElementById('finishShortageDesc');
+    const overPlanBox = document.getElementById('finishOverPlanAlert');
+    const overPlanDesc = document.getElementById('finishOverPlanDesc');
     const reasonWrap = document.getElementById('finishReasonWrap');
     const reasonErr = document.getElementById('finishReasonError');
-    if (!alertBox || !descEl || !id) return;
+    if (!id) return;
 
     const job = (window.jobMasterData && window.jobMasterData[id]) || {};
     let planQty = 0;
@@ -2001,12 +2003,25 @@ window.updateFinishModalShortageAlert = function () {
 
     if (planQty > 0 && actualTotal < planQty) {
         const shortQty = planQty - actualTotal;
-        descEl.innerHTML = `Target Plan: <b>${planQty} pcs</b> | Aktual (OK+Repair+Reject): <b>${actualTotal} pcs</b>.<br>Kurang <b>${shortQty} pcs</b>. Kekurangan ini otomatis masuk antrean <b>Recovery PPC</b>.`;
-        alertBox.classList.remove('hidden');
+        if (descEl) descEl.innerHTML = `Target Plan: <b>${planQty} pcs</b> | Aktual (OK+Repair+Reject): <b>${actualTotal} pcs</b>.<br>Kurang <b>${shortQty} pcs</b>. Kekurangan ini otomatis masuk antrean <b>Recovery PPC</b>.`;
+        if (alertBox) alertBox.classList.remove('hidden');
+        if (overPlanBox) overPlanBox.classList.add('hidden');
         if (reasonWrap) reasonWrap.classList.remove('hidden');
         if (reasonErr) reasonErr.classList.add('hidden');
+    } else if (planQty > 0 && actualTotal > planQty) {
+        const overQty = actualTotal - planQty;
+        if (overPlanDesc) overPlanDesc.innerHTML = `Target Plan: <b>${planQty} pcs</b> | Aktual (OK+Repair+Reject): <b>${actualTotal} pcs</b>.<br>Surplus: <b>+${overQty} pcs</b> (Status: <b>OVER PLAN</b>).`;
+        if (overPlanBox) overPlanBox.classList.remove('hidden');
+        if (alertBox) alertBox.classList.add('hidden');
+        if (reasonWrap) {
+            reasonWrap.classList.add('hidden');
+            const reasonInput = document.getElementById('finishTargetReason');
+            if (reasonInput) reasonInput.value = '';
+        }
+        if (reasonErr) reasonErr.classList.add('hidden');
     } else {
-        alertBox.classList.add('hidden');
+        if (alertBox) alertBox.classList.add('hidden');
+        if (overPlanBox) overPlanBox.classList.add('hidden');
         if (reasonWrap) {
             reasonWrap.classList.add('hidden');
             const reasonInput = document.getElementById('finishTargetReason');
@@ -3084,10 +3099,8 @@ function saveJob(id, source) {
     }
     const targetMax = parseInt(jobMasterData[id]?.target_qty, 10) || 0;
     if (targetMax > 0 && newActual > targetMax) {
-        showToast(`Target Plan maksimal ${targetMax} PCS! Total OK tidak boleh melebihi target.`, 'danger');
-        if (actualEl) actualEl.value = jobMasterData[id]?.actual_ok || '';
-        if (activeActualEl) activeActualEl.value = '';
-        return;
+        const overQty = newActual - targetMax;
+        showToast(`Info: Produksi Over Plan (+${overQty} PCS dari target ${targetMax} PCS)`, 'info');
     }
     if (newActual === 0) return;
 
@@ -3345,10 +3358,8 @@ window.stepInput = function (id, amount, jobId = null) {
             const targetMax = parseInt(jobMasterData[targetJobId]?.target_qty, 10) || 0;
 
             if (parsedAmount > 0 && targetMax > 0 && (current + parsedAmount) > targetMax) {
-                const sisa = Math.max(0, targetMax - current);
-                showToast(`Target Plan maksimal ${targetMax} PCS! Total OK tidak boleh melebihi target (Sisa: ${sisa} PCS).`, 'danger');
-                if (input) input.value = '';
-                return;
+                const overQty = (current + parsedAmount) - targetMax;
+                showToast(`Info: Produksi Over Plan (+${overQty} PCS dari target ${targetMax} PCS)`, 'info');
             }
 
             const newVal = Math.max(0, current + parsedAmount);
@@ -3402,15 +3413,13 @@ window.manualStep = function (id, inputId, jobId) {
             const isRepair = id.includes('repair');
             const isReject = id.includes('reject');
 
-            // Hanya validasi batasan target plan jika input adalah OK (bukan repair / reject)
             if (!isRepair && !isReject) {
                 const targetJobId = jobId || id.split('-').pop();
                 const current = Math.max(0, parseInt(jobMasterData[targetJobId]?.actual_ok, 10) || 0);
                 const targetMax = parseInt(jobMasterData[targetJobId]?.target_qty, 10) || 0;
                 if (targetMax > 0 && (current + value) > targetMax) {
-                    const sisa = Math.max(0, targetMax - current);
-                    showToast(`Target Plan maksimal ${targetMax} PCS! Input ${value} melebihi target (Sisa: ${sisa} PCS).`, 'danger');
-                    return;
+                    const overQty = (current + value) - targetMax;
+                    showToast(`Info: Produksi Over Plan (+${overQty} PCS dari target ${targetMax} PCS)`, 'info');
                 }
             }
             stepInput(id, value, jobId);

@@ -544,6 +544,39 @@
                 </div>
             </div>
 
+            {{-- HISTORI REVISI PPC --}}
+            @if(isset($revisions) && $revisions->isNotEmpty())
+            <div class="mt-8 pt-6 border-t border-slate-200">
+                <div class="flex items-center gap-2 mb-3">
+                    <span class="w-2.5 h-2.5 rounded-full bg-indigo-500"></span>
+                    <h3 class="text-xs font-black text-slate-800 uppercase tracking-widest">Histori Revisi Jadwal PPC</h3>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 font-bold border border-indigo-100">{{ $revisions->count() }} Revisi</span>
+                </div>
+                <div class="overflow-x-auto rounded-xl border border-slate-200 shadow-xs">
+                    <table class="w-full text-left text-xs bg-white">
+                        <thead class="bg-slate-50 text-slate-500 font-bold text-[10px] uppercase border-b border-slate-200">
+                            <tr>
+                                <th class="py-2.5 px-3">Waktu Revisi</th>
+                                <th class="py-2.5 px-3">Shift</th>
+                                <th class="py-2.5 px-3">Aksi</th>
+                                <th class="py-2.5 px-3">User</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            @foreach($revisions as $rev)
+                            <tr class="hover:bg-slate-50/60">
+                                <td class="py-2 px-3 font-mono text-slate-700">{{ $rev->created_at?->format('d/m/Y H:i:s') ?? '-' }}</td>
+                                <td class="py-2 px-3 font-semibold text-slate-800">{{ $rev->shift_name ?? '-' }}</td>
+                                <td class="py-2 px-3 font-medium text-slate-600">{{ $rev->action ?? 'Schedule Update' }}</td>
+                                <td class="py-2 px-3 text-slate-500">{{ $rev->creator?->name ?? 'System' }}</td>
+                            </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            @endif
+
         </div>{{-- /p-8 --}}
     </div>{{-- /print-card --}}
 

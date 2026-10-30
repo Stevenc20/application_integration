@@ -66,6 +66,19 @@
                 </div>
             </div>
 
+            {{-- ALERT OVER PLAN --}}
+            <div id="finishOverPlanAlert" class="hidden p-3.5 bg-indigo-50 border border-indigo-200 rounded-2xl">
+                <div class="flex items-start gap-2.5">
+                    <div class="w-6 h-6 rounded-lg bg-indigo-100 text-indigo-600 flex items-center justify-center shrink-0 mt-0.5">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <p class="text-xs font-black text-indigo-800 uppercase tracking-tight" id="finishOverPlanTitle">Status: OVER PLAN</p>
+                        <p class="text-xs text-indigo-700 mt-0.5 font-bold" id="finishOverPlanDesc">-</p>
+                    </div>
+                </div>
+            </div>
+
             {{-- ALASAN WAJIB JIKA TIDAK TERCAPAI TARGET --}}
             <div id="finishReasonWrap" class="hidden p-3.5 bg-amber-50 border border-amber-200 rounded-2xl">
                 <div class="flex items-start gap-2.5">
