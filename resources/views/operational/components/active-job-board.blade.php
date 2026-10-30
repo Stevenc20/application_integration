@@ -46,7 +46,7 @@
             if ($activeBreakDt) {
                 $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
                 $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
-                $currShift = ((int) now()->format('H') >= 7 && (int) now()->format('H') < 19) ? 'Shift Pagi' : 'Shift Malam';
+                $currShift = \App\Services\ProductionMetricsService::currentProductionShift();
                 $currTimeStr = now()->format('H:i:s');
                 $currentBreakSchedule = \App\Models\MasterBreakTime::where('is_active', true)
                     ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })

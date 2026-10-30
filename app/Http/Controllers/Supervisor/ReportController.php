@@ -1129,6 +1129,7 @@ class ReportController extends Controller
             'dt_material',
             'dt_log',
             'dt_production',
+            'dt_others',
         ];
         $dtCategoryMap = [
             'dt_dies' => 'dies',
@@ -1136,12 +1137,13 @@ class ReportController extends Controller
             'dt_material' => 'material',
             'dt_log' => 'logistic',
             'dt_production' => 'production',
+            'dt_others' => 'others',
         ];
         $allowed = array_merge(array_keys($qtyFields), array_keys($timeFields), $minutesFields);
 
         $audits = [];
 
-        DB::transaction(function () use ($updates, $allowed, $qtyFields, $timeFields, $minutesFields, $date, &$audits) {
+        DB::transaction(function () use ($updates, $allowed, $qtyFields, $timeFields, $minutesFields, $date, $shiftName, $lineName, &$audits) {
             foreach ($updates as $u) {
                 $planId = (int) ($u['plan_id'] ?? 0);
                 $field = $u['field'] ?? '';
@@ -1202,10 +1204,7 @@ class ReportController extends Controller
                     continue;
                 }
 
-                $jn = trim($plan->job_no ?? '');
-                $jm = trim($plan->job_master ?? '');
-                $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
-                $job = \App\Models\JobMaster::where('job_number', $identifier)->first();
+                $job = $this->lkhPlanToJob($plan);
                 if (! $job) {
                     continue;
                 }
@@ -1214,6 +1213,9 @@ class ReportController extends Controller
                     $dp = new \App\Models\DailyProduction;
                     $dp->job_master_id = $job->id;
                     $dp->work_date = $date;
+                    $dp->line = $plan->press_name ?: ($plan->line ?: $lineName);
+                    $dp->shift = $shiftName;
+                    $dp->target_qty = (int) ($plan->plan ?? 0);
                 }
 
                 $col = $qtyFields[$field];
@@ -1221,8 +1223,18 @@ class ReportController extends Controller
                 $audit['old_value'] = (string) $dp->getRawOriginal($col);
                 $audit['new_value'] = (string) $newQty;
                 $dp->{$col} = $newQty;
-                $dp->actual_qty = $dp->actual_ok + $dp->actual_repair + $dp->actual_reject;
+                $dp->actual_qty = (int) ($dp->actual_ok ?? 0) + (int) ($dp->actual_repair ?? 0) + (int) ($dp->actual_reject ?? 0);
+                if (empty($dp->work_date)) {
+                    $dp->work_date = $date;
+                }
                 $dp->save();
+
+                // Keep ProductionPlan synced with actual counts
+                $plan->ok = (int) ($dp->actual_ok ?? 0);
+                $plan->repair = (int) ($dp->actual_repair ?? 0);
+                $plan->reject = (int) ($dp->actual_reject ?? 0);
+                $plan->save();
+
                 $audits[] = $audit;
             }
         });
@@ -1252,7 +1264,31 @@ class ReportController extends Controller
         $jm = trim($plan->job_master ?? '');
         $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
 
-        return JobMaster::where('job_number', $identifier)->first();
+        $job = JobMaster::where('job_number', $identifier)->first();
+        if ($job) {
+            return $job;
+        }
+
+        // Resilient fallback: lookup by plan ID suffix if prefix diverged (e.g., after PPC import or manual rename)
+        $jobBySuffix = JobMaster::where('job_number', 'LIKE', "%-{$plan->id}")
+            ->get()
+            ->first(fn (JobMaster $j) => str_ends_with((string) $j->job_number, "-{$plan->id}"));
+        if ($jobBySuffix) {
+            return $jobBySuffix;
+        }
+
+        // If not found yet, auto-create JobMaster so edits or adjustments can be attached
+        return JobMaster::create([
+            'job_number' => $identifier,
+            'job_name' => $plan->job_master ?: ($plan->job_no ?: 'UNKNOWN JOB'),
+            'line' => $plan->press_name ?: ($plan->line ?: 'Line A'),
+            'target_qty' => (int) ($plan->plan ?? 0),
+            'sequence_no' => (int) ($plan->row_no ?? 1),
+            'status' => 'pending',
+            'plan_start' => $plan->start_time ? (str_contains($plan->start_time, '-') ? \Carbon\Carbon::parse($plan->start_time)->startOfMinute() : \Carbon\Carbon::parse($plan->plan_date.' '.$plan->start_time)->startOfMinute()) : null,
+            'plan_end' => $plan->finish_time ? (str_contains($plan->finish_time, '-') ? \Carbon\Carbon::parse($plan->finish_time)->startOfMinute() : \Carbon\Carbon::parse($plan->plan_date.' '.$plan->finish_time)->startOfMinute()) : null,
+            'capacity' => (int) ($plan->qty_plt ?? 0),
+        ]);
     }
 
     /**
@@ -1336,6 +1372,7 @@ class ReportController extends Controller
             'dt_material' => round($breakdown['material'], 1),
             'dt_log' => round($breakdown['logistic'], 1),
             'dt_production' => round($breakdown['production'], 1),
+            'dt_others' => round($breakdown['others'], 1),
         ];
     }
 
@@ -1361,6 +1398,7 @@ class ReportController extends Controller
             'dt_material' => 'material',
             'dt_log' => 'logistic',
             'dt_production' => 'production',
+            'dt_others' => 'others',
         ][$field] ?? 'production';
 
         return $this->lkhApplyDt($plan, $job, $category, $goal, $date);
@@ -1539,6 +1577,9 @@ class ReportController extends Controller
         if (str_contains($type, 'UBP')) {
             return 'ubp';
         }
+        if (str_contains($type, 'OTHERS')) {
+            return 'others';
+        }
 
         return 'production';
     }
@@ -1633,6 +1674,7 @@ class ReportController extends Controller
             'material' => 'Material',
             'logistic' => 'Logistic',
             'production' => 'Production',
+            'others' => 'Others',
         ][$category] ?? 'Production';
 
         $anchor = $actFinish ?: ($actStart ?: Carbon::now());
