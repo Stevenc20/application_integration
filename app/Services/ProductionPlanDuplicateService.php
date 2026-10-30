@@ -492,7 +492,7 @@ class ProductionPlanDuplicateService
         ];
     }
 
-    private function normalizeKey($value): string
+    private function normalizeKey(mixed $value): string
     {
         $value = strtoupper(trim((string) $value));
         if ($value === '') {
@@ -505,7 +505,7 @@ class ProductionPlanDuplicateService
         return trim(preg_replace('/\s+/', ' ', $value));
     }
 
-    private function normalizeShift($value): string
+    private function normalizeShift(mixed $value): string
     {
         $shift = strtoupper(trim((string) $value));
         $shift = preg_replace('/\s*\(.*?REV.*?\)|\s*REV(?:ISI)?\b/i', '', $shift);
@@ -522,7 +522,7 @@ class ProductionPlanDuplicateService
         return $shift !== '' ? $shift : 'PAGI';
     }
 
-    private function normalizeTime($value): string
+    private function normalizeTime(mixed $value): string
     {
         $time = trim((string) $value);
         if ($time === '') {
