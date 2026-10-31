@@ -1180,6 +1180,36 @@ function submitTarikShift(e) {
         btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Ajukan Tarik Shift';
     });
 }
+
+function stopActiveJobDirectly(jobId, jobNo) {
+    if (!confirm('Apakah Anda yakin ingin menghentikan sesi berjalan untuk job ' + jobNo + '?')) {
+        return;
+    }
+    fetch('/operational/job/' + jobId + '/force-stop', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'Accept': 'application/json',
+        }
+    })
+    .then(r => r.json().then(data => ({ status: r.status, data })))
+    .then(({ status, data }) => {
+        if (data.success) {
+            if (typeof showToast === 'function') {
+                showToast(data.message || 'Job berhasil dihentikan.', 'success');
+            } else {
+                alert(data.message || 'Job berhasil dihentikan.');
+            }
+            setTimeout(() => window.location.reload(), 1000);
+        } else {
+            alert('Gagal menghentikan job: ' + (data.message || 'Unknown error'));
+        }
+    })
+    .catch(err => {
+        alert('Gagal: ' + err.message);
+    });
+}
 </script>
 
 @php

@@ -31,6 +31,27 @@
     </div>
     @else
     {{-- REALTIME PRODUCTION CONTROL BOARD --}}
+    @if($isOrphanActiveJob ?? false)
+    <div class="mb-4 bg-amber-50 border-2 border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-md">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+            </div>
+            <div>
+                <span class="text-amber-800 font-black text-xs uppercase tracking-wider block">Job Berjalan dari Shift / Jadwal Lain</span>
+                <p class="text-amber-900 text-xs font-semibold mt-0.5">Item <strong class="font-black">{{ $activeJob->job_number }}</strong> ({{ $activeJob->job_name }}) sedang aktif di line ini namun tidak ada di jadwal shift aktif. Anda dapat langsung menghentikannya jika sudah tidak berjalan.</p>
+            </div>
+        </div>
+        <button type="button" onclick="stopActiveJobDirectly({{ $activeJob->id }}, '{{ $activeJob->job_number }}')" class="shrink-0 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-black uppercase tracking-wider shadow-sm transition-all flex items-center gap-2">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            <span>Hentikan Job Ini</span>
+        </button>
+    </div>
+    @endif
     <div id="active-job-card" class="bg-slate-50 rounded-3xl p-6 shadow-lg shadow-red-900/5 border border-slate-200 text-slate-800 relative overflow-hidden">
         <!-- Visual Accents -->
         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-red-400 to-transparent"></div>

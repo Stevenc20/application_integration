@@ -519,6 +519,10 @@ Route::middleware(['auth'])
         [InputHarianController::class, 'finish']
     )->name('job.finish');
 
+    Route::post('/job/{id}/force-stop',
+        [InputHarianController::class, 'forceStop']
+    )->name('job.forceStop');
+
     Route::get('/job/{id}/status',
         [InputHarianController::class, 'status']
     )->name('job.status');

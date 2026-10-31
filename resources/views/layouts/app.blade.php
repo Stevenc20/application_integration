@@ -96,18 +96,25 @@
     </div>
 
     @if(auth()->check() && in_array(strtolower(auth()->user()->role), ['supervisor', 'leader', 'foreman']))
-    <div id="global-timer-popout" class="fixed bottom-6 right-6 z-[100] hidden bg-gray-900 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-4 cursor-pointer hover:scale-105 transition-all border border-gray-700">
-        <div class="relative flex h-3 w-3">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+    <div id="global-timer-popout" class="fixed bottom-6 right-6 z-[100] hidden bg-gray-900 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-4 hover:scale-[1.02] transition-all border border-gray-700">
+        <div class="flex items-center gap-4 cursor-pointer" id="global-timer-clickable" title="Klik untuk menuju ke halaman job">
+            <div class="relative flex h-3 w-3">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-3 w-3 bg-green-500"></span>
+            </div>
+            <div>
+                <div class="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Lagi Berjalan</div>
+                <div id="global-timer-job" class="font-bold text-sm">Job</div>
+            </div>
+            <div id="global-timer-time" class="font-mono text-lg font-black text-green-400 tracking-widest ml-2 bg-gray-800 px-3 py-1 rounded-lg">
+                00:00:00
+            </div>
         </div>
-        <div>
-            <div class="text-[10px] text-gray-400 font-medium uppercase tracking-widest">Lagi Berjalan</div>
-            <div id="global-timer-job" class="font-bold text-sm">Job</div>
-        </div>
-        <div id="global-timer-time" class="font-mono text-lg font-black text-green-400 tracking-widest ml-2 bg-gray-800 px-3 py-1 rounded-lg">
-            00:00:00
-        </div>
+        <button type="button" id="global-timer-stop-btn" class="ml-1 p-2 rounded-xl bg-red-600/80 hover:bg-red-600 text-white transition-colors cursor-pointer" title="Hentikan item berjalan ini">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+        </button>
     </div>
     @endif
 
@@ -135,7 +142,44 @@
                     if(data.running) {
                         popout.classList.remove('hidden');
                         document.getElementById('global-timer-job').innerText = data.job_number;
-                        popout.onclick = () => window.location.href = data.url;
+                        const clickable = document.getElementById('global-timer-clickable');
+                        if (clickable) clickable.onclick = () => window.location.href = data.url;
+
+                        const stopBtn = document.getElementById('global-timer-stop-btn');
+                        if (stopBtn) {
+                            stopBtn.onclick = (e) => {
+                                e.stopPropagation();
+                                if (!confirm('Hentikan item ' + data.job_number + ' yang sedang berjalan?')) return;
+                                stopBtn.disabled = true;
+                                fetch('/operational/job/' + data.id + '/force-stop', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json',
+                                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                                        'Accept': 'application/json'
+                                    }
+                                })
+                                .then(r => r.json())
+                                .then(res => {
+                                    if (res.success) {
+                                        if (typeof showToast === 'function') {
+                                            showToast(res.message || 'Job dihentikan', 'success');
+                                        } else {
+                                            alert(res.message || 'Job berhasil dihentikan');
+                                        }
+                                        popout.classList.add('hidden');
+                                        setTimeout(() => window.location.reload(), 800);
+                                    } else {
+                                        alert('Gagal: ' + (res.message || 'Gagal'));
+                                        stopBtn.disabled = false;
+                                    }
+                                })
+                                .catch(err => {
+                                    alert('Error: ' + err.message);
+                                    stopBtn.disabled = false;
+                                });
+                            };
+                        }
 
                         if(window.globalTimerInterval) {
                             clearInterval(window.globalTimerInterval);

@@ -443,6 +443,21 @@ class InputHarianController extends Controller
 
                 $activeJob = $activeJobs->first();
 
+                // If activeJob is still null, check if there is an orphan/stale running job on this line
+                if (!$activeJob) {
+                    $staleJob = $baseActiveQuery()
+                        ->with([
+                            'dailyProduction',
+                            'downtimes',
+                            'dandoris'
+                        ])
+                        ->orderByDesc('updated_at')
+                        ->first();
+                    if ($staleJob) {
+                        $activeJob = $staleJob;
+                    }
+                }
+
                 // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung
                 if ($activeJob && $hasProductionProgress($activeJob)) {
                     $openDandoris = \App\Models\Downtime::where('job_master_id', $activeJob->id)
@@ -544,6 +559,11 @@ class InputHarianController extends Controller
             }
         }
 
+        $isOrphanActiveJob = false;
+        if ($activeJob && !empty($scheduledJobNumbers)) {
+            $isOrphanActiveJob = !in_array($activeJob->job_number, $scheduledJobNumbers);
+        }
+
         return view('operational.input_harian', [
             'jobs'            => $plans, 
             'pendingJobs'     => $pendingJobs,
@@ -551,6 +571,7 @@ class InputHarianController extends Controller
                                     'Line A', 'Line B', 'Line C', 'Line D', 'Shearing', 'Handwork'
                                  ]),
             'activeJob'       => $activeJob,
+            'isOrphanActiveJob' => $isOrphanActiveJob,
             'productionLogs'  => $productionLogs,
             'lastInputAt'     => $lastInputAt,
             'currentShift'    => $currentShift,
@@ -806,6 +827,79 @@ class InputHarianController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Gagal menyelesaikan job: ' . $e->getMessage() . ' (Line: ' . $e->getLine() . ')'
+            ], 500);
+        }
+    }
+
+    public function forceStop(Request $request, int|string $id)
+    {
+        try {
+            $job = JobMaster::find($id);
+            if (!$job) {
+                return response()->json(['success' => false, 'message' => 'Job tidak ditemukan'], 404);
+            }
+
+            // Close any open downtimes
+            $now = Carbon::now();
+            $openDts = Downtime::where('job_master_id', $job->id)->whereNull('finish_time')->get();
+            foreach ($openDts as $odt) {
+                $startDt = Carbon::parse($odt->start_time);
+                $odt->update([
+                    'finish_time' => $now,
+                    'duration_seconds' => abs($now->diffInSeconds($startDt)),
+                ]);
+            }
+
+            // Close open dandori in dandoris table if exists
+            \App\Models\Dandori::where('next_job_id', $job->id)->whereNull('finish_time')->update([
+                'finish_time' => $now,
+            ]);
+
+            // Calculate runtime
+            $runtime = $this->productionService->calculateRuntime($job->id);
+
+            // Close open production session
+            $session = ProductionSession::where('job_master_id', $job->id)
+                ->where('status', 'running')
+                ->first();
+            if ($session) {
+                $session->update([
+                    'total_seconds' => $runtime,
+                    'status' => 'stopped',
+                    'pause_time' => $now,
+                ]);
+            }
+
+            // Update daily production runtime
+            $workDate = $this->productionService->resolveWorkDate($job->id);
+            $daily = DailyProduction::where('job_master_id', $job->id)->where('work_date', $workDate)->first();
+            if ($daily) {
+                $daily->update(['runtime_seconds' => $runtime]);
+            }
+
+            // Mark job complete if it has production or finish, otherwise complete or pause based on request
+            $job->update([
+                'status' => 'complete',
+                'finished_at' => $now,
+            ]);
+
+            \App\Services\DashboardRealtimeService::flushCache();
+            if ($job->line) {
+                \App\Services\DashboardRealtimeService::signalUpdate($job->line);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Sesi job ' . $job->job_number . ' berhasil dihentikan.',
+            ]);
+        } catch (\Throwable $e) {
+            Log::error("Failed to force stop job $id: " . $e->getMessage(), [
+                'exception' => $e,
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal menghentikan job: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -1122,6 +1216,8 @@ class InputHarianController extends Controller
             'job_number' => $jobMaster->job_number,
             'total_seconds' => $session ? $session->total_seconds : 0,
             'start_time' => $startTimeStr,
+            'can_force_stop' => true,
+            'stop_url' => route('operational.job.forceStop', ['id' => $jobMaster->id]),
             'url' => route('operational.input_harian', $urlParams) . '#row-' . $jobMaster->id
         ]);
     }
