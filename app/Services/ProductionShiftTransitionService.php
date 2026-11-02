@@ -128,7 +128,7 @@ class ProductionShiftTransitionService
         $paused = [];
         $impactedLines = [];
 
-        DB::transaction(function () use ($staleJobs, $now, $activeDate, &$completed, &$paused, &$impactedLines) {
+        DB::transaction(function () use ($staleJobs, $now, $activeDate, $activeShift, &$completed, &$paused, &$impactedLines) {
             $prodService = app(ProductionService::class);
 
             foreach ($staleJobs as $jobInfo) {
