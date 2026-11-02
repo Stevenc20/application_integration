@@ -346,6 +346,15 @@ class InputHarianController extends Controller
                     return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
                 })->toArray();
 
+                foreach ($childPlans as $parentId => $children) {
+                    foreach ($children as $child) {
+                        $cjn = trim($child->job_no ?? '');
+                        $cjm = trim($child->job_master ?? '');
+                        $scheduledJobNumbers[] = $cjn ? ($cjn . '-' . $child->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cjm) . '-' . $child->id);
+                    }
+                }
+                $scheduledJobNumbers = array_values(array_unique($scheduledJobNumbers));
+
                 $baseActiveQuery = function() use ($lineFilter) {
                     $q = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
                     if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
@@ -503,10 +512,19 @@ class InputHarianController extends Controller
         }
 
         // 5. Cari Job Pending untuk Queue Selector (Dropdown Standby)
+        // Kumpulkan identifier baik dari parent plans maupun child plans (split istirahat)
         $scheduledJobNumbers = $plans->map(function($p) {
             $jn = trim($p->job_no ?? '');
             return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($p->job_master) . '-' . $p->id);
         })->toArray();
+
+        foreach ($childPlans as $parentId => $children) {
+            foreach ($children as $child) {
+                $cjn = trim($child->job_no ?? '');
+                $scheduledJobNumbers[] = $cjn ? ($cjn . '-' . $child->id) : ('AUTO-' . \Illuminate\Support\Str::slug($child->job_master) . '-' . $child->id);
+            }
+        }
+        $scheduledJobNumbers = array_values(array_unique($scheduledJobNumbers));
 
         $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running'])
             ->whereIn('job_number', $scheduledJobNumbers)
@@ -574,6 +592,17 @@ class InputHarianController extends Controller
         $isOrphanActiveJob = false;
         if ($activeJob && !empty($scheduledJobNumbers)) {
             $isOrphanActiveJob = !in_array($activeJob->job_number, $scheduledJobNumbers);
+            // Jika identifier job master menggunakan ID child plan atau format matching, pastikan dicek juga ke base plan ID
+            if ($isOrphanActiveJob) {
+                $parts = explode('-', $activeJob->job_number);
+                $activePlanId = end($parts);
+                if (is_numeric($activePlanId)) {
+                    $activePlan = \App\Models\ProductionPlan::find((int) $activePlanId);
+                    if ($activePlan && ($activePlan->plan_date == $date || $activePlan->shift_name == $latestShiftName)) {
+                        $isOrphanActiveJob = false;
+                    }
+                }
+            }
         }
 
         // Ambil info revisi schedule terbaru dari PPC untuk notifikasi Leader
