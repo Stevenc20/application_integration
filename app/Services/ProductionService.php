@@ -735,7 +735,9 @@ class ProductionService
             );
 
             // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
-            if ($nextJobId === 'STOP_SESSION' || $nextJobId === 'FINISH_ONLY') {
+            // Sentinels (STOP_SESSION, FINISH_ONLY, SHIFT_CUTOFF, ...) must never be
+            // treated as a job id, otherwise startDandori() receives a non-numeric string.
+            if (is_string($nextJobId) && ! is_numeric($nextJobId)) {
                 $resolvedNextJobId = null;
             } else {
                 $resolvedNextJobId = $nextJobId;
@@ -748,7 +750,7 @@ class ProductionService
             }
 
             if ($resolvedNextJobId) {
-                $this->startDandori($resolvedNextJobId);
+                $this->startDandori((int) $resolvedNextJobId);
             }
 
             $this->signalDashboard($jobId);
