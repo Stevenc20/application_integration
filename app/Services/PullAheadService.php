@@ -79,9 +79,28 @@ class PullAheadService
                 throw new Exception("Qty Approved melebihi Sisa Plan asli.");
             }
 
-            // 1. Kurangi remaining plan di shift asal
-            $originalPlan->remaining_plan = max(0, $baseQty - $qtyApproved);
+            // 1. Kurangi remaining plan & plan di shift asal
+            $newRemaining = max(0, $baseQty - $qtyApproved);
+            if ($originalPlan->original_plan === null) {
+                $originalPlan->original_plan = $originalPlan->plan ?: $baseQty;
+            }
+            $originalPlan->plan = $newRemaining;
+            $originalPlan->remaining_plan = $newRemaining;
+            $originalPlan->status = 'pending';
             $originalPlan->save();
+
+            // Sinkronkan ke JobMaster shift asal jika sudah ada
+            $origIdentifier = $originalPlan->job_no 
+                ? ($originalPlan->job_no . '-' . $originalPlan->id) 
+                : ('AUTO-' . \Illuminate\Support\Str::slug($originalPlan->job_master) . '-' . $originalPlan->id);
+            $origJm = \App\Models\JobMaster::where('job_number', $origIdentifier)->first();
+            if ($origJm) {
+                $origJm->target_qty = (int) $newRemaining;
+                if (in_array(strtolower($origJm->status), ['complete', 'completed', 'finished', 'closed'])) {
+                    $origJm->status = 'pending';
+                }
+                $origJm->save();
+            }
 
             // 2. Tentukan row_no untuk di shift target (berdasarkan final_sequence_after)
             $targetRowNo = 1;

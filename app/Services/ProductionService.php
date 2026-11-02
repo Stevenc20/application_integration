@@ -1615,6 +1615,7 @@ class ProductionService
         $targetLine = $job->line;
 
         // Find all plans matching the same job_no / job_master on the same date/shift/line
+        // NOTE: Strictly scoped to the SAME date and shift to prevent cross-shift corruption (e.g. pull-ahead items)
         $matchingPlanIds = collect();
         if ($plan) {
             $matchingPlanIds = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
@@ -1637,22 +1638,17 @@ class ProductionService
             $query->where('line', $targetLine);
         }
 
-        $query->where(function ($q) use ($matchingPlanIds, $baseJobNo, $job) {
-            if ($matchingPlanIds->isNotEmpty()) {
-                $q->where(function ($sub) use ($matchingPlanIds) {
-                    foreach ($matchingPlanIds as $pid) {
-                        $sub->orWhere('job_number', 'LIKE', "%-{$pid}");
-                    }
-                });
-            }
-            if ($baseJobNo) {
-                $q->orWhere('job_number', 'LIKE', "{$baseJobNo}-%")
-                  ->orWhere('job_number', $baseJobNo);
-            }
-            if ($job->job_name) {
-                $q->orWhere('job_name', $job->job_name);
-            }
-        });
+        // Only match sibling JobMasters that belong to the SAME date & shift
+        if ($matchingPlanIds->isNotEmpty()) {
+            $query->where(function ($q) use ($matchingPlanIds) {
+                foreach ($matchingPlanIds as $pid) {
+                    $q->orWhere('job_number', 'LIKE', "%-{$pid}");
+                }
+            });
+        } else {
+            // If no matching plan in the same shift, then there are NO siblings for this job
+            return new \Illuminate\Database\Eloquent\Collection();
+        }
 
         return $query->get();
     }
