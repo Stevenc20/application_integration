@@ -694,15 +694,34 @@ class ProductionService
                 $session->save();
             }
 
+            // Check output production
+            $totalOutput = 0;
+            if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
+                $totalOutput = (float)($finalOk ?? 0) + (float)($finalRepair ?? 0) + (float)($finalReject ?? 0);
+            } else {
+                $currOk = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('ok_qty');
+                $currRep = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('repair_qty');
+                $currRej = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('reject_qty');
+                $totalOutput = (float)$currOk + (float)$currRep + (float)$currRej;
+            }
+
+            // ATURAN MUTLAK: Jika item diputus karena cutoff shift atau stop session dan totalOutput == 0,
+            // JANGAN PERNAH tandai sebagai 'complete'. Reset status menjadi 'pending' agar bisa dikerjakan di kemudian hari.
+            $isCutoffOrStopWithZero = ($totalOutput <= 0 && in_array($nextJobId, ['SHIFT_CUTOFF', 'STOP_SESSION', 'FINISH_ONLY']));
+            $targetJobStatus = $isCutoffOrStopWithZero ? 'pending' : 'complete';
+
             $job = JobMaster::find($jobId);
-            $finishedAt = now();
+            $finishedAt = $isCutoffOrStopWithZero ? null : now();
             $jobUpdate = [
-                'status' => 'complete',
+                'status' => $targetJobStatus,
                 'finished_at' => $finishedAt,
             ];
+            if ($isCutoffOrStopWithZero) {
+                $jobUpdate['started_at'] = null;
+            }
 
-            // Pastikan started_at terisi jika sebelumnya belum sempat start
-            if ($job && empty($job->started_at)) {
+            // Pastikan started_at terisi jika status complete tapi sebelumnya belum sempat start
+            if (!$isCutoffOrStopWithZero && $job && empty($job->started_at)) {
                 $earliestStart = null;
                 // Cek ProductionSession
                 $firstSession = ProductionSession::where('job_master_id', $jobId)->whereNotNull('start_time')->orderBy('start_time')->first();
@@ -743,21 +762,23 @@ class ProductionService
             }
 
             JobMaster::where('id', $jobId)->update($jobUpdate);
-            $this->syncPlanStatus($jobId, 'complete');
+            $this->syncPlanStatus($jobId, $targetJobStatus);
 
-            // Synchronize complete state to sibling segments of the same job (across breaks)
+            // Synchronize status to sibling segments of the same job (across breaks)
             $siblingJobs = $this->getSiblingJobMasters($jobId);
             foreach ($siblingJobs as $sibling) {
                 if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
                     $siblingUpdate = [
-                        'status' => 'complete',
+                        'status' => $targetJobStatus,
                         'finished_at' => $finishedAt,
                     ];
-                    if (empty($sibling->started_at) && !empty($jobUpdate['started_at'])) {
+                    if ($isCutoffOrStopWithZero) {
+                        $siblingUpdate['started_at'] = null;
+                    } elseif (empty($sibling->started_at) && !empty($jobUpdate['started_at'])) {
                         $siblingUpdate['started_at'] = $jobUpdate['started_at'];
                     }
                     $sibling->update($siblingUpdate);
-                    $this->syncPlanStatus($sibling->id, 'complete');
+                    $this->syncPlanStatus($sibling->id, $targetJobStatus);
                 }
             }
 

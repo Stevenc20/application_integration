@@ -123,22 +123,28 @@ class RepairPullAheadStatus extends Command
             $parts = explode('-', $jm->job_number);
             $planId = end($parts);
             $plan = is_numeric($planId) ? ProductionPlan::find($planId) : null;
-            $planOk = (float)($plan->ok ?? 0);
+            $planOk = (float)($plan ? ($plan->ok ?? 0) : 0);
 
-            if ($actQty <= 0 && $planOk <= 0) {
+            // Log total di production logs
+            $logQty = (float) \App\Models\ProductionLog::where('job_master_id', $jm->id)->sum('ok_qty');
+
+            if ($actQty <= 0 && $planOk <= 0 && $logQty <= 0) {
                 $this->warn("Reset False Complete JobMaster ID {$jm->id} ({$jm->job_number} / {$jm->job_name}): status -> 'pending'");
                 $jm->status = 'pending';
+                $jm->started_at = null;
                 $jm->finished_at = null;
                 $jm->save();
 
                 if ($plan) {
                     $plan->status = 'pending';
+                    $plan->act_start = null;
                     $plan->act_finish = null;
                     $plan->save();
                 }
                 $fixedJmCount++;
             }
         }
+        $this->info("Total {$fixedJmCount} JobMaster false-complete berhasil direset ke 'pending'.");
 
         // 4. Tutup paksa job orphan/nyangkut dari shift sebelumnya (misal AES-006 atau job running/paused di line manapun yang melintasi shift)
         $this->info("\nMemeriksa job nyangkut di line produksi (A, B, C, D)...");

@@ -170,13 +170,45 @@ class ProductionShiftTransitionService
 
                 // Scenario: Job dari shift lain yang melewati batas cutoff (misal Shift Pagi melewati 21:00 ke Shift Malam)
                 // Hentikan/selesaikan job dari shift sebelumnya secara bersih agar line kosong dan siap untuk shift baru.
-                $prodService->finishJob($job->id, 'SHIFT_CUTOFF');
-                $completed[] = [
-                    'job_id' => $job->id,
-                    'job_number' => $job->job_number,
-                    'line' => $line,
-                    'reason' => 'Otomatis dihentikan (cut-off transisi shift ' . $activeShift . ')',
-                ];
+                // ATURAN PENTING: Jika actualOk == 0 (belum pernah diproduksi sama sekali), JANGAN PERNAH tandai sebagai complete!
+                // Reset kembali ke pending dan bersihkan open session / downtime agar bisa dikerjakan nanti.
+                if ($actualOk <= 0) {
+                    // Tutup downtime gantung jika ada
+                    Downtime::where('job_master_id', $job->id)
+                        ->whereNull('finish_time')
+                        ->update(['finish_time' => $now]);
+
+                    // Tutup sesi produksi yang terbuka
+                    ProductionSession::where('job_master_id', $job->id)
+                        ->whereIn('status', ['running', 'paused'])
+                        ->update([
+                            'status' => 'paused',
+                            'finish_time' => $now,
+                        ]);
+
+                    // Reset JobMaster dan ProductionPlan kembali ke pending
+                    $job->update([
+                        'status' => 'pending',
+                        'started_at' => null,
+                        'finished_at' => null,
+                    ]);
+                    $prodService->syncPlanStatus($job->id, 'pending');
+
+                    $paused[] = [
+                        'job_id' => $job->id,
+                        'job_number' => $job->job_number,
+                        'line' => $line,
+                        'reason' => 'Direset ke pending (0 pcs diproduksi pada cut-off shift ' . $activeShift . ')',
+                    ];
+                } else {
+                    $prodService->finishJob($job->id, 'SHIFT_CUTOFF');
+                    $completed[] = [
+                        'job_id' => $job->id,
+                        'job_number' => $job->job_number,
+                        'line' => $line,
+                        'reason' => 'Otomatis dihentikan (cut-off transisi shift ' . $activeShift . ')',
+                    ];
+                }
             }
         });
 
