@@ -33,7 +33,7 @@ class ProductionPlanController extends Controller
         $rawDate = $request->get('date');
         $date = $rawDate ?: now()->toDateString();
 
-        // Sync LKH quantities to ProductionPlan for display
+        // Sync LKH / Input Harian quantities to ProductionPlan for display
         try {
             $plansForDate = ProductionPlan::whereDate('plan_date', $date)->get();
             $mergeService = app(\App\Services\PpcScheduleMergeService::class);
@@ -52,9 +52,9 @@ class ProductionPlanController extends Controller
                         ->first();
 
                     if ($daily) {
-                        $ok = $daily->actual_qty;
-                        $repair = $daily->actual_repair ?: $daily->repair_qty;
-                        $reject = $daily->actual_reject ?: $daily->reject_qty;
+                        $ok = $daily->actual_ok ?? $daily->actual_qty ?? 0;
+                        $repair = $daily->actual_repair ?? $daily->repair_qty ?? 0;
+                        $reject = $daily->actual_reject ?? $daily->reject_qty ?? 0;
                     } else {
                         $ok = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('ok_qty');
                         $repair = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('repair_qty');

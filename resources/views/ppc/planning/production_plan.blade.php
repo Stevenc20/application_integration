@@ -446,11 +446,11 @@
                     <th class="px-3 py-4 text-[9px] font-black text-violet-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[80px]">Start</th>
                     <th class="px-3 py-4 text-[9px] font-black text-violet-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[80px]">Finish</th>
                     <th class="px-4 py-4 text-[9px] font-black text-slate-300 uppercase tracking-widest border-r border-slate-700 min-w-[250px]">Keterangan</th>
-                    {{-- Group: Reject --}}
-                    <th class="px-3 py-4 text-[9px] font-black text-rose-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-1</th>
-                    <th class="px-3 py-4 text-[9px] font-black text-rose-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-2</th>
-                    <th class="px-3 py-4 text-[9px] font-black text-rose-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-3</th>
-                    <th class="px-3 py-4 text-[9px] font-black text-rose-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-4</th>
+                    {{-- Group: Machine Allocation --}}
+                    <th class="px-3 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-1</th>
+                    <th class="px-3 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-2</th>
+                    <th class="px-3 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-3</th>
+                    <th class="px-3 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">A-4</th>
                     <th class="px-3 py-4 text-[9px] font-black text-slate-400 uppercase tracking-widest text-center border-r border-slate-700 min-w-[70px]">DT</th>
                     <th class="px-4 py-4 text-[9px] font-black text-slate-300 uppercase tracking-widest text-center min-w-[120px]">Status</th>
                 </tr>
@@ -895,7 +895,7 @@
             {{-- Summary Cards — Reorganized into PLAN vs ACTUAL with REPAIR --}}
             @if($totalFinishRow)
             @php 
-                $totalReject = ($totalFinishRow->a1 ?? 0) + ($totalFinishRow->a2 ?? 0) + ($totalFinishRow->a3 ?? 0) + ($totalFinishRow->a4 ?? 0);
+                $totalReject = $totalFinishRow->reject ?? 0;
                 $totalBalance = ($totalFinishRow->plan ?? 0) - ($totalFinishRow->ok ?? 0);
                 $targetGsph = ($totalFinishRow->tpt ?? 0) > 0 ? ($totalFinishRow->plan / ($totalFinishRow->tpt / 60)) : 0;
                 $achievement = ($totalFinishRow->plan ?? 0) > 0 ? (($totalFinishRow->ok ?? 0) / $totalFinishRow->plan) * 100 : 0;
