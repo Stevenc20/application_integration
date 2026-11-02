@@ -159,7 +159,7 @@ class MonitoringController extends Controller
         return redirect()->route('monitoring.line');
     }
 
-    public function history($type, Request $request)
+    public function history(string $type, Request $request)
     {
         $validTypes = ['downtime', 'break'];
         if (!in_array($type, $validTypes)) {

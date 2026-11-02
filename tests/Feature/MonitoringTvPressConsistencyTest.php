@@ -14,6 +14,7 @@ use App\Services\DashboardRealtimeService;
 use App\Services\LineStatusService;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use function Pest\Laravel\actingAs;
 
 uses(RefreshDatabase::class);
 
@@ -705,27 +706,27 @@ it('verifies Filter Semua vs individual Press A, B, C, D endpoints return identi
     }
 
     // 1. Monitor View only passes the 4 Press lines (Line A, Line B, Line C, Line D) in canonical order
-    $monitorResp = $this->actingAs($user)->get(route('supervisor.monitor'));
+    $monitorResp = actingAs($user)->get(route('supervisor.monitor'));
     $monitorResp->assertOk();
     $viewLines = $monitorResp->viewData('lines')->values()->all();
     expect($viewLines)->toBe(['Line A', 'Line B', 'Line C', 'Line D']);
 
     // 2. All-lines API payload
-    $allApi = $this->actingAs($user)->getJson(route('supervisor.dashboard.api', ['date' => $date, 'shift' => 1]))->assertOk()->json();
-    $allDetail = $this->actingAs($user)->getJson(route('supervisor.dashboard.detail', ['date' => $date, 'shift' => 1]))->assertOk()->json();
+    $allApi = actingAs($user)->getJson(route('supervisor.dashboard.api', ['date' => $date, 'shift' => 1]))->assertOk()->json();
+    $allDetail = actingAs($user)->getJson(route('supervisor.dashboard.detail', ['date' => $date, 'shift' => 1]))->assertOk()->json();
 
     expect(array_keys($allApi['line_kpi']))->toBe(['Line A', 'Line B', 'Line C', 'Line D']);
 
     // 3. Individual line filter ('A', 'B', 'C', 'D', 'PRESS D', 'Line D') matches All-lines data 100%
     foreach (['A', 'B', 'C', 'D'] as $letter) {
         $lineKey = 'Line '.$letter;
-        $singleApi = $this->actingAs($user)->getJson(route('supervisor.dashboard.api', [
+        $singleApi = actingAs($user)->getJson(route('supervisor.dashboard.api', [
             'date' => $date,
             'shift' => 1,
             'line' => $letter,
         ]))->assertOk()->json();
 
-        $singleDetail = $this->actingAs($user)->getJson(route('supervisor.dashboard.detail', [
+        $singleDetail = actingAs($user)->getJson(route('supervisor.dashboard.detail', [
             'date' => $date,
             'shift' => 1,
             'line' => 'PRESS '.$letter,
