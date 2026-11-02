@@ -55,15 +55,33 @@ class ProductionService
                 ]
             );
 
-            // Clear skipped_at if this plan was previously skipped
+            // VALIDASI TARGET: Jika job ini (atau gabungan split-nya) sudah tercapai targetnya (actual_ok >= target_qty),
+            // dilarang menjalankan ulang agar tidak terjadi anomali run sendiri / over-production.
             $planId = $this->resolvePlanId($jobId);
-            if ($planId) {
-                $plan = \App\Models\ProductionPlan::find($planId);
-                if ($plan && $plan->skipped_at !== null) {
-                    $plan->skipped_at = null;
-                    $plan->status = 'approved';
-                    $plan->save();
+            $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            $allRelatedJobIds = $siblingJobs->pluck('id')->push($jobId)->all();
+
+            $totalAchievedOk = (int) DailyProduction::whereIn('job_master_id', $allRelatedJobIds)
+                ->where('work_date', $effectiveWorkDate)
+                ->sum('actual_ok');
+
+            $targetLimit = 0;
+            if ($plan && $plan->original_plan && (int) $plan->original_plan > 0) {
+                $targetLimit = (int) $plan->original_plan;
+            } elseif ($plan && (int) $plan->plan > 0) {
+                $targetLimit = (int) $plan->plan;
+            } else {
+                $targetLimit = (int) ($currentJobMaster?->target_qty ?? 0);
+            }
+
+            if ($targetLimit > 0 && $totalAchievedOk >= $targetLimit) {
+                // Tandai job & sibling sebagai complete jika belum
+                JobMaster::whereIn('id', $allRelatedJobIds)->update(['status' => 'complete']);
+                if ($planId) {
+                    $this->syncPlanStatus($jobId, 'complete');
                 }
+                throw new \Exception("Item ini sudah mencapai target produksi ({$totalAchievedOk}/{$targetLimit} pcs) dan tidak dapat dijalankan kembali.");
             }
 
             $session->status = 'running';
@@ -133,6 +151,33 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $this->resolveWorkDate($jobId, $workDate);
             $job = JobMaster::findOrFail($jobId);
+
+            // VALIDASI TARGET SEBELUM DANDORI: Jika sudah tercapai targetnya, dilarang start dandori
+            $planId = $this->resolvePlanId($jobId);
+            $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            $allRelatedJobIds = $siblingJobs->pluck('id')->push($jobId)->all();
+
+            $totalAchievedOk = (int) DailyProduction::whereIn('job_master_id', $allRelatedJobIds)
+                ->where('work_date', $workDate)
+                ->sum('actual_ok');
+
+            $targetLimit = 0;
+            if ($plan && $plan->original_plan && (int) $plan->original_plan > 0) {
+                $targetLimit = (int) $plan->original_plan;
+            } elseif ($plan && (int) $plan->plan > 0) {
+                $targetLimit = (int) $plan->plan;
+            } else {
+                $targetLimit = (int) ($job->target_qty ?? 0);
+            }
+
+            if ($targetLimit > 0 && $totalAchievedOk >= $targetLimit) {
+                JobMaster::whereIn('id', $allRelatedJobIds)->update(['status' => 'complete']);
+                if ($planId) {
+                    $this->syncPlanStatus($jobId, 'complete');
+                }
+                throw new \Exception("Item ini sudah mencapai target produksi ({$totalAchievedOk}/{$targetLimit} pcs) dan tidak dapat dijalankan kembali.");
+            }
             
             // Auto cut-off: Stop and complete any other running job on the same line
             // (Exclude siblings of the same logical job that are split across breaks)
@@ -346,6 +391,33 @@ class ProductionService
         return DB::transaction(function () use ($jobId, $workDate) {
             $workDate = $this->resolveWorkDate($jobId, $workDate);
             $job = JobMaster::findOrFail($jobId);
+
+            // VALIDASI TARGET SEBELUM DANDORI: Jika sudah tercapai targetnya, dilarang start dandori
+            $planId = $this->resolvePlanId($jobId);
+            $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            $allRelatedJobIds = $siblingJobs->pluck('id')->push($jobId)->all();
+
+            $totalAchievedOk = (int) DailyProduction::whereIn('job_master_id', $allRelatedJobIds)
+                ->where('work_date', $workDate)
+                ->sum('actual_ok');
+
+            $targetLimit = 0;
+            if ($plan && $plan->original_plan && (int) $plan->original_plan > 0) {
+                $targetLimit = (int) $plan->original_plan;
+            } elseif ($plan && (int) $plan->plan > 0) {
+                $targetLimit = (int) $plan->plan;
+            } else {
+                $targetLimit = (int) ($job->target_qty ?? 0);
+            }
+
+            if ($targetLimit > 0 && $totalAchievedOk >= $targetLimit) {
+                JobMaster::whereIn('id', $allRelatedJobIds)->update(['status' => 'complete']);
+                if ($planId) {
+                    $this->syncPlanStatus($jobId, 'complete');
+                }
+                throw new \Exception("Item ini sudah mencapai target produksi ({$totalAchievedOk}/{$targetLimit} pcs) dan tidak dapat dijalankan kembali.");
+            }
             $now = now();
 
             // IDEMPOTENT: Jika sudah ada open 1st check, return record tersebut (hindari duplikasi)
@@ -1617,15 +1689,19 @@ class ProductionService
         $targetLine = $job->line;
 
         // Find all plans matching the same job_no / job_master on the same date/shift/line
+        // Include parent-child relationship (parent_job_id) if this job was split across breaks
         // NOTE: Strictly scoped to the SAME date and shift to prevent cross-shift corruption (e.g. pull-ahead items)
         $matchingPlanIds = collect();
         if ($plan) {
+            $rootParentId = $plan->parent_job_id ?: $plan->id;
             $matchingPlanIds = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
                 ->where('shift_name', $targetShift)
                 ->where('row_type', 'job')
-                ->where(function ($q) use ($plan, $baseJobNo) {
+                ->where(function ($q) use ($plan, $baseJobNo, $rootParentId) {
                     $q->where('job_no', $plan->job_no)
                       ->orWhere('job_no', $baseJobNo)
+                      ->orWhere('id', $rootParentId)
+                      ->orWhere('parent_job_id', $rootParentId)
                       ->orWhere(function ($sub) use ($plan) {
                           if (!empty($plan->job_master)) {
                               $sub->where('job_master', $plan->job_master);
