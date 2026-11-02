@@ -119,10 +119,14 @@ class InputHarianController extends Controller
         // SYNC: Pastikan JobMaster terupdate dari Jadwal
         $this->syncPlanToJobMaster($date, $currentShift);
 
-        // RECONCILE: Pastikan sesi shift sebelumnya yang masih running di-transisikan secara aman
-        // (job target selesai -> ditutup; job belum selesai -> di-pause aman, timer runtime dibekukan)
+        // RECONCILE: Pastikan sesi shift sebelumnya yang masih running/paused di-transisikan secara aman
+        // (job shift lampau yang melewati cutoff shift otomatis dihentikan/ditutup agar line bersih untuk shift baru)
         if ($currentShift !== 'all') {
             app(\App\Services\ProductionShiftTransitionService::class)->transitionShiftSafely($lineFilter, $latestShiftName, $date);
+        } else {
+            // Jika filter 'all', jalankan rekonsiliasi cutoff berdasarkan active shift aktual di jam sekarang
+            $activeShiftNow = \App\Services\ProductionMetricsService::currentProductionShift();
+            app(\App\Services\ProductionShiftTransitionService::class)->transitionShiftSafely($lineFilter, $activeShiftNow, $date);
         }
 
         // 2. QUERY UTAMA: Langsung dari ProductionPlan (Source of Truth)
@@ -445,10 +449,11 @@ class InputHarianController extends Controller
 
                 // If activeJob is still null, do NOT forcefully promote orphan/foreign stale jobs into activeJob
                 // to prevent refreshing loops and showing unscheduled jobs from another line/day/shift.
-                // However, check if there is an orphan running job strictly on this line for alerting/force-stopping.
+                // Auto cut-off: jika ada orphan job dari shift/jadwal lain yang masih nyangkut di line ini,
+                // hentikan secara otomatis lewat ProductionService agar line bersih dan antrean shift baru dapat langsung berjalan.
                 $orphanRunningJob = null;
                 if (!$activeJob) {
-                    $orphanRunningJob = $baseActiveQuery()
+                    $staleOrphan = $baseActiveQuery()
                         ->with([
                             'dailyProduction',
                             'downtimes',
@@ -456,6 +461,16 @@ class InputHarianController extends Controller
                         ])
                         ->orderByDesc('updated_at')
                         ->first();
+
+                    if ($staleOrphan) {
+                        try {
+                            $this->productionService->finishJob($staleOrphan->id, 'SHIFT_CUTOFF');
+                            \Illuminate\Support\Facades\Log::info("InputHarian: Auto stopped orphan running job {$staleOrphan->job_number} on line {$staleOrphan->line}");
+                        } catch (\Throwable $e) {
+                            \Illuminate\Support\Facades\Log::warning("InputHarian: Failed to auto-stop orphan {$staleOrphan->id}: " . $e->getMessage());
+                            $orphanRunningJob = $staleOrphan;
+                        }
+                    }
                 }
 
                 // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung

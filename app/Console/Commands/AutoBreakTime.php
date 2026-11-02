@@ -25,6 +25,16 @@ class AutoBreakTime extends Command
         $shiftName = ProductionMetricsService::currentProductionShift($now);
         $currentMinutes = $now->hour * 60 + $now->minute;
 
+        // Auto cut-off shift transition:
+        // Jalankan transisi shift otomatis untuk semua line (Line A, B, C, D, dsb)
+        // jika ada job dari shift sebelumnya yang masih running/paused melintasi pergantian shift (misal lewat 21:00 atau 07:30)
+        try {
+            app(\App\Services\ProductionShiftTransitionService::class)->transitionShiftSafely('ALL', $shiftName, $productionDate);
+        } catch (\Throwable $e) {
+            // Log silent error agar tidak memutus eksekusi break:auto
+            \Illuminate\Support\Facades\Log::warning('break:auto shift transition check failed: ' . $e->getMessage());
+        }
+
         $runningJobs = JobMaster::whereIn('status', ['running', 'paused'])
             ->whereHas('productionSessions', function ($q) use ($productionDate) {
                 $q->where('work_date', $productionDate)->whereIn('status', ['running', 'paused']);

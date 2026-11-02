@@ -25,16 +25,16 @@ class ProductionShiftTransitionService
         $activeShift = $currentShiftName ?: ProductionMetricsService::currentProductionShift($now);
         $activeDate = $workDate ?: ProductionMetricsService::currentProductionDate($now);
 
-        // Periksa job yang berstatus 'running' atau memiliki downtime gantung tanpa finish_time
+        // Periksa job yang berstatus 'running' atau 'paused' atau memiliki downtime gantung tanpa finish_time
         $query = JobMaster::where(function ($q) {
-                $q->where(DB::raw('LOWER(status)'), 'running')
+                $q->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
                   ->orWhereHas('downtimes', function ($dq) {
                       $dq->whereNull('finish_time');
                   });
             })
             ->with([
                 'dailyProduction' => fn ($q) => $q->where('work_date', $activeDate),
-                'productionSessions' => fn ($q) => $q->where('status', 'running'),
+                'productionSessions' => fn ($q) => $q->whereIn('status', ['running', 'paused']),
             ]);
 
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
@@ -148,60 +148,15 @@ class ProductionShiftTransitionService
                 $line = $job->line ?: 'Line A';
                 $impactedLines[$line] = true;
 
-                // Scenario A: Plan was completed in reality (actual >= plan)
-                if ($planQty > 0 && $actualOk >= $planQty) {
-                    $prodService->finishJob($job->id, 'STOP_SESSION');
-                    $completed[] = [
-                        'job_id' => $job->id,
-                        'job_number' => $job->job_number,
-                        'line' => $line,
-                        'reason' => 'Target tercapai (' . $actualOk . '/' . $planQty . ' pcs) saat transisi shift',
-                    ];
-                } else {
-                    // Scenario B: Plan was NOT completed or in progress -> Safe Pause
-                    $runtime = $prodService->calculateRuntime($job->id);
-
-                    // Pause open session
-                    $session = ProductionSession::where('job_master_id', $job->id)
-                        ->where('status', 'running')
-                        ->first();
-                    if ($session) {
-                        $session->update([
-                            'total_seconds' => $runtime,
-                            'status' => 'paused',
-                            'pause_time' => $now,
-                        ]);
-                    }
-
-                    // Close any open downtime except dandori (or close break if open)
-                    $openDts = Downtime::where('job_master_id', $job->id)
-                        ->whereNull('finish_time')
-                        ->get();
-                    foreach ($openDts as $odt) {
-                        $startDt = Carbon::parse($odt->start_time);
-                        $dur = abs($now->diffInSeconds($startDt));
-                        $odt->update([
-                            'finish_time' => $now,
-                            'duration_seconds' => $dur,
-                        ]);
-                    }
-
-                    // Update DailyProduction runtime
-                    if ($daily) {
-                        $daily->update(['runtime_seconds' => $runtime]);
-                    }
-
-                    // Pause JobMaster
-                    $job->update(['status' => 'paused']);
-
-                    $paused[] = [
-                        'job_id' => $job->id,
-                        'job_number' => $job->job_number,
-                        'line' => $line,
-                        'runtime_seconds' => $runtime,
-                        'reason' => 'Dipause aman saat transisi shift (Aktual: ' . $actualOk . '/' . $planQty . ' pcs, tidak dipaksa selesai)',
-                    ];
-                }
+                // Scenario: Job dari shift lain yang melewati batas cutoff (misal Shift Pagi melewati 21:00 ke Shift Malam)
+                // Hentikan/selesaikan job dari shift sebelumnya secara bersih agar line kosong dan siap untuk shift baru.
+                $prodService->finishJob($job->id, 'SHIFT_CUTOFF');
+                $completed[] = [
+                    'job_id' => $job->id,
+                    'job_number' => $job->job_number,
+                    'line' => $line,
+                    'reason' => 'Otomatis dihentikan (cut-off transisi shift ' . $activeShift . ')',
+                ];
             }
         });
 

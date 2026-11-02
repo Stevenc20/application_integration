@@ -140,6 +140,34 @@ class RepairPullAheadStatus extends Command
             }
         }
 
+        // 4. Tutup paksa job orphan/nyangkut dari shift sebelumnya (misal AES-006 atau job running/paused di line manapun yang melintasi shift)
+        $this->info("\nMemeriksa job nyangkut di line produksi (A, B, C, D)...");
+        try {
+            $shiftTransition = app(\App\Services\ProductionShiftTransitionService::class);
+            $res = $shiftTransition->transitionShiftSafely('ALL');
+            $this->info("Cutoff transisi shift selesai dieksekusi: " . json_encode($res['completed_jobs'] ?? []));
+        } catch (\Throwable $e) {
+            $this->error("Transisi shift error: " . $e->getMessage());
+        }
+
+        // Khusus item AES-006 di Line B jika masih ada status running/paused
+        $aesJobs = JobMaster::where(function($q) {
+                $q->where('job_number', 'LIKE', '%AES-006%')
+                  ->orWhere('job_name', 'LIKE', '%AES-006%');
+            })
+            ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
+            ->get();
+        foreach ($aesJobs as $aj) {
+            $this->warn("Menutup job nyangkut {$aj->job_number} (ID: {$aj->id}) di {$aj->line}...");
+            try {
+                app(\App\Services\ProductionService::class)->finishJob($aj->id, 'SHIFT_CUTOFF');
+                $this->info("  -> Sukses ditutup!");
+            } catch (\Throwable $e) {
+                $aj->update(['status' => 'completed', 'finished_at' => now()]);
+                $this->info("  -> Fallback update complete: " . $e->getMessage());
+            }
+        }
+
         $this->info("\nSelesai! Semua data telah diperiksa dan diselaraskan.");
         return 0;
     }
