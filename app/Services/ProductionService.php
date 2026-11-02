@@ -623,20 +623,68 @@ class ProductionService
             }
 
             $job = JobMaster::find($jobId);
-            JobMaster::where('id', $jobId)->update([
+            $finishedAt = now();
+            $jobUpdate = [
                 'status' => 'complete',
-                'finished_at' => now()
-            ]);
+                'finished_at' => $finishedAt,
+            ];
+
+            // Pastikan started_at terisi jika sebelumnya belum sempat start
+            if ($job && empty($job->started_at)) {
+                $earliestStart = null;
+                // Cek ProductionSession
+                $firstSession = ProductionSession::where('job_master_id', $jobId)->whereNotNull('start_time')->orderBy('start_time')->first();
+                if ($firstSession) {
+                    $earliestStart = $firstSession->start_time;
+                }
+                // Cek Dandori
+                if (!$earliestStart) {
+                    $firstDandori = Dandori::where('next_job_id', $jobId)->whereNotNull('start_time')->orderBy('start_time')->first();
+                    if ($firstDandori) {
+                        $earliestStart = $firstDandori->start_time;
+                    }
+                }
+                // Cek ProductionLog
+                if (!$earliestStart) {
+                    $firstLog = ProductionLog::where('job_master_id', $jobId)->orderBy('created_at')->first();
+                    if ($firstLog) {
+                        $earliestStart = $firstLog->created_at;
+                    }
+                }
+                // Fallback: jika tidak ada catatan waktu, hitung mundur dari finishedAt berdasarkan plan duration / runtime
+                if (!$earliestStart) {
+                    $planId = $this->resolvePlanId($jobId);
+                    $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+                    $fallbackMinutes = 0;
+                    if ($plan && $plan->start_time && $plan->finish_time) {
+                        $fallbackMinutes = abs(\Carbon\Carbon::parse($plan->finish_time)->diffInMinutes(\Carbon\Carbon::parse($plan->start_time)));
+                    }
+                    if ($fallbackMinutes <= 0 && $runtime > 0) {
+                        $fallbackMinutes = (int) ceil($runtime / 60);
+                    }
+                    if ($fallbackMinutes <= 0) {
+                        $fallbackMinutes = 5; // default wajar minimal
+                    }
+                    $earliestStart = \Carbon\Carbon::parse($finishedAt)->subMinutes((int) $fallbackMinutes);
+                }
+                $jobUpdate['started_at'] = $earliestStart;
+            }
+
+            JobMaster::where('id', $jobId)->update($jobUpdate);
             $this->syncPlanStatus($jobId, 'complete');
 
             // Synchronize complete state to sibling segments of the same job (across breaks)
             $siblingJobs = $this->getSiblingJobMasters($jobId);
             foreach ($siblingJobs as $sibling) {
                 if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
-                    $sibling->update([
+                    $siblingUpdate = [
                         'status' => 'complete',
-                        'finished_at' => now()
-                    ]);
+                        'finished_at' => $finishedAt,
+                    ];
+                    if (empty($sibling->started_at) && !empty($jobUpdate['started_at'])) {
+                        $siblingUpdate['started_at'] = $jobUpdate['started_at'];
+                    }
+                    $sibling->update($siblingUpdate);
                     $this->syncPlanStatus($sibling->id, 'complete');
                 }
             }
@@ -1474,13 +1522,40 @@ class ProductionService
             $updateData['reject'] = (float) ($reject ?? 0);
 
             // Sync actual times to PPC
+            $resolvedActStart = null;
             if ($jobMaster->started_at) {
-                $updateData['act_start'] = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+                $resolvedActStart = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+            } else {
+                // Fallback jika started_at di JobMaster belum diset tetapi sudah ada session / log
+                $earliest = ProductionSession::where('job_master_id', $jobId)->whereNotNull('start_time')->min('start_time')
+                    ?: Dandori::where('next_job_id', $jobId)->whereNotNull('start_time')->min('start_time')
+                    ?: ProductionLog::where('job_master_id', $jobId)->min('created_at');
+                if ($earliest) {
+                    $resolvedActStart = \Carbon\Carbon::parse($earliest)->format('H:i:s');
+                }
             }
+
+            if ($resolvedActStart) {
+                $updateData['act_start'] = $resolvedActStart;
+            }
+
             if ($jobMaster->finished_at) {
                 $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
             } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
                 $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
+            }
+
+            // Jika act_finish terisi tapi act_start masih kosong, tentukan fallback start agar tidak null
+            if (!empty($updateData['act_finish']) && empty($updateData['act_start'])) {
+                $planRecord = \App\Models\ProductionPlan::find($planId);
+                $fallbackMinutes = 0;
+                if ($planRecord && $planRecord->start_time && $planRecord->finish_time) {
+                    $fallbackMinutes = abs(\Carbon\Carbon::parse($planRecord->finish_time)->diffInMinutes(\Carbon\Carbon::parse($planRecord->start_time)));
+                }
+                if ($fallbackMinutes <= 0) {
+                    $fallbackMinutes = 5;
+                }
+                $updateData['act_start'] = \Carbon\Carbon::parse($updateData['act_finish'])->subMinutes((int) $fallbackMinutes)->format('H:i:s');
             }
 
             \App\Models\ProductionPlan::where('id', $planId)->update($updateData);

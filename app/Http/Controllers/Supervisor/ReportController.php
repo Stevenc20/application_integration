@@ -532,8 +532,6 @@ class ReportController extends Controller
             $planFinish = $parseTime($plan->finish_time);
 
             // Retrieve actual times from ProductionPlan (PPC) act_start/act_finish, falling back to JobMaster
-            $actStart = $plan->act_start ? $parseTime($plan->act_start) : (($jobData && $jobData->started_at) ? \Carbon\Carbon::parse($jobData->started_at) : null);
-
             $actFinish = null;
             if ($plan->act_finish) {
                 $actFinish = $parseTime($plan->act_finish);
@@ -545,6 +543,29 @@ class ReportController extends Controller
                         $actFinish = \Carbon\Carbon::parse($jobData->updated_at);
                     }
                 }
+            }
+
+            $actStart = $plan->act_start ? $parseTime($plan->act_start) : (($jobData && $jobData->started_at) ? \Carbon\Carbon::parse($jobData->started_at) : null);
+            if (! $actStart && $jobData) {
+                $firstSession = $jobData->productionSessions?->whereNotNull('start_time')->sortBy('start_time')->first();
+                if ($firstSession && $firstSession->start_time) {
+                    $actStart = \Carbon\Carbon::parse($firstSession->start_time);
+                } elseif ($jobDandoris && $jobDandoris->isNotEmpty()) {
+                    $firstDandori = $jobDandoris->sortBy('start_time')->first();
+                    if ($firstDandori && $firstDandori->start_time) {
+                        $actStart = \Carbon\Carbon::parse($firstDandori->start_time);
+                    }
+                }
+            }
+            if (! $actStart && $actFinish) {
+                $fallbackMinutes = 0;
+                if ($plan->start_time && $plan->finish_time) {
+                    $fallbackMinutes = abs(\Carbon\Carbon::parse($plan->finish_time)->diffInMinutes(\Carbon\Carbon::parse($plan->start_time)));
+                }
+                if ($fallbackMinutes <= 0) {
+                    $fallbackMinutes = 5;
+                }
+                $actStart = $actFinish->copy()->subMinutes((int) $fallbackMinutes);
             }
 
             // Filter downtimes to only those overlapping actual production window [actStart, actFinish]
@@ -1309,7 +1330,40 @@ class ReportController extends Controller
             return Carbon::parse($plan->act_start);
         }
 
-        return $job->started_at ? Carbon::parse($job->started_at) : null;
+        if ($job->started_at) {
+            return Carbon::parse($job->started_at);
+        }
+
+        // Cek log/session terawal
+        $firstSession = $job->productionSessions()->whereNotNull('start_time')->orderBy('start_time')->first();
+        if ($firstSession && $firstSession->start_time) {
+            return Carbon::parse($firstSession->start_time);
+        }
+
+        $firstDandori = \App\Models\Dandori::where('next_job_id', $job->id)->whereNotNull('start_time')->orderBy('start_time')->first();
+        if ($firstDandori && $firstDandori->start_time) {
+            return Carbon::parse($firstDandori->start_time);
+        }
+
+        $firstLog = $job->productionLogs()->orderBy('created_at')->first();
+        if ($firstLog && $firstLog->created_at) {
+            return Carbon::parse($firstLog->created_at);
+        }
+
+        // Jika act_finish terisi, jangan biarkan act_start kosong
+        $actFinish = $this->lkhActFinish($plan, $job);
+        if ($actFinish) {
+            $fallbackMinutes = 0;
+            if ($plan->start_time && $plan->finish_time) {
+                $fallbackMinutes = abs(Carbon::parse($plan->finish_time)->diffInMinutes(Carbon::parse($plan->start_time)));
+            }
+            if ($fallbackMinutes <= 0) {
+                $fallbackMinutes = 5;
+            }
+            return $actFinish->copy()->subMinutes((int) $fallbackMinutes);
+        }
+
+        return null;
     }
 
     private function lkhActFinish(ProductionPlan $plan, JobMaster $job): ?Carbon
