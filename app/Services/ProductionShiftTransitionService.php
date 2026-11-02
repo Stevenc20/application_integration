@@ -56,6 +56,26 @@ class ProductionShiftTransitionService
             $planShift = $plan ? $this->normalizeShiftName($plan->shift_name) : null;
             $isSameShift = ($planShift === null) || ($planShift === $this->normalizeShiftName($activeShift));
 
+            // SAFEGUARD: Jangan pernah menandai job sebagai stale jika:
+            // 1. Job baru saja distart/diupdate kurang dari 30 menit yang lalu (mencegah auto-kill pada job yang baru dimulai).
+            // 2. Job start time berada di dalam window shift aktif saat ini.
+            $jobStartTime = $job->started_at ? Carbon::parse($job->started_at) : null;
+            $jobUpdateTime = $job->updated_at ? Carbon::parse($job->updated_at) : null;
+            $isRecentlyActive = false;
+            if ($jobStartTime && $jobStartTime->diffInMinutes($now) < 30) {
+                $isRecentlyActive = true;
+            }
+            if ($jobUpdateTime && $jobUpdateTime->diffInMinutes($now) < 15) {
+                $isRecentlyActive = true;
+            }
+
+            [$shiftStart, $shiftEnd] = ProductionMetricsService::shiftWindow($activeDate, $activeShift);
+            $startedInActiveShift = $jobStartTime && $jobStartTime->betweenIncluded($shiftStart, $shiftEnd);
+
+            if ($startedInActiveShift || $isRecentlyActive) {
+                $isSameShift = true;
+            }
+
             $openSessions = $job->productionSessions;
             $openDowntimes = Downtime::where('job_master_id', $job->id)->whereNull('finish_time')->get();
 

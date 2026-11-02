@@ -397,8 +397,9 @@ class InputHarianController extends Controller
                 }
 
                 // 2. Fallback: Jika filter status/search membuat $plans tidak memuat job yang running di line ini,
-                // TETAP temukan active job di line ini HANYA jika memang sesuai dengan shift & tanggal yang sedang aktif,
-                // untuk mencegah job Shift Pagi bocor/nyangkut ke antrean Shift Malam!
+                // cari active job di line ini.
+                // Prioritas 1: Job yang cocok dengan shift & work_date yang sedang aktif.
+                // Prioritas 2: Job running/paused apa pun yang memang sedang berjalan di line ini (agar bar tidak hilang/kumat).
                 if ($activeJobs->isEmpty()) {
                     $fallbackQuery = $baseActiveQuery()
                         ->with([
@@ -409,9 +410,10 @@ class InputHarianController extends Controller
                             'dandoris'
                         ]);
 
-                    // Jika shift saat ini spesifik (misal Shift Malam atau Shift Pagi), batasi fallback hanya ke job milik shift tersebut
+                    // Jika shift saat ini spesifik (misal Shift Malam atau Shift Pagi), utamakan job milik shift tersebut
                     if ($currentShift !== 'all' && !empty($latestShiftName)) {
-                        $fallbackQuery->where(function($fq) use ($date, $latestShiftName) {
+                        $shiftMatchingQuery = clone $fallbackQuery;
+                        $shiftMatchingQuery->where(function($fq) use ($date, $latestShiftName) {
                             $fq->whereExists(function($sub) use ($date, $latestShiftName) {
                                 $sub->select(DB::raw(1))
                                     ->from('production_plans')
@@ -425,53 +427,48 @@ class InputHarianController extends Controller
                                   AND pp.shift_name = ?
                             )", [$date, $latestShiftName]);
                         });
+
+                        $activeJobs = $shiftMatchingQuery
+                            ->orderByRaw("CASE 
+                                WHEN EXISTS (
+                                    SELECT 1 FROM downtimes 
+                                    WHERE downtimes.job_master_id = job_masters.id 
+                                      AND downtimes.jenis_downtime = 'dandori' 
+                                      AND downtimes.finish_time IS NULL
+                                ) AND NOT EXISTS (
+                                    SELECT 1 FROM daily_productions 
+                                    WHERE daily_productions.job_master_id = job_masters.id 
+                                      AND daily_productions.work_date = '{$date}' 
+                                      AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
+                                ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
+                            ->orderByDesc('updated_at')
+                            ->orderByDesc('id')
+                            ->get();
                     }
 
-                    $activeJobs = $fallbackQuery
-                        ->orderByRaw("CASE 
-                            WHEN EXISTS (
-                                SELECT 1 FROM downtimes 
-                                WHERE downtimes.job_master_id = job_masters.id 
-                                  AND downtimes.jenis_downtime = 'dandori' 
-                                  AND downtimes.finish_time IS NULL
-                            ) AND NOT EXISTS (
-                                SELECT 1 FROM daily_productions 
-                                WHERE daily_productions.job_master_id = job_masters.id 
-                                  AND daily_productions.work_date = '{$date}' 
-                                  AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
-                            ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
-                        ->orderByDesc('updated_at')
-                        ->orderByDesc('id')
-                        ->get();
+                    // Jika belum ketemu juga, ambil running/paused job yang ada di line ini
+                    if ($activeJobs->isEmpty()) {
+                        $activeJobs = $fallbackQuery
+                            ->orderByRaw("CASE 
+                                WHEN EXISTS (
+                                    SELECT 1 FROM downtimes 
+                                    WHERE downtimes.job_master_id = job_masters.id 
+                                      AND downtimes.jenis_downtime = 'dandori' 
+                                      AND downtimes.finish_time IS NULL
+                                ) AND NOT EXISTS (
+                                    SELECT 1 FROM daily_productions 
+                                    WHERE daily_productions.job_master_id = job_masters.id 
+                                      AND daily_productions.work_date = '{$date}' 
+                                      AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
+                                ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
+                            ->orderByDesc('updated_at')
+                            ->orderByDesc('id')
+                            ->get();
+                    }
                 }
 
                 $activeJob = $activeJobs->first();
-
-                // If activeJob is still null, do NOT forcefully promote orphan/foreign stale jobs into activeJob
-                // to prevent refreshing loops and showing unscheduled jobs from another line/day/shift.
-                // Auto cut-off: jika ada orphan job dari shift/jadwal lain yang masih nyangkut di line ini,
-                // hentikan secara otomatis lewat ProductionService agar line bersih dan antrean shift baru dapat langsung berjalan.
                 $orphanRunningJob = null;
-                if (!$activeJob) {
-                    $staleOrphan = $baseActiveQuery()
-                        ->with([
-                            'dailyProduction',
-                            'downtimes',
-                            'dandoris'
-                        ])
-                        ->orderByDesc('updated_at')
-                        ->first();
-
-                    if ($staleOrphan) {
-                        try {
-                            $this->productionService->finishJob($staleOrphan->id, 'SHIFT_CUTOFF');
-                            \Illuminate\Support\Facades\Log::info("InputHarian: Auto stopped orphan running job {$staleOrphan->job_number} on line {$staleOrphan->line}");
-                        } catch (\Throwable $e) {
-                            \Illuminate\Support\Facades\Log::warning("InputHarian: Failed to auto-stop orphan {$staleOrphan->id}: " . $e->getMessage());
-                            $orphanRunningJob = $staleOrphan;
-                        }
-                    }
-                }
 
                 // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung
                 if ($activeJob && $hasProductionProgress($activeJob)) {
