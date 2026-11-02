@@ -8,7 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 class ScheduleStampingController extends Controller
 {
-    private $sectHeadOverride = null;
+    private ?string $sectHeadOverride = null;
 
     // ── INDEX ──────────────────────────────────────────────────────────────────
     public function index(Request $request)
@@ -511,7 +511,7 @@ class ScheduleStampingController extends Controller
 
 
 
-    private function populatePressSection($sheet, $pressName, $pressRow, $nextPressRow, $items, $date, $hariText, &$pressRows, $index): int
+    private function populatePressSection(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, string $pressName, int $pressRow, ?int $nextPressRow, \Illuminate\Support\Collection $items, string $date, ?string $hariText, array &$pressRows, int $index): int
     {
         // 1. Find the header row (where Col C is "NO.")
         $headerRow = null;
@@ -663,7 +663,7 @@ class ScheduleStampingController extends Controller
         return $diff;
     }
 
-    private function copySignatureBlock($sheet, $dstStartRow, $pressName, $date)
+    private function copySignatureBlock(\PhpOffice\PhpSpreadsheet\Worksheet\Worksheet $sheet, int $dstStartRow, string $pressName, string $date)
     {
         $spreadsheet = $sheet->getParent();
         $srcSheet = $spreadsheet->getSheetByName('Format TTD');
@@ -760,7 +760,7 @@ class ScheduleStampingController extends Controller
         }
     }
 
-    private function exportFallback($date, $shift, $press, $search)
+    private function exportFallback(?string $date, ?string $shift, ?string $press, ?string $search)
     {
         $query = ScheduleStamping::query();
         if ($date)  $query->where('upload_date', $date);
@@ -1223,7 +1223,7 @@ class ScheduleStampingController extends Controller
     /**
      * Delete a specific job row and recalculate the remaining sequence.
      */
-    public function deleteJob($id)
+    public function deleteJob(int|string $id)
     {
         $item = ScheduleStamping::findOrFail($id);
 
@@ -1331,7 +1331,7 @@ class ScheduleStampingController extends Controller
      * Dipanggil setelah drag reorder atau penambahan break.
      * Hanya mengubah start_time, finish_time, row_no — tidak mengubah data lain.
      */
-    private function recalculateSection($uploadDate, $shiftName, $pressName, $initialStartTime = null)
+    private function recalculateSection(string $uploadDate, string $shiftName, string $pressName, ?string $initialStartTime = null)
     {
         // Ensure standard breaks exist before recalculation
         $this->ensureStandardBreaks($uploadDate, $shiftName, $pressName);
@@ -1479,7 +1479,7 @@ class ScheduleStampingController extends Controller
         return back()->with('success', 'Waktu istirahat standar berhasil ditambahkan.');
     }
 
-    private function ensureStandardBreaks($date, $shift, $press)
+    private function ensureStandardBreaks(string $date, string $shift, string $press)
     {
         // Fetch hari from any existing row in this section (to detect Friday)
         $anyRow = ScheduleStamping::where('upload_date', $date)
@@ -1644,7 +1644,7 @@ class ScheduleStampingController extends Controller
      * Break rows disisipkan di antara job rows berdasarkan kapan break itu terjadi
      * relatif terhadap finish time job sebelumnya.
      */
-    private function mergeJobsAndBreaks($jobRows, $breakRows, $shiftName)
+    private function mergeJobsAndBreaks(\Illuminate\Support\Collection $jobRows, \Illuminate\Support\Collection $breakRows, string $shiftName)
     {
         if ($breakRows->isEmpty()) {
             return $jobRows;
@@ -1822,7 +1822,7 @@ class ScheduleStampingController extends Controller
         ];
     }
 
-    private function matchBreakName($jobNo, $breakName, $shiftName)
+    private function matchBreakName(?string $jobNo, string $breakName, string $shiftName)
     {
         $jn = strtoupper(trim($jobNo));
         $bn = strtoupper(trim($breakName));
@@ -1856,7 +1856,7 @@ class ScheduleStampingController extends Controller
         return false;
     }
 
-    private function pushIfInBreak($timeStr, $shift = null, $fixedBreaks = null)
+    private function pushIfInBreak(?string $timeStr, ?string $shift = null, ?array $fixedBreaks = null)
     {
         if (!$timeStr || $timeStr === '-') return $timeStr;
         if (!$fixedBreaks) $fixedBreaks = $this->getFixedBreaks($shift);
@@ -1959,14 +1959,14 @@ class ScheduleStampingController extends Controller
     /**
      * Wrapper string-based untuk backward compatibility (dipakai calculateRow).
      */
-    private function calculateFinishWithBreaks($startTime, $duration, $shift = null, $hari = null)
+    private function calculateFinishWithBreaks(?string $startTime, int $duration, ?string $shift = null, ?string $hari = null)
     {
         $startMins  = $this->timeToMinutesNormalized($startTime, $shift);
         $finishMins = $this->calculateFinishMinsWithBreaks($startMins, (int)$duration, $shift, $hari);
         return $this->minutesToTime($finishMins);
     }
 
-    private function timeToMinutes($timeStr)
+    private function timeToMinutes(?string $timeStr): int
     {
         if (!$timeStr || $timeStr === '-') return 0;
         $timeStr = str_replace('.', ':', $timeStr);
@@ -1975,7 +1975,7 @@ class ScheduleStampingController extends Controller
         return (int)$parts[0] * 60 + (int)$parts[1];
     }
 
-    private function timeToMinutesNormalized($timeStr, $shift = null)
+    private function timeToMinutesNormalized(?string $timeStr, ?string $shift = null): int
     {
         $mins = $this->timeToMinutes($timeStr);
         // If Shift Malam, times from 00:00 to 11:59 are treated as the next day (+1440 mins)
@@ -1988,14 +1988,14 @@ class ScheduleStampingController extends Controller
         return $mins;
     }
 
-    private function minutesToTime($mins)
+    private function minutesToTime(int|float $mins): string
     {
         $h = floor($mins / 60) % 24;
         $m = $mins % 60;
         return sprintf('%02d:%02d', $h, $m);
     }
 
-    private function addMinutesToTime($timeStr, $minutes)
+    private function addMinutesToTime(?string $timeStr, int|float $minutes): ?string
     {
         if (!$timeStr || $timeStr === '-') return null;
         try {
@@ -2014,7 +2014,7 @@ class ScheduleStampingController extends Controller
         }
     }
 
-    private function getBreakOverlap($startTime, $tpt, $shift = null)
+    private function getBreakOverlap(?string $startTime, int|float $tpt, ?string $shift = null): ?array
     {
         if (!$startTime || $tpt <= 0) return null;
         $startMins = $this->timeToMinutes($startTime);
@@ -2036,7 +2036,7 @@ class ScheduleStampingController extends Controller
         return null;
     }
 
-    private function getNextJob($allItems, $currentItem)
+    private function getNextJob(\Illuminate\Support\Collection $allItems, \App\Models\ScheduleStamping $currentItem): ?\App\Models\ScheduleStamping
     {
         $found = false;
         foreach ($allItems as $it) {

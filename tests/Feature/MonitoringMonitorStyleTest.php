@@ -43,7 +43,7 @@ test('monitor renders solid reject and repair colors for every line in both them
         ->toContain('data-line="D"');
 });
 
-test('monitor exposes display count, auto-scroll interval, pager, and local persistence controls', function () {
+test('monitor exposes auto pagination, bottom pager and line filtering', function () {
     $user = User::create([
         'name' => 'Supervisor Monitor Display',
         'nrp' => 'SUP-MON-DISPLAY-'.uniqid(),
@@ -58,19 +58,14 @@ test('monitor exposes display count, auto-scroll interval, pager, and local pers
         ->getContent();
 
     expect($html)
-        ->toContain('data-display-mode="items15"')
-        ->toContain('data-display-mode="items20"')
-        ->toContain('data-display-mode="auto"')
-        ->toContain('data-scroll-interval="15"')
-        ->toContain('data-scroll-interval="20"')
+        ->toContain('id="monitorBottomBar"')
+        ->toContain('id="displayItemInfo"')
         ->toContain('id="displayPager"')
         ->toContain('id="displayPrev"')
         ->toContain('id="displayNext"')
-        ->toContain("const DISPLAY_MODE_KEY = 'monitor-display-mode'")
-        ->toContain("const DISPLAY_INTERVAL_KEY = 'monitor-scroll-interval'")
+        ->toContain('const AUTO_PAGE_SIZE = 15;')
+        ->toContain('scrollIntervalSec = 20;')
         ->toContain('function pauseAutoRotate()')
         ->toContain('function resetDisplaySession()')
-        ->toContain('const AUTO_PAGE_SIZE = 10;')
-        ->toContain("if (displayMode === 'items15') pageSize = 15;")
-        ->toContain("if (displayMode === 'items20') pageSize = 20;");
+        ->toContain('const pageSize = 15;');
 });

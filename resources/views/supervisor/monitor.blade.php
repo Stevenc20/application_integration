@@ -61,40 +61,31 @@
         .filter-bar button.active:hover{background:#1e40af}
         .filter-bar+.filter-bar{margin-left:8px}
 
-        /* ── Display controls (item count / auto-scroll) ── */
-        .display-bar{
-            display:flex;align-items:center;gap:8px;flex-wrap:wrap;
-            padding:5px 20px;background:#fff;border-bottom:1px solid #e2e8f0;
-            flex-shrink:0;min-height:34px;
+        /* ── Display pager / info below table ── */
+        .monitor-bottom-bar{
+            display:flex;align-items:center;justify-content:space-between;gap:8px;
+            padding:6px 20px;background:#fff;border-top:1px solid #e2e8f0;
+            flex-shrink:0;min-height:36px;
         }
-        .display-bar-label{font-size:clamp(9px,0.6vw,18px);font-weight:900;color:#64748b;letter-spacing:0.08em;white-space:nowrap}
-        #displayModeBar button.active{background:#0f766e;color:#fff;border-color:#0f766e}
-        #displayModeBar button.active:hover{background:#115e59}
-        #displayIntervalBar{transition:opacity .12s ease}
-        #displayIntervalBar button.active{background:#b45309;color:#fff;border-color:#b45309}
-        #displayIntervalBar button.active:hover{background:#92400e}
-        .display-pager{display:none;align-items:center;gap:4px}
+        .display-pager{display:none;align-items:center;gap:6px}
         .display-pager.show{display:inline-flex}
         .display-pager button{
             display:inline-flex;align-items:center;justify-content:center;
-            width:clamp(22px,1.6vw,42px);height:clamp(22px,1.6vw,42px);
+            width:clamp(22px,1.6vw,36px);height:clamp(22px,1.6vw,36px);
             border-radius:6px;border:1px solid #e2e8f0;background:#fff;color:#475569;
-            font-size:clamp(14px,1vw,26px);font-weight:900;line-height:1;cursor:pointer;transition:all .12s;
+            font-size:clamp(14px,1vw,24px);font-weight:900;line-height:1;cursor:pointer;transition:all .12s;
         }
         .display-pager button:hover:not(:disabled){background:#f1f5f9;border-color:#94a3b8}
         .display-pager button:disabled{opacity:.35;cursor:not-allowed}
-        .display-pager span{font-size:clamp(9px,0.65vw,20px);font-weight:900;color:#475569;white-space:nowrap;font-variant-numeric:tabular-nums}
-        .display-hint{font-size:clamp(9px,0.55vw,16px);font-weight:700;color:#94a3b8;margin-left:auto;white-space:nowrap}
+        .display-pager span{font-size:clamp(11px,0.7vw,18px);font-weight:800;color:#334155;white-space:nowrap;font-variant-numeric:tabular-nums}
+        .display-item-info{font-size:clamp(11px,0.7vw,18px);font-weight:800;color:#334155;white-space:nowrap;font-variant-numeric:tabular-nums}
         @keyframes detailPageEnter{from{opacity:.35}to{opacity:1}}
         .detail-page-frame.page-enter{animation:detailPageEnter .3s ease-out}
-        body.dark .display-bar{background:#1e293b;border-color:#334155}
-        body.dark .display-bar-label{color:#94a3b8}
+        body.dark .monitor-bottom-bar{background:#1e293b;border-color:#334155}
         body.dark .display-pager button{background:#334155;color:#cbd5e1;border-color:#475569}
         body.dark .display-pager button:hover:not(:disabled){background:#475569;border-color:#64748b}
         body.dark .display-pager span{color:#cbd5e1}
-        body.dark .display-hint{color:#64748b}
-        body.dark #displayModeBar button.active{background:#14b8a6;color:#042f2e;border-color:#14b8a6}
-        body.dark #displayIntervalBar button.active{background:#f59e0b;color:#111827;border-color:#f59e0b}
+        body.dark .display-item-info{color:#cbd5e1}
 
         /* Shift bar buttons match filter bar */
         #shiftBar button{padding:4px 14px;border-radius:6px;border:1px solid #e2e8f0;font-size:11px;font-weight:700;cursor:pointer;background:#fff;color:#64748b;transition:all .12s}
@@ -785,31 +776,20 @@
             </a>
         </div>
     </div>
-    <div class="display-bar" id="displayBar">
-        <span class="display-bar-label">TAMPILAN</span>
-        <div class="filter-bar" id="displayModeBar">
-            <button type="button" data-display-mode="items15">15 ITEM</button>
-            <button type="button" data-display-mode="items20">20 ITEM</button>
-            <button type="button" data-display-mode="auto">SCROLL OTOMATIS</button>
-        </div>
-        <div class="filter-bar" id="displayIntervalBar">
-            <span class="display-bar-label">INTERVAL</span>
-            <button type="button" data-scroll-interval="15">15 DETIK</button>
-            <button type="button" data-scroll-interval="20">20 DETIK</button>
-        </div>
-        <div class="display-pager" id="displayPager">
-            <button type="button" id="displayPrev" title="Halaman sebelumnya">&lsaquo;</button>
-            <span id="displayPageInfo">1 / 1</span>
-            <button type="button" id="displayNext" title="Halaman berikutnya">&rsaquo;</button>
-        </div>
-        <span class="display-hint" id="displayHint"></span>
-    </div>
     <div class="table-wrap">
         <div class="table-scroll">
             <table id="monitorTable">
                 <thead id="monitorThead"></thead>
                 <tbody id="monitorTbody"></tbody>
             </table>
+        </div>
+    </div>
+    <div class="monitor-bottom-bar" id="monitorBottomBar">
+        <div class="display-item-info" id="displayItemInfo">0 item</div>
+        <div class="display-pager" id="displayPager">
+            <button type="button" id="displayPrev" title="Halaman sebelumnya">&lsaquo;</button>
+            <span id="displayPageInfo">1 / 1</span>
+            <button type="button" id="displayNext" title="Halaman berikutnya">&rsaquo;</button>
         </div>
     </div>
 </div>
@@ -1112,51 +1092,19 @@ const DISPLAY_INTERVAL_KEY = 'monitor-scroll-interval';
 const DISPLAY_MODES = ['items15', 'items20', 'auto'];
 const DISPLAY_INTERVALS = [15, 20];
 const DISPLAY_PAUSE_MS = 12000;
-const AUTO_PAGE_SIZE = 10;
+const AUTO_PAGE_SIZE = 15;
 let detailPage = 0;
 let detailPages = 1;
 let detailTotalRows = 0;
-let detailPageSize = 0;
+let detailPageSize = 15;
 let lastRenderedDetailPage = -1;
 let rotateTimer = null;
 let autoPauseUntil = 0;
 let autoPauseTimer = null;
-let displayMode = 'items15';
-let scrollIntervalSec = 15;
-
-try {
-    const savedMode = localStorage.getItem(DISPLAY_MODE_KEY);
-    if (DISPLAY_MODES.indexOf(savedMode) !== -1) displayMode = savedMode;
-    const savedInterval = parseInt(localStorage.getItem(DISPLAY_INTERVAL_KEY), 10);
-    if (DISPLAY_INTERVALS.indexOf(savedInterval) !== -1) scrollIntervalSec = savedInterval;
-} catch (e) {
-    // localStorage bisa diblokir di browser/TV tertentu; pakai default.
-}
-
-function saveDisplayPreferences() {
-    try {
-        localStorage.setItem(DISPLAY_MODE_KEY, displayMode);
-        localStorage.setItem(DISPLAY_INTERVAL_KEY, String(scrollIntervalSec));
-    } catch (e) {
-        // Preferensi tidak tersimpan, tetapi tampilan tetap berjalan.
-    }
-}
-
-function isAutoDisplayMode() {
-    return displayMode === 'auto';
-}
+let displayMode = 'auto';
+let scrollIntervalSec = 20;
 
 function updateDisplayControls() {
-    document.querySelectorAll('#displayModeBar button').forEach(function (btn) {
-        btn.classList.toggle('active', btn.dataset.displayMode === displayMode);
-    });
-    document.querySelectorAll('#displayIntervalBar button').forEach(function (btn) {
-        btn.classList.toggle('active', Number(btn.dataset.scrollInterval) === scrollIntervalSec);
-    });
-
-    const intervalBar = document.getElementById('displayIntervalBar');
-    if (intervalBar) intervalBar.style.display = isAutoDisplayMode() ? 'flex' : 'none';
-
     const showPager = selectedLine !== null && detailPages > 1;
     const pager = document.getElementById('displayPager');
     if (pager) pager.classList.toggle('show', showPager);
@@ -1164,9 +1112,7 @@ function updateDisplayControls() {
     const pageInfo = document.getElementById('displayPageInfo');
     if (pageInfo) {
         if (showPager) {
-            const start = detailPage * detailPageSize + 1;
-            const end = Math.min((detailPage + 1) * detailPageSize, detailTotalRows);
-            pageInfo.textContent = (detailPage + 1) + ' / ' + detailPages + ' · ' + start + '–' + end + ' / ' + detailTotalRows;
+            pageInfo.textContent = (detailPage + 1) + ' / ' + detailPages;
         } else {
             pageInfo.textContent = '1 / 1';
         }
@@ -1177,41 +1123,24 @@ function updateDisplayControls() {
     if (prevBtn) prevBtn.disabled = !showPager;
     if (nextBtn) nextBtn.disabled = !showPager;
 
-    const hint = document.getElementById('displayHint');
-    if (!hint) return;
-    if (selectedLine === null) {
-        hint.textContent = 'Daftar item: pilih Press A–D';
-    } else if (isAutoDisplayMode()) {
-        const paused = autoPauseUntil > Date.now();
-        hint.textContent = paused
-            ? 'Auto ' + scrollIntervalSec + ' dtk · dijeda'
-            : 'Auto ' + scrollIntervalSec + ' dtk · ' + AUTO_PAGE_SIZE + ' item/langkah';
-    } else {
-        hint.textContent = detailTotalRows + ' item';
+    const itemInfo = document.getElementById('displayItemInfo');
+    if (itemInfo) {
+        if (selectedLine === null) {
+            itemInfo.textContent = 'Pilih Press A–D untuk detail item';
+        } else if (detailTotalRows > 15) {
+            const end = Math.min((detailPage + 1) * 15, detailTotalRows);
+            itemInfo.textContent = end + ' / ' + detailTotalRows + ' item';
+        } else {
+            itemInfo.textContent = detailTotalRows + ' item';
+        }
     }
-}
-
-function setDisplayMode(mode) {
-    if (DISPLAY_MODES.indexOf(mode) === -1 || displayMode === mode) return;
-    displayMode = mode;
-    saveDisplayPreferences();
-    resetDisplaySession();
-    renderTable();
-}
-
-function setScrollInterval(seconds) {
-    if (DISPLAY_INTERVALS.indexOf(seconds) === -1) return;
-    scrollIntervalSec = seconds;
-    saveDisplayPreferences();
-    updateDisplayControls();
-    if (isAutoDisplayMode()) startRotate(true);
 }
 
 function resetDisplaySession() {
     detailPage = 0;
     detailPages = 1;
     detailTotalRows = 0;
-    detailPageSize = 0;
+    detailPageSize = 15;
     autoPauseUntil = 0;
     if (autoPauseTimer) {
         clearTimeout(autoPauseTimer);
@@ -1222,13 +1151,13 @@ function resetDisplaySession() {
 }
 
 function pauseAutoRotate() {
-    if (!isAutoDisplayMode() || selectedLine === null || detailPages <= 1) return;
+    if (selectedLine === null || detailPages <= 1) return;
     autoPauseUntil = Date.now() + DISPLAY_PAUSE_MS;
     if (autoPauseTimer) clearTimeout(autoPauseTimer);
     autoPauseTimer = setTimeout(function () {
         autoPauseTimer = null;
         autoPauseUntil = 0;
-        if (isAutoDisplayMode()) startRotate(true);
+        startRotate(true);
         updateDisplayControls();
     }, DISPLAY_PAUSE_MS);
     stopRotate();
@@ -1237,7 +1166,7 @@ function pauseAutoRotate() {
 
 function changeDetailPage(delta) {
     if (selectedLine === null || detailPages <= 1) return;
-    if (isAutoDisplayMode()) pauseAutoRotate();
+    pauseAutoRotate();
     detailPage = (detailPage + delta + detailPages) % detailPages;
     renderTable();
 }
@@ -1361,7 +1290,7 @@ function stopRotate(){
 }
 
 function startRotate(forceRestart = false){
-    if(document.hidden || !isAutoDisplayMode() || selectedLine === null || detailPages <= 1){
+    if(document.hidden || selectedLine === null || detailPages <= 1){
         stopRotate();
         updateDisplayControls();
         return;
@@ -1374,7 +1303,7 @@ function startRotate(forceRestart = false){
     if(rotateTimer && !forceRestart) return;
     stopRotate();
     rotateTimer = setInterval(()=>{
-        if(document.hidden || !isAutoDisplayMode() || selectedLine === null || detailPages <= 1 || autoPauseUntil > Date.now()){
+        if(document.hidden || selectedLine === null || detailPages <= 1 || autoPauseUntil > Date.now()){
             stopRotate();
             updateDisplayControls();
             return;
@@ -1384,19 +1313,12 @@ function startRotate(forceRestart = false){
     }, scrollIntervalSec * 1000);
 }
 
-document.querySelectorAll('#displayModeBar button').forEach(function (btn) {
-    btn.addEventListener('click', function () { setDisplayMode(btn.dataset.displayMode); });
-});
-document.querySelectorAll('#displayIntervalBar button').forEach(function (btn) {
-    btn.addEventListener('click', function () { setScrollInterval(Number(btn.dataset.scrollInterval)); });
-});
 document.getElementById('displayPrev')?.addEventListener('click', function () { changeDetailPage(-1); });
 document.getElementById('displayNext')?.addEventListener('click', function () { changeDetailPage(1); });
 
 const monitorScrollEl = document.querySelector('.table-scroll');
 ['wheel', 'touchstart', 'pointerdown'].forEach(function (eventName) {
     monitorScrollEl?.addEventListener(eventName, function (event) {
-        if (!isAutoDisplayMode()) return;
         if (!event.target.closest('#monitorTable')) return;
         pauseAutoRotate();
     }, { passive: true });
@@ -1435,7 +1357,7 @@ function renderAllLines(){
             </table>
         `;
         const thead=document.getElementById('monitorThead');
-        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:16px;text-align:left;padding-left:4px;">DESC</th>';
+        let hh='<tr><th rowspan="2" style="width:8%;min-width:60px;overflow:hidden;text-overflow:ellipsis;font-size:16px;text-align:center;">DESC</th>';
         LINES.forEach((l,li)=>{
             const isLast = (li === LINES.length - 1);
             const borderCls = isLast ? '' : ' line-border-r';
@@ -1648,11 +1570,8 @@ function renderTable(){
         tbl.style.tableLayout='fixed';
 
         thead.innerHTML = `
-            <tr class="single-top-header">
-                <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px;">PRESS ${line}</th>
-            </tr>
             <tr>
-                <th style="width:25%;font-size:18px;text-align:left;padding-left:6px;">DESC</th>
+                <th style="width:25%;font-size:18px;text-align:center;">DESC</th>
                 <th style="width:25%;font-size:18px;">PLAN</th>
                 <th style="width:25%;font-size:18px;">CURR</th>
                 <th style="width:25%;font-size:18px;">ACTUAL</th>
@@ -1841,11 +1760,8 @@ function renderTable(){
                 <div class="card-bg" style="width:28%; display:flex; flex-direction:column; position:sticky; left:0; z-index:10; border-right:3px solid #cbd5e1; box-shadow:4px 0 8px rgba(0,0,0,0.05); flex-shrink:0; overflow:hidden;">
                     <table class="large-table left-kpi-table" style="width:100%; height:100%; table-layout:fixed; border-collapse:collapse; border-right:none;">
                         <thead>
-                            <tr class="single-top-header">
-                                <th colspan="4" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:left; padding-left:14px; height:30px; border-right:none;">PRESS ${line}</th>
-                            </tr>
-                            <tr style="height:25px;">
-                                <th style="width:28%;font-size:1.1vw;text-align:left;padding-left:6px;">DESC</th>
+                            <tr style="height:30px;">
+                                <th style="width:28%;font-size:1.1vw;text-align:center;">DESC</th>
                                 <th class="th-plan" style="width:24%;font-size:1.1vw;">PLAN</th>
                                 <th style="width:24%;font-size:1.1vw;">CURR</th>
                                 <th style="width:24%; border-right:none;font-size:1.1vw;">ACTUAL</th>
@@ -1860,10 +1776,7 @@ function renderTable(){
                 <div class="detail-page-frame${animatePage ? ' page-enter' : ''}" style="width:72%; display:flex; flex-direction:column; overflow:hidden;">
                     <table class="large-table right-detail-table" style="width:100%; height:100%; table-layout:fixed; border-collapse:collapse; border-left:none;">
                         <thead>
-                            <tr class="single-top-header">
-                                <th colspan="14" style="background:#1e40af; color:#fff; font-weight:900; letter-spacing:0.08em; text-align:right; padding-right:14px; height:30px; border-left:none;">DETAIL PRODUKSI : ${pct}%${pageTag}</th>
-                            </tr>
-                            <tr style="height:25px;">
+                            <tr style="height:30px;">
                                 <th style="width:4%; border-left:none; white-space:nowrap;">NO</th>
                                 <th style="width:20%; white-space:nowrap;">JOB NO</th>
                                 <th style="width:7%; white-space:nowrap;">PLAN QTY</th>
@@ -1913,11 +1826,9 @@ function renderTable(){
         return scrollEl.firstElementChild;
     };
 
-    // Fixed 15/20 items per view, or small groups for smooth auto-scroll.
+    // Fixed 15 items per view with automatic rotation every 20s if items > 15
     const previousDetailPage = lastRenderedDetailPage;
-    let pageSize = AUTO_PAGE_SIZE;
-    if (displayMode === 'items15') pageSize = 15;
-    if (displayMode === 'items20') pageSize = 20;
+    const pageSize = 15;
 
     detailTotalRows = rightRows.length;
     detailPageSize = Math.min(pageSize, rightRows.length);
@@ -1933,13 +1844,13 @@ function renderTable(){
         end: Math.min(pageStart + pageSize, rightRows.length),
         total: rightRows.length,
     } : null;
-    const animatePage = isAutoDisplayMode() && previousDetailPage >= 0 && previousDetailPage !== detailPage;
+    const animatePage = previousDetailPage >= 0 && previousDetailPage !== detailPage;
 
     const root = renderCaseB(pageRows, pageInfo, true, animatePage);
     lastRenderedDetailPage = detailPage;
     applyFit(root);
     updateDisplayControls();
-    if (isAutoDisplayMode()) startRotate(); else stopRotate();
+    if (detailPages > 1) startRotate(); else stopRotate();
 }
 
 fetchData();
@@ -1951,7 +1862,7 @@ document.addEventListener('visibilitychange',function(){
     }
     LAST_HASH='';
     fetchData();
-    if(isAutoDisplayMode()) startRotate(true);
+    if(detailPages > 1) startRotate(true);
 });
 let resizeTimer = null;
 window.addEventListener('resize', function(){
