@@ -391,8 +391,7 @@ class SignatureController extends Controller
             return response()->json(['pending' => false]);
         }
 
-        $hour = (int) now()->format('H');
-        $workDate = ($hour < 7) ? now()->subDay()->toDateString() : now()->toDateString();
+        $workDate = \App\Services\ProductionMetricsService::currentProductionDate();
 
         $userId = Auth::id();
         $assignments = LineAssignment::where(function ($q) use ($userId, $sigRole) {
