@@ -449,6 +449,9 @@ async function _triggerAutoBreakEnd(jobId) {
             delete job._breakPaused;
             delete job._frozenTimer;
         }
+        if (job && !job.started_at) {
+            job.started_at = new Date().toISOString();
+        }
         // Resume server-side regardless of local flag state (flag is lost after reload);
         // only skip if we positively know the job is already running.
         if (!job || wasBreakPaused || job.status === 'paused' || job.status === undefined) {
@@ -458,6 +461,10 @@ async function _triggerAutoBreakEnd(jobId) {
             }).catch(() => {});
         }
         if (job) job.status = 'running';
+        if (window.ProductionConfig) {
+            window.ProductionConfig.currentStatus = 'running';
+            window.ProductionConfig.currentIsDandori = false;
+        }
 
         window._autoBreakActive = false;
         window._autoBreakDowntimeId = null;
@@ -575,6 +582,14 @@ function _updateBreakUI(jobId, label, isPaused) {
                         delete job._breakPaused;
                         delete job._frozenTimer;
                     }
+                    if (!job.started_at) {
+                        job.started_at = new Date().toISOString();
+                    }
+                    job.status = 'running';
+                }
+                if (window.ProductionConfig) {
+                    window.ProductionConfig.currentStatus = 'running';
+                    window.ProductionConfig.currentIsDandori = false;
                 }
                 if (window.runningDowntimes) delete window.runningDowntimes[`${activeId}_break`];
                 if (window.ProductionConfig) {
@@ -996,8 +1011,9 @@ function updateTimeline(forceAll = false) {
             }
         } else {
             const activeJob = window.jobMasterData ? window.jobMasterData[activeJobId] : null;
-            const isStarted = activeJob && activeJob.started_at;
-            if (!isStarted) {
+            const jobStatus = String(activeJob?.status || window.ProductionConfig?.currentStatus || '').toLowerCase();
+            const isStarted = activeJob && (activeJob.started_at || jobStatus === 'running' || jobStatus === 'paused');
+            if (!isStarted && jobStatus === 'pending') {
                 label = 'PENDING';
                 bgClass = 'px-4 py-3 mt-3.5 rounded-2xl border bg-slate-800/80 border-slate-700 flex items-center justify-between transition-all duration-300';
                 textClass = 'text-sm font-black text-slate-500 uppercase tracking-widest';

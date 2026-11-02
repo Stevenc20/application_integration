@@ -61,17 +61,17 @@
             $activeShiftName = request('shift', $currentShift ?? 'Shift Pagi');
             [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $activeShiftName);
 
-            // Fetch currently applicable break schedule for the current time and shift
-            $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
-            $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
-            $currShift = \App\Services\ProductionMetricsService::currentProductionShift();
-            $currTimeStr = now()->format('H:i:s');
-            $currentBreakSchedule = \App\Models\MasterBreakTime::where('is_active', true)
-                ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })
-                ->where(function($q) use ($currShift) { $q->where('shift', $currShift)->orWhereNull('shift'); })
-                ->where('waktu_mulai', '<=', $currTimeStr)
-                ->where('waktu_selesai', '>=', $currTimeStr)
-                ->first();
+            // Fetch currently applicable break schedule for the current time and shift (with PPC schedule override priority)
+            $currTimeStr = now()->format('H:i');
+            $currTimeSecStr = now()->format('H:i:s');
+            $currMinutesNow = (int)now()->format('H') * 60 + (int)now()->format('i');
+            $applicableBreaks = \App\Models\MasterBreakTime::getBreaksWithPpcOverride($date, $activeShiftName, $activeJob->line ?? request('line', $lineFilter ?? 'Line A'));
+            $currentBreakSchedule = $applicableBreaks->first(function($b) use ($currMinutesNow) {
+                if ($b->startMin > $b->endMin) {
+                    return $currMinutesNow >= $b->startMin || $currMinutesNow < $b->endMin;
+                }
+                return $currMinutesNow >= $b->startMin && $currMinutesNow < $b->endMin;
+            });
 
             // Auto-close any stale break downtime whose scheduled window has already passed
             $activeBreakDt = \App\Models\Downtime::where('job_master_id', $activeJob->id)
@@ -108,21 +108,18 @@
 
             // Cek apakah job sudah punya progres produksi aktual (part OK/Repair/Reject)
             $actualProdTotal = (($activeJob->dailyProduction->actual_ok ?? 0) + ($activeJob->dailyProduction->actual_repair ?? 0) + ($activeJob->dailyProduction->actual_reject ?? 0));
-            $hasProduced = ($actualProdTotal > 0) || !empty($activeJob->started_at);
+            $isRunningStatus = in_array(strtolower($activeJob->status), ['running', 'paused']);
+            $hasProduced = ($actualProdTotal > 0) || !empty($activeJob->started_at) || $isRunningStatus;
 
-            // $isDandori = true if open dandori or open 1st check is active, KECUALI jika sudah mulai produksi secara riil
-            if ($hasProduced) {
-                $isDandori = false;
-            } else {
-                $isDandori = ($openDandori !== null) || ($openFirstCheck !== null);
-            }
+            // $isDandori = true HANYA jika open dandori atau open 1st check benar-benar masih aktif
+            $isDandori = ($openDandori !== null) || ($openFirstCheck !== null);
 
             if (!$isDandori && !$effectiveStartedAt && $hasActiveNonDandoriDt) {
                 // If never started and has non-dandori DT, only treat as dandori if job is still pending
                 $isDandori = strtolower($activeJob->status) === 'pending' && !$hasProduced;
             }
             $firstDandori = $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
-            $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($effectiveStartedAt ?? null);
+            $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($effectiveStartedAt ?? ($isRunningStatus ? now() : null));
 
             $prodPlan = $activeJob->production_plan;
             $schedStart = $prodPlan ? $prodPlan->start_time : ($activeJob->plan_start ? \Carbon\Carbon::parse($activeJob->plan_start)->format('H:i') : '07:40');
@@ -434,7 +431,7 @@
             <!-- Performance Console (Left Area) -->
             <div class="lg:col-span-9">
                 <!-- Quick Entry & Performance Console (min-h-[220px]) -->
-                @if($effectiveStartedAt && !$isDandori)
+                @if(($effectiveStartedAt || $isRunningStatus) && !$isDandori)
                 <div class="p-5 bg-red-50/50 border border-red-200 rounded-3xl min-h-[220px] flex flex-col gap-4 h-full">
                     <!-- Header -->
                     <div class="flex items-center justify-between border-b border-red-200 pb-3">
@@ -611,7 +608,7 @@
                     }
                 @endphp
 
-                @if(!$effectiveStartedAt && !$isDandori && !$firstDandori && (strtolower($activeJob->status) === 'pending'))
+                @if(!$effectiveStartedAt && !$isRunningStatus && !$isDandori && !$firstDandori && (strtolower($activeJob->status) === 'pending'))
                 <div class="p-4 bg-white border border-slate-200 rounded-3xl min-h-[260px] flex flex-col h-full">
                     <div class="flex items-center justify-between border-b border-slate-200 pb-3 mb-4">
                         <span class="text-xs sm:text-sm font-black text-slate-500 uppercase tracking-widest">Operator Console</span>

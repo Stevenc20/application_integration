@@ -115,4 +115,72 @@ class MasterBreakTime extends Model
         }
         return 'Shift Pagi';
     }
+
+    /**
+     * Get break schedule with override priority from ProductionPlan (uploaded PPC schedule).
+     * If PPC uploaded specific break rows for this date, shift, and line, use those.
+     * Otherwise, fallback to MasterBreakTime schedule.
+     */
+    public static function getBreaksWithPpcOverride(string $date, string $shiftName, ?string $line = null): \Illuminate\Support\Collection
+    {
+        $normalizedShift = self::normalizeShiftKey($shiftName);
+
+        // Check if there are break rows in production_plans for this date and shift
+        $planBreakQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'break')
+            ->where(function($q) use ($normalizedShift, $shiftName) {
+                $q->where('shift_name', $normalizedShift)
+                  ->orWhere('shift_name', 'LIKE', '%' . $normalizedShift . '%')
+                  ->orWhere('shift_name', 'LIKE', '%' . $shiftName . '%');
+            })
+            ->whereNotNull('start_time')
+            ->whereNotNull('finish_time');
+
+        if ($line && strtoupper($line) !== 'ALL') {
+            $normLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $line)));
+            $planBreakQuery->where(function($lq) use ($normLine, $line) {
+                $lq->whereRaw("UPPER(TRIM(press_name)) = ?", [strtoupper(trim($line))])
+                   ->orWhereRaw("UPPER(press_name) LIKE ?", ["%{$normLine}%"])
+                   ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normLine}%"]);
+            });
+        }
+
+        $planBreaks = $planBreakQuery->orderBy('start_time')->get();
+
+        if ($planBreaks->isNotEmpty()) {
+            return $planBreaks->map(function($pb) {
+                $start = substr((string)$pb->start_time, 0, 5);
+                $end = substr((string)$pb->finish_time, 0, 5);
+                $label = trim((string)($pb->job_master ?: ($pb->job_no ?: 'Istirahat PPC')));
+                return (object)[
+                    'label' => $label,
+                    'type' => 'break',
+                    'waktu_mulai' => $start,
+                    'waktu_selesai' => $end,
+                    'start' => $start,
+                    'end' => $end,
+                    'startMin' => self::timeToMinutes($start),
+                    'endMin' => self::timeToMinutes($end),
+                    'source' => 'ppc_plan',
+                ];
+            });
+        }
+
+        // Fallback to MasterBreakTime database
+        return self::getApplicableBreaks($date, $shiftName)->map(function($b) {
+            $start = substr((string)$b->waktu_mulai, 0, 5);
+            $end = substr((string)$b->waktu_selesai, 0, 5);
+            return (object)[
+                'label' => $b->label,
+                'type' => $b->type,
+                'waktu_mulai' => $start,
+                'waktu_selesai' => $end,
+                'start' => $start,
+                'end' => $end,
+                'startMin' => self::timeToMinutes($start),
+                'endMin' => self::timeToMinutes($end),
+                'source' => 'master',
+            ];
+        });
+    }
 }

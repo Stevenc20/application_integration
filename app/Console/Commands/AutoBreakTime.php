@@ -25,12 +25,6 @@ class AutoBreakTime extends Command
         $shiftName = ProductionMetricsService::currentProductionShift($now);
         $currentMinutes = $now->hour * 60 + $now->minute;
 
-        $breaks = MasterBreakTime::getApplicableBreaks($productionDate, $shiftName);
-
-        if ($breaks->isEmpty()) {
-            return 0;
-        }
-
         $runningJobs = JobMaster::whereIn('status', ['running', 'paused'])
             ->whereHas('productionSessions', function ($q) use ($productionDate) {
                 $q->where('work_date', $productionDate)->whereIn('status', ['running', 'paused']);
@@ -45,6 +39,12 @@ class AutoBreakTime extends Command
         foreach ($runningJobs as $job) {
             $effectiveWorkDate = $productionService->resolveWorkDate($job->id, $productionDate);
 
+            // Prioritize break schedule from PPC uploaded production_plans for this job's line
+            $jobBreaks = MasterBreakTime::getBreaksWithPpcOverride($effectiveWorkDate, $shiftName, $job->line);
+            if ($jobBreaks->isEmpty()) {
+                continue;
+            }
+
             $activeBreak = Downtime::where('job_master_id', $job->id)
                 ->whereNull('finish_time')
                 ->where('jenis_downtime', 'break time')
@@ -53,9 +53,9 @@ class AutoBreakTime extends Command
             $inBreakWindow = false;
             $matchedBreak = null;
 
-            foreach ($breaks as $b) {
-                $startMin = MasterBreakTime::timeToMinutes(substr($b->waktu_mulai, 0, 5));
-                $endMin = MasterBreakTime::timeToMinutes(substr($b->waktu_selesai, 0, 5));
+            foreach ($jobBreaks as $b) {
+                $startMin = $b->startMin ?? MasterBreakTime::timeToMinutes(substr($b->waktu_mulai, 0, 5));
+                $endMin = $b->endMin ?? MasterBreakTime::timeToMinutes(substr($b->waktu_selesai, 0, 5));
                 $matches = ($startMin > $endMin)
                     ? ($currentMinutes >= $startMin || $currentMinutes < $endMin)
                     : ($currentMinutes >= $startMin && $currentMinutes < $endMin);

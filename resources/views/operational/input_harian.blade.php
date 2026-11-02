@@ -701,11 +701,12 @@ window.jobDowntimeHistory = {
     @endif
 };
 
-// ——— AUTO BREAK TIME SCHEDULE (PPC Source of Truth) ———
+// ——— AUTO BREAK TIME SCHEDULE (PPC Source of Truth with Override Priority) ———
 @php
     $effectiveWorkDate = $date ?? \App\Services\ProductionMetricsService::currentProductionDate();
     $effectiveShift = $currentShift ?? \App\Services\ProductionMetricsService::currentProductionShift();
-    $breakScheduleData = \App\Models\MasterBreakTime::getApplicableBreaks($effectiveWorkDate, $effectiveShift)
+    $activeLineFilter = $lineFilter ?? request('line', 'Line A');
+    $breakScheduleData = \App\Models\MasterBreakTime::getBreaksWithPpcOverride($effectiveWorkDate, $effectiveShift, $activeLineFilter)
         ->map(fn($b) => [
             'label' => $b->label,
             'type' => $b->type,
