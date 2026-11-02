@@ -58,31 +58,33 @@
         <div class="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-red-500/3 to-transparent"></div>
         
         @php 
-            // Close any stale break downtime whose scheduled window has already passed
+            $activeShiftName = request('shift', $currentShift ?? 'Shift Pagi');
+            [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $activeShiftName);
+
+            // Fetch currently applicable break schedule for the current time and shift
+            $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
+            $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
+            $currShift = \App\Services\ProductionMetricsService::currentProductionShift();
+            $currTimeStr = now()->format('H:i:s');
+            $currentBreakSchedule = \App\Models\MasterBreakTime::where('is_active', true)
+                ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })
+                ->where(function($q) use ($currShift) { $q->where('shift', $currShift)->orWhereNull('shift'); })
+                ->where('waktu_mulai', '<=', $currTimeStr)
+                ->where('waktu_selesai', '>=', $currTimeStr)
+                ->first();
+
+            // Auto-close any stale break downtime whose scheduled window has already passed
             $activeBreakDt = \App\Models\Downtime::where('job_master_id', $activeJob->id)
                 ->whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(TRIM(jenis_downtime))'), ['break time', 'break'])
                 ->whereNull('finish_time')
                 ->first();
-            $currentBreakSchedule = null;
-            if ($activeBreakDt) {
-                $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
-                $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
-                $currShift = \App\Services\ProductionMetricsService::currentProductionShift();
-                $currTimeStr = now()->format('H:i:s');
-                $currentBreakSchedule = \App\Models\MasterBreakTime::where('is_active', true)
-                    ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })
-                    ->where(function($q) use ($currShift) { $q->where('shift', $currShift)->orWhereNull('shift'); })
-                    ->where('waktu_mulai', '<=', $currTimeStr)
-                    ->where('waktu_selesai', '>=', $currTimeStr)
-                    ->first();
-                if (!$currentBreakSchedule) {
-                    $activeBreakDt->update(['finish_time' => now()]);
-                    $activeBreakDt = null;
-                }
+
+            if ($activeBreakDt && !$currentBreakSchedule) {
+                $activeBreakDt->update(['finish_time' => now()]);
+                $activeBreakDt = null;
+                $activeJob->unsetRelation('downtimes');
             }
 
-            $activeShiftName = request('shift', $currentShift ?? 'Shift Pagi');
-            [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $activeShiftName);
             $activeDowntime = \App\Models\Downtime::where('job_master_id', $activeJob->id)
                 ->whereNull('finish_time')
                 ->where('start_time', '>=', $curShiftStart)
@@ -387,15 +389,9 @@
                     <p id="break-overlay-label" class="text-3xl sm:text-4xl font-black text-slate-700 uppercase tracking-widest mb-2">{{ $activeDowntime->problem ?? 'BREAK TIME' }}</p>
                     <p class="text-sm font-black text-slate-500 uppercase tracking-widest">Istirahat — Timer dijeda</p>
                     <p id="break-overlay-timer" class="text-5xl sm:text-6xl font-black text-slate-800 mt-6 tabular-nums">
-                        @if($isOnBreak && $activeDowntime && $activeDowntime->start_time)
+                        @if($isOnBreak && $currentBreakSchedule)
                             @php
-                                $masterBreak = \App\Models\MasterBreakTime::where('hari', strtolower(now()->locale('id')->dayName))
-                                    ->where('waktu_mulai', '<=', now()->format('H:i:s'))
-                                    ->where('waktu_selesai', '>=', now()->format('H:i:s'))
-                                    ->first();
-                                $breakRemaining = $masterBreak
-                                    ? max(0, \Carbon\Carbon::parse(now()->toDateString() . ' ' . $masterBreak->waktu_selesai)->diffInSeconds(now()))
-                                    : 0;
+                                $breakRemaining = max(0, \Carbon\Carbon::parse(now()->toDateString() . ' ' . $currentBreakSchedule->waktu_selesai)->diffInSeconds(now()));
                             @endphp
                             {{ sprintf('%02d:%02d:%02d', intdiv($breakRemaining, 3600), intdiv($breakRemaining % 3600, 60), $breakRemaining % 60) }}
                         @else

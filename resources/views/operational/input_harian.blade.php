@@ -430,6 +430,15 @@ window.runningDowntimes = {
         @if($jd)
             @php
                 [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $currentShift);
+                $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
+                $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
+                $currTimeStr = now()->format('H:i:s');
+                $isCurrentlyInBreak = \App\Models\MasterBreakTime::where('is_active', true)
+                    ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })
+                    ->where(function($q) use ($currentShift) { $q->where('shift', $currentShift)->orWhereNull('shift'); })
+                    ->where('waktu_mulai', '<=', $currTimeStr)
+                    ->where('waktu_selesai', '>=', $currTimeStr)
+                    ->exists();
             @endphp
             @foreach($jd->downtimes->whereNull('finish_time')->filter(fn($dt) => $dt->start_time >= $curShiftStart && $dt->start_time < $curShiftEnd) as $rdt)
                 @php 
@@ -440,6 +449,7 @@ window.runningDowntimes = {
                     elseif($dtTypeLower == 'break time') $btnType = 'break';
                     elseif($dtTypeLower == 'dandori') $btnType = 'dandori';
                 @endphp
+                @if($btnType !== 'break' || $isCurrentlyInBreak)
                 "{{ $jd->id }}_{{ $btnType }}": { 
                     id: {{ $rdt->id }}, 
                     start: new Date("{{ \Carbon\Carbon::parse($rdt->start_time)->toIso8601String() }}"), 
@@ -448,6 +458,7 @@ window.runningDowntimes = {
                     dtType: "{{ $rdt->jenis_downtime }}",
                     problem: {!! json_encode($rdt->problem ?? '') !!}
                 },
+                @endif
             @endforeach
 
             @foreach($jd->dandoris->whereNull('finish_time')->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check') as $fc)
@@ -466,6 +477,15 @@ window.runningDowntimes = {
     @if(isset($activeJob) && !(is_object($jobs) && method_exists($jobs, 'getCollection') ? $jobs->getCollection() : $jobs)->pluck('job_data.id')->contains($activeJob->id))
         @php
             [$curShiftStart, $curShiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $currentShift);
+            $dayMap = ['Monday'=>'senin','Tuesday'=>'selasa','Wednesday'=>'rabu','Thursday'=>'kamis','Friday'=>'jumat','Saturday'=>'sabtu','Sunday'=>'minggu'];
+            $currDay = $dayMap[now()->format('l')] ?? strtolower(now()->format('l'));
+            $currTimeStr = now()->format('H:i:s');
+            $isCurrentlyInBreak = \App\Models\MasterBreakTime::where('is_active', true)
+                ->where(function($q) use ($currDay) { $q->where('hari', $currDay)->orWhere('hari', 'semua'); })
+                ->where(function($q) use ($currentShift) { $q->where('shift', $currentShift)->orWhereNull('shift'); })
+                ->where('waktu_mulai', '<=', $currTimeStr)
+                ->where('waktu_selesai', '>=', $currTimeStr)
+                ->exists();
         @endphp
         @foreach($activeJob->downtimes->whereNull('finish_time')->filter(fn($dt) => $dt->start_time >= $curShiftStart && $dt->start_time < $curShiftEnd) as $rdt)
             @php 
@@ -476,6 +496,7 @@ window.runningDowntimes = {
                 elseif($dtTypeLower == 'break time') $btnType = 'break';
                 elseif($dtTypeLower == 'dandori') $btnType = 'dandori';
             @endphp
+            @if($btnType !== 'break' || $isCurrentlyInBreak)
             "{{ $activeJob->id }}_{{ $btnType }}": { 
                 id: {{ $rdt->id }}, 
                 start: new Date("{{ \Carbon\Carbon::parse($rdt->start_time)->toIso8601String() }}"), 
@@ -484,6 +505,7 @@ window.runningDowntimes = {
                 dtType: "{{ $rdt->jenis_downtime }}",
                 problem: {!! json_encode($rdt->problem ?? '') !!}
             },
+            @endif
             @endforeach
 
             @foreach($activeJob->dandoris->whereNull('finish_time')->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check') as $fc)

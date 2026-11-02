@@ -291,9 +291,12 @@ function _isInBreakWindow(now) {
     const schedule = window._breakSchedule || [];
     const mins = now.getHours() * 60 + now.getMinutes();
     for (const b of schedule) {
+        if (b.startMin == null || b.endMin == null || isNaN(b.startMin) || isNaN(b.endMin)) continue;
         if (b.startMin > b.endMin) {
-            // Lintas tengah malam (e.g. 23:30 - 00:30)
-            if (mins >= b.startMin || mins < b.endMin) return b;
+            // Lintas tengah malam (e.g. 23:30 - 00:30): valid hanya jika start di malam hari (>= 20:00) dan end di pagi hari (<= 08:00)
+            if (b.startMin >= 1200 && b.endMin <= 480) {
+                if (mins >= b.startMin || mins < b.endMin) return b;
+            }
         } else {
             if (mins >= b.startMin && mins < b.endMin) return b;
         }
@@ -315,13 +318,18 @@ function _autoBreakTick() {
     const alreadyRunningBreak = window.runningDowntimes?.[`${activeId}_break`];
 
     // ——— LIVE COUNTDOWN BREAK OVERLAY ———
-    if (breakWindow || window._autoBreakActive || alreadyRunningBreak) {
+    if (breakWindow) {
         const breakTimerEl = document.getElementById('break-overlay-timer');
-        if (breakTimerEl && breakWindow) {
+        if (breakTimerEl) {
             const currentSecondsOfDay = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
             const endSecondsOfDay = breakWindow.endMin * 60;
             const remainingSecs = Math.max(0, endSecondsOfDay - currentSecondsOfDay);
             breakTimerEl.textContent = formatSeconds(remainingSecs);
+        }
+    } else {
+        const breakOverlay = document.getElementById('break-overlay');
+        if (breakOverlay && !breakOverlay.classList.contains('hidden') && !window._autoBreakActive && !alreadyRunningBreak) {
+            _updateBreakUI(activeId, null, false);
         }
     }
 
@@ -527,8 +535,10 @@ function _updateBreakUI(jobId, label, isPaused) {
     const breakWindow = _isInBreakWindow(now);
     const history = window.jobDowntimeHistory?.[activeId] || [];
 
+    let foundBreak = false;
     for (const h of history) {
         if (!h.end && h.type === 'break time') {
+            foundBreak = true;
             if (breakWindow) {
                 // Legitimate active break window
                 window._autoBreakActive = true;
@@ -581,6 +591,16 @@ function _updateBreakUI(jobId, label, isPaused) {
             }
             break;
         }
+    }
+
+    // Safety fallback: if not in break window, ensure break overlay and running downtime are cleared
+    if (!breakWindow) {
+        if (window.runningDowntimes && window.runningDowntimes[`${activeId}_break`]) {
+            delete window.runningDowntimes[`${activeId}_break`];
+        }
+        window._autoBreakActive = false;
+        window._autoBreakDowntimeId = null;
+        _updateBreakUI(activeId, null, false);
     }
 })();
 

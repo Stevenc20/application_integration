@@ -67,6 +67,9 @@ class PpcBreakTimeAutoPauseResumeTest extends TestCase
             $t->string('source')->nullable();
             $t->timestamp('start_time')->nullable();
             $t->timestamp('finish_time')->nullable();
+            $t->string('image_path')->nullable();
+            $t->string('image_path_part')->nullable();
+            $t->string('image_path_tooling')->nullable();
             $t->integer('duration_seconds')->default(0);
             $t->timestamps();
         });
