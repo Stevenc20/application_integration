@@ -1015,7 +1015,10 @@ class InputHarianController extends Controller
             return response()->json([]);
         }
 
-        $jobs = JobMaster::where('id', '!=', $id)
+        $siblingJobs = $this->productionService->getSiblingJobMasters($id);
+        $excludeIds = $siblingJobs->pluck('id')->push($id)->all();
+
+        $jobs = JobMaster::whereNotIn('id', $excludeIds)
             ->whereIn('status', ['pending', 'paused'])
             ->orderBy('sequence_no')
             ->orderBy('job_number')

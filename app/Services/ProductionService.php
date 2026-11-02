@@ -70,10 +70,15 @@ class ProductionService
             $session->save();
 
             // Auto cut-off: Stop and complete any other running job on the same line so only 1 job runs at a time
+            // (Exclude siblings of the same logical job that are split across breaks)
             $currentJobMaster = JobMaster::find($jobId);
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            $siblingJobIds = $siblingJobs->pluck('id')->all();
+
             if ($currentJobMaster && $currentJobMaster->line) {
                 $otherRunningJobs = JobMaster::where('line', $currentJobMaster->line)
                     ->where('id', '!=', $jobId)
+                    ->whereNotIn('id', $siblingJobIds)
                     ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
                     ->get();
 
@@ -106,6 +111,14 @@ class ProductionService
             JobMaster::where('id', $jobId)->update($updateData);
             $this->syncPlanStatus($jobId, 'running');
 
+            // Synchronize status to sibling segments of the same job (across breaks)
+            foreach ($siblingJobs as $sibling) {
+                if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
+                    $sibling->update(['status' => 'running', 'started_at' => $updateData['started_at'] ?? $sibling->started_at]);
+                    $this->syncPlanStatus($sibling->id, 'running');
+                }
+            }
+
             $this->signalDashboard($jobId);
 
             return true;
@@ -122,9 +135,14 @@ class ProductionService
             $job = JobMaster::findOrFail($jobId);
             
             // Auto cut-off: Stop and complete any other running job on the same line
+            // (Exclude siblings of the same logical job that are split across breaks)
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            $siblingJobIds = $siblingJobs->pluck('id')->all();
+
             if ($job->line) {
                 $otherRunningJobs = JobMaster::where('line', $job->line)
                     ->where('id', '!=', $jobId)
+                    ->whereNotIn('id', $siblingJobIds)
                     ->whereIn(DB::raw('LOWER(status)'), ['running', 'paused'])
                     ->get();
 
@@ -135,6 +153,14 @@ class ProductionService
 
             $job->update(['status' => 'running']);
             $this->syncPlanStatus($jobId, 'running');
+
+            // Synchronize status to sibling segments of the same job (across breaks)
+            foreach ($siblingJobs as $sibling) {
+                if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
+                    $sibling->update(['status' => 'running']);
+                    $this->syncPlanStatus($sibling->id, 'running');
+                }
+            }
 
             ProductionSession::firstOrCreate(
                 [
@@ -480,6 +506,15 @@ class ProductionService
             JobMaster::where('id', $jobId)->update(['status' => 'paused']);
             $this->syncPlanStatus($jobId, 'paused');
 
+            // Synchronize pause state to sibling segments of the same job
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            foreach ($siblingJobs as $sibling) {
+                if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
+                    $sibling->update(['status' => 'paused']);
+                    $this->syncPlanStatus($sibling->id, 'paused');
+                }
+            }
+
             DailyProduction::updateOrCreate(
                 ['job_master_id' => $jobId, 'work_date' => $workDate],
                 ['runtime_seconds' => $runtime]
@@ -510,6 +545,15 @@ class ProductionService
 
             JobMaster::where('id', $jobId)->update(['status' => 'running']);
             $this->syncPlanStatus($jobId, 'running');
+
+            // Synchronize resume state to sibling segments of the same job
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            foreach ($siblingJobs as $sibling) {
+                if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
+                    $sibling->update(['status' => 'running']);
+                    $this->syncPlanStatus($sibling->id, 'running');
+                }
+            }
 
             $this->signalDashboard($jobId);
 
@@ -584,6 +628,18 @@ class ProductionService
                 'finished_at' => now()
             ]);
             $this->syncPlanStatus($jobId, 'complete');
+
+            // Synchronize complete state to sibling segments of the same job (across breaks)
+            $siblingJobs = $this->getSiblingJobMasters($jobId);
+            foreach ($siblingJobs as $sibling) {
+                if (!in_array(strtolower($sibling->status), ['complete', 'finished', 'closed', 'done'])) {
+                    $sibling->update([
+                        'status' => 'complete',
+                        'finished_at' => now()
+                    ]);
+                    $this->syncPlanStatus($sibling->id, 'complete');
+                }
+            }
 
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
                 // Finalisasi: ambil nilai repair & reject yang valid dari form R&R (harus punya foto evidence)
@@ -1296,14 +1352,32 @@ class ProductionService
         $parts = explode('-', $current->job_number);
         $planId = end($parts);
 
+        $siblingJobs = $this->getSiblingJobMasters($currentJobId);
+        $excludeJobIds = $siblingJobs->pluck('id')->push($currentJobId)->all();
+
         if (is_numeric($planId)) {
             $currentPlan = \App\Models\ProductionPlan::find($planId);
             if ($currentPlan) {
+                // Find all plan IDs that belong to the same logical job/sibling to skip them
+                $siblingPlanIds = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
+                    ->where('shift_name', $currentPlan->shift_name)
+                    ->where('press_name', $currentPlan->press_name)
+                    ->where('row_type', 'job')
+                    ->where(function ($q) use ($currentPlan) {
+                        $q->where('job_no', $currentPlan->job_no);
+                        if (!empty($currentPlan->job_master)) {
+                            $q->orWhere('job_master', $currentPlan->job_master);
+                        }
+                    })
+                    ->pluck('id')
+                    ->all();
+
                 $nextPlan = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
                     ->where('shift_name', $currentPlan->shift_name)
                     ->where('press_name', $currentPlan->press_name)
                     ->where('row_type', 'job')
                     ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                    ->whereNotIn('id', $siblingPlanIds)
                     ->where('row_no', '>', $currentPlan->row_no)
                     ->orderBy('row_no', 'asc')
                     ->first();
@@ -1323,7 +1397,7 @@ class ProductionService
         // Fallback to old query, tetapi batasi agar tetap di shift yang sama bila plan terdeteksi
         $fallbackQuery = JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
             ->where('line', $current->line)
-            ->where('id', '!=', $currentJobId);
+            ->whereNotIn('id', $excludeJobIds);
 
         if (isset($currentPlan) && $currentPlan) {
             $fallbackQuery->where(function($fq) use ($currentPlan) {
@@ -1411,6 +1485,18 @@ class ProductionService
 
             \App\Models\ProductionPlan::where('id', $planId)->update($updateData);
 
+            // Also synchronize status to sibling plans if status changed
+            if ($status !== null && isset($updateData['status'])) {
+                $siblingJobs = $this->getSiblingJobMasters($jobId);
+                foreach ($siblingJobs as $sibling) {
+                    $sParts = explode('-', $sibling->job_number);
+                    $sPlanId = end($sParts);
+                    if (is_numeric($sPlanId)) {
+                        \App\Models\ProductionPlan::where('id', (int) $sPlanId)->update(['status' => $updateData['status']]);
+                    }
+                }
+            }
+
             // Recovery Lock: if this plan has a recovery_id and ok > 0,
             // set the RecoveryItem status to in_production automatically
             $plan = \App\Models\ProductionPlan::find($planId);
@@ -1428,6 +1514,72 @@ class ProductionService
     private function syncPlanStatus(int $jobId, string $status)
     {
         $this->syncPlan($jobId, $status);
+    }
+
+    /**
+     * Find sibling JobMaster records that belong to the same logical job
+     * (e.g. split across breaks in the same date/shift/line).
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, JobMaster>
+     */
+    public function getSiblingJobMasters(int $jobId): \Illuminate\Database\Eloquent\Collection
+    {
+        $job = JobMaster::find($jobId);
+        if (!$job) {
+            return new \Illuminate\Database\Eloquent\Collection();
+        }
+
+        $planId = $this->resolvePlanId($jobId);
+        $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+
+        $parts = explode('-', $job->job_number);
+        $baseJobNo = count($parts) > 1 ? implode('-', array_slice($parts, 0, -1)) : $job->job_number;
+
+        $targetDate = $plan ? $plan->plan_date : $this->resolveWorkDate($jobId);
+        $targetShift = $plan ? $plan->shift_name : null;
+        $targetLine = $job->line;
+
+        // Find all plans matching the same job_no / job_master on the same date/shift/line
+        $matchingPlanIds = collect();
+        if ($plan) {
+            $matchingPlanIds = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
+                ->where('shift_name', $targetShift)
+                ->where('row_type', 'job')
+                ->where(function ($q) use ($plan, $baseJobNo) {
+                    $q->where('job_no', $plan->job_no)
+                      ->orWhere('job_no', $baseJobNo)
+                      ->orWhere(function ($sub) use ($plan) {
+                          if (!empty($plan->job_master)) {
+                              $sub->where('job_master', $plan->job_master);
+                          }
+                      });
+                })
+                ->pluck('id');
+        }
+
+        $query = JobMaster::where('id', '!=', $jobId);
+        if ($targetLine) {
+            $query->where('line', $targetLine);
+        }
+
+        $query->where(function ($q) use ($matchingPlanIds, $baseJobNo, $job) {
+            if ($matchingPlanIds->isNotEmpty()) {
+                $q->where(function ($sub) use ($matchingPlanIds) {
+                    foreach ($matchingPlanIds as $pid) {
+                        $sub->orWhere('job_number', 'LIKE', "%-{$pid}");
+                    }
+                });
+            }
+            if ($baseJobNo) {
+                $q->orWhere('job_number', 'LIKE', "{$baseJobNo}-%")
+                  ->orWhere('job_number', $baseJobNo);
+            }
+            if ($job->job_name) {
+                $q->orWhere('job_name', $job->job_name);
+            }
+        });
+
+        return $query->get();
     }
 
     private function signalDashboard(int $jobId): void

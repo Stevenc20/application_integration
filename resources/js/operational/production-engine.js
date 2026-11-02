@@ -1944,9 +1944,13 @@ explicitTargetQty) {
             // Populate from blade data instead of fetch — instant, no lag
             const currentJob = window.jobMasterData && window.jobMasterData[id];
             const currentLine = currentJob ? (currentJob.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '') : '';
+            const currentCleanNo = currentJob ? ((currentJob.job_number && currentJob.job_number.lastIndexOf('-') !== -1) ? currentJob.job_number.substring(0, currentJob.job_number.lastIndexOf('-')).toUpperCase() : (currentJob.job_number || '').toUpperCase()) : '';
             const allJobs = window._pendingJobsData || [];
             const filtered = allJobs.filter(j => {
                 if (j.id == id) return false;
+                const jCleanNo = (j.job_number && j.job_number.lastIndexOf('-') !== -1) ? j.job_number.substring(0, j.job_number.lastIndexOf('-')).toUpperCase() : (j.job_number || '').toUpperCase();
+                // Exclude any segment of the same job currently processing
+                if (currentCleanNo && jCleanNo === currentCleanNo) return false;
                 if (!currentLine) return true;
                 const jobLine = (j.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '');
                 return jobLine === currentLine;
