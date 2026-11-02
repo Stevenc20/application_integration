@@ -859,14 +859,15 @@ class InputHarianController extends Controller
             // Calculate runtime
             $runtime = $this->productionService->calculateRuntime($job->id);
 
-            // Close open production session
+            // Close open production session with valid enum ('finished')
             $session = ProductionSession::where('job_master_id', $job->id)
-                ->where('status', 'running')
+                ->whereIn('status', ['running', 'paused'])
                 ->first();
             if ($session) {
                 $session->update([
                     'total_seconds' => $runtime,
-                    'status' => 'stopped',
+                    'status' => 'finished',
+                    'finish_time' => $now,
                     'pause_time' => $now,
                 ]);
             }
@@ -878,11 +879,8 @@ class InputHarianController extends Controller
                 $daily->update(['runtime_seconds' => $runtime]);
             }
 
-            // Mark job complete if it has production or finish, otherwise complete or pause based on request
-            $job->update([
-                'status' => 'complete',
-                'finished_at' => $now,
-            ]);
+            // Mark job complete in JobMaster and sync with ProductionPlan
+            $this->productionService->finishJob($job->id);
 
             \App\Services\DashboardRealtimeService::flushCache();
             if ($job->line) {
