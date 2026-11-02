@@ -307,11 +307,24 @@
                             <div class="w-12 h-12 rounded-2xl bg-red-50 border border-red-200 flex items-center justify-center shadow-lg shadow-red-900/5 flex-shrink-0">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                             </div>
-                            <div class="min-w-0">
-                                <span class="text-[10px] sm:text-xs font-black text-red-500 uppercase tracking-widest block leading-none">Running Session</span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="text-[10px] sm:text-xs font-black text-red-500 uppercase tracking-widest block leading-none">Running Session</span>
+                                    <button type="button" onclick="stopActiveJobDirectly({{ $activeJob->id }}, '{{ $activeJob->job_number }}')" class="px-2 py-1 rounded-lg bg-red-100 hover:bg-red-600 text-red-600 hover:text-white text-[9px] font-black uppercase tracking-wider transition-all flex items-center gap-1 cursor-pointer" title="Hentikan sesi berjalan ini">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"/>
+                                        </svg>
+                                        <span>Stop</span>
+                                    </button>
+                                </div>
                                 <h2 class="text-lg sm:text-xl font-black text-slate-800 tracking-tighter truncate leading-none mt-1.5" title="{{ $activeJob->job_number }}">
                                     {{ strpos($activeJob->job_number, '-') !== false ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number }}
                                 </h2>
+                                @if(!empty($activeJob->job_name) && $activeJob->job_name !== $activeJob->job_number)
+                                <p class="text-xs font-bold text-slate-500 truncate mt-1 leading-tight" title="{{ $activeJob->job_name }}">
+                                    {{ $activeJob->job_name }}
+                                </p>
+                                @endif
                             </div>
                         </div>
 

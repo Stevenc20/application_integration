@@ -443,9 +443,12 @@ class InputHarianController extends Controller
 
                 $activeJob = $activeJobs->first();
 
-                // If activeJob is still null, check if there is an orphan/stale running job on this line
+                // If activeJob is still null, do NOT forcefully promote orphan/foreign stale jobs into activeJob
+                // to prevent refreshing loops and showing unscheduled jobs from another line/day/shift.
+                // However, check if there is an orphan running job strictly on this line for alerting/force-stopping.
+                $orphanRunningJob = null;
                 if (!$activeJob) {
-                    $staleJob = $baseActiveQuery()
+                    $orphanRunningJob = $baseActiveQuery()
                         ->with([
                             'dailyProduction',
                             'downtimes',
@@ -453,9 +456,6 @@ class InputHarianController extends Controller
                         ])
                         ->orderByDesc('updated_at')
                         ->first();
-                    if ($staleJob) {
-                        $activeJob = $staleJob;
-                    }
                 }
 
                 // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung
@@ -571,6 +571,7 @@ class InputHarianController extends Controller
                                     'Line A', 'Line B', 'Line C', 'Line D', 'Shearing', 'Handwork'
                                  ]),
             'activeJob'       => $activeJob,
+            'orphanRunningJob' => $orphanRunningJob,
             'isOrphanActiveJob' => $isOrphanActiveJob,
             'productionLogs'  => $productionLogs,
             'lastInputAt'     => $lastInputAt,
@@ -1067,6 +1068,36 @@ class InputHarianController extends Controller
     {
         $lineFilter = $request->get('line');
         $date = $request->get('date') ?: \App\Services\ProductionMetricsService::currentProductionDate();
+
+        // 1. Line Resolution: Jika user login memiliki role leader/line spesifik atau LineAssignment dan parameter line kosong
+        if (empty($lineFilter) && Auth::check()) {
+            $userRole = strtolower($request->user()?->role ?? '');
+            if ($userRole === 'leader a') {
+                $lineFilter = 'Line A';
+            } elseif ($userRole === 'leader b') {
+                $lineFilter = 'Line B';
+            } elseif ($userRole === 'leader c') {
+                $lineFilter = 'Line C';
+            } elseif ($userRole === 'leader d') {
+                $lineFilter = 'Line D';
+            } elseif ($userRole === 'shearing') {
+                $lineFilter = 'Shearing';
+            } elseif ($userRole === 'handwork') {
+                $lineFilter = 'Handwork';
+            } elseif (str_starts_with($userRole, 'leader')) {
+                $suffix = trim(substr($userRole, 6));
+                if (in_array(strtoupper($suffix), ['A', 'B', 'C', 'D'])) {
+                    $lineFilter = 'Line ' . strtoupper($suffix);
+                }
+            }
+            if (!$lineFilter) {
+                $assignment = \App\Models\LineAssignment::where('leader_user_id', Auth::id())->first();
+                if ($assignment) {
+                    $lineFilter = $assignment->line_name;
+                }
+            }
+        }
+
         $normalizedLine = '';
         if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
@@ -1075,8 +1106,9 @@ class InputHarianController extends Controller
         // Cari JobMaster yang sedang running atau paused di line ini
         $jmQuery = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
         if ($normalizedLine) {
-            $jmQuery->where(function($q) use ($normalizedLine) {
-                $q->whereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
+            $jmQuery->where(function($q) use ($normalizedLine, $lineFilter) {
+                $q->whereRaw("UPPER(TRIM(line)) = ?", [strtoupper(trim($lineFilter))])
+                  ->orWhereRaw("UPPER(line) LIKE ?", ["%{$normalizedLine}%"])
                   ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedLine}%"]);
             });
         }

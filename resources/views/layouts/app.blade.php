@@ -95,8 +95,31 @@
         </main>
     </div>
 
-    @if(auth()->check() && in_array(strtolower(auth()->user()->role), ['supervisor', 'leader', 'foreman']))
-    <div id="global-timer-popout" class="fixed bottom-6 right-6 z-[100] hidden bg-gray-900 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-4 hover:scale-[1.02] transition-all border border-gray-700">
+    @if(auth()->check() && (strtolower(auth()->user()->role) === 'foreman' || str_starts_with(strtolower(auth()->user()->role), 'leader') || strtolower(auth()->user()->role) === 'supervisor'))
+    @php
+        $popoutLine = null;
+        $role = strtolower(auth()->user()->role);
+        if (str_starts_with($role, 'leader')) {
+            $suffix = trim(substr($role, 6));
+            if ($suffix !== '') {
+                $suffix = strtoupper($suffix);
+                if (in_array($suffix, ['A', 'B', 'C', 'D'])) {
+                    $popoutLine = 'Line ' . $suffix;
+                }
+            }
+            if (!$popoutLine) {
+                $assignment = \App\Models\LineAssignment::where('leader_user_id', auth()->id())->first();
+                if ($assignment) {
+                    $popoutLine = $assignment->line_name;
+                }
+            }
+        } elseif ($role === 'shearing') {
+            $popoutLine = 'Shearing';
+        } elseif ($role === 'handwork') {
+            $popoutLine = 'Handwork';
+        }
+    @endphp
+    <div id="global-timer-popout" data-line="{{ $popoutLine }}" class="fixed bottom-6 right-6 z-[100] hidden bg-gray-900 text-white rounded-2xl shadow-2xl p-4 flex items-center gap-4 hover:scale-[1.02] transition-all border border-gray-700">
         <div class="flex items-center gap-4 cursor-pointer" id="global-timer-clickable" title="Klik untuk menuju ke halaman job">
             <div class="relative flex h-3 w-3">
                 <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
@@ -136,7 +159,11 @@
                 const popout = document.getElementById('global-timer-popout');
                 if(!popout) return;
 
-                fetch('/operational/active-job')
+                let url = '/operational/active-job';
+                const line = popout.getAttribute('data-line');
+                if (line) url += `?line=${encodeURIComponent(line)}`;
+
+                fetch(url)
                 .then(res => res.json())
                 .then(data => {
                     if(data.running) {

@@ -557,7 +557,7 @@ function _updateBreakUI(jobId, label, isPaused) {
                 }
                 _updateBreakUI(activeId, breakWindow.label, true);
             } else {
-                // Stale break from previous window — close it immediately and resume the job
+                // Stale break from previous window — close it immediately in history without triggering unneeded broadcast
                 h.end = Date.now();
                 if (h.id) {
                     fetch(`/operational/downtime/${h.id}/finish`, {
@@ -566,12 +566,6 @@ function _updateBreakUI(jobId, label, isPaused) {
                     }).catch(() => {});
                 }
                 const job = window.jobMasterData?.[activeId];
-                if (!job || job.status !== 'running') {
-                    fetch(`/operational/job/${activeId}/resume`, {
-                        method: 'POST',
-                        headers: { 'X-CSRF-TOKEN': window.ProductionConfig?.csrfToken, 'Accept': 'application/json' }
-                    }).catch(() => {});
-                }
                 if (job) {
                     if (job._breakPaused) {
                         if (job._frozenTimer != null) {
@@ -581,7 +575,6 @@ function _updateBreakUI(jobId, label, isPaused) {
                         delete job._breakPaused;
                         delete job._frozenTimer;
                     }
-                    job.status = 'running';
                 }
                 if (window.runningDowntimes) delete window.runningDowntimes[`${activeId}_break`];
                 if (window.ProductionConfig) {
@@ -3293,9 +3286,16 @@ function _isModalOpen() {
     return false;
 }
 
+let _pageLoadedAt = Date.now();
+let _lastReloadAttempt = 0;
+
 function checkSyncStatus() {
     if (window._isReloading || (window.ActionRunner && window.ActionRunner.locked)) return;
     if (_isModalOpen()) return;
+    // Don't auto-reload within the first 15 seconds of page load to prevent reload loops
+    if (Date.now() - _pageLoadedAt < 15000) return;
+    if (Date.now() - _lastReloadAttempt < 15000) return;
+
     const config = window.ProductionConfig;
     const line = config.currentLine || '';
     const shift = config.currentShift || '';
@@ -3305,6 +3305,7 @@ function checkSyncStatus() {
         if (_isModalOpen()) return;
         if ((data.running && data.id !== config.currentActiveId) || (!data.running && config.currentActiveId !== null)) {
             if (_isInBreakState(config.currentActiveId)) return;
+            _lastReloadAttempt = Date.now();
             window._isReloading = true;
             location.reload();
         }
