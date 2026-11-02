@@ -147,3 +147,105 @@ test('ppc production plan actual cards sync real actual ok, repair, reject from 
     $response->assertSee('<span class="text-xl font-black text-indigo-600">30</span>', false);
     $response->assertSee('<span class="text-xl font-black text-rose-600">15</span>', false);
 });
+
+test('ppc production plan actual cards follow selected line filter and isolate data between lines', function () {
+    $lineA = LineMaster::create([
+        'line_code' => 'PA',
+        'line_name' => 'PRESS A',
+        'status' => 'active',
+    ]);
+
+    $lineB = LineMaster::create([
+        'line_code' => 'PB',
+        'line_name' => 'PRESS B',
+        'status' => 'active',
+    ]);
+
+    $user = User::create([
+        'name' => 'PPC MultiLine Tester',
+        'nrp' => 'PPC-003',
+        'password' => 'secret',
+        'role' => 'superadmin',
+    ]);
+
+    $date = '2026-11-02';
+
+    // 1. Data PRESS A dengan produksi aktual
+    $planA = ProductionPlan::create([
+        'line_master_id' => $lineA->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS A',
+        'job_master' => 'PART PRESS A',
+        'job_no' => 'PA-01',
+        'row_no' => 1,
+        'row_type' => 'job',
+        'plan' => 1000,
+        'ok' => 0,
+        'repair' => 0,
+        'reject' => 0,
+        'status' => 'running',
+    ]);
+
+    $jobA = JobMaster::create([
+        'job_number' => 'PA-01-'.$planA->id,
+        'job_name' => 'PART PRESS A',
+        'line' => 'PRESS A',
+        'status' => 'running',
+        'target_qty' => 1000,
+    ]);
+
+    DailyProduction::create([
+        'job_master_id' => $jobA->id,
+        'work_date' => $date,
+        'actual_qty' => 850,
+        'actual_ok' => 800,
+        'actual_repair' => 30,
+        'actual_reject' => 20,
+        'repair_qty' => 30,
+        'reject_qty' => 20,
+    ]);
+
+    // 2. Data PRESS B belum ada produksi sama sekali (actual 0)
+    $planB = ProductionPlan::create([
+        'line_master_id' => $lineB->id,
+        'plan_date' => $date,
+        'shift_name' => 'Shift Pagi',
+        'press_name' => 'PRESS B',
+        'job_master' => 'PART PRESS B',
+        'job_no' => 'PB-01',
+        'row_no' => 1,
+        'row_type' => 'job',
+        'plan' => 2000,
+        'ok' => 0,
+        'repair' => 0,
+        'reject' => 0,
+        'status' => 'pending',
+    ]);
+
+    // Request filter PRESS A -> harus tampil data aktual PRESS A (OK: 800, Repair: 30, Reject: 20)
+    $responseA = $this->actingAs($user)->get(route('ppc.planning.production_plan', [
+        'date' => $date,
+        'press' => 'PRESS A',
+        'shift' => 'Shift Pagi',
+    ]));
+
+    $responseA->assertOk();
+    $responseA->assertSee('<span class="text-xl font-black text-emerald-600">800</span>', false);
+    $responseA->assertSee('<span class="text-xl font-black text-indigo-600">30</span>', false);
+    $responseA->assertSee('<span class="text-xl font-black text-rose-600">20</span>', false);
+
+    // Request filter PRESS B -> harus tampil 0 untuk semua card actual (tidak boleh tercampur dengan PRESS A)
+    $responseB = $this->actingAs($user)->get(route('ppc.planning.production_plan', [
+        'date' => $date,
+        'press' => 'PRESS B',
+        'shift' => 'Shift Pagi',
+    ]));
+
+    $responseB->assertOk();
+    $responseB->assertSee('<span class="text-xl font-black text-emerald-600">0</span>', false);
+    $responseB->assertSee('<span class="text-xl font-black text-indigo-600">0</span>', false);
+    $responseB->assertSee('<span class="text-xl font-black text-rose-600">0</span>', false);
+    $responseB->assertDontSee('<span class="text-xl font-black text-emerald-600">800</span>', false);
+    $responseB->assertDontSee('<span class="text-xl font-black text-rose-600">20</span>', false);
+});

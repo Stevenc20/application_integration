@@ -44,21 +44,39 @@ class ProductionPlanController extends Controller
                     continue;
                 }
 
+                // Cari JobMaster terhubung: via format -{$plan->id}, atau slug AUTO-{jm}-{$plan->id}, atau job_number sama
                 $job = $mergeService->findLinkedJobMaster((int) $plan->id);
+                if (! $job && $jn !== '') {
+                    $job = \App\Models\JobMaster::where('job_number', $jn)
+                        ->orWhere('job_number', 'LIKE', "{$jn}-%")
+                        ->first();
+                }
 
                 if ($job) {
-                    $daily = \App\Models\DailyProduction::where('job_master_id', $job->id)
-                        ->whereDate('work_date', $date)
-                        ->first();
+                    // Cari juga child job masters jika job ini di-split
+                    $childPlanIds = ProductionPlan::where('parent_job_id', $plan->id)->pluck('id')->toArray();
+                    $targetJobIds = [$job->id];
+                    if (! empty($childPlanIds)) {
+                        $childJobs = \App\Models\JobMaster::where(function ($q) use ($childPlanIds) {
+                            foreach ($childPlanIds as $cId) {
+                                $q->orWhere('job_number', 'LIKE', "%-{$cId}");
+                            }
+                        })->pluck('id')->toArray();
+                        $targetJobIds = array_unique(array_merge($targetJobIds, $childJobs));
+                    }
 
-                    if ($daily) {
-                        $ok = $daily->actual_ok ?? $daily->actual_qty ?? 0;
-                        $repair = $daily->actual_repair ?? $daily->repair_qty ?? 0;
-                        $reject = $daily->actual_reject ?? $daily->reject_qty ?? 0;
+                    $dailyRecords = \App\Models\DailyProduction::whereIn('job_master_id', $targetJobIds)
+                        ->whereDate('work_date', $date)
+                        ->get();
+
+                    if ($dailyRecords->isNotEmpty()) {
+                        $ok = $dailyRecords->sum(fn ($d) => $d->actual_ok ?? $d->actual_qty ?? 0);
+                        $repair = $dailyRecords->sum(fn ($d) => $d->actual_repair ?? $d->repair_qty ?? 0);
+                        $reject = $dailyRecords->sum(fn ($d) => $d->actual_reject ?? $d->reject_qty ?? 0);
                     } else {
-                        $ok = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('ok_qty');
-                        $repair = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('repair_qty');
-                        $reject = \App\Models\ProductionLog::where('job_master_id', $job->id)->sum('reject_qty');
+                        $ok = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)->sum('ok_qty');
+                        $repair = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)->sum('repair_qty');
+                        $reject = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)->sum('reject_qty');
                     }
 
                     $plan->update([
@@ -182,8 +200,10 @@ class ProductionPlanController extends Controller
             ->get();
 
         // =====================================
-        // TOTAL FINISH ROW (from ALL data, so sums are accurate)
+        // TOTAL FINISH ROW (from filtered line & shift data, so sums are accurate)
         // =====================================
+        $jobPlans = $allPlans->where('row_type', 'job');
+
         $totalFinishRow = $allPlans->filter(function ($row) {
             $jm = strtoupper($row->job_master ?? '');
             $jn = strtoupper($row->job_no ?? '');
@@ -194,8 +214,6 @@ class ProductionPlanController extends Controller
 
         // FALLBACK: Generate automatic summary if explicit row is missing
         if (! $totalFinishRow && $allPlans->count() > 0) {
-            $jobPlans = $allPlans->where('row_type', 'job');
-
             $totalFinishRow = (object) [
                 'id' => 0,
                 'plan' => $jobPlans->sum('plan'),
@@ -226,6 +244,12 @@ class ProductionPlanController extends Controller
                 'job_no' => 'TOTAL FINISH',
                 'keterangan' => '',
             ];
+        } elseif ($totalFinishRow && $jobPlans->isNotEmpty()) {
+            // Selalu update nilai aktual ok, repair, reject dari agregasi job plan aktif line ini
+            // agar data aktual card tidak beku di nilai Excel (0 atau parameter lama)
+            $totalFinishRow->ok = (float) $jobPlans->sum('ok');
+            $totalFinishRow->repair = (float) $jobPlans->sum('repair');
+            $totalFinishRow->reject = (float) $jobPlans->sum('reject');
         }
 
         // Card summaries from all data
