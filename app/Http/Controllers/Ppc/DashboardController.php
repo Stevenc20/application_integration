@@ -14,30 +14,22 @@ class DashboardController extends Controller
     {
         $today = Carbon::today()->toDateString();
 
-        // Tanggal aktif: pakai tanggal request, jika tidak ada pakai tanggal terakhir
-        // yang punya schedule (supaya hasil upload PPC tetap terlihat).
         $requestDate = request('date');
-        $hasScheduleOnRequestDate = false;
+        $hasScheduleToday = ProductionPlan::whereDate('plan_date', $today)
+            ->where('row_type', 'job')
+            ->exists();
 
         if ($requestDate && preg_match('/^\d{4}-\d{2}-\d{2}$/', $requestDate)) {
             $activeDate = $requestDate;
-            $hasScheduleOnRequestDate = ProductionPlan::whereDate('plan_date', $activeDate)
-                ->where('row_type', 'job')
-                ->exists();
-        } else {
+        } elseif ($hasScheduleToday) {
+            // Jika hari ini sudah ada schedule, selalu prioritaskan hari ini
             $activeDate = $today;
-        }
-
-        if (! $hasScheduleOnRequestDate) {
+        } else {
+            // Jika hari ini belum ada schedule, fallback ke tanggal schedule terbaru
             $latestPlanDate = ProductionPlan::where('row_type', 'job')
                 ->max('plan_date');
 
-            if ($latestPlanDate) {
-                $latestPlanDate = Carbon::parse($latestPlanDate)->toDateString();
-                if (! $requestDate || $latestPlanDate !== Carbon::parse($requestDate)->toDateString()) {
-                    $activeDate = $latestPlanDate;
-                }
-            }
+            $activeDate = $latestPlanDate ? Carbon::parse($latestPlanDate)->toDateString() : $today;
         }
 
         $baseQuery = fn () => ProductionPlan::whereDate('plan_date', $activeDate)
