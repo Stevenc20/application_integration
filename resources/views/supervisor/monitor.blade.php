@@ -784,8 +784,8 @@
             </table>
         </div>
     </div>
-    <div class="monitor-bottom-bar" id="monitorBottomBar">
-        <div class="display-item-info" id="displayItemInfo">0 item</div>
+    <div class="monitor-bottom-bar" id="monitorBottomBar" style="display:none;">
+        <div class="display-item-info" id="displayItemInfo"></div>
         <div class="display-pager" id="displayPager">
             <button type="button" id="displayPrev" title="Halaman sebelumnya">&lsaquo;</button>
             <span id="displayPageInfo">1 / 1</span>
@@ -1105,6 +1105,11 @@ let displayMode = 'auto';
 let scrollIntervalSec = 20;
 
 function updateDisplayControls() {
+    const bottomBar = document.getElementById('monitorBottomBar');
+    if (bottomBar) {
+        bottomBar.style.display = selectedLine === null ? 'none' : 'flex';
+    }
+
     const showPager = selectedLine !== null && detailPages > 1;
     const pager = document.getElementById('displayPager');
     if (pager) pager.classList.toggle('show', showPager);
@@ -1126,7 +1131,7 @@ function updateDisplayControls() {
     const itemInfo = document.getElementById('displayItemInfo');
     if (itemInfo) {
         if (selectedLine === null) {
-            itemInfo.textContent = 'Pilih Press A–D untuk detail item';
+            itemInfo.textContent = '';
         } else if (detailTotalRows > 15) {
             const end = Math.min((detailPage + 1) * 15, detailTotalRows);
             itemInfo.textContent = end + ' / ' + detailTotalRows + ' item';
