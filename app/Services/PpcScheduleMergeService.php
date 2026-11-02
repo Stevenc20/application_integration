@@ -526,13 +526,18 @@ class PpcScheduleMergeService
         }
 
         if ($cleanJobNo !== '' && ! in_array($cleanJobNo, ['-', 'BREAK'], true)) {
+            $noKey = $shiftName.'||'.$lineId.'||'.$cleanJobNo;
+            $match = $this->popCandidatePlan($indexes['byJobNoQueue'], $noKey, $usedPlanIds);
+            if ($match) {
+                return $match;
+            }
+
             $noStartKey = $shiftName.'||'.$lineId.'||'.$cleanJobNo.'||'.$cleanStart;
             $match = $this->firstUnique($indexes['byJobNoStart'], $noStartKey);
             if ($match && !isset($usedPlanIds[(int) $match->id])) {
                 return $match;
             }
 
-            $noKey = $shiftName.'||'.$lineId.'||'.$cleanJobNo;
             $match = $this->firstUnique($indexes['byJobNo'], $noKey);
             if ($match && !isset($usedPlanIds[(int) $match->id])) {
                 return $match;
@@ -541,6 +546,11 @@ class PpcScheduleMergeService
 
         if ($cleanJobMaster !== '' && $cleanJobMaster !== 'BREAK') {
             $jobMasterKey = $shiftName.'||'.$lineId.'||'.$cleanJobMaster;
+            $match = $this->popCandidatePlan($indexes['byJobMasterQueue'], $jobMasterKey, $usedPlanIds);
+            if ($match) {
+                return $match;
+            }
+
             $looseKey = $jobMasterKey.'||'.(int) $finalRowNo;
             $match = $this->firstUnique($indexes['byLooseKey'], $looseKey);
             if ($match && !isset($usedPlanIds[(int) $match->id])) {

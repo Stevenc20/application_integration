@@ -105,6 +105,33 @@
     </div>
     @endif
 
+    {{-- PPC SCHEDULE REVISION NOTICE BANNER --}}
+    @if(isset($latestScheduleRevision) && $latestScheduleRevision)
+    <div class="flex items-start gap-3 bg-blue-50 border border-blue-200 rounded-2xl px-5 py-4 mb-6 shadow-sm">
+        <div class="w-9 h-9 rounded-lg bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-sm">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+        </div>
+        <div class="min-w-0 flex-1">
+            <div class="flex flex-wrap items-center gap-2">
+                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-black bg-blue-600 text-white tracking-wider">
+                    JADWAL REVISI PPC
+                </span>
+                <span class="text-xs font-semibold text-blue-700">
+                    {{ $latestScheduleRevision->shift_name ?: 'Shift' }} &bull; {{ $latestScheduleRevision->created_at?->format('d M Y H:i') }}
+                </span>
+            </div>
+            <p class="text-sm font-semibold text-gray-800 mt-1">
+                Jadwal ini merupakan revisi terbaru dari tim PPC. Di-upload oleh <span class="font-bold text-blue-900 underline">{{ $latestScheduleRevision->creator?->name ?? 'Tim PPC' }}</span>.
+            </p>
+            <p class="text-xs text-gray-600 mt-0.5">
+                Urutan item otomatis disesuaikan dengan revisi terbaru. Data item yang sedang running atau sudah selesai diproses tetap dipertahankan dengan aman.
+            </p>
+        </div>
+    </div>
+    @endif
+
         {{-- 
         BAGIAN FILTER DATA
         Berfungsi untuk membatasi tampilan Job agar operator fokus pada Line-nya masing-masing.

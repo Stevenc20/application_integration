@@ -564,6 +564,19 @@ class InputHarianController extends Controller
             $isOrphanActiveJob = !in_array($activeJob->job_number, $scheduledJobNumbers);
         }
 
+        // Ambil info revisi schedule terbaru dari PPC untuk notifikasi Leader
+        $latestScheduleRevision = \App\Models\ScheduleRevision::whereDate('plan_date', $date)
+            ->where(function ($q) use ($currentShift) {
+                if ($currentShift !== 'all') {
+                    $clean = preg_replace('/\bshift\s*/i', '', $currentShift);
+                    $q->where('shift_name', 'LIKE', "%{$clean}%")
+                      ->orWhere('shift_name', 'LIKE', "%{$currentShift}%");
+                }
+            })
+            ->with('creator')
+            ->orderByDesc('id')
+            ->first();
+
         return view('operational.input_harian', [
             'jobs'            => $plans, 
             'pendingJobs'     => $pendingJobs,
@@ -573,6 +586,7 @@ class InputHarianController extends Controller
             'activeJob'       => $activeJob,
             'orphanRunningJob' => $orphanRunningJob,
             'isOrphanActiveJob' => $isOrphanActiveJob,
+            'latestScheduleRevision' => $latestScheduleRevision,
             'productionLogs'  => $productionLogs,
             'lastInputAt'     => $lastInputAt,
             'currentShift'    => $currentShift,

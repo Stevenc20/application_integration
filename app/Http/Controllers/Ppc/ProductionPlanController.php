@@ -163,8 +163,7 @@ class ProductionPlanController extends Controller
         if ($request->filled('status') && $request->status !== '') {
             $allPlans->where(DB::raw('LOWER(status)'), strtolower($request->status));
         }
-        $allPlans = $allPlans->orderByRaw("CASE WHEN LOWER(status) = 'running' THEN 0 ELSE 1 END")
-            ->orderBy('row_no', 'asc')
+        $allPlans = $allPlans->orderBy('row_no', 'asc')
             ->get();
 
         // =====================================
@@ -183,8 +182,7 @@ class ProductionPlanController extends Controller
         if ($request->filled('status') && $request->status !== '') {
             $plans->where(DB::raw('LOWER(status)'), strtolower($request->status));
         }
-        $plans = $plans->orderByRaw("CASE WHEN LOWER(status) = 'running' THEN 0 ELSE 1 END")
-            ->orderBy('row_no', 'asc')
+        $plans = $plans->orderBy('row_no', 'asc')
             ->where(function ($q) {
                 $q->where('row_type', '!=', 'total_finish')
                     ->where('row_type', '!=', 'note')

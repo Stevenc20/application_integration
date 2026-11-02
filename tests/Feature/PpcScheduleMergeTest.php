@@ -720,3 +720,92 @@ test('a new revision row gets its job master in input harian normal flow', funct
     expect($job->job_name)->toBe('JOB NEW');
     expect((int) $job->target_qty)->toBe(100);
 });
+
+test('revision changes row order while preserving completed and running items without duplication', function () {
+    Carbon::setTestNow('2026-10-23 11:00:00');
+
+    $line = ppcLine();
+    $date = '2026-10-23';
+
+    // 1. Initial schedule with 3 jobs
+    $plan1 = ppcPlan($line, $date, ['job_master' => 'PART X', 'job_no' => 'AA-1001', 'row_no' => 1, 'plan' => 100]);
+    $plan2 = ppcPlan($line, $date, ['job_master' => 'PART Y', 'job_no' => 'AA-3446', 'row_no' => 2, 'plan' => 200]);
+    $plan3 = ppcPlan($line, $date, ['job_master' => 'PART Z', 'job_no' => 'AA-5000', 'row_no' => 3, 'plan' => 300]);
+
+    // Attach JobMaster with production progress on AA-3446 (already completed) and AA-1001 (running)
+    $job1 = JobMaster::create([
+        'job_number' => 'AA-1001-'.$plan1->id,
+        'job_name' => 'PART X',
+        'line' => 'PRESS A',
+        'sequence_no' => 1,
+        'target_qty' => 100,
+        'status' => 'running',
+    ]);
+    $plan1->update(['status' => 'running', 'ok' => 45]);
+
+    $job2 = JobMaster::create([
+        'job_number' => 'AA-3446-'.$plan2->id,
+        'job_name' => 'PART Y',
+        'line' => 'PRESS A',
+        'sequence_no' => 2,
+        'target_qty' => 200,
+        'status' => 'complete',
+    ]);
+    $plan2->update(['status' => 'complete', 'ok' => 200]);
+
+    $ppcUser = User::create([
+        'name' => 'Rangga PPC',
+        'nrp' => 'PPC-RANGGA',
+        'password' => bcrypt('secret'),
+        'role' => 'ppc',
+    ]);
+
+    // 2. Upload revision: AA-3446 moves from row 2 to row 3, new job AA-9999 inserted at row 2, AA-1001 stays at row 1
+    app(PpcScheduleMergeService::class)->merge([
+        ppcSheet('Shift Pagi (Rev)', 'PRESS A', [
+            ppcRow(['job_master' => 'PART X', 'job_no' => 'AA-1001', 'row_no' => 1, 'plan' => 100]),
+            ppcRow(['job_master' => 'PART NEW', 'job_no' => 'AA-9999', 'row_no' => 2, 'plan' => 150]),
+            ppcRow(['job_master' => 'PART Y', 'job_no' => 'AA-3446', 'row_no' => 3, 'plan' => 250]),
+            ppcRow(['job_master' => 'PART Z', 'job_no' => 'AA-5000', 'row_no' => 4, 'plan' => 300]),
+        ]),
+    ], $date, $ppcUser->id);
+
+    // Verify plans count (no duplicate AA-3446 or AA-1001)
+    expect(ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'AA-3446')->count())->toBe(1);
+    expect(ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'AA-1001')->count())->toBe(1);
+
+    // AA-3446 row_no moved to 3, but completed status and actual ok remain intact
+    $updatedPlan2 = ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'AA-3446')->first();
+    expect($updatedPlan2->row_no)->toBe(3);
+    expect($updatedPlan2->status)->toBe('complete');
+    expect((float) $updatedPlan2->ok)->toBe(200.0);
+
+    // AA-1001 running status remains intact
+    $updatedPlan1 = ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'AA-1001')->first();
+    expect($updatedPlan1->row_no)->toBe(1);
+    expect($updatedPlan1->status)->toBe('running');
+    expect((float) $updatedPlan1->ok)->toBe(45.0);
+
+    // 3. Check Input Harian sync and revision notice banner
+    $leader = User::create([
+        'name' => 'Leader Press A',
+        'nrp' => 'LEADER-A',
+        'password' => bcrypt('secret'),
+        'role' => 'leader a',
+    ]);
+
+    $response = $this->actingAs($leader)
+        ->get(route('operational.input_harian', [
+            'date' => $date,
+            'shift' => 'Shift Pagi',
+            'line' => 'Line A',
+        ]))
+        ->assertOk();
+
+    $content = $response->getContent();
+    expect($content)->toContain('JADWAL REVISI PPC');
+    expect($content)->toContain('Rangga PPC');
+
+    // JobMaster sequence for AA-3446 is also updated to 3
+    expect($job2->fresh()->sequence_no)->toBe(3);
+});
