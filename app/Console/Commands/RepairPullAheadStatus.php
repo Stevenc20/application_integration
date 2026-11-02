@@ -6,6 +6,7 @@ use Illuminate\Console\Command;
 use App\Models\ProductionPlan;
 use App\Models\JobMaster;
 use App\Models\PullAheadRequest;
+use App\Models\DailyProduction;
 use Illuminate\Support\Facades\DB;
 
 class RepairPullAheadStatus extends Command
@@ -22,33 +23,18 @@ class RepairPullAheadStatus extends Command
      *
      * @var string
      */
-    protected $description = 'Perbaiki plan dan status JobMaster/ProductionPlan shift asal yang ditarik shift (misal shift malam) yang keliru menjadi complete atau plannya belum berkurang.';
+    protected $description = 'Perbaiki plan dan status JobMaster/ProductionPlan shift malam atau shift lain yang keliru complete padahal belum diproduksi.';
 
     /**
      * Execute the console command.
      */
     public function handle()
     {
-        $this->info("=== REPAIR PULL AHEAD STATUS & PLAN QTY ===");
+        $this->info("=== REPAIR PRODUCTION STATUS & PLAN QTY ===");
 
-        // Cari semua pull ahead requests yang statusnya APPLIED atau APPROVED
+        // 1. Perbaiki berdasarkan PullAheadRequest
         $requests = PullAheadRequest::whereIn('status', ['APPLIED', 'APPROVED'])->get();
-
-        if ($requests->isEmpty()) {
-            $this->warn("Tidak ditemukan record PullAheadRequest dengan status APPLIED/APPROVED.");
-            
-            // Cek manual jika ada plan RC-2764 FNS di shift malam
-            $manualNightPlans = ProductionPlan::where('job_no', 'like', '%RC-2764%')
-                ->orWhere('job_master', 'like', '%RC-2764%')
-                ->get();
-                
-            foreach ($manualNightPlans as $p) {
-                $this->info("Check plan ID {$p->id}: {$p->job_no} | Date: {$p->plan_date} | Shift: {$p->shift_name} | Plan: {$p->plan} | Status: {$p->status}");
-            }
-            return 0;
-        }
-
-        $fixedCount = 0;
+        $this->info("Ditemukan " . $requests->count() . " PullAheadRequest.");
 
         foreach ($requests as $req) {
             $originalPlan = ProductionPlan::find($req->original_plan_id);
@@ -58,68 +44,62 @@ class RepairPullAheadStatus extends Command
 
             $qtyApproved = (float)($req->qty_approved ?: $req->qty_requested);
             $baseQty = (float)($originalPlan->original_plan ?: ($originalPlan->plan + $qtyApproved));
-
-            // Sisa plan seharusnya
             $expectedRemaining = max(0, $baseQty - $qtyApproved);
 
-            $this->info("Memeriksa Plan Asal ID: {$originalPlan->id} ({$originalPlan->job_no}) [{$originalPlan->shift_name}]");
-            $this->line("  Base Qty: {$baseQty}, Qty Ditarik: {$qtyApproved}, Sisa Seharusnya: {$expectedRemaining}");
+            $this->info("PullAhead Plan Asal ID {$originalPlan->id}: {$originalPlan->job_no} | Base: {$baseQty} | Ditarik: {$qtyApproved} | Sisa Seharusnya: {$expectedRemaining}");
 
-            $updated = false;
+            $originalPlan->original_plan = $baseQty;
+            $originalPlan->plan = $expectedRemaining;
+            $originalPlan->remaining_plan = $expectedRemaining;
+            $originalPlan->status = 'pending';
+            $originalPlan->save();
 
-            if ($originalPlan->original_plan === null) {
-                $originalPlan->original_plan = $baseQty;
-                $updated = true;
+            // Sync JobMaster yang berakhiran -{originalPlan->id}
+            $origJms = JobMaster::where('job_number', 'LIKE', "%-{$originalPlan->id}")->get();
+            foreach ($origJms as $jm) {
+                $this->warn("  -> Reset JobMaster #{$jm->id} ({$jm->job_number}) status: '{$jm->status}' -> 'pending', target_qty: {$expectedRemaining}");
+                $jm->target_qty = (int)$expectedRemaining;
+                $jm->status = 'pending';
+                $jm->finished_at = null;
+                $jm->save();
             }
-
-            // Jika plan belum dikurangi
-            if ((float)$originalPlan->plan > $expectedRemaining && $expectedRemaining > 0) {
-                $this->warn("  -> Memperbarui plan dari {$originalPlan->plan} ke {$expectedRemaining}");
-                $originalPlan->plan = $expectedRemaining;
-                $originalPlan->remaining_plan = $expectedRemaining;
-                $updated = true;
-            }
-
-            // Jika status keliru completed padahal actual ok belum memenuhi plan
-            if (in_array(strtolower($originalPlan->status), ['completed', 'complete']) && (float)($originalPlan->ok ?? 0) < $originalPlan->plan) {
-                $this->warn("  -> Mengembalikan status plan dari '{$originalPlan->status}' ke 'pending'");
-                $originalPlan->status = 'pending';
-                $updated = true;
-            }
-
-            if ($updated) {
-                $originalPlan->save();
-            }
-
-            // Cek dan sync ke JobMaster asal
-            $origIdentifier = $originalPlan->job_no 
-                ? ($originalPlan->job_no . '-' . $originalPlan->id) 
-                : ('AUTO-' . \Illuminate\Support\Str::slug($originalPlan->job_master) . '-' . $originalPlan->id);
-
-            $origJm = JobMaster::where('job_number', $origIdentifier)->first();
-            if ($origJm) {
-                $jmUpdated = false;
-                if ((float)$origJm->target_qty != (float)$originalPlan->plan) {
-                    $this->warn("  -> Memperbarui JobMaster target_qty ke {$originalPlan->plan}");
-                    $origJm->target_qty = (int) $originalPlan->plan;
-                    $jmUpdated = true;
-                }
-
-                if (in_array(strtolower($origJm->status), ['complete', 'completed', 'finished', 'closed'])) {
-                    $this->warn("  -> Mengembalikan status JobMaster dari '{$origJm->status}' ke 'pending'");
-                    $origJm->status = 'pending';
-                    $jmUpdated = true;
-                }
-
-                if ($jmUpdated) {
-                    $origJm->save();
-                }
-            }
-
-            $fixedCount++;
         }
 
-        $this->info("\nSelesai! Sebanyak {$fixedCount} data request diperiksa dan diselaraskan.");
+        // 2. Scan SEMUA JobMaster & ProductionPlan di Shift Malam (atau shift aktif) yang statusnya COMPLETE tapi actual_ok/actual_qty = 0 dan belum pernah diproduksi
+        $this->info("\nMemeriksa JobMaster yang keliru 'complete' padahal actual_ok = 0...");
+        
+        $falseCompleteJms = JobMaster::whereIn(DB::raw('LOWER(status)'), ['complete', 'completed', 'finished', 'closed'])
+            ->get();
+
+        $fixedJmCount = 0;
+        foreach ($falseCompleteJms as $jm) {
+            // Cek apakah ada daily production dengan actual > 0
+            $daily = DailyProduction::where('job_master_id', $jm->id)->first();
+            $actQty = (float)($daily ? ($daily->actual_ok + $daily->actual_repair + $daily->actual_reject) : 0);
+
+            // Ekstrak plan_id jika ada
+            $parts = explode('-', $jm->job_number);
+            $planId = end($parts);
+            $plan = is_numeric($planId) ? ProductionPlan::find($planId) : null;
+            $planOk = (float)($plan->ok ?? 0);
+
+            // Jika actual_ok = 0 dan plan_ok = 0, ini adalah item yang belum diproduksi dan salah di-complete!
+            if ($actQty <= 0 && $planOk <= 0) {
+                $this->warn("Reset False Complete JobMaster ID {$jm->id} ({$jm->job_number} / {$jm->job_name}): status -> 'pending'");
+                $jm->status = 'pending';
+                $jm->finished_at = null;
+                $jm->save();
+
+                if ($plan) {
+                    $plan->status = 'pending';
+                    $plan->act_finish = null;
+                    $plan->save();
+                }
+                $fixedJmCount++;
+            }
+        }
+
+        $this->info("\nSelesai! Sebanyak {$fixedJmCount} JobMaster false-complete berhasil dikembalikan ke status 'pending'.");
         return 0;
     }
 }
