@@ -806,19 +806,14 @@ class ProductionService
                 ]
             );
 
-            // AUTO-START NEXT JOB WITH DANDORI IF SPECIFIED OR AUTO-DETECT
+            // AUTO-START NEXT JOB WITH DANDORI IF EXPLICITLY SPECIFIED ONLY
             // Sentinels (STOP_SESSION, FINISH_ONLY, SHIFT_CUTOFF, ...) must never be
             // treated as a job id, otherwise startDandori() receives a non-numeric string.
-            if (is_string($nextJobId) && ! is_numeric($nextJobId)) {
-                $resolvedNextJobId = null;
-            } else {
-                $resolvedNextJobId = $nextJobId;
-                if (empty($resolvedNextJobId)) {
-                    $nextJob = $this->getNextJob($jobId);
-                    if ($nextJob) {
-                        $resolvedNextJobId = $nextJob->id;
-                    }
-                }
+            // PENTING: JANGAN auto-start / auto-dandori item berikutnya secara otomatis tanpa pilihan eksplisit operator
+            // agar tidak terjadi anomali item berjalan sendiri tanpa sepengetahuan line operator!
+            $resolvedNextJobId = null;
+            if (!empty($nextJobId) && is_numeric($nextJobId) && (int) $nextJobId > 0) {
+                $resolvedNextJobId = (int) $nextJobId;
             }
 
             if ($resolvedNextJobId) {
