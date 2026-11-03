@@ -455,13 +455,20 @@
 
                 if ($isJobActiveOrDone || !empty($segments)) {
                     // Determine anchor start & end
-                    $jobStart = $job->started_at
-                        ? \Carbon\Carbon::parse($job->started_at)
-                        : ($earliest ?: ($thePlan?->start_time ? \Carbon\Carbon::parse($jobWorkDate.' '.substr($thePlan->start_time, 0, 5)) : \Carbon\Carbon::parse($jobWorkDate.' 07:30:00')));
+                    // IMPORTANT: If job has dandori before job->started_at, anchor jobStart to $earliest so dandori is never cut off!
+                    $jobStart = ($earliest && $job->started_at)
+                        ? ($earliest < \Carbon\Carbon::parse($job->started_at) ? $earliest : \Carbon\Carbon::parse($job->started_at))
+                        : ($job->started_at
+                            ? \Carbon\Carbon::parse($job->started_at)
+                            : ($earliest ?: ($thePlan?->start_time ? \Carbon\Carbon::parse($jobWorkDate.' '.substr($thePlan->start_time, 0, 5)) : \Carbon\Carbon::parse($jobWorkDate.' 07:30:00'))));
 
                     $jobEnd = $job->finished_at
                         ? \Carbon\Carbon::parse($job->finished_at)
                         : ($latest ?: ($thePlan?->finish_time ? \Carbon\Carbon::parse($jobWorkDate.' '.substr($thePlan->finish_time, 0, 5)) : now()));
+
+                    if ($latest && $latest > $jobEnd) {
+                        $jobEnd = $latest->copy();
+                    }
 
                     if ($jobEnd <= $jobStart) {
                         $jobEnd = $jobStart->copy()->addSeconds(max((int)$runtime, 300));
