@@ -388,6 +388,49 @@ class DashboardDetailService
                 }
             }
 
+            // Catatan: Jika kuantitas agregat produksi lebih besar dari total kuantitas log manual yang tercatat
+            // (misal log manual parsial atau seluruhnya diinput via finalisasi job atau LKH),
+            // tambahkan baris selisih agregat tanpa membuat data palsu (Root cause, Countermeasure, PIC, dan Foto tetap '-' dan kosong).
+            $loggedRepairTotal = array_sum(array_column($allRepairList, 'qty'));
+            if ($actualRepair > $loggedRepairTotal) {
+                $unloggedRepairQty = $actualRepair - $loggedRepairTotal;
+                $defectLabel = $loggedRepairTotal > 0 ? 'Repair (Sisa Agregat Produksi)' : 'Repair (Agregat Produksi)';
+                $allRepairList[] = [
+                    'id' => 0,
+                    'type' => 'REPAIR',
+                    'defect_name' => $defectLabel,
+                    'qty' => $unloggedRepairQty,
+                    'repair_category' => '-',
+                    'area_problem' => '-',
+                    'root_cause' => '-',
+                    'countermeasure' => '-',
+                    'pic' => '-',
+                    'time' => '-',
+                    'images' => [],
+                    'is_aggregate' => true,
+                ];
+            }
+
+            $loggedRejectTotal = array_sum(array_column($allRejectList, 'qty'));
+            if ($actualReject > $loggedRejectTotal) {
+                $unloggedRejectQty = $actualReject - $loggedRejectTotal;
+                $defectLabel = $loggedRejectTotal > 0 ? 'Reject (Sisa Agregat Produksi)' : 'Reject (Agregat Produksi)';
+                $allRejectList[] = [
+                    'id' => 0,
+                    'type' => 'REJECT',
+                    'defect_name' => $defectLabel,
+                    'qty' => $unloggedRejectQty,
+                    'repair_category' => '-',
+                    'area_problem' => '-',
+                    'root_cause' => '-',
+                    'countermeasure' => '-',
+                    'pic' => '-',
+                    'time' => '-',
+                    'images' => [],
+                    'is_aggregate' => true,
+                ];
+            }
+
             $rows[] = [
                 'no' => $no,
                 'job_master_id' => $jobId,

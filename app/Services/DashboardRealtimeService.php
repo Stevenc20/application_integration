@@ -450,60 +450,56 @@ class DashboardRealtimeService
             }
         }
 
-        // Fallback jika belum ada RepairRejectLog detail tapi ada dailyRecords repair/reject
-        if (empty($repairRows)) {
-            foreach ($dailyRecords as $dp) {
-                if ($dp->actual_repair > 0) {
-                    $job = $dp->jobMaster;
-                    $fallbackPic = '-';
-                    if (! empty($dp->saved_by)) {
-                        $fallbackPic = \App\Models\User::find($dp->saved_by)?->name ?? '-';
-                    }
-                    $repairRows[] = [
-                        'no' => count($repairRows) + 1,
-                        'type' => 'REPAIR',
-                        'item' => $shortJob($job?->job_name),
-                        'job' => $job?->job_number ?? '-',
-                        'defect_name' => 'Defect',
-                        'problem' => 'Defect',
-                        'qty' => (int) $dp->actual_repair,
-                        'repair_category' => '-',
-                        'area_problem' => '-',
-                        'root_cause' => '-',
-                        'countermeasure' => '-',
-                        'pic' => $fallbackPic,
-                        'time' => '-',
-                        'images' => [],
-                    ];
-                }
-            }
-        }
+        // Fallback jika belum semua Repair/Reject tercatat di RepairRejectLog tapi ada di dailyRecords
+        $loggedRepairMap = collect($repairRows)->groupBy('job')->map(fn ($rows) => $rows->sum('qty'));
+        $loggedRejectMap = collect($rejectRows)->groupBy('job')->map(fn ($rows) => $rows->sum('qty'));
 
-        if (empty($rejectRows)) {
-            foreach ($dailyRecords as $dp) {
-                if ($dp->actual_reject > 0) {
-                    $job = $dp->jobMaster;
-                    $fallbackPic = '-';
-                    if (! empty($dp->saved_by)) {
-                        $fallbackPic = \App\Models\User::find($dp->saved_by)?->name ?? '-';
-                    }
-                    $rejectRows[] = [
-                        'no' => count($rejectRows) + 1,
-                        'type' => 'REJECT',
-                        'item' => $shortJob($job?->job_name),
-                        'job' => $job?->job_number ?? '-',
-                        'defect_name' => 'Reject',
-                        'problem' => 'Reject',
-                        'qty' => (int) $dp->actual_reject,
-                        'repair_category' => '-',
-                        'area_problem' => '-',
-                        'root_cause' => '-',
-                        'countermeasure' => '-',
-                        'pic' => $fallbackPic,
-                        'time' => '-',
-                        'images' => [],
-                    ];
-                }
+        foreach ($dailyRecords as $dp) {
+            $job = $dp->jobMaster;
+            $jobKey = $job?->job_number ?? '-';
+
+            $totalLoggedRepair = $loggedRepairMap->get($jobKey, 0);
+            if ($dp->actual_repair > $totalLoggedRepair) {
+                $unloggedQty = (int) ($dp->actual_repair - $totalLoggedRepair);
+                $repairRows[] = [
+                    'no' => count($repairRows) + 1,
+                    'type' => 'REPAIR',
+                    'item' => $shortJob($job?->job_name),
+                    'job' => $jobKey,
+                    'defect_name' => 'Repair (Sisa Agregat)',
+                    'problem' => 'Repair (Sisa Agregat)',
+                    'qty' => $unloggedQty,
+                    'repair_category' => '-',
+                    'area_problem' => '-',
+                    'root_cause' => '-',
+                    'countermeasure' => '-',
+                    'pic' => '-',
+                    'time' => '-',
+                    'images' => [],
+                    'is_aggregate' => true,
+                ];
+            }
+
+            $totalLoggedReject = $loggedRejectMap->get($jobKey, 0);
+            if ($dp->actual_reject > $totalLoggedReject) {
+                $unloggedQty = (int) ($dp->actual_reject - $totalLoggedReject);
+                $rejectRows[] = [
+                    'no' => count($rejectRows) + 1,
+                    'type' => 'REJECT',
+                    'item' => $shortJob($job?->job_name),
+                    'job' => $jobKey,
+                    'defect_name' => 'Reject (Sisa Agregat)',
+                    'problem' => 'Reject (Sisa Agregat)',
+                    'qty' => $unloggedQty,
+                    'repair_category' => '-',
+                    'area_problem' => '-',
+                    'root_cause' => '-',
+                    'countermeasure' => '-',
+                    'pic' => '-',
+                    'time' => '-',
+                    'images' => [],
+                    'is_aggregate' => true,
+                ];
             }
         }
 

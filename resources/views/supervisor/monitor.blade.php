@@ -2152,13 +2152,17 @@ window.openDefectDetailModal = function(rowIndex, type) {
                 `;
             }
 
+            const isAggr = !!rr.is_aggregate;
+            const aggrNotice = isAggr ? '<span style="display:inline-block; margin-top:3px; font-size:10px; font-weight:700; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:4px;">Pencatatan Agregat Produksi (Tanpa Log Manual)</span>' : '';
+
             html += `
-                <tr style="border-bottom: 1px solid #cbd5e1;">
+                <tr style="border-bottom: 1px solid #cbd5e1; ${isAggr ? 'background: #fffbeb;' : ''}">
                     <td style="text-align: center;">
                         <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 4px 8px; border-radius: 6px; font-size: clamp(10px, 0.75vw, 12px); display:inline-block; letter-spacing:0.02em; font-weight:900;">${rr.type}</span>
                     </td>
                     <td>
                         <div style="font-weight: 800; color: #0f172a; line-height:1.4;">${rr.defect_name}</div>
+                        ${aggrNotice}
                         ${rr.area_problem && rr.area_problem !== '-' ? `<div style="font-size:clamp(10px, 0.75vw, 12px); color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${rr.area_problem}</span></div>` : ''}
                     </td>
                     <td style="text-align: center; font-weight: 900; color: ${totalColor};">
@@ -2245,14 +2249,18 @@ window.openDefectKpiModal = function(type, line) {
                 `;
             }
 
+            const isAggr = !!r.is_aggregate;
+            const aggrNotice = isAggr ? '<span style="display:inline-block; margin-top:3px; font-size:10px; font-weight:700; color:#b45309; background:#fef3c7; padding:1px 6px; border-radius:4px;">Pencatatan Agregat Produksi (Tanpa Log Manual)</span>' : '';
+
             html += `
-                <tr style="border-bottom: 1px solid #cbd5e1;">
+                <tr style="border-bottom: 1px solid #cbd5e1; ${isAggr ? 'background: #fffbeb;' : ''}">
                     <td style="text-align: center;">
                         <span style="background: ${rowBadgeBg}; color: ${rowBadgeColor}; padding: 4px 8px; border-radius: 6px; font-size: clamp(10px, 0.75vw, 12px); display:inline-block; letter-spacing:0.02em; font-weight:900;">${r.type || typeUpper}</span>
                     </td>
                     <td>
                         <div style="font-weight: 800; color: #0f172a; line-height:1.4;">${r.defect_name || r.problem || '-'}</div>
                         <div style="font-size:clamp(10px, 0.75vw, 12px); color:#2563eb; margin-top:4px; font-weight:800; background:#eff6ff; display:inline-block; padding:2px 8px; border-radius:4px; border:1px solid #dbeafe;">Job: ${r.job || r.item || '-'}</div>
+                        ${aggrNotice}
                         ${r.area_problem && r.area_problem !== '-' ? `<div style="font-size:clamp(10px, 0.75vw, 12px); color:#64748b; margin-top:4px; font-weight:600;">Area: <span style="color:#0f172a;">${r.area_problem}</span></div>` : ''}
                     </td>
                     <td style="text-align: center; font-weight: 900; color: ${totalColor};">

@@ -1,15 +1,32 @@
 @php
     $status = $job->job_data->status ?? 'pending';
-    $actualOk = $job->job_data->dailyProduction?->actual_ok ?? 0;
-    $actualRepair = $job->job_data->dailyProduction?->actual_repair ?? 0;
-    $actualReject = $job->job_data->dailyProduction?->actual_reject ?? 0;
-    $actualQty = $job->job_data->dailyProduction?->actual_qty ?? 0;
-    $efficiency = $job->job_data->dailyProduction?->efficiency ?? 0;
-    $runtime = $job->job_data->dailyProduction?->runtime_seconds ?? 0;
     $rawStatus = strtolower($job->job_data->status ?? 'pending');
     $isCompleted = in_array($rawStatus, ['complete', 'completed', 'finished', 'closed', 'done']);
     $status = $isCompleted ? 'completed' : ($rawStatus === 'running' || $rawStatus === 'paused' ? 'running' : 'pending');
     $jobId = $job->job_data->id ?? 0;
+
+    // Prioritas sumber data kuantitas:
+    // 1. Jika ada DailyProduction dan actual_qty > 0, ambil dari DailyProduction (sumber transaksi harian).
+    // 2. Jika DailyProduction null ATAU DailyProduction belum terisi (actual_qty == 0) sementara ProductionPlan sudah memiliki nilai
+    //    (misal data disinkronkan dari LKH/PPC atau job selesai/recovery), fallback ke nilai ProductionPlan.
+    $dp = $job->job_data?->dailyProduction;
+    $dpHasQty = $dp && (($dp->actual_ok ?? 0) + ($dp->actual_repair ?? 0) + ($dp->actual_reject ?? 0)) > 0;
+
+    if ($dpHasQty) {
+        $actualOk = (int) ($dp->actual_ok ?? 0);
+        $actualRepair = (int) ($dp->actual_repair ?? 0);
+        $actualReject = (int) ($dp->actual_reject ?? 0);
+        $actualQty = (int) ($dp->actual_qty ?? ($actualOk + $actualRepair + $actualReject));
+        $efficiency = (float) ($dp->efficiency ?? 0);
+        $runtime = (int) ($dp->runtime_seconds ?? 0);
+    } else {
+        $actualOk = (int) ($job->ok ?? 0);
+        $actualRepair = (int) ($job->repair ?? 0);
+        $actualReject = (int) ($job->reject ?? 0);
+        $actualQty = $actualOk + $actualRepair + $actualReject;
+        $efficiency = ($job->plan > 0) ? round(($actualOk / $job->plan) * 100, 1) : 0;
+        $runtime = (int) ($dp->runtime_seconds ?? 0);
+    }
     
     $firstPending = isset($pendingJobs) ? $pendingJobs->first() : null;
     $isFirstPending = $firstPending && $firstPending->id === $jobId;
