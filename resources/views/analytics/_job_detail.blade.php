@@ -551,8 +551,13 @@
                         if ($ev['start'] > $lastPos) {
                             $appendProdBlock($lastPos, $ev['start']);
                         }
-                        $filledSegments[] = $ev;
+                        // If this event starts after or at lastPos, push it
                         if ($ev['end'] > $lastPos) {
+                            $evToPush = $ev;
+                            if ($evToPush['start'] < $lastPos) {
+                                $evToPush['start'] = $lastPos->copy();
+                            }
+                            $filledSegments[] = $evToPush;
                             $lastPos = $ev['end']->copy();
                         }
                     }
