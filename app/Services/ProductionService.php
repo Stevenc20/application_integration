@@ -1743,7 +1743,7 @@ class ProductionService
     /**
      * Sync ProductionPlan status based on JobMaster
      */
-    private function syncPlanStatus(int $jobId, string $status)
+    public function syncPlanStatus(int $jobId, string $status)
     {
         $this->syncPlan($jobId, $status);
     }
