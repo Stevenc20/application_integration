@@ -185,17 +185,32 @@ class InputHarianController extends Controller
         // 3. Ambil data dengan status realtime (Source of Truth: ProductionPlan status is synchronized by Service)
         // DISABLE PAGINATION temporarily for MES Stabilization as requested
         // INDUSTRIAL SORTING: Sort by original PPC upload order first (row_no)
-        $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
+        $plans = $planQuery->orderBy('row_no', 'asc')->orderBy('id', 'asc')->get();
 
         // ── MERGE BREAK SPLITS ──
         $parentIds = $plans->pluck('id');
         $childPlans = \App\Models\ProductionPlan::whereIn('parent_job_id', $parentIds->filter())
             ->whereDate('plan_date', $date)
             ->where('shift_name', $latestShiftName)
+            ->orderBy('row_no', 'asc')
+            ->orderBy('id', 'asc')
             ->get()
             ->groupBy('parent_job_id');
 
         $plans = $plans->filter(fn ($p) => !$p->parent_job_id)->values();
+
+        // Identifier PPC: gabungkan parent + child (split istirahat) lalu urutkan
+        // berdasarkan row_no PPC agar antrean sama persis dengan timeline PPC.
+        $scheduledJobNumbers = $plans->concat($childPlans->flatten(1))
+            ->sortBy(fn($p) => [(int) ($p->row_no ?? 999999), (int) $p->id])
+            ->map(function($p) {
+                $jn = trim($p->job_no ?? '');
+                $jm = trim($p->job_master ?? '');
+                return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            })
+            ->unique()
+            ->values()
+            ->toArray();
 
         // MAPPING: Hubungkan setiap Plan ke JobMaster-nya (Optimized to fix N+1)
         $jobNumbers = $plans->map(function($p) {
@@ -281,16 +296,9 @@ class InputHarianController extends Controller
             return $plan;
         });
 
-        // DYNAMIC QUEUE REORDERING: Pin active 'Running' / 'Paused' job to top, rest maintain strict PPC row order
-        $plans = $plans->sort(function($a, $b) {
-            $statusA = in_array(strtolower($a->job_data?->status ?? $a->status ?? 'pending'), ['running', 'paused']) ? 0 : 1;
-            $statusB = in_array(strtolower($b->job_data?->status ?? $b->status ?? 'pending'), ['running', 'paused']) ? 0 : 1;
-
-            if ($statusA === $statusB) {
-                return $a->row_no <=> $b->row_no;
-            }
-            return $statusA <=> $statusB;
-        })->values();
+        // Urutan antrean mengikuti jadwal PPC murni (row_no, lalu id).
+        // Job running/paused tidak dipindah ke atas agar urutan tetap sama dengan PPC.
+        $plans = $plans->values();
 
         // Determine if all jobs are done (for showing "Akhiri Shift" button)
         $jobPlans = $plans->filter(fn($p) => ($p->row_type ?? 'job') === 'job');
@@ -358,21 +366,6 @@ class InputHarianController extends Controller
                 $activeJob = $activeJobQuery->first();
             } else {
                 // Today mode: cari job running realtime yang sesuai dengan jadwal aktif hari ini
-                $scheduledJobNumbers = $plans->map(function($p) {
-                    $jn = trim($p->job_no ?? '');
-                    $jm = trim($p->job_master ?? '');
-                    return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
-                })->toArray();
-
-                foreach ($childPlans as $parentId => $children) {
-                    foreach ($children as $child) {
-                        $cjn = trim($child->job_no ?? '');
-                        $cjm = trim($child->job_master ?? '');
-                        $scheduledJobNumbers[] = $cjn ? ($cjn . '-' . $child->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cjm) . '-' . $child->id);
-                    }
-                }
-                $scheduledJobNumbers = array_values(array_unique($scheduledJobNumbers));
-
                 $baseActiveQuery = function() use ($lineFilter) {
                     $q = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
                     if ($lineFilter && strtoupper($lineFilter) !== 'ALL') {
@@ -494,6 +487,14 @@ class InputHarianController extends Controller
                     }
                 }
 
+                // Pilih job aktif paling awal menurut urutan PPC, bukan yang terakhir di-update.
+                if ($activeJobs->isNotEmpty() && !empty($scheduledJobNumbers)) {
+                    $ppcOrder = array_flip($scheduledJobNumbers);
+                    $activeJobs = $activeJobs->sortBy(
+                        fn($job) => $ppcOrder[$job->job_number] ?? PHP_INT_MAX
+                    )->values();
+                }
+
                 $activeJob = $activeJobs->first();
                 $orphanRunningJob = null;
 
@@ -530,26 +531,13 @@ class InputHarianController extends Controller
         }
 
         // 5. Cari Job Pending untuk Queue Selector (Dropdown Standby)
-        // Kumpulkan identifier baik dari parent plans maupun child plans (split istirahat)
-        $scheduledJobNumbers = $plans->map(function($p) {
-            $jn = trim($p->job_no ?? '');
-            return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($p->job_master) . '-' . $p->id);
-        })->toArray();
+        // $scheduledJobNumbers sudah disusun mengikuti row_no PPC (parent + split child).
+        $ppcQueueOrder = array_flip($scheduledJobNumbers);
 
-        foreach ($childPlans as $parentId => $children) {
-            foreach ($children as $child) {
-                $cjn = trim($child->job_no ?? '');
-                $scheduledJobNumbers[] = $cjn ? ($cjn . '-' . $child->id) : ('AUTO-' . \Illuminate\Support\Str::slug($child->job_master) . '-' . $child->id);
-            }
-        }
-        $scheduledJobNumbers = array_values(array_unique($scheduledJobNumbers));
-
-        $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running'])
+        $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running', 'paused'])
             ->whereIn('job_number', $scheduledJobNumbers)
             ->get()
-            ->sortBy(function($job) use ($scheduledJobNumbers) {
-                return array_search($job->job_number, $scheduledJobNumbers);
-            })
+            ->sortBy(fn($job) => $ppcQueueOrder[$job->job_number] ?? PHP_INT_MAX)
             ->values();
 
         $scheduleContext = ($lineFilter ?: 'SEMUA LINE') . ' &bull; ' . strtoupper($currentShift === 'all' ? 'SEMUA SHIFT' : $currentShift);
