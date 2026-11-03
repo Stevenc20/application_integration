@@ -765,7 +765,6 @@ class InputHarianController extends Controller
         // Note: Do NOT auto-cutoff running/paused jobs here to prevent terminating ongoing production
         // when the operator switches shifts, lines, or views.
     }
-}
 
     public function start(Request $request, int|string $id)
     {
