@@ -75,8 +75,15 @@ class DandoriController extends Controller
         $dandoriStatus = [];
         foreach ($activityTypes as $code => $display) {
             $record = Dandori::where('next_job_id', $id)
-                ->where('activity', $display)
-                ->whereDate('work_date', now()->toDateString())
+                ->where(function($q) use ($code, $display) {
+                    $q->where('activity', $display);
+                    if ($code === 'first_check') {
+                        $q->orWhere('jenis_dandori', '1st_check')
+                          ->orWhere('jenis_dandori', '1st check');
+                    } else {
+                        $q->orWhere('jenis_dandori', 'dandori');
+                    }
+                })
                 ->latest()
                 ->first();
 
@@ -88,7 +95,6 @@ class DandoriController extends Controller
         }
 
         $totalDuration = Dandori::where('next_job_id', $id)
-            ->whereDate('work_date', now()->toDateString())
             ->sum('duration_minutes');
 
         return response()->json([

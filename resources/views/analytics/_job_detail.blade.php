@@ -352,7 +352,9 @@
                 }
 
                 // 2b. Dandori & 1st Check from dandoris table (\App\Models\Dandori)
+                // Deduplicate with existing dandori segments (from downtimes or dandoriSessions)
                 if (isset($dandoris)) {
+                    $hasExistingDandori = collect($segments)->contains(fn($seg) => $seg['type'] === 'dandori');
                     foreach ($dandoris as $dRec) {
                         $s = $dRec->start_time ? \Carbon\Carbon::parse($dRec->start_time) : null;
                         $e = $dRec->finish_time ? \Carbon\Carbon::parse($dRec->finish_time) : ($s && ($dRec->duration_minutes ?? 0) > 0 ? $s->copy()->addSeconds((int)($dRec->duration_minutes * 60)) : ($s ? $s->copy()->addMinutes(5) : null));
@@ -362,6 +364,11 @@
                                 || strtolower(trim($dRec->jenis_dandori ?? '')) === '1st check' 
                                 || strtoupper(trim($dRec->activity ?? '')) === '1ST CHECK';
                             
+                            // If this is standard dandori and we already have dandori from downtime/session, skip duplicate
+                            if (!$isFC && $hasExistingDandori) {
+                                continue;
+                            }
+
                             $dandoriLink = route('operational.dandori', array_filter(['job_id' => $job->id, 'line' => $jobLine, 'shift' => $jobShift, 'date' => $s->format('Y-m-d')]));
                             $segments[] = [
                                 'type' => $isFC ? '1st_check' : 'dandori',
@@ -372,6 +379,7 @@
                                 'detail' => $dRec->activity ?? ($isFC ? '1st Check' : 'Dandori Setup'),
                                 'link' => $dandoriLink
                             ];
+                            if (!$isFC) $hasExistingDandori = true;
                             if (!$earliest || $s < $earliest) $earliest = $s;
                             if (!$latest || $e > $latest) $latest = $e;
                         }
@@ -379,6 +387,7 @@
                 }
 
                 // 3. Downtimes (Dandori, Try Out, Break, pure Downtime)
+                $hasExistingDandori = collect($segments)->contains(fn($seg) => $seg['type'] === 'dandori');
                 foreach ($job->downtimes as $dt) {
                     $s = $dt->start_time ? \Carbon\Carbon::parse($dt->start_time) : null;
                     $dur = (int)($dt->duration_seconds ?? 0);
@@ -389,6 +398,11 @@
                         $isDandori = ($dtType === 'dandori');
                         $isTryOut = in_array($dtType, ['try out', 'tryout']);
                         $isBreak = in_array($dtType, ['break time', 'break']);
+
+                        // If this is dandori and we already have a dandori segment, don't duplicate
+                        if ($isDandori && $hasExistingDandori) {
+                            continue;
+                        }
 
                         $segType = $isDandori ? 'dandori' : ($isTryOut ? 'tryout' : ($isBreak ? 'break' : 'downtime'));
                         $segmentColor = $isDandori ? 'bg-amber-400' : ($isTryOut ? 'bg-orange-500' : ($isBreak ? 'bg-indigo-500' : 'bg-red-600'));
@@ -414,6 +428,7 @@
                             'detail' => $dt->problem ?: ($dt->penyebab ?: $segLabel),
                             'link' => $link
                         ];
+                        if ($isDandori) $hasExistingDandori = true;
                         if (!$earliest || $s < $earliest) $earliest = $s;
                         if (!$latest || $e > $latest) $latest = $e;
                     }
@@ -892,54 +907,115 @@
     @endif
 
     {{-- Dandori Sessions --}}
-    @if($dandoriSessions->isNotEmpty())
+    @php
+        $jobDandoriRecords = $job->dandoris ?? collect();
+    @endphp
+    @if($jobDandoriRecords->isNotEmpty() || $dandoriSessions->isNotEmpty())
     <div class="section-card">
         <div class="section-header flex items-center justify-between">
-            <h3 class="text-xs font-bold text-slate-700">Dandori / Changeover</h3>
-            <span class="text-[10px] font-bold text-slate-400">{{ $dandoriSessions->count() }} sessions</span>
+            <h3 class="text-xs font-bold text-slate-700">Dandori / Changeover &amp; 1st Check</h3>
+            <span class="text-[10px] font-bold text-slate-400">{{ $jobDandoriRecords->count() + $dandoriSessions->count() }} activities</span>
         </div>
         <div class="p-5 space-y-4">
-            @foreach($dandoriSessions as $ds)
-            <div class="border border-slate-100 rounded-xl p-4">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-bold text-slate-700">Session #{{ $ds->id }}</span>
-                    <span class="text-[10px] font-bold text-slate-400">{{ $ds->total_minutes ? round($ds->total_minutes, 1).' min' : '-' }}</span>
-                </div>
-                <div class="flex gap-4 text-[10px] text-slate-500 mb-2">
-                    @if($ds->start_time)<span>Mulai: {{ \Carbon\Carbon::parse($ds->start_time)->format('d M H:i') }}</span>@endif
-                    @if($ds->finish_time)<span>Selesai: {{ \Carbon\Carbon::parse($ds->finish_time)->format('d M H:i') }}</span>@endif
-                    <span>Status: <span class="font-bold {{ strtolower($ds->status ?? '') === 'completed' ? 'text-emerald-600' : 'text-amber-600' }}">{{ $ds->status ?? 'ONGOING' }}</span></span>
-                </div>
-                @if($ds->groups->isNotEmpty())
-                <div class="ml-4 space-y-2">
-                    @foreach($ds->groups as $g)
-                    <div class="border-l-2 border-slate-200 pl-3">
-                        <div class="flex items-center justify-between">
-                            <span class="text-[10px] font-bold text-slate-600">{{ $g->group_name ?? 'Group #'.$g->id }}</span>
-                            <span class="text-[9px] text-slate-400">{{ $g->total_minutes ? round($g->total_minutes, 1).' min' : '-' }}</span>
-                        </div>
-                        @if($g->details->isNotEmpty())
-                        <div class="flex flex-wrap gap-1 mt-1">
-                            @foreach($g->details as $d)
-                            <span class="px-2 py-0.5 rounded text-[8px] font-bold {{ strtolower($d->status ?? '') === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500' }}">
-                                {{ $d->activity_name ?? 'Step #'.$d->id }}
-                                @if($d->duration_minutes > 0)<span class="ml-1 text-slate-400">({{ round($d->duration_minutes, 1) }}m)</span>@endif
-                            </span>
-                            @endforeach
-                        </div>
-                        @endif
-                    </div>
-                    @endforeach
-                </div>
-                @endif
+            {{-- Actual Active Dandori Records from \App\Models\Dandori --}}
+            @if($jobDandoriRecords->isNotEmpty())
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="bg-slate-50 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                            <th class="text-left px-5 py-3">Aktivitas</th>
+                            <th class="text-left px-5 py-3">Jenis</th>
+                            <th class="text-left px-5 py-3">Waktu Mulai</th>
+                            <th class="text-left px-5 py-3">Waktu Selesai</th>
+                            <th class="text-right px-5 py-3">Durasi</th>
+                            <th class="text-right px-5 py-3">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100">
+                        @foreach($jobDandoriRecords as $dRec)
+                        @php
+                            $isFC = strtolower(trim($dRec->jenis_dandori ?? '')) === '1st_check' || strtolower(trim($dRec->jenis_dandori ?? '')) === '1st check' || strtoupper(trim($dRec->activity ?? '')) === '1ST CHECK';
+                            $durSec = ($dRec->duration_minutes ?? 0) > 0 ? (int)round($dRec->duration_minutes * 60) : ($dRec->start_time && $dRec->finish_time ? abs(\Carbon\Carbon::parse($dRec->finish_time)->diffInSeconds(\Carbon\Carbon::parse($dRec->start_time))) : 0);
+                        @endphp
+                        <tr class="hover:bg-slate-50">
+                            <td class="px-5 py-3 text-xs font-bold text-slate-700">{{ $dRec->activity ?? ($isFC ? '1st Check' : 'Dandori Setup') }}</td>
+                            <td class="px-5 py-3">
+                                <span class="px-2 py-0.5 rounded-full text-[10px] font-bold {{ $isFC ? 'bg-purple-100 text-purple-700' : 'bg-amber-100 text-amber-700' }}">
+                                    {{ $isFC ? '1ST CHECK' : 'DANDORI' }}
+                                </span>
+                            </td>
+                            <td class="px-5 py-3 text-xs text-slate-500 font-mono">{{ $dRec->start_time ? \Carbon\Carbon::parse($dRec->start_time)->format('d M H:i:s') : '-' }}</td>
+                            <td class="px-5 py-3 text-xs text-slate-500 font-mono">{{ $dRec->finish_time ? \Carbon\Carbon::parse($dRec->finish_time)->format('d M H:i:s') : 'ONGOING' }}</td>
+                            <td class="px-5 py-3 text-right font-mono text-slate-700 text-xs">
+                                @if($durSec >= 3600)
+                                    {{ floor($durSec / 3600) }}h {{ floor(($durSec % 3600) / 60) }}m {{ $durSec % 60 }}s
+                                @elseif($durSec >= 60)
+                                    {{ floor($durSec / 60) }}m {{ $durSec % 60 }}s
+                                @elseif($durSec > 0)
+                                    {{ $durSec }}s
+                                @else
+                                    -
+                                @endif
+                            </td>
+                            <td class="px-5 py-3 text-right">
+                                <span class="text-[10px] font-bold {{ $dRec->finish_time ? 'text-emerald-600' : 'text-amber-600' }}">
+                                    {{ $dRec->finish_time ? 'COMPLETED' : 'RUNNING' }}
+                                </span>
+                            </td>
+                        </tr>
+                        @endforeach
+                    </tbody>
+                </table>
             </div>
-            @endforeach
+            @endif
+
+            {{-- Optional DandoriSession steps --}}
+            @if($dandoriSessions->isNotEmpty())
+            <div class="mt-4 pt-4 border-t border-slate-100 space-y-4">
+                <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Detail Sesi / Check Steps</span>
+                @foreach($dandoriSessions as $ds)
+                <div class="border border-slate-100 rounded-xl p-4">
+                    <div class="flex items-center justify-between mb-2">
+                        <span class="text-xs font-bold text-slate-700">Session #{{ $ds->id }}</span>
+                        <span class="text-[10px] font-bold text-slate-400">{{ $ds->total_minutes ? round($ds->total_minutes, 1).' min' : '-' }}</span>
+                    </div>
+                    <div class="flex gap-4 text-[10px] text-slate-500 mb-2">
+                        @if($ds->start_time)<span>Mulai: {{ \Carbon\Carbon::parse($ds->start_time)->format('d M H:i') }}</span>@endif
+                        @if($ds->finish_time)<span>Selesai: {{ \Carbon\Carbon::parse($ds->finish_time)->format('d M H:i') }}</span>@endif
+                        <span>Status: <span class="font-bold {{ strtolower($ds->status ?? '') === 'completed' ? 'text-emerald-600' : 'text-amber-600' }}">{{ $ds->status ?? 'ONGOING' }}</span></span>
+                    </div>
+                    @if($ds->groups->isNotEmpty())
+                    <div class="ml-4 space-y-2">
+                        @foreach($ds->groups as $g)
+                        <div class="border-l-2 border-slate-200 pl-3">
+                            <div class="flex items-center justify-between">
+                                <span class="text-[10px] font-bold text-slate-600">{{ $g->group_name ?? 'Group #'.$g->id }}</span>
+                                <span class="text-[9px] text-slate-400">{{ $g->total_minutes ? round($g->total_minutes, 1).' min' : '-' }}</span>
+                            </div>
+                            @if($g->details->isNotEmpty())
+                            <div class="flex flex-wrap gap-1 mt-1">
+                                @foreach($g->details as $d)
+                                <span class="px-2 py-0.5 rounded text-[8px] font-bold {{ strtolower($d->status ?? '') === 'completed' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500' }}">
+                                    {{ $d->activity_name ?? 'Step #'.$d->id }}
+                                    @if($d->duration_minutes > 0)<span class="ml-1 text-slate-400">({{ round($d->duration_minutes, 1) }}m)</span>@endif
+                                </span>
+                                @endforeach
+                            </div>
+                            @endif
+                        </div>
+                        @endforeach
+                    </div>
+                    @endif
+                </div>
+                @endforeach
+            </div>
+            @endif
         </div>
     </div>
     @endif
 
     {{-- Jika tidak ada data sama sekali --}}
-    @if($job->productionLogs->isEmpty() && $job->downtimes->isEmpty() && $job->repairRejects->isEmpty() && $sessions->isEmpty() && $dandoriSessions->isEmpty())
+    @if($job->productionLogs->isEmpty() && $job->downtimes->isEmpty() && $job->repairRejects->isEmpty() && $sessions->isEmpty() && $dandoriSessions->isEmpty() && ($job->dandoris ?? collect())->isEmpty())
     <div class="bg-white rounded-xl border border-slate-200 shadow-sm p-10 text-center">
         <p class="text-slate-500 font-bold">Belum ada data detail untuk job ini.</p>
         <p class="text-xs text-slate-400 mt-1">Data akan muncul setelah operator melakukan input produksi.</p>

@@ -337,7 +337,9 @@
                 }
 
                 // 2b. Dandori & 1st Check from dandoris table (\App\Models\Dandori)
+                // Deduplicate with existing dandori segments (from downtimes or dandoriSessions)
                 if ($job && $job->relationLoaded('dandoris')) {
+                    $hasExistingDandori = collect($segments)->contains(fn($seg) => $seg['type'] === 'dandori');
                     foreach ($job->dandoris as $dRec) {
                         $s = $dRec->start_time ? \Carbon\Carbon::parse($dRec->start_time) : null;
                         $e = $dRec->finish_time ? \Carbon\Carbon::parse($dRec->finish_time) : ($s && ($dRec->duration_minutes ?? 0) > 0 ? $s->copy()->addSeconds((int)($dRec->duration_minutes * 60)) : ($s ? $s->copy()->addMinutes(5) : null));
@@ -347,6 +349,11 @@
                                 || strtolower(trim($dRec->jenis_dandori ?? '')) === '1st check' 
                                 || strtoupper(trim($dRec->activity ?? '')) === '1ST CHECK';
                             
+                            // If this is standard dandori and we already have dandori from downtime/session, skip duplicate
+                            if (!$isFC && $hasExistingDandori) {
+                                continue;
+                            }
+
                             $dandoriLink = route('operational.dandori', array_filter(['job_id' => $job->id, 'line' => $planLine, 'shift' => $planShift, 'date' => $s->format('Y-m-d')]));
                             $segments[] = [
                                 'type' => $isFC ? '1st_check' : 'dandori',
@@ -357,6 +364,7 @@
                                 'detail' => $dRec->activity ?? ($isFC ? '1st Check' : 'Dandori Setup'),
                                 'link' => $dandoriLink
                             ];
+                            if (!$isFC) $hasExistingDandori = true;
                             if (!$earliest || $s < $earliest) $earliest = $s;
                             if (!$latest || $e > $latest) $latest = $e;
                         }
@@ -365,6 +373,7 @@
 
                 // 3. Downtimes (Dandori, Try Out, Break, pure Downtime)
                 if ($job && $job->relationLoaded('downtimes')) {
+                    $hasExistingDandori = collect($segments)->contains(fn($seg) => $seg['type'] === 'dandori');
                     foreach ($job->downtimes as $dt) {
                         $s = $dt->start_time ? \Carbon\Carbon::parse($dt->start_time) : null;
                         $dur = (int)($dt->duration_seconds ?? 0);
@@ -376,6 +385,11 @@
                             $isTryOut = in_array($dtType, ['try out', 'tryout']);
                             $isBreak = in_array($dtType, ['break time', 'break']);
                             $isIdle = in_array($dtType, ['idle', 'idle time']);
+
+                            // If this is dandori and we already have a dandori segment, don't duplicate
+                            if ($isDandori && $hasExistingDandori) {
+                                continue;
+                            }
 
                             $segType = $isDandori ? 'dandori' : ($isTryOut ? 'tryout' : ($isBreak ? 'break' : 'downtime'));
                             $segmentColor = $isDandori ? 'bg-amber-400' : ($isTryOut ? 'bg-orange-500' : ($isBreak ? 'bg-indigo-500' : 'bg-red-600'));
@@ -401,6 +415,7 @@
                                 'detail' => $dt->problem ?: ($dt->penyebab ?: $segLabel),
                                 'link' => $link
                             ];
+                            if ($isDandori) $hasExistingDandori = true;
                             if (!$earliest || $s < $earliest) $earliest = $s;
                             if (!$latest || $e > $latest) $latest = $e;
                         }

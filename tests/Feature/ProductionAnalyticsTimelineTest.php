@@ -187,6 +187,12 @@ class ProductionAnalyticsTimelineTest extends TestCase
         $this->assertStringContainsString('Try Out 00:03', $renderedDetail);
         $this->assertStringContainsString('Break 00:15', $renderedDetail);
 
+        // Verify Dandori section in detail view shows both Dandori and 1st Check records
+        $this->assertStringContainsString('PERSIAPAN DANDORI', $renderedDetail);
+        $this->assertStringContainsString('1ST CHECK', $renderedDetail);
+        $this->assertStringContainsString('10m 0s', $renderedDetail);
+        $this->assertStringContainsString('5m 0s', $renderedDetail);
+
         // Verify that monitoring/history query works with try out and plan_id/job_id
         $request = \Illuminate\Http\Request::create(route('monitoring.history', [
             'type' => 'downtime',
