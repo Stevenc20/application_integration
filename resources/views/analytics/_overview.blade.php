@@ -41,7 +41,7 @@
         ['label'=>'Downtime', 'color'=>'bg-red-600', 'sec'=>$tRepair],
         ['label'=>'Dandori', 'color'=>'bg-amber-500', 'sec'=>$tDandori],
         ['label'=>'Try Out', 'color'=>'bg-orange-500', 'sec'=>$tTryout],
-        ['label'=>'Break Time', 'color'=>'bg-indigo-500', 'sec'=>$tBreak],
+        ['label'=>'Break Time', 'color'=>'bg-slate-500', 'sec'=>$tBreak],
         ['label'=>'Production', 'color'=>'bg-blue-500', 'sec'=>$tProd],
     ];
 @endphp
@@ -340,22 +340,32 @@
                 // Deduplicate with existing dandori segments (from downtimes or dandoriSessions)
                 if ($job && $job->relationLoaded('dandoris')) {
                     $hasExistingDandori = collect($segments)->contains(fn($seg) => $seg['type'] === 'dandori');
+                    $fcRec = $job->dandoris->first(function($d) {
+                        $jt = strtolower(trim($d->jenis_dandori ?? ''));
+                        $act = strtoupper(trim($d->activity ?? ''));
+                        return $jt === '1st_check' || $jt === '1st check' || $act === '1ST CHECK';
+                    });
+                    $fcStart = ($fcRec && $fcRec->start_time) ? \Carbon\Carbon::parse($fcRec->start_time) : null;
+
                     foreach ($job->dandoris as $dRec) {
                         $s = $dRec->start_time ? \Carbon\Carbon::parse($dRec->start_time) : null;
                         $durM = (float)($dRec->duration_minutes ?? 0);
+                        $isFC = strtolower(trim($dRec->jenis_dandori ?? '')) === '1st_check' 
+                            || strtolower(trim($dRec->jenis_dandori ?? '')) === '1st check' 
+                            || strtoupper(trim($dRec->activity ?? '')) === '1ST CHECK';
+
                         $e = $dRec->finish_time 
                             ? \Carbon\Carbon::parse($dRec->finish_time) 
                             : ($s && $durM > 0 
                                 ? $s->copy()->addSeconds((int)round($durM * 60)) 
-                                : ($job && $job->started_at && $s && \Carbon\Carbon::parse($job->started_at) > $s 
-                                    ? \Carbon\Carbon::parse($job->started_at) 
-                                    : ($s ? $s->copy()->addMinutes(5) : null)));
+                                : ((!$isFC && $fcStart && $s && $fcStart > $s)
+                                    ? $fcStart->copy()
+                                    : ($job && $job->started_at && $s && \Carbon\Carbon::parse($job->started_at) > $s 
+                                        ? \Carbon\Carbon::parse($job->started_at) 
+                                        : ($s ? $s->copy()->addMinutes(5) : null))));
 
                         if ($s) {
                             if (!$e || $e < $s) $e = $s->copy();
-                            $isFC = strtolower(trim($dRec->jenis_dandori ?? '')) === '1st_check' 
-                                || strtolower(trim($dRec->jenis_dandori ?? '')) === '1st check' 
-                                || strtoupper(trim($dRec->activity ?? '')) === '1ST CHECK';
                             
                             // If this is standard dandori and we already have dandori from downtime/session, skip duplicate
                             if (!$isFC && $hasExistingDandori) {
@@ -408,7 +418,7 @@
                             }
 
                             $segType = $isDandori ? 'dandori' : ($isTryOut ? 'tryout' : ($isBreak ? 'break' : 'downtime'));
-                            $segmentColor = $isDandori ? 'bg-amber-400' : ($isTryOut ? 'bg-orange-500' : ($isBreak ? 'bg-indigo-500' : 'bg-red-600'));
+                            $segmentColor = $isDandori ? 'bg-amber-400' : ($isTryOut ? 'bg-orange-500' : ($isBreak ? 'bg-slate-500' : 'bg-red-600'));
                             $segLabel = $isDandori ? 'Dandori' : ($isTryOut ? 'Try Out' : ($isBreak ? 'Break Time' : ($dt->jenis_downtime ?? 'Downtime')));
                             
                             $link = null;
@@ -716,14 +726,14 @@
                     @endif
                     @if($jFirstCheck > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>1st Check {{ gmdate('H:i', $jFirstCheck) }}</span>@endif
                     @if($jTryOut > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>Try Out {{ gmdate('H:i', $jTryOut) }}</span>@endif
-                    @if($jBreakTime > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-indigo-500"></span>Break Time {{ gmdate('H:i', $jBreakTime) }}</span>@endif
+                    @if($jBreakTime > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Break Time {{ gmdate('H:i', $jBreakTime) }}</span>@endif
                     @if($jOvertime > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-600 ring-1 ring-red-300"></span>Overtime {{ gmdate('H:i', $jOvertime) }}</span>@endif
                 </div>
 
                 {{-- DONUT + OUTSIDE SHIFT + HISTORY LINKS --}}
                 @php
                 $jTotalTime = max($jProdTotal + $jRepair + $jDandoriSec + $jFirstCheck + $jTryOut + $jBreakTime, 1);
-                $donutColors = ['#2563eb','#dc2626','#f59e0b','#a855f7','#f97316','#6366f1'];
+                $donutColors = ['#2563eb','#dc2626','#f59e0b','#a855f7','#f97316','#64748b'];
                 $donutSecs  = [$jProdTotal, $jRepair, $jDandoriSec, $jFirstCheck, $jTryOut, $jBreakTime];
                 $donutLabels= ['Prod','Downtime','Dandori','1st Check','Try Out','Break'];
                 $gradParts = []; $acc = 0;

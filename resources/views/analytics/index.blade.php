@@ -295,7 +295,7 @@
                 document.body.appendChild(el);
             }
             const lc = (label||'').toLowerCase();
-            const lColor = lc.includes('dandori') ? '#fbbf24' : lc.includes('1st') ? '#a855f7' : lc.includes('production') ? '#60a5fa' : lc.includes('overtime') ? '#f87171' : lc.includes('out') ? '#f97316' : lc.includes('break') ? '#6366f1' : '#f87171';
+            const lColor = lc.includes('dandori') ? '#fbbf24' : lc.includes('1st') ? '#a855f7' : lc.includes('production') ? '#60a5fa' : lc.includes('overtime') ? '#f87171' : lc.includes('out') ? '#f97316' : lc.includes('break') ? '#64748b' : '#f87171';
             el.innerHTML = '<div style="font-weight:800;font-size:10px;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:5px;color:' + lColor + ';">' + label + '</div>'
                 + '<div style="display:flex;gap:12px;font-size:10px;color:#94a3b8;">'
                 + '<span>' + from + ' → ' + to + '</span>'

@@ -142,21 +142,18 @@ class ProductionAnalyticsController extends Controller
                 'dailyProduction' => function ($q) use ($dateFrom, $dateTo) {
                     $q->whereBetween('work_date', [$dateFrom, $dateTo]);
                 },
-                'downtimes' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59']);
+                'downtimes',
+                'productionLogs' => function ($q) {
+                    $q->orderBy('created_at', 'desc')->take(10);
                 },
-                'productionLogs' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereBetween('created_at', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])->orderBy('created_at', 'desc')->take(5);
+                'productionSessions' => function ($q) {
+                    $q->orderBy('start_time');
                 },
-                'productionSessions' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereDate('work_date', '>=', $dateFrom)->whereDate('work_date', '<=', $dateTo)->orderBy('start_time');
+                'dandoriSessions' => function ($q) {
+                    $q->orderBy('start_time');
                 },
-                'dandoriSessions' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])->orderBy('start_time');
-                },
-                'dandoris' => function ($q) use ($dateFrom, $dateTo) {
-                    $q->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
-                      ->orderBy('start_time');
+                'dandoris' => function ($q) {
+                    $q->orderBy('start_time');
                 },
             ])
             ->get()

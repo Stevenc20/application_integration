@@ -33,8 +33,25 @@ class FixOrphanedDandoriDurations extends Command
 
             $finishTime = null;
 
+            // Anchor 0: Check if there is a 1st Check succeeding this Dandori
+            $succeedingFirstCheck = Dandori::where('next_job_id', $job->id)
+                ->where('id', '!=', $d->id)
+                ->where(function($q) {
+                    $q->where('jenis_dandori', 'like', '%first%')
+                      ->orWhere('jenis_dandori', 'like', '%1st%')
+                      ->orWhere('activity', 'like', '%1ST%');
+                })
+                ->whereNotNull('start_time')
+                ->where('start_time', '>', $d->start_time)
+                ->orderBy('start_time')
+                ->first();
+
+            if ($succeedingFirstCheck) {
+                $finishTime = Carbon::parse($succeedingFirstCheck->start_time);
+            }
+
             // Anchor 1: When job started actual production
-            if ($job->started_at && Carbon::parse($job->started_at) > $dStart) {
+            if (!$finishTime && $job->started_at && Carbon::parse($job->started_at) > $dStart) {
                 $finishTime = Carbon::parse($job->started_at);
             }
             // Anchor 2: When job has production session

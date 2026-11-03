@@ -35,7 +35,7 @@
         ['label'=>'Repair', 'color'=>'bg-red-600', 'sec'=>$tRepair],
         ['label'=>'Dandori', 'color'=>'bg-amber-500', 'sec'=>$tDandori],
         ['label'=>'Try Out', 'color'=>'bg-orange-500', 'sec'=>$tTryout],
-        ['label'=>'Break', 'color'=>'bg-indigo-500', 'sec'=>$tBreak],
+        ['label'=>'Break', 'color'=>'bg-slate-500', 'sec'=>$tBreak],
         ['label'=>'Production', 'color'=>'bg-blue-500', 'sec'=>$tProd],
     ];
 @endphp
