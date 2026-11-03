@@ -1219,17 +1219,22 @@ class InputHarianController extends Controller
             return $actualTotal > 0 || !empty($jm->started_at);
         };
 
-        $jobMaster = $jmQuery->where(function($q) use ($date, $request) {
+        $startOfDay = Carbon::parse($date)->startOfDay()->toDateTimeString();
+        $nextDay    = Carbon::parse($date)->addDay()->startOfDay()->toDateTimeString();
+
+        $jobMaster = $jmQuery->where(function($q) use ($date, $startOfDay, $nextDay, $request) {
                 $requestedShift = $request->get('shift');
                 if ($requestedShift && $requestedShift !== 'all') {
-                    $q->whereExists(function($sub) use ($date, $requestedShift) {
+                    $q->whereExists(function($sub) use ($startOfDay, $nextDay, $requestedShift) {
                         $sub->select(DB::raw(1))
                             ->from('production_plans')
                             ->whereColumn('production_plans.job_no', 'job_masters.job_number')
-                            ->whereDate('production_plans.plan_date', $date)
+                            ->where('production_plans.plan_date', '>=', $startOfDay)
+                            ->where('production_plans.plan_date', '<', $nextDay)
                             ->where('production_plans.shift_name', 'like', "{$requestedShift}%");
-                    })->orWhere(function($sub) use ($date, $requestedShift) {
-                        $planIds = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                    })->orWhere(function($sub) use ($startOfDay, $nextDay, $requestedShift) {
+                        $planIds = \App\Models\ProductionPlan::where('plan_date', '>=', $startOfDay)
+                            ->where('plan_date', '<', $nextDay)
                             ->where('shift_name', 'like', "{$requestedShift}%")
                             ->pluck('id')
                             ->toArray();
