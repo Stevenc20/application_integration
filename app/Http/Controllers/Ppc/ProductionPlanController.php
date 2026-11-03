@@ -944,7 +944,31 @@ class ProductionPlanController extends Controller
             ], 422);
         }
 
+        $date = $plan->plan_date ? Carbon::parse($plan->plan_date)->toDateString() : null;
+        $shift = $plan->shift_name;
+        $press = $plan->press_name;
+
+        // Hapus linked unstarted JobMaster agar tidak tertinggal di antrean operasional
+        $linkedJob = $mergeService->findLinkedJobMaster((int) $plan->id);
+        if ($linkedJob && ! $mergeService->jobHasActivity($linkedJob)) {
+            $linkedJob->delete();
+        }
+
+        // Hapus RecoveryItem terkait jika ada dan belum diproses
+        \App\Models\RecoveryItem::where('production_plan_id', $plan->id)
+            ->whereIn('status', ['waiting_approval', 'pending'])
+            ->delete();
+
         $plan->delete();
+
+        // Regenerasi timeline section agar jam start_time dan finish_time item berikutnya menyesuaikan
+        if ($date && $shift && $press) {
+            try {
+                app(\App\Services\TimelineGenerationService::class)->regenerateSection($date, $shift, $press);
+            } catch (\Throwable $e) {
+                Log::warning('Timeline regeneration after plan destroy failed: '.$e->getMessage());
+            }
+        }
 
         return response()->json([
             'success' => true,

@@ -440,12 +440,16 @@ class InputHarianController extends Controller
                                     ->whereColumn('production_plans.job_no', 'job_masters.job_number')
                                     ->whereDate('production_plans.plan_date', $date)
                                     ->where('production_plans.shift_name', $latestShiftName);
-                            })->orWhereRaw("EXISTS (
-                                SELECT 1 FROM production_plans pp
-                                WHERE pp.id = CAST(SUBSTRING_INDEX(job_masters.job_number, '-', -1) AS UNSIGNED)
-                                  AND pp.plan_date = ?
-                                  AND pp.shift_name = ?
-                            )", [$date, $latestShiftName]);
+                            });
+
+                            if (DB::connection()->getDriverName() === 'mysql') {
+                                $fq->orWhereRaw("EXISTS (
+                                    SELECT 1 FROM production_plans pp
+                                    WHERE pp.id = CAST(SUBSTRING_INDEX(job_masters.job_number, '-', -1) AS UNSIGNED)
+                                      AND pp.plan_date = ?
+                                      AND pp.shift_name = ?
+                                )", [$date, $latestShiftName]);
+                            }
                         });
 
                         $activeJobs = $shiftMatchingQuery
@@ -727,6 +731,37 @@ class InputHarianController extends Controller
                     'status'     => 'pending',
                 ]));
             }
+        }
+
+        // Cleanup: Jika ada JobMaster berstatus pending yang terhubung ke baris ProductionPlan pada tanggal ini
+        // namun ID plan-nya sudah dihapus oleh PPC (misal revisi PPC menghapus item tersebut),
+        // hapus JobMaster orphan tersebut agar tidak muncul di antrean atau dropdown proses selanjutnya.
+        if (!empty($identifiers)) {
+            $mergeService = app(\App\Services\PpcScheduleMergeService::class);
+            $orphanJobs = \App\Models\JobMaster::where('status', 'pending')
+                ->where('job_number', 'like', '%-%')
+                ->get()
+                ->filter(function ($job) use ($identifiers, $date, $mergeService) {
+                    $parts = explode('-', $job->job_number);
+                    $planId = end($parts);
+                    if (!is_numeric($planId)) {
+                        return false;
+                    }
+                    if (in_array($job->job_number, $identifiers, true)) {
+                        return false;
+                    }
+                    // Cek apakah plan id masih ada di DB untuk tanggal ini
+                    $planExists = \App\Models\ProductionPlan::where('id', (int) $planId)->exists();
+                    if (!$planExists && !$mergeService->jobHasActivity($job)) {
+                        return true;
+                    }
+                    return false;
+                });
+
+            foreach ($orphanJobs as $orphanJob) {
+                $orphanJob->delete();
+            }
+        }
         // Note: Do NOT auto-cutoff running/paused jobs here to prevent terminating ongoing production
         // when the operator switches shifts, lines, or views.
     }
