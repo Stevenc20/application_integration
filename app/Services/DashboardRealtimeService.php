@@ -393,10 +393,23 @@ class DashboardRealtimeService
             }
         }
 
+        $allTargetJobIds = $jobIds->toArray();
+        if (! empty($allTargetJobIds)) {
+            $siblingJobIds = JobMaster::whereIn('id', $allTargetJobIds)
+                ->get()
+                ->flatMap(function ($j) {
+                    return app(\App\Services\ProductionService::class)->getSiblingJobMasters($j->id)->pluck('id');
+                })
+                ->all();
+            $allTargetJobIds = array_values(array_unique(array_merge($allTargetJobIds, $siblingJobIds)));
+        }
+
         $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'jobMaster', 'images'])
-            ->whereIn('job_master_id', $jobIds)
-            ->where('created_at', '>=', $shiftStartDt)
-            ->where('created_at', '<', $shiftEndDt)
+            ->whereIn('job_master_id', $allTargetJobIds)
+            ->where(function ($q) use ($shiftStartDt, $shiftEndDt, $workDate) {
+                $q->whereBetween('created_at', [$shiftStartDt, $shiftEndDt])
+                    ->orWhereDate('created_at', $workDate);
+            })
             ->get();
 
         foreach ($repairRejectLogs as $rr) {

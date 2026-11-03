@@ -61,7 +61,9 @@ class RepairRejectController extends Controller
             $query->where('type', $request->type);
         }
         if ($request->filled('job_id')) {
-            $query->where('job_master_id', $request->job_id);
+            $jobId = (int) $request->job_id;
+            $siblingJobIds = app(\App\Services\ProductionService::class)->getSiblingJobMasters($jobId)->pluck('id')->push($jobId)->unique()->values()->all();
+            $query->whereIn('job_master_id', $siblingJobIds);
         }
         if ($request->filled('defect')) {
             $query->where('defect_name', 'like', '%' . $request->defect . '%');
@@ -290,8 +292,17 @@ class RepairRejectController extends Controller
      */
     public function getByJob(int|string $jobId)
     {
+        $targetId = (int) $jobId;
+        $siblingJobIds = app(\App\Services\ProductionService::class)
+            ->getSiblingJobMasters($targetId)
+            ->pluck('id')
+            ->push($targetId)
+            ->unique()
+            ->values()
+            ->all();
+
         $logs = RepairRejectLog::with(['images', 'creator'])
-            ->where('job_master_id', $jobId)
+            ->whereIn('job_master_id', $siblingJobIds)
             ->orderBy('created_at', 'desc')
             ->get()
             ->map(function ($log) {

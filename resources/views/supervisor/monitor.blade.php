@@ -1880,6 +1880,10 @@ window.openKpiModalFromMonitor = function(type, line) {
     const resolveLineData = (td, l) => {
         if (!td) return null;
         if (td[l]) return td[l];
+        const target = normLineKey(l);
+        for (const k of Object.keys(td)) {
+            if (normLineKey(k) === target) return td[k];
+        }
         const matchKey = Object.keys(td).find(k => k === l || k === `PRESS ${l}` || `PRESS ${k}` === l || k.endsWith(` ${l}`) || l.endsWith(` ${k}`));
         return matchKey ? td[matchKey] : null;
     };
@@ -2193,6 +2197,10 @@ window.openDefectKpiModal = function(type, line) {
     const resolveLineData = (td, l) => {
         if (!td) return null;
         if (td[l]) return td[l];
+        const target = normLineKey(l);
+        for (const k of Object.keys(td)) {
+            if (normLineKey(k) === target) return td[k];
+        }
         const matchKey = Object.keys(td).find(k => k === l || k === `PRESS ${l}` || `PRESS ${k}` === l || k.endsWith(` ${l}`) || l.endsWith(` ${k}`));
         return matchKey ? td[matchKey] : null;
     };

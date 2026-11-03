@@ -789,7 +789,7 @@
                         <span id="rr-count-badge-{{ $activeJob->id }}" class="hidden text-[9px] font-black px-2 py-0.5 rounded-full bg-orange-100 text-orange-500 border border-orange-200">0</span>
                     </div>
                     <div class="flex items-center gap-3">
-                        <a href="{{ route('operational.repair_reject.index', ['job_id' => $activeJob->id, 'line' => $activeJob->line]) }}" class="text-[9px] font-black text-red-500 hover:text-red-600 uppercase tracking-widest flex items-center gap-1 group">
+                        <a href="{{ route('operational.repair_reject.index', ['job_id' => $activeJob->id, 'line' => $activeJob->line, 'date' => $date ?? now()->toDateString()]) }}" class="text-[9px] font-black text-red-500 hover:text-red-600 uppercase tracking-widest flex items-center gap-1 group">
                             Lihat History R&R
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-3 h-3 transform group-hover:translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="3" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
                         </a>

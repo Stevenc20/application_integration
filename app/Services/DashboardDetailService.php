@@ -182,8 +182,19 @@ class DashboardDetailService
         }
 
         // ── REPAIR & REJECT LOGS ──
+        $allDetailJobIds = $jobIds->toArray();
+        if (! empty($allDetailJobIds)) {
+            $siblingJobIds = JobMaster::whereIn('id', $allDetailJobIds)
+                ->get()
+                ->flatMap(function ($j) {
+                    return app(\App\Services\ProductionService::class)->getSiblingJobMasters($j->id)->pluck('id');
+                })
+                ->all();
+            $allDetailJobIds = array_values(array_unique(array_merge($allDetailJobIds, $siblingJobIds)));
+        }
+
         $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'images'])
-            ->whereIn('job_master_id', $jobIds)
+            ->whereIn('job_master_id', $allDetailJobIds)
             ->get();
 
         $repairItems = [];

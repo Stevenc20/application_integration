@@ -222,6 +222,7 @@ class InputHarianController extends Controller
                     // No date filter: job is already scoped to plan date via job_number
                 },
                 'dandoris',
+                'repairRejects.images',
             ])
             ->get()
             ->keyBy('job_number');
@@ -235,13 +236,30 @@ class InputHarianController extends Controller
             foreach ($children as $child) {
                 $childKey = trim($child->job_no ?? '') . '-' . $child->id;
                 $childJm = $jobMasters->get($childKey);
-                if (!$childJm || !$childJm->dailyProduction) continue;
-                if (!$parentJm->dailyProduction) continue;
-                $parentJm->dailyProduction->actual_ok     = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
-                $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
-                $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
+                if (!$childJm) continue;
+
+                // Sync status from child if child is running/paused or complete
+                $cStatus = strtolower($childJm->status ?? '');
+                $pStatus = strtolower($parentJm->status ?? '');
+                if (in_array($cStatus, ['running', 'paused']) && !in_array($pStatus, ['running', 'paused'])) {
+                    $parentJm->status = $childJm->status;
+                }
+
+                if ($childJm->dailyProduction) {
+                    if (!$parentJm->dailyProduction) {
+                        $parentJm->dailyProduction = clone $childJm->dailyProduction;
+                    } else {
+                        $parentJm->dailyProduction->actual_ok     = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
+                        $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
+                        $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
+                        $parentJm->dailyProduction->actual_qty    = ($parentJm->dailyProduction->actual_qty ?? 0) + ($childJm->dailyProduction->actual_qty ?? 0);
+                    }
+                }
                 foreach ($childJm->downtimes ?? [] as $dt) {
                     $parentJm->downtimes->push($dt);
+                }
+                foreach ($childJm->repairRejects ?? [] as $rr) {
+                    $parentJm->repairRejects->push($rr);
                 }
             }
         }
