@@ -738,28 +738,32 @@ class InputHarianController extends Controller
         // hapus JobMaster orphan tersebut agar tidak muncul di antrean atau dropdown proses selanjutnya.
         if (!empty($identifiers)) {
             $mergeService = app(\App\Services\PpcScheduleMergeService::class);
-            $orphanJobs = \App\Models\JobMaster::where('status', 'pending')
+            $candidateJobs = \App\Models\JobMaster::where('status', 'pending')
                 ->where('job_number', 'like', '%-%')
-                ->get()
-                ->filter(function ($job) use ($identifiers, $date, $mergeService) {
-                    $parts = explode('-', $job->job_number);
-                    $planId = end($parts);
-                    if (!is_numeric($planId)) {
-                        return false;
-                    }
-                    if (in_array($job->job_number, $identifiers, true)) {
-                        return false;
-                    }
-                    // Cek apakah plan id masih ada di DB untuk tanggal ini
-                    $planExists = \App\Models\ProductionPlan::where('id', (int) $planId)->exists();
-                    if (!$planExists && !$mergeService->jobHasActivity($job)) {
-                        return true;
-                    }
-                    return false;
-                });
+                ->whereNotIn('job_number', $identifiers)
+                ->get();
 
-            foreach ($orphanJobs as $orphanJob) {
-                $orphanJob->delete();
+            if ($candidateJobs->isNotEmpty()) {
+                $planIds = [];
+                foreach ($candidateJobs as $job) {
+                    $parts = explode('-', $job->job_number);
+                    $pid = end($parts);
+                    if (is_numeric($pid)) {
+                        $planIds[] = (int) $pid;
+                    }
+                }
+                $existingPlanIds = empty($planIds) ? [] : \App\Models\ProductionPlan::whereIn('id', array_unique($planIds))->pluck('id')->all();
+                $existingPlanIdMap = array_flip($existingPlanIds);
+
+                foreach ($candidateJobs as $job) {
+                    $parts = explode('-', $job->job_number);
+                    $pid = end($parts);
+                    if (is_numeric($pid) && !isset($existingPlanIdMap[(int) $pid])) {
+                        if (!$mergeService->jobHasActivity($job)) {
+                            $job->delete();
+                        }
+                    }
+                }
             }
         }
         // Note: Do NOT auto-cutoff running/paused jobs here to prevent terminating ongoing production
