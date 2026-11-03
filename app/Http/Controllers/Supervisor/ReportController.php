@@ -180,15 +180,18 @@ class ReportController extends Controller
             foreach ($children as $child) {
                 $childKey = trim($child->job_no ?? '').'-'.$child->id;
                 $childJm = $jobMasters->get($childKey);
-                if (! $childJm || ! $childJm->dailyProduction) {
+                if (! $childJm) {
                     continue;
                 }
-                if (! $parentJm->dailyProduction) {
-                    continue;
+                if ($childJm->dailyProduction) {
+                    if (! $parentJm->dailyProduction) {
+                        $parentJm->dailyProduction = clone $childJm->dailyProduction;
+                    } else {
+                        $parentJm->dailyProduction->actual_ok = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
+                        $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
+                        $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
+                    }
                 }
-                $parentJm->dailyProduction->actual_ok = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
-                $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
-                $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
                 // Merge downtimes too
                 foreach ($childJm->downtimes ?? [] as $dt) {
                     $parentJm->downtimes->push($dt);
