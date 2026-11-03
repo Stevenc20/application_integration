@@ -41,7 +41,7 @@ test('finishing a job without skipIdle auto-starts the next job as idle (creates
     ]);
 
     // Finish job 1 without skipIdle (defaults to false)
-    $service->finishJob($job1->id, $job2->id, false);
+    $service->finishJob($job1->id, $job2->id, false, 100, 0, 0);
 
     // Assert job 1 is complete
     $job1->refresh();
@@ -91,7 +91,7 @@ test('finishing a job with skipIdle true starts next job neutrally (no downtime 
     ]);
 
     // Finish job 3 with skipIdle = true
-    $service->finishJob($job1->id, $job2->id, true);
+    $service->finishJob($job1->id, $job2->id, true, 100, 0, 0);
 
     // Assert job 3 is complete
     $job1->refresh();
@@ -104,6 +104,33 @@ test('finishing a job with skipIdle true starts next job neutrally (no downtime 
     // Assert no downtime record was created for job 4
     $downtime = Downtime::where('job_master_id', $job2->id)->first();
     expect($downtime)->toBeNull();
+});
+
+test('finishing a job with zero output resets it to pending instead of complete', function () {
+    $service = new ProductionService();
+
+    $job = JobMaster::create([
+        'job_number' => 'JOB-ZERO',
+        'job_name' => 'Job Zero',
+        'line' => 'LINE-A',
+        'capacity' => 100,
+        'status' => 'running',
+        'started_at' => now(),
+    ]);
+
+    ProductionSession::create([
+        'job_master_id' => $job->id,
+        'work_date' => now()->toDateString(),
+        'status' => 'running',
+        'start_time' => now(),
+    ]);
+
+    $service->finishJob($job->id, null, true);
+
+    $job->refresh();
+    expect($job->status)->toBe('pending');
+    expect($job->started_at)->toBeNull();
+    expect($job->finished_at)->toBeNull();
 });
 
 test('saving a production log closes any active idle downtime', function () {

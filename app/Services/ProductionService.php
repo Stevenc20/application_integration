@@ -736,23 +736,38 @@ class ProductionService
                 $totalOutput = (float)$currOk + (float)$currRep + (float)$currRej;
             }
 
-            // ATURAN MUTLAK: Jika item diputus karena cutoff shift atau stop session dan totalOutput == 0,
-            // JANGAN PERNAH tandai sebagai 'complete'. Reset status menjadi 'pending' agar bisa dikerjakan di kemudian hari.
-            $isCutoffOrStopWithZero = ($totalOutput <= 0 && in_array($nextJobId, ['SHIFT_CUTOFF', 'STOP_SESSION', 'FINISH_ONLY']));
-            $targetJobStatus = $isCutoffOrStopWithZero ? 'pending' : 'complete';
+            // Jangan reset item yang pernah menghasilkan output pada tanggal lain.
+            // Guard ini hanya untuk item yang benar-benar belum pernah diproduksi sama sekali.
+            $hasExplicitFinal = ($finalOk !== null || $finalRepair !== null || $finalReject !== null);
+            if ($totalOutput <= 0 && !$hasExplicitFinal) {
+                $allTimeDaily = (float) DailyProduction::where('job_master_id', $jobId)
+                    ->selectRaw('COALESCE(SUM(actual_ok + actual_repair + actual_reject), 0) as total')
+                    ->value('total');
+                $allTimeLog = (float) ProductionLog::where('job_master_id', $jobId)
+                    ->selectRaw('COALESCE(SUM(ok_qty + repair_qty + reject_qty), 0) as total')
+                    ->value('total');
+                $totalOutput = max($totalOutput, $allTimeDaily, $allTimeLog);
+            }
+
+            // ATURAN MUTLAK: Item dengan total output 0 TIDAK PERNAH boleh menjadi 'complete',
+            // apa pun alasan finish-nya (cutoff shift, stop session, auto cut-off job lain,
+            // force stop, maupun finish manual). Reset ke 'pending' agar bisa dikerjakan lagi.
+            // Ini mencegah item yang belum diproduksi tampil selesai di Line/PPC.
+            $isZeroOutput = ($totalOutput <= 0);
+            $targetJobStatus = $isZeroOutput ? 'pending' : 'complete';
 
             $job = JobMaster::find($jobId);
-            $finishedAt = $isCutoffOrStopWithZero ? null : now();
+            $finishedAt = $isZeroOutput ? null : now();
             $jobUpdate = [
                 'status' => $targetJobStatus,
                 'finished_at' => $finishedAt,
             ];
-            if ($isCutoffOrStopWithZero) {
+            if ($isZeroOutput) {
                 $jobUpdate['started_at'] = null;
             }
 
             // Pastikan started_at terisi jika status complete tapi sebelumnya belum sempat start
-            if (!$isCutoffOrStopWithZero && $job && empty($job->started_at)) {
+            if (!$isZeroOutput && $job && empty($job->started_at)) {
                 $earliestStart = null;
                 // Cek ProductionSession
                 $firstSession = ProductionSession::where('job_master_id', $jobId)->whereNotNull('start_time')->orderBy('start_time')->first();
@@ -803,7 +818,7 @@ class ProductionService
                         'status' => $targetJobStatus,
                         'finished_at' => $finishedAt,
                     ];
-                    if ($isCutoffOrStopWithZero) {
+                    if ($isZeroOutput) {
                         $siblingUpdate['started_at'] = null;
                     } elseif (empty($sibling->started_at) && !empty($jobUpdate['started_at'])) {
                         $siblingUpdate['started_at'] = $jobUpdate['started_at'];
@@ -875,7 +890,9 @@ class ProductionService
             $this->signalDashboard($jobId);
 
             // --- Auto-recovery: queue short-of-plan items ---
-            $planId = $this->resolvePlanId($jobId);
+            // Item dengan output 0 dikembalikan ke pending, bukan diselesaikan,
+            // sehingga tidak boleh dibuatkan recovery/notifikasi PPC (plan aslinya masih ada).
+            $planId = $isZeroOutput ? null : $this->resolvePlanId($jobId);
             $mismatch = null;
             $autoRecoveryItem = null;
             $job = \App\Models\JobMaster::find($jobId);
@@ -935,7 +952,7 @@ class ProductionService
                 }
             }
 
-            if (!$autoRecoveryItem && $job) {
+            if (!$isZeroOutput && !$autoRecoveryItem && $job) {
                 $planQty = (float) ($job->target_qty ?? 0);
                 if ($planQty > 0 && $actualQtyTotal < $planQty) {
                     $recoveryQty = $planQty - $actualQtyOk;
@@ -1360,12 +1377,22 @@ class ProductionService
                     'efficiency'        => $efficiency,
                     'remarks'           => $data['remarks'] ?? $existing->remarks ?? null,
                     'saved_by'          => Auth::id(),
-                    'status'            => 'complete',
                 ]
             );
 
-            // Sync status and quantities to PPC Production Plan
-            $this->syncPlan($jobId, 'complete', $actualQty, $repairQty, $rejectQty);
+            // Sync status and quantities to PPC Production Plan.
+            // Menyimpan qty 0 tidak boleh menandai plan selesai: item yang belum
+            // diproduksi harus tetap pending/approved agar tidak tampil COMPLETED.
+            $totalOutput = $actualQty + $repairQty + $rejectQty;
+            if ($totalOutput > 0) {
+                $planStatus = 'complete';
+            } elseif (in_array(strtolower((string) $job?->status), ['running', 'paused'], true)) {
+                $planStatus = 'running';
+            } else {
+                $planStatus = 'pending';
+            }
+
+            $this->syncPlan($jobId, $planStatus, $actualQty, $repairQty, $rejectQty);
 
             $this->signalDashboard($jobId);
 
@@ -1642,41 +1669,50 @@ class ProductionService
             $updateData['repair'] = (float) ($repair ?? 0);
             $updateData['reject'] = (float) ($reject ?? 0);
 
-            // Sync actual times to PPC
-            $resolvedActStart = null;
-            if ($jobMaster->started_at) {
-                $resolvedActStart = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+            // Reset ke pending berarti item belum benar-benar dikerjakan.
+            // Jangan pertahankan act_start/act_finish lama agar tidak tampak selesai di PPC/Line.
+            $resetActTimes = (($updateData['status'] ?? null) === 'pending');
+
+            if ($resetActTimes) {
+                $updateData['act_start'] = null;
+                $updateData['act_finish'] = null;
             } else {
-                // Fallback jika started_at di JobMaster belum diset tetapi sudah ada session / log
-                $earliest = ProductionSession::where('job_master_id', $jobId)->whereNotNull('start_time')->min('start_time')
-                    ?: Dandori::where('next_job_id', $jobId)->whereNotNull('start_time')->min('start_time')
-                    ?: ProductionLog::where('job_master_id', $jobId)->min('created_at');
-                if ($earliest) {
-                    $resolvedActStart = \Carbon\Carbon::parse($earliest)->format('H:i:s');
+                // Sync actual times to PPC
+                $resolvedActStart = null;
+                if ($jobMaster->started_at) {
+                    $resolvedActStart = \Carbon\Carbon::parse($jobMaster->started_at)->format('H:i:s');
+                } else {
+                    // Fallback jika started_at di JobMaster belum diset tetapi sudah ada session / log
+                    $earliest = ProductionSession::where('job_master_id', $jobId)->whereNotNull('start_time')->min('start_time')
+                        ?: Dandori::where('next_job_id', $jobId)->whereNotNull('start_time')->min('start_time')
+                        ?: ProductionLog::where('job_master_id', $jobId)->min('created_at');
+                    if ($earliest) {
+                        $resolvedActStart = \Carbon\Carbon::parse($earliest)->format('H:i:s');
+                    }
                 }
-            }
 
-            if ($resolvedActStart) {
-                $updateData['act_start'] = $resolvedActStart;
-            }
-
-            if ($jobMaster->finished_at) {
-                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
-            } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
-                $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
-            }
-
-            // Jika act_finish terisi tapi act_start masih kosong, tentukan fallback start agar tidak null
-            if (!empty($updateData['act_finish']) && empty($updateData['act_start'])) {
-                $planRecord = \App\Models\ProductionPlan::find($planId);
-                $fallbackMinutes = 0;
-                if ($planRecord && $planRecord->start_time && $planRecord->finish_time) {
-                    $fallbackMinutes = abs(\Carbon\Carbon::parse($planRecord->finish_time)->diffInMinutes(\Carbon\Carbon::parse($planRecord->start_time)));
+                if ($resolvedActStart) {
+                    $updateData['act_start'] = $resolvedActStart;
                 }
-                if ($fallbackMinutes <= 0) {
-                    $fallbackMinutes = 5;
+
+                if ($jobMaster->finished_at) {
+                    $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->finished_at)->format('H:i:s');
+                } elseif (in_array(strtolower($jobMaster->status), ['complete', 'finished', 'closed'])) {
+                    $updateData['act_finish'] = \Carbon\Carbon::parse($jobMaster->updated_at)->format('H:i:s');
                 }
-                $updateData['act_start'] = \Carbon\Carbon::parse($updateData['act_finish'])->subMinutes((int) $fallbackMinutes)->format('H:i:s');
+
+                // Jika act_finish terisi tapi act_start masih kosong, tentukan fallback start agar tidak null
+                if (!empty($updateData['act_finish']) && empty($updateData['act_start'])) {
+                    $planRecord = \App\Models\ProductionPlan::find($planId);
+                    $fallbackMinutes = 0;
+                    if ($planRecord && $planRecord->start_time && $planRecord->finish_time) {
+                        $fallbackMinutes = abs(\Carbon\Carbon::parse($planRecord->finish_time)->diffInMinutes(\Carbon\Carbon::parse($planRecord->start_time)));
+                    }
+                    if ($fallbackMinutes <= 0) {
+                        $fallbackMinutes = 5;
+                    }
+                    $updateData['act_start'] = \Carbon\Carbon::parse($updateData['act_finish'])->subMinutes((int) $fallbackMinutes)->format('H:i:s');
+                }
             }
 
             \App\Models\ProductionPlan::where('id', $planId)->update($updateData);
