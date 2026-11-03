@@ -211,6 +211,17 @@ class ProductionPlanDuplicateService
                     throw new \RuntimeException('Audit penghapusan duplikat gagal disimpan.');
                 }
 
+                // Regenerate section timeline agar jam start/finish cascaded rapi setelah item dihapus
+                try {
+                    $timelineGenerator = app(\App\Services\TimelineGenerationService::class);
+                    $dateStr = $lockedPlan->plan_date ? \Carbon\Carbon::parse($lockedPlan->plan_date)->format('Y-m-d') : null;
+                    if ($dateStr && $lockedPlan->shift_name) {
+                        $timelineGenerator->regenerateSection($dateStr, $lockedPlan->shift_name, $lockedPlan->press_name);
+                    }
+                } catch (\Throwable $e) {
+                    \Illuminate\Support\Facades\Log::warning('Timeline regeneration after duplicate delete failed: ' . $e->getMessage());
+                }
+
                 return true;
             });
         } catch (QueryException $e) {

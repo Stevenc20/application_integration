@@ -709,12 +709,15 @@ class ProductionPlanController extends Controller
                 $effectivePress = $item->press_name ?: ($targetPress ?: 'PRESS A');
 
                 // Tentukan Shift & Date target:
-                // Jika dari Shift Pagi -> Next Shift adalah Shift Malam di tgl yang sama
-                // Jika dari Shift Malam -> Next Shift adalah Shift Pagi di H+1
+                // Jika request mengirim targetDate/targetShift spesifik (misal dari modal context), utamakan itu;
+                // Jika tidak, gunakan logic shift berikutnya (Pagi -> Malam tgl sama, Malam -> Pagi H+1)
                 $srcDate = $item->source_date ? $item->source_date->format('Y-m-d') : ($item->original_date ? Carbon::parse($item->original_date)->format('Y-m-d') : ($targetDate ?: now()->toDateString()));
                 $srcShift = $item->source_shift ?: ($item->original_shift_name ?: ($targetShift ?: 'Shift Pagi'));
 
-                if (stripos($srcShift, 'malam') !== false) {
+                if (! empty($targetDate) && ! empty($targetShift)) {
+                    $itemTargetShift = $targetShift;
+                    $itemTargetDate = $targetDate;
+                } elseif (stripos($srcShift, 'malam') !== false) {
                     $itemTargetShift = 'Shift Pagi';
                     $itemTargetDate = Carbon::parse($srcDate)->addDay()->toDateString();
                 } else {
@@ -1242,7 +1245,7 @@ class ProductionPlanController extends Controller
         $plan->a4 = $plan->p4 ? $plan->tpt : 0;
         $plan->save();
 
-        // Regenerate timeline
+        // Regenerate timeline agar seluruh baris di section (termasuk baris setelahnya) terkalkulasi & cascade secara berurutan
         try {
             $timelineGenerator = app(TimelineGenerationService::class);
             $timelineGenerator->regenerateForPlan($plan);
