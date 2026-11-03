@@ -342,7 +342,15 @@
                     $hasExistingDandori = collect($segments)->contains(fn($seg) => $seg['type'] === 'dandori');
                     foreach ($job->dandoris as $dRec) {
                         $s = $dRec->start_time ? \Carbon\Carbon::parse($dRec->start_time) : null;
-                        $e = $dRec->finish_time ? \Carbon\Carbon::parse($dRec->finish_time) : ($s && ($dRec->duration_minutes ?? 0) > 0 ? $s->copy()->addSeconds((int)($dRec->duration_minutes * 60)) : ($s ? $s->copy()->addMinutes(5) : null));
+                        $durM = (float)($dRec->duration_minutes ?? 0);
+                        $e = $dRec->finish_time 
+                            ? \Carbon\Carbon::parse($dRec->finish_time) 
+                            : ($s && $durM > 0 
+                                ? $s->copy()->addSeconds((int)round($durM * 60)) 
+                                : ($job && $job->started_at && $s && \Carbon\Carbon::parse($job->started_at) > $s 
+                                    ? \Carbon\Carbon::parse($job->started_at) 
+                                    : ($s ? $s->copy()->addMinutes(5) : null)));
+
                         if ($s) {
                             if (!$e || $e < $s) $e = $s->copy();
                             $isFC = strtolower(trim($dRec->jenis_dandori ?? '')) === '1st_check' 
@@ -377,14 +385,22 @@
                     foreach ($job->downtimes as $dt) {
                         $s = $dt->start_time ? \Carbon\Carbon::parse($dt->start_time) : null;
                         $dur = (int)($dt->duration_seconds ?? 0);
-                        $e = $dt->finish_time ? \Carbon\Carbon::parse($dt->finish_time) : ($s && $dur > 0 ? $s->copy()->addSeconds($dur) : null);
-                        if ($s && ($dur > 0 || $dt->finish_time)) {
+                        $dtType = strtolower(trim($dt->jenis_downtime ?? ''));
+                        $isDandori = ($dtType === 'dandori');
+                        $isTryOut = in_array($dtType, ['try out', 'tryout']);
+                        $isBreak = in_array($dtType, ['break time', 'break']);
+                        $isIdle = in_array($dtType, ['idle', 'idle time']);
+
+                        $e = $dt->finish_time 
+                            ? \Carbon\Carbon::parse($dt->finish_time) 
+                            : ($s && $dur > 0 
+                                ? $s->copy()->addSeconds($dur) 
+                                : ($isDandori && $job && $job->started_at && $s && \Carbon\Carbon::parse($job->started_at) > $s 
+                                    ? \Carbon\Carbon::parse($job->started_at) 
+                                    : null));
+
+                        if ($s && ($dur > 0 || $dt->finish_time || ($isDandori && $job && $job->started_at))) {
                             if (!$e || $e < $s) $e = $s->copy()->addSeconds(max($dur, 1));
-                            $dtType = strtolower(trim($dt->jenis_downtime ?? ''));
-                            $isDandori = ($dtType === 'dandori');
-                            $isTryOut = in_array($dtType, ['try out', 'tryout']);
-                            $isBreak = in_array($dtType, ['break time', 'break']);
-                            $isIdle = in_array($dtType, ['idle', 'idle time']);
 
                             // If this is dandori and we already have a dandori segment, don't duplicate
                             if ($isDandori && $hasExistingDandori) {

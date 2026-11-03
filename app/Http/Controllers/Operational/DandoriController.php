@@ -313,6 +313,25 @@ class DandoriController extends Controller
 
             $activities = $actQuery->orderBy('created_at', 'asc')->get();
 
+            $totalDuration = $activities->sum(function($a) {
+                if (($a->duration_minutes ?? 0) > 0) {
+                    return (float) $a->duration_minutes;
+                }
+                if ($a->start_time && $a->finish_time) {
+                    return abs(Carbon::parse($a->finish_time)->diffInSeconds(Carbon::parse($a->start_time))) / 60;
+                }
+                // Jika masih open atau selesai tanpa finish_time pada job yang sudah selesai/running
+                $job = $a->nextJob;
+                if ($job && $job->started_at && $a->start_time) {
+                    $jobStart = Carbon::parse($job->started_at);
+                    $dandoriStart = Carbon::parse($a->start_time);
+                    if ($jobStart > $dandoriStart) {
+                        return abs($jobStart->diffInSeconds($dandoriStart)) / 60;
+                    }
+                }
+                return 0;
+            });
+
             return [
                 'job_id'         => $group->next_job_id,
                 'job_number'     => $group->job_number ?? 'N/A',
@@ -320,19 +339,38 @@ class DandoriController extends Controller
                 'line'           => $group->line,
                 'shift'          => $group->shift,
                 'date'           => Carbon::parse($group->work_date)->format('d M Y'),
-                'total_duration' => round($activities->sum('duration_minutes'), 2),
+                'total_duration' => round($totalDuration, 2),
                 'activities'     => $activities->map(function ($a) {
                     $isFirstCheck = strtolower(trim($a->jenis_dandori ?? '')) === '1st_check' 
                         || strtolower(trim($a->jenis_dandori ?? '')) === '1st check' 
                         || strtoupper(trim($a->activity ?? '')) === '1ST CHECK';
 
+                    $durMinutes = (float)($a->duration_minutes ?? 0);
+                    $finishTimeStr = $a->finish_time ? Carbon::parse($a->finish_time)->format('H:i') : '-';
+
+                    if ($durMinutes <= 0) {
+                        if ($a->start_time && $a->finish_time) {
+                            $durMinutes = abs(Carbon::parse($a->finish_time)->diffInSeconds(Carbon::parse($a->start_time))) / 60;
+                        } else {
+                            $job = $a->nextJob;
+                            if ($job && $job->started_at && $a->start_time) {
+                                $jStart = Carbon::parse($job->started_at);
+                                $dStart = Carbon::parse($a->start_time);
+                                if ($jStart > $dStart) {
+                                    $durMinutes = abs($jStart->diffInSeconds($dStart)) / 60;
+                                    $finishTimeStr = $jStart->format('H:i');
+                                }
+                            }
+                        }
+                    }
+
                     return [
                         'type'          => $a->activity,
                         'jenis_dandori' => $isFirstCheck ? '1st_check' : 'dandori',
                         'start'         => $a->start_time ? Carbon::parse($a->start_time)->format('H:i') : '-',
-                        'finish'        => $a->finish_time ? Carbon::parse($a->finish_time)->format('H:i') : '-',
-                        'duration'      => round($a->duration_minutes, 2),
-                        'is_finished'   => !is_null($a->finish_time)
+                        'finish'        => $finishTimeStr,
+                        'duration'      => round($durMinutes, 2),
+                        'is_finished'   => !is_null($a->finish_time) || $durMinutes > 0
                     ];
                 })
             ];

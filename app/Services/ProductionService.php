@@ -124,6 +124,18 @@ class ProductionService
                         'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($openDowntime->start_time)))
                     ]);
                 }
+
+                // Close any existing open dandori before starting production
+                $openDandoris = Dandori::where('next_job_id', $jobId)
+                    ->whereNull('finish_time')
+                    ->get();
+                foreach ($openDandoris as $od) {
+                    $dDur = abs($now->diffInSeconds(Carbon::parse($od->start_time))) / 60;
+                    $od->update([
+                        'finish_time' => $now,
+                        'duration_minutes' => round($dDur, 2)
+                    ]);
+                }
             }
 
             JobMaster::where('id', $jobId)->update($updateData);
@@ -677,9 +689,28 @@ class ProductionService
             $workDate = $this->resolveWorkDate($jobId);
 
             // Auto-close any active downtimes for this job
-            Downtime::where('job_master_id', $jobId)
+            $now = now();
+            $openDowntimes = Downtime::where('job_master_id', $jobId)
                 ->whereNull('finish_time')
-                ->update(['finish_time' => now()]);
+                ->get();
+            foreach ($openDowntimes as $odt) {
+                $odt->update([
+                    'finish_time' => $now,
+                    'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($odt->start_time)))
+                ]);
+            }
+
+            // Auto-close any active dandoris for this job
+            $openDandoris = Dandori::where('next_job_id', $jobId)
+                ->whereNull('finish_time')
+                ->get();
+            foreach ($openDandoris as $od) {
+                $dDur = abs($now->diffInSeconds(Carbon::parse($od->start_time))) / 60;
+                $od->update([
+                    'finish_time' => $now,
+                    'duration_minutes' => round($dDur, 2)
+                ]);
+            }
 
             $runtime = $this->calculateRuntime($jobId);
 
