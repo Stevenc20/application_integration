@@ -944,8 +944,304 @@ function toggleLkhEdit(on) {
             }
         });
         lkhUpdates = {};
+        // Recalculate all rows and footers back to original state
+        document.querySelectorAll('#lkh-actual-tbody tr[data-plan-id]').forEach(tr => {
+            lkhRecalculateRow(tr);
+        });
+        lkhRecalculateTotals();
     }
     lkhSetEditMode(on);
+}
+
+function lkhFormatMinutes(val) {
+    const mins = Math.max(0, Number(val) || 0);
+    const m = Math.floor(mins);
+    const s = Math.round((mins - m) * 60);
+    return m + '.' + String(s).padStart(2, '0');
+}
+
+function lkhFormatNumber(val, decimals = 0) {
+    const n = Number(val) || 0;
+    return n.toLocaleString('en-US', {
+        minimumFractionDigits: decimals,
+        maximumFractionDigits: decimals
+    });
+}
+
+function lkhRecalculateRow(tr) {
+    if (!tr) return;
+    const getVal = (col) => {
+        const cell = tr.querySelector('[data-col="' + col + '"]');
+        if (!cell) return 0;
+        return Number(cell.dataset.value) || 0;
+    };
+    const setCell = (col, rawVal, formattedText) => {
+        const cell = tr.querySelector('[data-col="' + col + '"]');
+        if (!cell) return;
+        cell.dataset.value = rawVal;
+        const disp = cell.querySelector('.lkh-edit-display');
+        if (disp) {
+            disp.textContent = formattedText !== undefined ? formattedText : rawVal;
+        } else {
+            // Check if there are links inside cell (like HW or DT badge)
+            const spanVal = cell.querySelector('.dt-total-val, .pass-rate-val');
+            if (spanVal) {
+                spanVal.textContent = formattedText !== undefined ? formattedText : rawVal;
+            } else {
+                cell.textContent = formattedText !== undefined ? formattedText : rawVal;
+            }
+        }
+    };
+
+    const good = getVal('actual_good');
+    const repair = getVal('actual_repair');
+    const reject = getVal('actual_reject');
+    const totalStroke = Math.max(0, good + repair + reject);
+
+    setCell('total_stroke', totalStroke, lkhFormatNumber(totalStroke));
+    setCell('act_qty', totalStroke, lkhFormatNumber(totalStroke));
+
+    // Quality rates
+    const passRate = totalStroke > 0 ? (good / totalStroke * 100) : 0;
+    const repRate = totalStroke > 0 ? (repair / totalStroke * 100) : 0;
+    const rejRate = totalStroke > 0 ? (reject / totalStroke * 100) : 0;
+    setCell('pass_rate', passRate.toFixed(1), passRate.toFixed(1));
+    setCell('repair_rate', repRate.toFixed(1), repRate.toFixed(1));
+    setCell('reject_rate', rejRate.toFixed(1), rejRate.toFixed(1));
+
+    // Dandori
+    const diesVariant = getVal('dandori_dies_variant');
+    const qcheck = getVal('dandori_qcheck');
+    const danTotal = diesVariant + qcheck;
+    setCell('dandori_total', danTotal, lkhFormatMinutes(danTotal));
+
+    // Downtimes
+    const dtDies = getVal('dt_dies');
+    const dtMachine = getVal('dt_machine');
+    const dtMaterial = getVal('dt_material');
+    const dtLog = getVal('dt_log');
+    const dtProd = getVal('dt_production');
+    const dtOthers = getVal('dt_others');
+    const dtTotal = dtDies + dtMachine + dtMaterial + dtLog + dtProd + dtOthers;
+    setCell('dt_total', dtTotal, lkhFormatMinutes(dtTotal));
+
+    // Press Time
+    let pressTime = getVal('press_time');
+    const planCt = Number(tr.dataset.planCt) || 0;
+    if (pressTime <= 0 && planCt > 0 && totalStroke > 0) {
+        pressTime = (totalStroke * planCt) / 60;
+        setCell('press_time', Math.ceil(pressTime), String(Math.ceil(pressTime)));
+    }
+
+    // TPT Actual = Press Time + Total Dandori + Total Downtime (Break Time EXCLUDED to avoid double-counting)
+    const tptAct = pressTime + danTotal + dtTotal;
+    setCell('tpt_act', tptAct, lkhFormatMinutes(tptAct));
+
+    // Break Time & Work Time
+    const breakTime = Number(tr.dataset.breakDuration) || getVal('break_time') || 0;
+    const workTime = tptAct + breakTime;
+    setCell('work_time', workTime, lkhFormatMinutes(workTime));
+
+    // CT Actual = (Press Time * 60) / Total Stroke
+    const ctActual = totalStroke > 0 ? ((pressTime * 60) / totalStroke) : 0;
+    setCell('ct_actual', ctActual.toFixed(1), ctActual.toFixed(1));
+
+    // GSPH = round(Total Stroke / (TPT Actual / 60))
+    const gsph = tptAct > 0 ? Math.round(totalStroke / (tptAct / 60)) : 0;
+    setCell('gsph', gsph, lkhFormatNumber(gsph));
+
+    // Recalculate Actual Finish if Actual Start is set and Actual Finish was not explicitly overridden
+    const startCell = tr.querySelector('[data-col="actual_start"]');
+    const finishCell = tr.querySelector('[data-col="actual_finish"]');
+    if (startCell && finishCell && startCell.dataset.value) {
+        const startVal = startCell.dataset.value.trim();
+        if (/^\d{1,2}:\d{2}$/.test(startVal)) {
+            const parts = startVal.split(':');
+            const startMins = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
+            const totalElapsedMins = Math.round(tptAct + breakTime);
+            const finishMins = (startMins + totalElapsedMins) % 1440;
+            const fH = String(Math.floor(finishMins / 60)).padStart(2, '0');
+            const fM = String(finishMins % 60).padStart(2, '0');
+            const computedFinish = fH + ':' + fM;
+
+            // Only update finish cell if not actively being edited or if user hasn't given custom finish
+            const isFinishOverridden = lkhUpdates[finishCell.dataset.planId + ':actual_finish'] !== undefined;
+            if (!isFinishOverridden && finishCell.dataset.editing !== '1') {
+                finishCell.dataset.value = computedFinish;
+                lkhRestoreCellDisplay(finishCell);
+            }
+        }
+    }
+}
+
+function lkhRecalculateTotals() {
+    const rows = Array.from(document.querySelectorAll('#lkh-actual-tbody tr[data-plan-id]'));
+    if (!rows.length) return;
+
+    let totPlanQty = 0, totStroke = 0, totGood = 0, totRepair = 0, totReject = 0;
+    let totPress = 0, totDiesVar = 0, totQcheck = 0, totDandori = 0;
+    let totDtDies = 0, totDtMach = 0, totDtMatl = 0, totDtLog = 0, totDtProd = 0, totDtOth = 0, totDtTotal = 0;
+    let totTptPlan = 0, totTptAct = 0, totBreak = 0, totWork = 0;
+
+    let weightedOeeSum = 0;
+    let totalWorkTimeWeight = 0;
+
+    rows.forEach(tr => {
+        const getV = (col) => {
+            const cell = tr.querySelector('[data-col="' + col + '"]');
+            return cell ? (Number(cell.dataset.value) || 0) : 0;
+        };
+        totPlanQty += Number(tr.querySelector('[data-col="plan_qty"]')?.dataset.value) || 0;
+        const good = getV('actual_good');
+        const repair = getV('actual_repair');
+        const reject = getV('actual_reject');
+        const stroke = good + repair + reject;
+
+        totGood += good;
+        totRepair += repair;
+        totReject += reject;
+        totStroke += stroke;
+
+        totPress += getV('press_time');
+        totDiesVar += getV('dandori_dies_variant');
+        totQcheck += getV('dandori_qcheck');
+        totDandori += (getV('dandori_dies_variant') + getV('dandori_qcheck'));
+
+        totDtDies += getV('dt_dies');
+        totDtMach += getV('dt_machine');
+        totDtMatl += getV('dt_material');
+        totDtLog += getV('dt_log');
+        totDtProd += getV('dt_production');
+        totDtOth += getV('dt_others');
+        totDtTotal += (getV('dt_dies') + getV('dt_machine') + getV('dt_material') + getV('dt_log') + getV('dt_production') + getV('dt_others'));
+
+        totTptPlan += getV('tpt_plan');
+        const rowTptAct = getV('tpt_act');
+        totTptAct += rowTptAct;
+        const rowBreak = Number(tr.dataset.breakDuration) || getV('break_time') || 0;
+        totBreak += rowBreak;
+        const rowWork = rowTptAct + rowBreak;
+        totWork += rowWork;
+
+        const rowOee = getV('oee');
+        if (rowWork > 0 && rowOee > 0) {
+            weightedOeeSum += (rowOee * rowWork);
+            totalWorkTimeWeight += rowWork;
+        }
+    });
+
+    const totPassRate = totStroke > 0 ? (totGood / totStroke * 100) : 0;
+    const totRepRate = totStroke > 0 ? (totRepair / totStroke * 100) : 0;
+    const totRejRate = totStroke > 0 ? (totReject / totStroke * 100) : 0;
+    const totGsph = totTptAct > 0 ? Math.round(totStroke / (totTptAct / 60)) : 0;
+    const totOee = totalWorkTimeWeight > 0 ? (weightedOeeSum / totalWorkTimeWeight) : (totStroke > 0 ? totPassRate : 0);
+
+    // Update Footers in #lkh-actual-tfoot
+    const setFoot = (key, text) => {
+        const cell = document.querySelector('#lkh-actual-tfoot [data-foot="' + key + '"]');
+        if (cell) cell.textContent = text;
+    };
+
+    setFoot('plan_qty', lkhFormatNumber(totPlanQty));
+    setFoot('act_qty', lkhFormatNumber(totStroke));
+    setFoot('good', lkhFormatNumber(totGood));
+    setFoot('repair', lkhFormatNumber(totRepair));
+    setFoot('reject', lkhFormatNumber(totReject));
+    setFoot('stroke', lkhFormatNumber(totStroke));
+    setFoot('press_time', String(Math.ceil(totPress)));
+    setFoot('dandori_dies', lkhFormatMinutes(totDiesVar));
+    setFoot('dandori_qcheck', lkhFormatMinutes(totQcheck));
+    setFoot('dandori_total', lkhFormatMinutes(totDandori));
+    setFoot('dt_dies', lkhFormatMinutes(totDtDies));
+    setFoot('dt_machine', lkhFormatMinutes(totDtMach));
+    setFoot('dt_material', lkhFormatMinutes(totDtMatl));
+    setFoot('dt_log', lkhFormatMinutes(totDtLog));
+    setFoot('dt_production', lkhFormatMinutes(totDtProd));
+    setFoot('dt_others', lkhFormatMinutes(totDtOth));
+    setFoot('dt_total', lkhFormatMinutes(totDtTotal));
+    setFoot('tpt_plan', lkhFormatMinutes(totTptPlan));
+    setFoot('tpt_act', lkhFormatMinutes(totTptAct));
+    setFoot('break_time', lkhFormatMinutes(totBreak));
+    setFoot('work_time', lkhFormatMinutes(totWork));
+    setFoot('pass_rate', totPassRate.toFixed(1));
+    setFoot('repair_rate', totRepRate.toFixed(1));
+    setFoot('reject_rate', totRejRate.toFixed(1));
+    setFoot('oee', totOee.toFixed(1));
+    setFoot('gsph', lkhFormatNumber(totGsph));
+
+    // Update Section 3 Summary Achievement
+    const setSummRow = (type, actVal, formattedAct, pctVal, isInverse = false) => {
+        const tr = document.querySelector('#lkh-summary-tbody tr[data-summ="' + type + '"]');
+        if (!tr) return;
+        const actTd = tr.querySelector('.val-actual');
+        const pctTd = tr.querySelector('.val-pct');
+        if (actTd) {
+            actTd.dataset.valAct = actVal;
+            actTd.textContent = formattedAct;
+        }
+        if (pctTd) {
+            pctTd.textContent = pctVal.toFixed(1) + '%';
+            pctTd.className = 'val-pct';
+            if (isInverse) {
+                pctTd.classList.add(pctVal <= 80 ? 'good' : (pctVal <= 100 ? 'warn' : 'bad'));
+            } else {
+                pctTd.classList.add(pctVal >= 100 ? 'good' : (pctVal >= 80 ? 'warn' : 'bad'));
+            }
+        }
+    };
+
+    // Qty Process: Actual is Good qty (completed parts) or Stroke depending on summary standard
+    // In summary rows, sumQtyAct is actual completed parts (actual_good)
+    const summQtyPlan = Number(document.querySelector('#lkh-summary-tbody tr[data-summ="qty"] .val-plan')?.dataset.valPlan) || totPlanQty;
+    const qtyPct = summQtyPlan > 0 ? (totGood / summQtyPlan * 100) : 0;
+    setSummRow('qty', totGood, lkhFormatNumber(totGood) + ' Pcs', qtyPct);
+
+    // TPT Process
+    const summTptPlan = Number(document.querySelector('#lkh-summary-tbody tr[data-summ="tpt"] .val-plan')?.dataset.valPlan) || totTptPlan;
+    const tptPct = summTptPlan > 0 ? (totTptAct / summTptPlan * 100) : 0;
+    setSummRow('tpt', totTptAct, lkhFormatNumber(totTptAct, 1) + ' Min', tptPct);
+
+    // GSPH
+    const summGsphPlan = Number(document.querySelector('#lkh-summary-tbody tr[data-summ="gsph"] .val-plan')?.dataset.valPlan) || 0;
+    const gsphPct = summGsphPlan > 0 ? (totGsph / summGsphPlan * 100) : 0;
+    setSummRow('gsph', totGsph, lkhFormatNumber(totGsph, 0) + ' Pcs/Hour', gsphPct);
+
+    // Quality Rates
+    const summPassPlan = Number(document.querySelector('#lkh-summary-tbody tr[data-summ="pass"] .val-plan')?.dataset.valPlan) || 100;
+    const passPct = summPassPlan > 0 ? (totPassRate / summPassPlan * 100) : 0;
+    setSummRow('pass', totPassRate, totPassRate.toFixed(1) + '%', passPct);
+
+    const summRejPlan = Number(document.querySelector('#lkh-summary-tbody tr[data-summ="reject"] .val-plan')?.dataset.valPlan) || 2;
+    const rejPct = summRejPlan > 0 ? (totRejRate / summRejPlan * 100) : 0;
+    setSummRow('reject', totRejRate, totRejRate.toFixed(2) + '%', rejPct, true);
+
+    const summRepPlan = Number(document.querySelector('#lkh-summary-tbody tr[data-summ="repair"] .val-plan')?.dataset.valPlan) || 1;
+    const repPct = summRepPlan > 0 ? (totRepRate / summRepPlan * 100) : 0;
+    setSummRow('repair', totRepRate, totRepRate.toFixed(2) + '%', repPct, true);
+
+    // OEE
+    const oeeTr = document.querySelector('#lkh-summary-tbody tr[data-summ="oee"]');
+    if (oeeTr) {
+        const actTd = oeeTr.querySelector('.val-actual');
+        const pctTd = oeeTr.querySelector('.val-pct');
+        if (actTd) actTd.textContent = totOee.toFixed(1) + '%';
+        if (pctTd) {
+            pctTd.textContent = totOee.toFixed(1) + '%';
+            pctTd.className = 'val-pct ' + (totOee >= 85 ? 'good' : (totOee >= 65 ? 'warn' : 'bad'));
+        }
+    }
+
+    // Achievement
+    const achTr = document.querySelector('#lkh-summary-tbody tr[data-summ="achievement"]');
+    if (achTr) {
+        const actTd = achTr.querySelector('.val-actual');
+        const pctTd = achTr.querySelector('.val-pct');
+        if (actTd) actTd.textContent = lkhFormatNumber(totGood, 0);
+        if (pctTd) {
+            pctTd.textContent = qtyPct.toFixed(1) + '%';
+            pctTd.className = 'bg-gray-100 val-pct ' + (qtyPct >= 100 ? 'good' : (qtyPct >= 80 ? 'warn' : 'bad'));
+        }
+    }
 }
 
 function lkhRestoreCellDisplay(cell) {
@@ -986,6 +1282,13 @@ function lkhCellToInput(cell) {
         cell.dataset.value = val;
         cell.classList.add('lkh-cell-edited');
         lkhRestoreCellDisplay(cell);
+
+        // Trigger dynamic recalculation of row and totals
+        const row = cell.closest('tr');
+        if (row) {
+            lkhRecalculateRow(row);
+        }
+        lkhRecalculateTotals();
     };
     const cancel = () => { lkhRestoreCellDisplay(cell); };
     input.addEventListener('change', commit);

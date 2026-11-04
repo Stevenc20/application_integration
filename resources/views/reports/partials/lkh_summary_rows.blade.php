@@ -19,57 +19,57 @@
 
         $pctClass = fn($v) => $v >= 100 ? 'good' : ($v >= 80 ? 'warn' : 'bad');
     @endphp
-    <tr><td class="bg-gray-50 font-bold text-gray-700">ITEM PROCESS</td>
-        <td class="val-plan">{{ number_format($sumItemPlan) }} Items</td>
-        <td class="val-actual">{{ number_format($sumItemAct) }} Items</td>
+    <tr data-summ="item"><td class="bg-gray-50 font-bold text-gray-700">ITEM PROCESS</td>
+        <td class="val-plan" data-val-plan="{{ $sumItemPlan }}">{{ number_format($sumItemPlan) }} Items</td>
+        <td class="val-actual" data-val-act="{{ $sumItemAct }}">{{ number_format($sumItemAct) }} Items</td>
         @php $pct = $sumItemPlan > 0 ? ($sumItemAct / $sumItemPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">QTY PROCESS (PCS)</td>
-        <td class="val-plan">{{ number_format($sumQtyPlan) }} Pcs</td>
-        <td class="val-actual">{{ number_format($sumQtyAct) }} Pcs</td>
+    <tr data-summ="qty"><td class="bg-gray-50 font-bold text-gray-700">QTY PROCESS (PCS)</td>
+        <td class="val-plan" data-val-plan="{{ $sumQtyPlan }}">{{ number_format($sumQtyPlan) }} Pcs</td>
+        <td class="val-actual" data-val-act="{{ $sumQtyAct }}">{{ number_format($sumQtyAct) }} Pcs</td>
         @php $pct = $sumQtyPlan > 0 ? ($sumQtyAct / $sumQtyPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">TPT PROCESS (MIN)</td>
-        <td class="val-plan">{{ number_format($sumTptPlan,1) }} Min</td>
-        <td class="val-actual">{{ number_format($sumTptAct,1) }} Min</td>
+    <tr data-summ="tpt"><td class="bg-gray-50 font-bold text-gray-700">TPT PROCESS (MIN)</td>
+        <td class="val-plan" data-val-plan="{{ $sumTptPlan }}">{{ number_format($sumTptPlan,1) }} Min</td>
+        <td class="val-actual" data-val-act="{{ $sumTptAct }}">{{ number_format($sumTptAct,1) }} Min</td>
         @php $pct = $sumTptPlan > 0 ? ($sumTptAct / $sumTptPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">GSPH</td>
-        <td class="val-plan">{{ number_format($sumGsphPlan,0) }} Pcs/Hour</td>
-        <td class="val-actual">{{ number_format($sumGsphAct,0) }} Pcs/Hour</td>
+    <tr data-summ="gsph"><td class="bg-gray-50 font-bold text-gray-700">GSPH</td>
+        <td class="val-plan" data-val-plan="{{ $sumGsphPlan }}">{{ number_format($sumGsphPlan,0) }} Pcs/Hour</td>
+        <td class="val-actual" data-val-act="{{ $sumGsphAct }}">{{ number_format($sumGsphAct,0) }} Pcs/Hour</td>
         @php $pct = $sumGsphPlan > 0 ? ($sumGsphAct / $sumGsphPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">PASS RATE (%)</td>
-        <td class="val-plan">{{ number_format($sumPassPlan,1) }}%</td>
-        <td class="val-actual">{{ number_format($sumPassAct,1) }}%</td>
+    <tr data-summ="pass"><td class="bg-gray-50 font-bold text-gray-700">PASS RATE (%)</td>
+        <td class="val-plan" data-val-plan="{{ $sumPassPlan }}">{{ number_format($sumPassPlan,1) }}%</td>
+        <td class="val-actual" data-val-act="{{ $sumPassAct }}">{{ number_format($sumPassAct,1) }}%</td>
         @php $pct = $sumPassPlan > 0 ? ($sumPassAct / $sumPassPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pctClass($pct) }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">REJECT RATE (%)</td>
-        <td class="val-plan">{{ number_format($sumRejPlan,2) }}%</td>
-        <td class="val-actual">{{ number_format($sumRejAct,2) }}%</td>
+    <tr data-summ="reject"><td class="bg-gray-50 font-bold text-gray-700">REJECT RATE (%)</td>
+        <td class="val-plan" data-val-plan="{{ $sumRejPlan }}">{{ number_format($sumRejPlan,2) }}%</td>
+        <td class="val-actual" data-val-act="{{ $sumRejAct }}">{{ number_format($sumRejAct,2) }}%</td>
         @php $pct = $sumRejPlan > 0 ? ($sumRejAct / $sumRejPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pct <= 80 ? 'good' : ($pct <= 100 ? 'warn' : 'bad') }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">REPAIR RATE (%)</td>
-        <td class="val-plan">{{ number_format($sumRepPlan,2) }}%</td>
-        <td class="val-actual">{{ number_format($sumRepAct,2) }}%</td>
+    <tr data-summ="repair"><td class="bg-gray-50 font-bold text-gray-700">REPAIR RATE (%)</td>
+        <td class="val-plan" data-val-plan="{{ $sumRepPlan }}">{{ number_format($sumRepPlan,2) }}%</td>
+        <td class="val-actual" data-val-act="{{ $sumRepAct }}">{{ number_format($sumRepAct,2) }}%</td>
         @php $pct = $sumRepPlan > 0 ? ($sumRepAct / $sumRepPlan * 100) : 0; @endphp
         <td class="val-pct {{ $pct <= 80 ? 'good' : ($pct <= 100 ? 'warn' : 'bad') }}">{{ number_format($pct,1) }}%</td>
     </tr>
-    <tr><td class="bg-gray-50 font-bold text-gray-700">OEE (%)</td>
+    <tr data-summ="oee"><td class="bg-gray-50 font-bold text-gray-700">OEE (%)</td>
         <td class="val-plan">100.0%</td>
-        <td class="val-actual">{{ number_format($sumOee,1) }}%</td>
+        <td class="val-actual" data-val-act="{{ $sumOee }}">{{ number_format($sumOee,1) }}%</td>
         <td class="val-pct {{ $sumOee >= 85 ? 'good' : ($sumOee >= 65 ? 'warn' : 'bad') }}">{{ number_format($sumOee,1) }}%</td>
     </tr>
-    <tr class="bg-gray-100 font-black text-lg">
+    <tr data-summ="achievement" class="bg-gray-100 font-black text-lg">
         <td class="bg-gray-100 font-black text-gray-800">ACHIEVEMENT</td>
-        <td class="bg-gray-100 text-gray-600">{{ number_format($sumQtyPlan,0) }}</td>
-        <td class="bg-gray-100 val-actual">{{ number_format($sumQtyAct,0) }}</td>
+        <td class="bg-gray-100 text-gray-600" data-val-plan="{{ $sumQtyPlan }}">{{ number_format($sumQtyPlan,0) }}</td>
+        <td class="bg-gray-100 val-actual" data-val-act="{{ $sumQtyAct }}">{{ number_format($sumQtyAct,0) }}</td>
         <td class="bg-gray-100 val-pct {{ $pctClass($achievementPct) }}">{{ number_format($achievementPct,1) }}%</td>
     </tr>
 </tbody>

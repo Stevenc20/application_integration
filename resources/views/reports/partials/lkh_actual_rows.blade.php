@@ -8,12 +8,13 @@
         }
     }
 
-    $editTd = function ($planId, $field, $type, $value, $formatted, $tdClass) use ($canEdit) {
+    $editTd = function ($planId, $field, $type, $value, $formatted, $tdClass, $colAttr = '') use ($canEdit) {
         $display = $formatted !== '' && $formatted !== null ? $formatted : '-';
+        $attr = $colAttr ? ' data-col="' . $colAttr . '"' : '';
         if (!$canEdit) {
-            return '<td class="' . $tdClass . '">' . $display . '</td>';
+            return '<td class="' . $tdClass . '"' . $attr . '>' . $display . '</td>';
         }
-        return '<td class="' . $tdClass . ' lkh-editable-cell" data-plan-id="' . (int) $planId . '" data-field="' . $field . '" data-type="' . $type . '" data-value="' . e((string) $value) . '" title="Klik untuk edit"><span class="lkh-edit-display">' . $display . '</span><span class="lkh-edit-icon">✎</span></td>';
+        return '<td class="' . $tdClass . ' lkh-editable-cell"' . $attr . ' data-plan-id="' . (int) $planId . '" data-field="' . $field . '" data-type="' . $type . '" data-value="' . e((string) $value) . '" title="Klik untuk edit"><span class="lkh-edit-display">' . $display . '</span><span class="lkh-edit-icon">✎</span></td>';
     };
 @endphp
 
@@ -85,52 +86,52 @@
             $dtTotal = $job['dt_total'] ?? 0;
             $planId = $job['plan_id'] ?? 0;
         @endphp
-        <tr>
+        <tr data-plan-id="{{ $planId }}" data-break-duration="{{ $breakTime }}" data-plan-ct="{{ $ctRecord }}">
             <td class="text-center font-bold text-gray-500">{{ $job['display_no'] ?? $loop->iteration }}</td>
             <td class="text-center font-semibold text-gray-800" title="{{ $job['job_master'] ?? '' }}">{{ !empty($job['job_no']) ? $job['job_no'] : ($job['job_master'] ?? '-') }}</td>
-            <td class="cell-qty">{{ number_format($job['plan_qty'] ?? 0) }}</td>
-            <td class="cell-qty font-bold">{{ number_format($totalStroke) }}</td>
-            {!! $editTd($planId, 'actual_good', 'qty', $actGood, number_format($actGood), 'cell-qty text-emerald-700 font-bold') !!}
-            {!! $editTd($planId, 'actual_repair', 'qty', $actRepair, number_format($actRepair), 'cell-qty text-amber-700') !!}
-            {!! $editTd($planId, 'actual_reject', 'qty', $actReject, number_format($actReject), 'cell-qty text-red-600') !!}
-            <td class="cell-qty font-bold">{{ number_format($totalStroke) }}</td>
+            <td class="cell-qty" data-col="plan_qty">{{ number_format($job['plan_qty'] ?? 0) }}</td>
+            <td class="cell-qty font-bold" data-col="act_qty">{{ number_format($totalStroke) }}</td>
+            {!! $editTd($planId, 'actual_good', 'qty', $actGood, number_format($actGood), 'cell-qty text-emerald-700 font-bold', 'actual_good') !!}
+            {!! $editTd($planId, 'actual_repair', 'qty', $actRepair, number_format($actRepair), 'cell-qty text-amber-700', 'actual_repair') !!}
+            {!! $editTd($planId, 'actual_reject', 'qty', $actReject, number_format($actReject), 'cell-qty text-red-600', 'actual_reject') !!}
+            <td class="cell-qty font-bold" data-col="total_stroke">{{ number_format($totalStroke) }}</td>
             <td class="text-center cell-time">{{ $timeCell($planStart) }}</td>
             <td class="text-center cell-time">{{ $timeCell($planFinish) }}</td>
-            {!! $editTd($planId, 'actual_start', 'time', $actStart ? $actStart->format('H:i') : '', $timeCell($actStart), 'text-center cell-time font-bold text-emerald-800') !!}
-            {!! $editTd($planId, 'actual_finish', 'time', $actFinish ? $actFinish->format('H:i') : '', $timeCell($actFinish), 'text-center cell-time font-bold text-emerald-800') !!}
-            <td class="text-center font-semibold">{{ number_format($ctRecord,1) }}</td>
-            <td class="text-center font-semibold">{{ number_format($ctActual,1) }}</td>
-            <td class="cell-qty">@fmtMin($procAct)</td>
-            {!! $editTd($planId, 'dandori_dies_variant', 'mins', $job['dies_variant_time'] ?? 0, \App\Support\ProductionFormat::minutes($job['dies_variant_time'] ?? 0), 'text-center font-semibold') !!}
-            {!! $editTd($planId, 'dandori_qcheck', 'mins', $job['qcheck_time'] ?? 0, \App\Support\ProductionFormat::minutes($job['qcheck_time'] ?? 0), 'text-center') !!}
-            {!! $editTd($planId, 'dandori_total', 'mins', $dctActual, \App\Support\ProductionFormat::minutes($dctActual), 'cell-qty') !!}
-            {!! $editTd($planId, 'dt_dies', 'mins', $dtDies, \App\Support\ProductionFormat::minutes($dtDies), 'cell-qty') !!}
-            {!! $editTd($planId, 'dt_machine', 'mins', $dtMach, \App\Support\ProductionFormat::minutes($dtMach), 'cell-qty') !!}
-            {!! $editTd($planId, 'dt_material', 'mins', $dtMatl, \App\Support\ProductionFormat::minutes($dtMatl), 'cell-qty') !!}
-            {!! $editTd($planId, 'dt_log', 'mins', $dtLog, \App\Support\ProductionFormat::minutes($dtLog), 'cell-qty') !!}
-            {!! $editTd($planId, 'dt_production', 'mins', $dtProd, \App\Support\ProductionFormat::minutes($dtProd), 'cell-qty') !!}
-            {!! $editTd($planId, 'dt_others', 'mins', $dtOth, \App\Support\ProductionFormat::minutes($dtOth), 'cell-qty') !!}
-            <td class="cell-qty font-bold">
+            {!! $editTd($planId, 'actual_start', 'time', $actStart ? $actStart->format('H:i') : '', $timeCell($actStart), 'text-center cell-time font-bold text-emerald-800', 'actual_start') !!}
+            {!! $editTd($planId, 'actual_finish', 'time', $actFinish ? $actFinish->format('H:i') : '', $timeCell($actFinish), 'text-center cell-time font-bold text-emerald-800', 'actual_finish') !!}
+            <td class="text-center font-semibold" data-col="ct_record">{{ number_format($ctRecord,1) }}</td>
+            <td class="text-center font-semibold" data-col="ct_actual">{{ number_format($ctActual,1) }}</td>
+            <td class="cell-qty" data-col="press_time" data-value="{{ $procAct }}">@fmtMin($procAct)</td>
+            {!! $editTd($planId, 'dandori_dies_variant', 'mins', $job['dies_variant_time'] ?? 0, \App\Support\ProductionFormat::minutes($job['dies_variant_time'] ?? 0), 'text-center font-semibold', 'dandori_dies_variant') !!}
+            {!! $editTd($planId, 'dandori_qcheck', 'mins', $job['qcheck_time'] ?? 0, \App\Support\ProductionFormat::minutes($job['qcheck_time'] ?? 0), 'text-center', 'dandori_qcheck') !!}
+            {!! $editTd($planId, 'dandori_total', 'mins', $dctActual, \App\Support\ProductionFormat::minutes($dctActual), 'cell-qty', 'dandori_total') !!}
+            {!! $editTd($planId, 'dt_dies', 'mins', $dtDies, \App\Support\ProductionFormat::minutes($dtDies), 'cell-qty', 'dt_dies') !!}
+            {!! $editTd($planId, 'dt_machine', 'mins', $dtMach, \App\Support\ProductionFormat::minutes($dtMach), 'cell-qty', 'dt_machine') !!}
+            {!! $editTd($planId, 'dt_material', 'mins', $dtMatl, \App\Support\ProductionFormat::minutes($dtMatl), 'cell-qty', 'dt_material') !!}
+            {!! $editTd($planId, 'dt_log', 'mins', $dtLog, \App\Support\ProductionFormat::minutes($dtLog), 'cell-qty', 'dt_log') !!}
+            {!! $editTd($planId, 'dt_production', 'mins', $dtProd, \App\Support\ProductionFormat::minutes($dtProd), 'cell-qty', 'dt_production') !!}
+            {!! $editTd($planId, 'dt_others', 'mins', $dtOth, \App\Support\ProductionFormat::minutes($dtOth), 'cell-qty', 'dt_others') !!}
+            <td class="cell-qty font-bold" data-col="dt_total" data-value="{{ $dtTotal }}">
                 @if ($planId && $dtTotal > 0)
                 <a href="{{ route('monitoring.history', ['type' => 'downtime', 'plan_id' => $planId, 'date' => $date]) }}" class="text-blue-600 hover:underline" title="Lihat detail downtime">DT</a>
                 @endif
-                @fmtMin($dtTotal)
+                <span class="dt-total-val">@fmtMin($dtTotal)</span>
             </td>
-            <td class="cell-qty">@fmtMin($tptPlan)</td>
-            <td class="cell-qty font-bold">@fmtMin($tptActual)</td>
+            <td class="cell-qty" data-col="tpt_plan" data-value="{{ $tptPlan }}">@fmtMin($tptPlan)</td>
+            <td class="cell-qty font-bold" data-col="tpt_act" data-value="{{ $tptActual }}">@fmtMin($tptActual)</td>
             <td class="text-center text-[10px] font-semibold text-gray-500">{{ $breakTime > 0 ? 'BREAK' : '-' }}</td>
-            <td class="cell-qty">@fmtMin($breakTime)</td>
-            <td class="cell-qty font-bold">@fmtMin($workTime)</td>
-            <td class="cell-qty {{ $passRate >= 98 ? 'text-emerald-700' : 'text-amber-700' }}">
+            <td class="cell-qty" data-col="break_time" data-value="{{ $breakTime }}">@fmtMin($breakTime)</td>
+            <td class="cell-qty font-bold" data-col="work_time" data-value="{{ $workTime }}">@fmtMin($workTime)</td>
+            <td class="cell-qty {{ $passRate >= 98 ? 'text-emerald-700' : 'text-amber-700' }}" data-col="pass_rate">
                 @if ($planId && ($actRepair > 0 || $actReject > 0))
                 <a href="{{ route('supervisor.handwork.index', ['plan_id' => $planId]) }}" class="text-blue-600 hover:underline" title="Lihat detail handwork">HW</a>
                 @endif
-                {{ number_format($passRate,1) }}
+                <span class="pass-rate-val">{{ number_format($passRate,1) }}</span>
             </td>
-            <td class="cell-qty {{ $repairRate <= 1 ? 'text-emerald-700' : 'text-amber-700' }}">{{ number_format($repairRate,1) }}</td>
-            <td class="cell-qty {{ $rejectRate <= 2 ? 'text-emerald-700' : 'text-red-600' }}">{{ number_format($rejectRate,1) }}</td>
-            <td class="cell-qty font-bold {{ $oee >= 85 ? 'text-emerald-700' : ($oee >= 65 ? 'text-amber-700' : 'text-red-600') }}">{{ number_format($oee,1) }}</td>
-            <td class="cell-qty font-bold text-red-900">{{ number_format($gsphActual,0) }}</td>
+            <td class="cell-qty {{ $repairRate <= 1 ? 'text-emerald-700' : 'text-amber-700' }}" data-col="repair_rate">{{ number_format($repairRate,1) }}</td>
+            <td class="cell-qty {{ $rejectRate <= 2 ? 'text-emerald-700' : 'text-red-600' }}" data-col="reject_rate">{{ number_format($rejectRate,1) }}</td>
+            <td class="cell-qty font-bold {{ $oee >= 85 ? 'text-emerald-700' : ($oee >= 65 ? 'text-amber-700' : 'text-red-600') }}" data-col="oee">{{ number_format($oee,1) }}</td>
+            <td class="cell-qty font-bold text-red-900" data-col="gsph">{{ number_format($gsphActual,0) }}</td>
         </tr>
         @endif
     @empty
@@ -168,35 +169,35 @@
     <tr>
         <td></td>
         <td class="font-bold">TOTAL SHIFT</td>
-        <td class="cell-qty font-bold">{{ number_format($tActPlan) }}</td>
-        <td class="cell-qty font-bold">{{ number_format($tActStroke) }}</td>
-        <td class="cell-qty font-bold text-emerald-800">{{ number_format($tActGood) }}</td>
-        <td class="cell-qty font-bold text-amber-700">{{ number_format($tActRepair) }}</td>
-        <td class="cell-qty font-bold text-red-600">{{ number_format($tActReject) }}</td>
-        <td class="cell-qty font-bold">{{ number_format($tActStroke) }}</td>
+        <td class="cell-qty font-bold" data-foot="plan_qty">{{ number_format($tActPlan) }}</td>
+        <td class="cell-qty font-bold" data-foot="act_qty">{{ number_format($tActStroke) }}</td>
+        <td class="cell-qty font-bold text-emerald-800" data-foot="good">{{ number_format($tActGood) }}</td>
+        <td class="cell-qty font-bold text-amber-700" data-foot="repair">{{ number_format($tActRepair) }}</td>
+        <td class="cell-qty font-bold text-red-600" data-foot="reject">{{ number_format($tActReject) }}</td>
+        <td class="cell-qty font-bold" data-foot="stroke">{{ number_format($tActStroke) }}</td>
         <td colspan="4"></td>
         <td></td>
         <td></td>
-        <td class="cell-qty font-bold">{{ (int)ceil($tActProc) }}</td>
-        <td class="cell-qty font-bold">@fmtMin($actRows->sum('dies_variant_time'))</td>
-        <td class="cell-qty font-bold">@fmtMin($tActQcheck)</td>
-        <td class="cell-qty font-bold">@fmtMin($tActDct)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtDies)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtMach)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtMatl)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtLog)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtProd)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtOth)</td>
-        <td class="cell-qty font-bold">@fmtMin($tDtTotal)</td>
-        <td class="cell-qty font-bold">@fmtMin($tActTptPlan)</td>
-        <td class="cell-qty font-bold">@fmtMin($tActTpt)</td>
+        <td class="cell-qty font-bold" data-foot="press_time">{{ (int)ceil($tActProc) }}</td>
+        <td class="cell-qty font-bold" data-foot="dandori_dies">@fmtMin($actRows->sum('dies_variant_time'))</td>
+        <td class="cell-qty font-bold" data-foot="dandori_qcheck">@fmtMin($tActQcheck)</td>
+        <td class="cell-qty font-bold" data-foot="dandori_total">@fmtMin($tActDct)</td>
+        <td class="cell-qty font-bold" data-foot="dt_dies">@fmtMin($tDtDies)</td>
+        <td class="cell-qty font-bold" data-foot="dt_machine">@fmtMin($tDtMach)</td>
+        <td class="cell-qty font-bold" data-foot="dt_material">@fmtMin($tDtMatl)</td>
+        <td class="cell-qty font-bold" data-foot="dt_log">@fmtMin($tDtLog)</td>
+        <td class="cell-qty font-bold" data-foot="dt_production">@fmtMin($tDtProd)</td>
+        <td class="cell-qty font-bold" data-foot="dt_others">@fmtMin($tDtOth)</td>
+        <td class="cell-qty font-bold" data-foot="dt_total">@fmtMin($tDtTotal)</td>
+        <td class="cell-qty font-bold" data-foot="tpt_plan">@fmtMin($tActTptPlan)</td>
+        <td class="cell-qty font-bold" data-foot="tpt_act">@fmtMin($tActTpt)</td>
         <td></td>
-        <td class="cell-qty font-bold">@fmtMin($tActBreak)</td>
-        <td class="cell-qty font-bold">@fmtMin($tActWork)</td>
-        <td class="cell-qty font-bold">{{ number_format($tActPassRate,1) }}</td>
-        <td class="cell-qty font-bold">{{ number_format($tActRepRate,1) }}</td>
-        <td class="cell-qty font-bold">{{ number_format($tActRejRate,1) }}</td>
-        <td class="cell-qty font-bold {{ $tActOee >= 85 ? 'text-emerald-700' : ($tActOee >= 65 ? 'text-amber-700' : 'text-red-600') }}">{{ number_format($tActOee,1) }}</td>
-        <td class="cell-qty font-bold text-red-900">{{ number_format($tActGsph,0) }}</td>
+        <td class="cell-qty font-bold" data-foot="break_time">@fmtMin($tActBreak)</td>
+        <td class="cell-qty font-bold" data-foot="work_time">@fmtMin($tActWork)</td>
+        <td class="cell-qty font-bold" data-foot="pass_rate">{{ number_format($tActPassRate,1) }}</td>
+        <td class="cell-qty font-bold" data-foot="repair_rate">{{ number_format($tActRepRate,1) }}</td>
+        <td class="cell-qty font-bold" data-foot="reject_rate">{{ number_format($tActRejRate,1) }}</td>
+        <td class="cell-qty font-bold {{ $tActOee >= 85 ? 'text-emerald-700' : ($tActOee >= 65 ? 'text-amber-700' : 'text-red-600') }}" data-foot="oee">{{ number_format($tActOee,1) }}</td>
+        <td class="cell-qty font-bold text-red-900" data-foot="gsph">{{ number_format($tActGsph,0) }}</td>
     </tr>
 </tfoot>
