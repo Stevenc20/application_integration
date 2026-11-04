@@ -421,6 +421,14 @@
                         </div>
                         <p class="text-xs font-black text-amber-700 leading-relaxed">Item sedang dalam jeda istirahat. Mohon tunggu sebentar — produksi akan otomatis dilanjutkan setelah waktu istirahat selesai.</p>
                     </div>
+
+                    {{-- Manual Resume / Akhiri Istirahat Sekarang --}}
+                    <div class="mt-4">
+                        <button type="button" onclick="resumeActiveJobFromBreak({{ $activeJob->id }})" class="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all flex items-center gap-2 active:scale-95">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            <span>Akhiri Istirahat & Lanjutkan Produksi Sekarang</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 

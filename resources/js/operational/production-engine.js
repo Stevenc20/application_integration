@@ -1356,9 +1356,38 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
     }
 }
 
+window.resumeActiveJobFromBreak = async function resumeActiveJobFromBreak(jobId) {
+    if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
+    await window.ActionRunner.run('Resume from Break', async () => {
+        await _triggerAutoBreakEnd(jobId);
+        showToast('Waktu istirahat diakhiri. Produksi dilanjutkan!', 'success');
+        setTimeout(() => location.reload(), 400);
+    });
+};
+
 window.enqueueJob = async function enqueueJob(id) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
-    if (window._autoBreakActive) { showToast('Sedang break time, tidak bisa enqueue job.', 'warning'); return; }
+    if (window._autoBreakActive) {
+        showConfirm(
+            'Saat Ini Waktu Istirahat',
+            'Sistem mendeteksi jadwal istirahat sedang aktif. Apakah Anda ingin mengakhiri istirahat dan langsung menjalankan item ini?',
+            async () => {
+                closeConfirmModal();
+                const activeId = window.ProductionConfig?.currentActiveId;
+                if (activeId) {
+                    await _triggerAutoBreakEnd(activeId);
+                }
+                window._autoBreakActive = false;
+                window._autoBreakDowntimeId = null;
+                await _performEnqueue(id);
+            }
+        );
+        return;
+    }
+    await _performEnqueue(id);
+};
+
+async function _performEnqueue(id) {
     await window.ActionRunner.run('Enqueue Job', async () => {
         const res = await fetch(`/operational/job/${id}/enqueue`, {
             method: 'POST',
@@ -1383,7 +1412,24 @@ window.enqueueJob = async function enqueueJob(id) {
 
 window.jsStartDandori = async function jsStartDandori(jobId) {
     if (window.ProductionConfig?.isLocked) { showToast('Shift sudah dikunci.', 'danger'); return; }
-    if (window._autoBreakActive) { showToast('Sedang break time, tidak bisa start dandori.', 'warning'); return; }
+    if (window._autoBreakActive) {
+        showConfirm(
+            'Saat Ini Waktu Istirahat',
+            'Sistem mendeteksi jadwal istirahat sedang aktif. Apakah Anda ingin mengakhiri istirahat dan langsung mulai dandori?',
+            async () => {
+                closeConfirmModal();
+                await _triggerAutoBreakEnd(jobId);
+                window._autoBreakActive = false;
+                window._autoBreakDowntimeId = null;
+                await _performStartDandori(jobId);
+            }
+        );
+        return;
+    }
+    await _performStartDandori(jobId);
+};
+
+async function _performStartDandori(jobId) {
     await window.ActionRunner.run('Start Dandori', async () => {
         const res = await fetch(`/operational/job/${jobId}/dandori/start`, {
             method: 'POST',

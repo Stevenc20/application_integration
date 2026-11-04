@@ -166,7 +166,31 @@ class MasterBreakTime extends Model
             });
         }
 
-        // Fallback to MasterBreakTime database
+        // Jika hari ini PPC sudah upload jadwal produksi (ada item job di production_plans),
+        // tetapi TIDAK ADA baris break di jadwal PPC tersebut, berarti PPC memang menjadwalkan
+        // produksi non-stop atau jam istirahatnya tidak berlaku / berbeda. Jangan fallback ke MasterBreakTime!
+        $hasPpcJobSchedule = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->where('row_type', 'job')
+            ->where(function($q) use ($normalizedShift, $shiftName) {
+                $q->where('shift_name', $normalizedShift)
+                  ->orWhere('shift_name', 'LIKE', '%' . $normalizedShift . '%')
+                  ->orWhere('shift_name', 'LIKE', '%' . $shiftName . '%');
+            })
+            ->when($line && strtoupper($line) !== 'ALL', function($lq) use ($line) {
+                $normLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $line)));
+                $lq->where(function($sub) use ($normLine, $line) {
+                    $sub->whereRaw("UPPER(TRIM(press_name)) = ?", [strtoupper(trim($line))])
+                        ->orWhereRaw("UPPER(press_name) LIKE ?", ["%{$normLine}%"])
+                        ->orWhereRaw("REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normLine}%"]);
+                });
+            })
+            ->exists();
+
+        if ($hasPpcJobSchedule) {
+            return collect();
+        }
+
+        // Fallback to MasterBreakTime database hanya jika sama sekali belum ada jadwal PPC hari ini
         return self::getApplicableBreaks($date, $shiftName)->map(function($b) {
             $start = substr((string)$b->waktu_mulai, 0, 5);
             $end = substr((string)$b->waktu_selesai, 0, 5);
