@@ -794,11 +794,15 @@ function submitShift(confirmed) {
         const activeShift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
         const activeDate = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
 
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+            || (window.ProductionConfig && window.ProductionConfig.csrfToken)
+            || '';
+
         fetch('{{ route('operational.shift.submit', ['lineId' => '__LINE__']) }}'.replace('__LINE__', encodeURIComponent(activeLine)), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': csrfToken,
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
@@ -867,11 +871,15 @@ function cancelShift() {
         const activeShift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
         const activeDate = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
 
+        const cancelCsrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+            || (window.ProductionConfig && window.ProductionConfig.csrfToken)
+            || '';
+
         fetch('{{ route('operational.shift.cancel', ['lineId' => '__LINE__']) }}'.replace('__LINE__', encodeURIComponent(activeLine)), {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+                'X-CSRF-TOKEN': cancelCsrfToken,
                 'Accept': 'application/json',
             },
             body: JSON.stringify({
@@ -1212,7 +1220,7 @@ function submitTarikShift(e) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || (window.ProductionConfig && window.ProductionConfig.csrfToken) || '',
             'Accept': 'application/json'
         },
         body: JSON.stringify({
@@ -1260,7 +1268,7 @@ function stopActiveJobDirectly(jobId, jobNo) {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || (window.ProductionConfig && window.ProductionConfig.csrfToken) || '',
             'Accept': 'application/json',
         }
     })
