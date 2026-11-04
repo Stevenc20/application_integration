@@ -718,6 +718,14 @@ class ProductionService
                 ->whereDate('work_date', $workDate)
                 ->first();
 
+            // Fallback: jika session dengan workDate tidak ditemukan (misal mismatch tanggal pada shift malam), ambil session aktif terakhir
+            if (!$session) {
+                $session = ProductionSession::where('job_master_id', $jobId)
+                    ->whereIn('status', ['running', 'paused'])
+                    ->orderByDesc('id')
+                    ->first() ?: ProductionSession::where('job_master_id', $jobId)->orderByDesc('id')->first();
+            }
+
             if ($session) {
                 $session->total_seconds = (int) $runtime;
                 $session->status = 'finished';

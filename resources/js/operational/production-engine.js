@@ -22,11 +22,42 @@ window.addEventListener('error', function (event) {
     }
 });
 
+// Global CSRF Token resolver with DOM meta fallback
+function getEffectiveCsrfToken() {
+    return document.querySelector('meta[name="csrf-token"]')?.getAttribute('content')
+        || (window.ProductionConfig && window.ProductionConfig.csrfToken)
+        || '';
+}
+
 // Auto Session / CSRF Token Expired (419 & 401) Recovery Interceptor
 (function() {
     const originalFetch = window.fetch;
     let isReloadingForAuth = false;
     window.fetch = async function(...args) {
+        // Ensure X-CSRF-TOKEN header is fresh if missing or empty on POST/PUT/DELETE
+        try {
+            if (args.length > 1 && args[1] && typeof args[1] === 'object') {
+                const method = (args[1].method || 'GET').toUpperCase();
+                if (method !== 'GET' && method !== 'HEAD') {
+                    args[1].headers = args[1].headers || {};
+                    const headers = args[1].headers;
+                    const hasToken = headers['X-CSRF-TOKEN'] || (headers.get && headers.get('X-CSRF-TOKEN'));
+                    if (!hasToken) {
+                        const token = getEffectiveCsrfToken();
+                        if (token) {
+                            if (typeof headers.set === 'function') {
+                                headers.set('X-CSRF-TOKEN', token);
+                            } else {
+                                headers['X-CSRF-TOKEN'] = token;
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (e) {
+            // Ignore header injection error
+        }
+
         const response = await originalFetch.apply(this, args);
         if ((response.status === 419 || response.status === 401) && !isReloadingForAuth) {
             isReloadingForAuth = true;
@@ -2219,7 +2250,9 @@ async function submitFinalJob() {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': window.ProductionConfig.csrfToken,
+                    'X-CSRF-TOKEN': getEffectiveCsrfToken(),
+                    'X-Shift': (window.ProductionConfig && window.ProductionConfig.currentShift) || '',
+                    'X-Date': (window.ProductionConfig && window.ProductionConfig.currentDate) || '',
                     'Accept': 'application/json'
                 },
                 body: JSON.stringify({ 

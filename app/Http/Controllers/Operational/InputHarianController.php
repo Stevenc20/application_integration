@@ -327,6 +327,7 @@ class InputHarianController extends Controller
         }
 
         $activeJob = null;
+        $orphanRunningJob = null;
 
         if ($request->filled('job_id')) {
             $requestedJob = JobMaster::with([
@@ -500,7 +501,18 @@ class InputHarianController extends Controller
                 }
 
                 $activeJob = $activeJobs->first();
-                $orphanRunningJob = null;
+                if (!$activeJob) {
+                    $orphanRunningJob = $baseActiveQuery()
+                        ->with([
+                            'dailyProduction' => function ($q) use ($date) {
+                                $q->where('work_date', $date);
+                            },
+                            'downtimes',
+                            'dandoris'
+                        ])
+                        ->orderByDesc('updated_at')
+                        ->first();
+                }
 
                 // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung
                 if ($activeJob && $hasProductionProgress($activeJob)) {
@@ -894,8 +906,8 @@ class InputHarianController extends Controller
 
     public function finish(Request $request, int|string $id)
     {
-        $this->guardLockedShift($id);
         try {
+            $this->guardLockedShift($id);
             $nextJobId = $request->json('next_job_id') ?: $request->input('next_job_id');
             $skipIdle = filter_var($request->json('skip_idle') ?? $request->input('skip_idle', false), FILTER_VALIDATE_BOOLEAN);
             $finalOk = $request->json('ok_qty');
