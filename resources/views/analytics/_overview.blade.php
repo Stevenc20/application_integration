@@ -242,6 +242,8 @@
             {{-- ACTUAL SEGMENTED EXECUTION BAR (powered by ProductionTimelineService) --}}
             @php
                 $planDate = $plan->plan_date ? \Carbon\Carbon::parse($plan->plan_date)->format('Y-m-d') : ($dateFrom ?? now()->toDateString());
+                $planLine = $plan->press_name ? trim(str_replace(['PRESS ', 'Press ', 'LINE ', 'Line '], '', $plan->press_name)) : ($line ?? '');
+                $planShift = $plan->shift_name ?? ($shift ?? 'Shift 1');
                 $timelineService = app(\App\Services\ProductionTimelineService::class);
                 $segments = $timelineService->buildJobTimeline($job, $plan, $planDate);
 
