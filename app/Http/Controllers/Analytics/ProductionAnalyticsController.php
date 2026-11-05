@@ -10,6 +10,7 @@ use App\Models\ProductionLog;
 use App\Models\ProductionSession;
 use App\Models\DandoriSession;
 use App\Models\ProductionPlan;
+use App\Services\ProductionTimelineService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -50,7 +51,7 @@ class ProductionAnalyticsController extends Controller
 
         $data = match ($tab) {
             'overview' => $this->overviewData($dateFrom, $dateTo, $line, $shift, $status),
-            'timeline' => $this->timelineData($dateFrom, $dateTo, $line),
+            'timeline' => $this->timelineData($dateFrom, $dateTo, $line, $shift),
             'history' => $this->historyData($request, $dateFrom, $dateTo, $line, $shift),
             'lifecycle' => $this->lifecycleData(),
             'more_detail' => $this->moreDetailData($dateFrom, $dateTo, $line, $shift),
@@ -107,15 +108,22 @@ class ProductionAnalyticsController extends Controller
         $achievement = $achievementTarget > 0 ? round(($stats->total_ok / $achievementTarget) * 100, 1) : 0;
 
         $dpJobIds = (clone $dpQuery)->distinct()->pluck('job_master_id')->filter();
+        
+        // Date boundary adjustment: on night shift, events cross midnight into dateTo + 1 day (up to 08:00:00)
+        $isNightShift = $shift && str_contains(strtolower($shift), 'malam');
+        $effectiveDtEnd = $isNightShift
+            ? Carbon::parse($dateTo)->addDay()->format('Y-m-d') . ' 08:00:00'
+            : $dateTo . ' 23:59:59';
+
         $downtimeAgg = $dpJobIds->isNotEmpty()
             ? Downtime::whereIn('job_master_id', $dpJobIds)
-                ->whereBetween('start_time', [$dateFrom.' 00:00:00', $dateTo.' 23:59:59'])
+                ->whereBetween('start_time', [$dateFrom.' 00:00:00', $effectiveDtEnd])
                 ->selectRaw("
-                    COALESCE(SUM(CASE WHEN jenis_downtime IN ('idle','idle time') THEN duration_seconds ELSE 0 END), 0) as idle_sec,
-                    COALESCE(SUM(CASE WHEN jenis_downtime='repair' THEN duration_seconds ELSE 0 END), 0) as repair_sec,
-                    COALESCE(SUM(CASE WHEN jenis_downtime='dandori' THEN duration_seconds ELSE 0 END), 0) as dandori_sec,
-                    COALESCE(SUM(CASE WHEN jenis_downtime IN ('try out','tryout') THEN duration_seconds ELSE 0 END), 0) as tryout_sec,
-                    COALESCE(SUM(CASE WHEN jenis_downtime IN ('break time','break') THEN duration_seconds ELSE 0 END), 0) as break_sec
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('idle','idle time') THEN duration_seconds ELSE 0 END), 0) as idle_sec,
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime))='repair' THEN duration_seconds ELSE 0 END), 0) as repair_sec,
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('dandori', 'setup') THEN duration_seconds ELSE 0 END), 0) as dandori_sec,
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('try out','tryout','trial') THEN duration_seconds ELSE 0 END), 0) as tryout_sec,
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('break time','break','breaktime','istirahat') THEN duration_seconds ELSE 0 END), 0) as break_sec
                 ")->first()
             : (object) ['idle_sec' => 0, 'repair_sec' => 0, 'dandori_sec' => 0, 'tryout_sec' => 0, 'break_sec' => 0];
 
@@ -195,23 +203,36 @@ class ProductionAnalyticsController extends Controller
         return compact('stats', 'dailyTrend', 'achievement', 'downtimeAgg', 'plans', 'totalPlanTarget');
     }
 
-    private function timelineData(?string $dateFrom, ?string $dateTo, ?string $line)
+    private function timelineData(?string $dateFrom, ?string $dateTo, ?string $line, ?string $shift = null)
     {
-        $logsQuery = ProductionLog::whereBetween('created_at', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+        $isNightShift = $shift && str_contains(strtolower($shift), 'malam');
+        $effectiveDtEnd = $isNightShift
+            ? Carbon::parse($dateTo)->addDay()->format('Y-m-d') . ' 08:00:00'
+            : $dateTo . ' 23:59:59';
+
+        $logsQuery = ProductionLog::whereBetween('created_at', [$dateFrom . ' 00:00:00', $effectiveDtEnd])
             ->with('jobMaster');
 
-        $downtimesQuery = Downtime::whereBetween('start_time', [$dateFrom . ' 00:00:00', $dateTo . ' 23:59:59'])
+        $downtimesQuery = Downtime::whereBetween('start_time', [$dateFrom . ' 00:00:00', $effectiveDtEnd])
             ->with('jobMaster');
+
+        $dandorisQuery = \App\Models\Dandori::whereBetween('start_time', [$dateFrom . ' 00:00:00', $effectiveDtEnd])
+            ->with('nextJob');
 
         if ($line) {
             $logsQuery->whereHas('jobMaster', fn($q) => $q->where('line', $line));
             $downtimesQuery->whereHas('jobMaster', fn($q) => $q->where('line', $line));
+            $dandorisQuery->where(function ($q) use ($line) {
+                $q->where('line', $line)
+                  ->orWhereHas('nextJob', fn($jq) => $jq->where('line', $line));
+            });
         }
 
         $logs = $logsQuery->orderBy('created_at')->get();
         $downtimes = $downtimesQuery->orderBy('start_time')->get();
+        $dandoris = $dandorisQuery->orderBy('start_time')->get();
 
-        return compact('logs', 'downtimes');
+        return compact('logs', 'downtimes', 'dandoris');
     }
 
     private function historyData(Request $request, ?string $dateFrom, ?string $dateTo, ?string $line, ?string $shift)
