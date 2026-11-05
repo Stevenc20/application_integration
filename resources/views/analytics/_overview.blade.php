@@ -375,14 +375,13 @@
                                     $cursorClass = !empty($seg['link']) ? 'cursor-pointer' : 'cursor-default';
                                     $clickHandler = !empty($seg['link']) ? "window.location.href='".$seg['link']."'" : "void(0)";
                                     $lane = (int) ($seg['lane'] ?? 0);
-                                    if ($lane === 0) {
+                                    $totalLanes = max(1, (int) ($seg['total_lanes'] ?? 1));
+                                    if ($totalLanes === 1) {
                                         $topStyle = 'top: 0%; height: 100%; z-index: 10;';
-                                    } elseif ($lane === 1) {
-                                        $topStyle = 'top: 0%; height: 50%; z-index: 20;';
                                     } else {
-                                        // 3+ concurrent events: divide height appropriately
-                                        $topPct = min(66, $lane * 33);
-                                        $topStyle = "top: {$topPct}%; height: 33%; z-index: " . (20 + $lane) . ";";
+                                        $laneHeight = 100 / $totalLanes;
+                                        $laneTop = $lane * $laneHeight;
+                                        $topStyle = "top: {$laneTop}%; height: {$laneHeight}%; z-index: " . (10 + $lane) . ";";
                                     }
                                 @endphp
                                 <div class="absolute {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all rounded-[2px]"

@@ -1232,4 +1232,71 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $this->assertEquals(900, $fc['duration_sec']);
         $this->assertEquals(300, $tryout['duration_sec']);
     }
+
+    /**
+     * 21. Verifikasi Partisi Lane Interval Spatially:
+     * - Ketika Dandori dan 1st Check overlap, keduanya memiliki total_lanes = 2 (terbagi 50% & 50%).
+     * - Ketika 1st Check selesai dan produksi tunggal dimulai, produksi memiliki total_lanes = 1 (memenuhi tinggi 100%).
+     */
+    public function test_individual_activity_after_overlap_recovers_full_height()
+    {
+        $dStart = Carbon::parse('2026-11-05 08:00:00');
+        $dFinish = Carbon::parse('2026-11-05 08:30:00'); // Dandori 30m
+        $fcStart = Carbon::parse('2026-11-05 08:10:00');
+        $fcFinish = Carbon::parse('2026-11-05 08:25:00'); // 1st Check 15m (overlap dalam Dandori)
+        $pFinish = Carbon::parse('2026-11-05 09:30:00'); // Produksi 08:30 - 09:30
+
+        $job = JobMaster::create([
+            'job_number' => 'JOB-LANE-RECOVERY-TEST',
+            'line' => 'PRESS A',
+            'status' => 'complete',
+            'started_at' => $dStart,
+            'finished_at' => $pFinish,
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Changeover',
+            'jenis_dandori' => 'dandori',
+            'start_time' => $dStart,
+            'finish_time' => $dFinish,
+            'duration_minutes' => 30,
+            'work_date' => '2026-11-05',
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => '1ST CHECK',
+            'jenis_dandori' => '1st_check',
+            'start_time' => $fcStart,
+            'finish_time' => $fcFinish,
+            'duration_minutes' => 15,
+            'work_date' => '2026-11-05',
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $pFinish);
+
+        $dandori = collect($timeline)->firstWhere('type', 'dandori');
+        $fc = collect($timeline)->firstWhere('type', '1st_check');
+        $prod = collect($timeline)->firstWhere('type', 'production');
+
+        $this->assertNotNull($dandori);
+        $this->assertNotNull($fc);
+        $this->assertNotNull($prod);
+
+        // During overlap: total_lanes must be 2 (sharing height 50% each)
+        $this->assertEquals(2, $dandori['total_lanes']);
+        $this->assertEquals(2, $fc['total_lanes']);
+
+        // After overlap finishes: Single Production segment MUST have total_lanes = 1 (100% full height)
+        $this->assertEquals(1, $prod['total_lanes']);
+        $this->assertEquals(0, $prod['lane']);
+        $this->assertEquals(3600, $prod['duration_sec']);
+    }
 }

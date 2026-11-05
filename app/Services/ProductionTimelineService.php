@@ -415,6 +415,38 @@ class ProductionTimelineService
             }
         }
 
+        // Post-process ALL segments to calculate max concurrent lanes per overlapping cluster
+        // so that overlapping segments cleanly share the vertical space, while non-overlapping segments fill 100% height
+        $count = count($segments);
+        for ($i = 0; $i < $count; $i++) {
+            $sI = $segments[$i];
+            if ($sI['type'] === 'planned') {
+                $segments[$i]['total_lanes'] = 1;
+                continue;
+            }
+
+            // Find all segments that overlap with segment $i (including itself)
+            $overlappingIndexes = [$i];
+            for ($j = 0; $j < $count; $j++) {
+                if ($i === $j) continue;
+                $sJ = $segments[$j];
+                if ($sJ['type'] === 'planned') continue;
+
+                $oStart = max($sI['start']->timestamp, $sJ['start']->timestamp);
+                $oEnd = min($sI['end']->timestamp, $sJ['end']->timestamp);
+                if ($oEnd > $oStart) {
+                    $overlappingIndexes[] = $j;
+                }
+            }
+
+            // Find maximum lane index among all overlapping segments in this time cluster
+            $maxLane = 0;
+            foreach ($overlappingIndexes as $idx) {
+                $maxLane = max($maxLane, $segments[$idx]['lane'] ?? 0);
+            }
+            $segments[$i]['total_lanes'] = $maxLane + 1;
+        }
+
         return $segments;
     }
 
