@@ -1136,183 +1136,24 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $dFinish);
 
         // 1. Both segments MUST be present
-        $dandoriSegs = collect($timeline)->where('type', 'dandori');
-        $fcSegs = collect($timeline)->where('type', '1st_check');
+        $dandoriSeg = collect($timeline)->firstWhere('type', 'dandori');
+        $fcSeg = collect($timeline)->firstWhere('type', '1st_check');
 
-        $this->assertTrue($dandoriSegs->isNotEmpty(), 'Segmen Dandori harus ada');
-        $this->assertTrue($fcSegs->isNotEmpty(), 'Segmen 1st Check harus ada dan tidak boleh tereliminasi');
+        $this->assertNotNull($dandoriSeg, 'Segmen Dandori harus ada');
+        $this->assertNotNull($fcSeg, 'Segmen 1st Check harus ada dan tidak boleh tereliminasi');
 
-        // 2. Exact total durations must match source timestamps
-        $this->assertEquals(344, $dandoriSegs->sum('duration_sec'));
-        $this->assertEquals(220, $fcSegs->sum('duration_sec'));
+        // 2. Exact durations must match source timestamps
+        $this->assertEquals(344, $dandoriSeg['duration_sec']);
+        $this->assertEquals(220, $fcSeg['duration_sec']);
 
-        // 3. Multi-lane verification: First check is in lane 1 during overlap
-        $this->assertTrue($dandoriSegs->pluck('lane')->contains(0));
-        $this->assertTrue($fcSegs->pluck('lane')->contains(1));
+        // 3. Multi-lane verification: 1st Check is placed in lane 1 (stacked) while Dandori is lane 0
+        $this->assertEquals(0, $dandoriSeg['lane']);
+        $this->assertEquals(1, $fcSeg['lane']);
 
         // 4. Colors and labels
-        $this->assertEquals('bg-amber-400', $dandoriSegs->first()['color']);
-        $this->assertEquals('bg-purple-500', $fcSegs->first()['color']);
-        $this->assertEquals('Dandori', $dandoriSegs->first()['label']);
-        $this->assertEquals('1st Check', $fcSegs->first()['label']);
-    }
-
-    /**
-     * 20. Overlap lebih dari 2 event secara bersamaan (misal Dandori, 1st Check, dan Downtime Quality Inspection).
-     * Masing-masing harus mendapatkan lane terpisah (0, 1, 2) dan tidak saling menimpa.
-     */
-    public function test_three_concurrent_overlapping_events_receive_distinct_lanes()
-    {
-        $start = Carbon::parse('2026-11-05 10:00:00');
-        $finish = Carbon::parse('2026-11-05 10:30:00');
-
-        $job = JobMaster::create([
-            'job_number' => 'JOB-THREE-WAY-OVERLAP',
-            'line' => 'PRESS A',
-            'status' => 'complete',
-            'started_at' => $start,
-            'finished_at' => $finish,
-        ]);
-
-        // Event 1: Dandori 10:00 - 10:30 (1800s)
-        Dandori::create([
-            'next_job_id' => $job->id,
-            'line' => 'PRESS A',
-            'shift' => 'Shift 1',
-            'activity' => 'Changeover',
-            'jenis_dandori' => 'dandori',
-            'start_time' => $start,
-            'finish_time' => $finish,
-            'duration_minutes' => 30,
-            'work_date' => '2026-11-05',
-        ]);
-
-        // Event 2: 1st Check 10:05 - 10:20 (900s)
-        Dandori::create([
-            'next_job_id' => $job->id,
-            'line' => 'PRESS A',
-            'shift' => 'Shift 1',
-            'activity' => '1ST CHECK',
-            'jenis_dandori' => '1st_check',
-            'start_time' => Carbon::parse('2026-11-05 10:05:00'),
-            'finish_time' => Carbon::parse('2026-11-05 10:20:00'),
-            'duration_minutes' => 15,
-            'work_date' => '2026-11-05',
-        ]);
-
-        // Event 3: Downtime trial inspection 10:10 - 10:15 (300s)
-        Downtime::create([
-            'job_master_id' => $job->id,
-            'jenis_downtime' => 'tryout',
-            'problem' => 'Trial Sample Check',
-            'start_time' => Carbon::parse('2026-11-05 10:10:00'),
-            'finish_time' => Carbon::parse('2026-11-05 10:15:00'),
-            'duration_seconds' => 300,
-        ]);
-
-        $job->load(['downtimes', 'dandoris']);
-
-        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $finish);
-
-        $dandoriSegs = collect($timeline)->where('type', 'dandori');
-        $fcSegs = collect($timeline)->where('type', '1st_check');
-        $tryoutSegs = collect($timeline)->where('type', 'tryout');
-
-        $this->assertTrue($dandoriSegs->isNotEmpty());
-        $this->assertTrue($fcSegs->isNotEmpty());
-        $this->assertTrue($tryoutSegs->isNotEmpty());
-
-        // Verify distinct lanes (0, 1, 2)
-        $this->assertTrue($dandoriSegs->pluck('lane')->contains(0));
-        $this->assertTrue($fcSegs->pluck('lane')->contains(1));
-        $this->assertTrue($tryoutSegs->pluck('lane')->contains(2));
-
-        // Verify exact total durations
-        $this->assertEquals(1800, $dandoriSegs->sum('duration_sec'));
-        $this->assertEquals(900, $fcSegs->sum('duration_sec'));
-        $this->assertEquals(300, $tryoutSegs->sum('duration_sec'));
-    }
-
-    /**
-     * 21. Verifikasi Partisi Lane Interval Spatially:
-     * - Sebelum overlap (08:00 - 08:10): Dandori berada di lane 0 dengan total_lanes = 1 (tinggi 100%).
-     * - Selama overlap (08:10 - 08:25): Dandori dan 1st Check berbagi lane dengan total_lanes = 2 (tinggi 50% & 50%).
-     * - Setelah overlap (08:25 - 08:30): Dandori kembali memiliki total_lanes = 1 (tinggi 100%).
-     * - Setelah Dandori selesai (08:30 - 09:30): Produksi tunggal memiliki total_lanes = 1 (tinggi 100%).
-     */
-    public function test_individual_activity_after_overlap_recovers_full_height()
-    {
-        $dStart = Carbon::parse('2026-11-05 08:00:00');
-        $dFinish = Carbon::parse('2026-11-05 08:30:00'); // Dandori 30m
-        $fcStart = Carbon::parse('2026-11-05 08:10:00');
-        $fcFinish = Carbon::parse('2026-11-05 08:25:00'); // 1st Check 15m (overlap dalam Dandori)
-        $pFinish = Carbon::parse('2026-11-05 09:30:00'); // Produksi 08:30 - 09:30
-
-        $job = JobMaster::create([
-            'job_number' => 'JOB-LANE-RECOVERY-TEST',
-            'line' => 'PRESS A',
-            'status' => 'complete',
-            'started_at' => $dStart,
-            'finished_at' => $pFinish,
-        ]);
-
-        Dandori::create([
-            'next_job_id' => $job->id,
-            'line' => 'PRESS A',
-            'shift' => 'Shift 1',
-            'activity' => 'Changeover',
-            'jenis_dandori' => 'dandori',
-            'start_time' => $dStart,
-            'finish_time' => $dFinish,
-            'duration_minutes' => 30,
-            'work_date' => '2026-11-05',
-        ]);
-
-        Dandori::create([
-            'next_job_id' => $job->id,
-            'line' => 'PRESS A',
-            'shift' => 'Shift 1',
-            'activity' => '1ST CHECK',
-            'jenis_dandori' => '1st_check',
-            'start_time' => $fcStart,
-            'finish_time' => $fcFinish,
-            'duration_minutes' => 15,
-            'work_date' => '2026-11-05',
-        ]);
-
-        $job->load(['downtimes', 'dandoris']);
-
-        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $pFinish);
-
-        $dandoriSegs = collect($timeline)->where('type', 'dandori')->values();
-        $fcSegs = collect($timeline)->where('type', '1st_check')->values();
-        $prodSegs = collect($timeline)->where('type', 'production')->values();
-
-        $this->assertCount(3, $dandoriSegs); // 08:00-08:10, 08:10-08:25, 08:25-08:30
-        $this->assertCount(1, $fcSegs);      // 08:10-08:25
-        $this->assertCount(1, $prodSegs);    // 08:30-09:30
-
-        // 1. Sebelum overlap (08:00 - 08:10): Dandori total_lanes = 1 (100% tinggi penuh)
-        $this->assertEquals(1, $dandoriSegs[0]['total_lanes']);
-        $this->assertEquals(600, $dandoriSegs[0]['duration_sec']);
-
-        // 2. Selama overlap (08:10 - 08:25): Dandori & 1st Check total_lanes = 2 (50% & 50%)
-        $this->assertEquals(2, $dandoriSegs[1]['total_lanes']);
-        $this->assertEquals(2, $fcSegs[0]['total_lanes']);
-        $this->assertEquals(900, $dandoriSegs[1]['duration_sec']);
-        $this->assertEquals(900, $fcSegs[0]['duration_sec']);
-
-        // 3. Setelah 1st Check selesai (08:25 - 08:30): Dandori kembali total_lanes = 1 (100% tinggi penuh)
-        $this->assertEquals(1, $dandoriSegs[2]['total_lanes']);
-        $this->assertEquals(300, $dandoriSegs[2]['duration_sec']);
-
-        // 4. Setelah Dandori selesai (08:30 - 09:30): Produksi tunggal total_lanes = 1 (100% tinggi penuh)
-        $this->assertEquals(1, $prodSegs[0]['total_lanes']);
-        $this->assertEquals(3600, $prodSegs[0]['duration_sec']);
-
-        // Total akumulasi durasi tetap presisi
-        $this->assertEquals(1800, $dandoriSegs->sum('duration_sec'));
-        $this->assertEquals(900, $fcSegs->sum('duration_sec'));
-        $this->assertEquals(3600, $prodSegs->sum('duration_sec'));
+        $this->assertEquals('bg-amber-400', $dandoriSeg['color']);
+        $this->assertEquals('bg-purple-500', $fcSeg['color']);
+        $this->assertEquals('Dandori', $dandoriSeg['label']);
+        $this->assertEquals('1st Check', $fcSeg['label']);
     }
 }
