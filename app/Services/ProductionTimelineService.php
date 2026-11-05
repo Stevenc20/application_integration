@@ -415,39 +415,115 @@ class ProductionTimelineService
             }
         }
 
-        // Post-process ALL segments to calculate max concurrent lanes per overlapping cluster
-        // so that overlapping segments cleanly share the vertical space, while non-overlapping segments fill 100% height
-        $count = count($segments);
-        for ($i = 0; $i < $count; $i++) {
-            $sI = $segments[$i];
-            if ($sI['type'] === 'planned') {
-                $segments[$i]['total_lanes'] = 1;
-                continue;
+        // Post-process: Split segments at all concurrency boundaries (active start & end points)
+        // so that before overlap an event occupies 100% height, during overlap it occupies 50% (or 1/N),
+        // and after overlap the remaining event returns to 100% height.
+        return $this->splitSegmentsByConcurrency($segments);
+    }
+
+    /**
+     * Slice segments into contiguous sub-slices at every transition point where
+     * the number of concurrent events changes.
+     */
+    protected function splitSegmentsByConcurrency(array $segments): array
+    {
+        if (empty($segments)) {
+            return [];
+        }
+
+        // Filter active segments (exclude planned)
+        $activeSegs = [];
+        $plannedSegs = [];
+        foreach ($segments as $seg) {
+            if ($seg['type'] === 'planned') {
+                $plannedSegs[] = $seg;
+            } else {
+                $activeSegs[] = $seg;
             }
+        }
 
-            // Find all segments that overlap with segment $i (including itself)
-            $overlappingIndexes = [$i];
-            for ($j = 0; $j < $count; $j++) {
-                if ($i === $j) continue;
-                $sJ = $segments[$j];
-                if ($sJ['type'] === 'planned') continue;
+        if (empty($activeSegs)) {
+            return $segments;
+        }
 
-                $oStart = max($sI['start']->timestamp, $sJ['start']->timestamp);
-                $oEnd = min($sI['end']->timestamp, $sJ['end']->timestamp);
-                if ($oEnd > $oStart) {
-                    $overlappingIndexes[] = $j;
+        // Collect all distinct boundary timestamps
+        $points = [];
+        foreach ($activeSegs as $seg) {
+            $points[] = $seg['start']->timestamp;
+            $points[] = $seg['end']->timestamp;
+        }
+        $points = array_values(array_unique($points));
+        sort($points);
+
+        $result = [];
+
+        // For each adjacent pair [t0, t1], find all active segments that cover this slice
+        $numPoints = count($points);
+        for ($k = 0; $k < $numPoints - 1; $k++) {
+            $t0 = $points[$k];
+            $t1 = $points[$k + 1];
+            if ($t1 <= $t0) continue;
+
+            $covering = [];
+            foreach ($activeSegs as $seg) {
+                if ($seg['start']->timestamp <= $t0 && $seg['end']->timestamp >= $t1) {
+                    $covering[] = $seg;
                 }
             }
 
-            // Find maximum lane index among all overlapping segments in this time cluster
-            $maxLane = 0;
-            foreach ($overlappingIndexes as $idx) {
-                $maxLane = max($maxLane, $segments[$idx]['lane'] ?? 0);
+            if (empty($covering)) continue;
+
+            $totalLanesInSlice = count($covering);
+            // Sort covering segments deterministically by type or original start timestamp
+            usort($covering, function ($a, $b) {
+                // Keep lane 0 consistent (e.g. Dandori in lane 0, 1st Check in lane 1)
+                $priority = fn($t) => match ($t) {
+                    'production' => 1,
+                    'overtime'   => 2,
+                    'dandori'    => 3,
+                    '1st_check'  => 4,
+                    'tryout'     => 5,
+                    'break'      => 6,
+                    default      => 7,
+                };
+                $pA = $priority($a['type']);
+                $pB = $priority($b['type']);
+                if ($pA !== $pB) {
+                    return $pA <=> $pB;
+                }
+                return $a['start']->timestamp <=> $b['start']->timestamp;
+            });
+
+            foreach ($covering as $laneIdx => $parentSeg) {
+                $sliceStart = Carbon::createFromTimestamp($t0, $parentSeg['start']->timezone);
+                $sliceEnd = Carbon::createFromTimestamp($t1, $parentSeg['end']->timezone);
+                $sliceDur = $t1 - $t0;
+
+                $slice = $parentSeg;
+                $slice['start'] = $sliceStart;
+                $slice['end'] = $sliceEnd;
+                $slice['duration_sec'] = $sliceDur;
+                $slice['original_start'] = $parentSeg['original_start'] ?? $parentSeg['start'];
+                $slice['original_end'] = $parentSeg['original_end'] ?? $parentSeg['end'];
+                $slice['original_duration_sec'] = $parentSeg['original_duration_sec'] ?? $parentSeg['duration_sec'];
+                $slice['lane'] = $laneIdx;
+                $slice['total_lanes'] = $totalLanesInSlice;
+
+                $result[] = $slice;
             }
-            $segments[$i]['total_lanes'] = $maxLane + 1;
         }
 
-        return $segments;
+        // Re-append planned segments
+        foreach ($plannedSegs as $pSeg) {
+            $pSeg['lane'] = 0;
+            $pSeg['total_lanes'] = 1;
+            $result[] = $pSeg;
+        }
+
+        // Sort result chronologically
+        usort($result, fn($a, $b) => $a['start']->timestamp <=> $b['start']->timestamp ?: $a['lane'] <=> $b['lane']);
+
+        return $result;
     }
 
     /**

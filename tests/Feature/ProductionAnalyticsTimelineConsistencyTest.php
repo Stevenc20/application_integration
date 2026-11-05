@@ -1136,25 +1136,25 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $dFinish);
 
         // 1. Both segments MUST be present
-        $dandoriSeg = collect($timeline)->firstWhere('type', 'dandori');
-        $fcSeg = collect($timeline)->firstWhere('type', '1st_check');
+        $dandoriSegs = collect($timeline)->where('type', 'dandori');
+        $fcSegs = collect($timeline)->where('type', '1st_check');
 
-        $this->assertNotNull($dandoriSeg, 'Segmen Dandori harus ada');
-        $this->assertNotNull($fcSeg, 'Segmen 1st Check harus ada dan tidak boleh tereliminasi');
+        $this->assertTrue($dandoriSegs->isNotEmpty(), 'Segmen Dandori harus ada');
+        $this->assertTrue($fcSegs->isNotEmpty(), 'Segmen 1st Check harus ada dan tidak boleh tereliminasi');
 
-        // 2. Exact durations must match source timestamps
-        $this->assertEquals(344, $dandoriSeg['duration_sec']);
-        $this->assertEquals(220, $fcSeg['duration_sec']);
+        // 2. Exact total durations must match source timestamps
+        $this->assertEquals(344, $dandoriSegs->sum('duration_sec'));
+        $this->assertEquals(220, $fcSegs->sum('duration_sec'));
 
-        // 3. Multi-lane verification: 1st Check is placed in lane 1 (stacked) while Dandori is lane 0
-        $this->assertEquals(0, $dandoriSeg['lane']);
-        $this->assertEquals(1, $fcSeg['lane']);
+        // 3. Multi-lane verification: First check is in lane 1 during overlap
+        $this->assertTrue($dandoriSegs->pluck('lane')->contains(0));
+        $this->assertTrue($fcSegs->pluck('lane')->contains(1));
 
         // 4. Colors and labels
-        $this->assertEquals('bg-amber-400', $dandoriSeg['color']);
-        $this->assertEquals('bg-purple-500', $fcSeg['color']);
-        $this->assertEquals('Dandori', $dandoriSeg['label']);
-        $this->assertEquals('1st Check', $fcSeg['label']);
+        $this->assertEquals('bg-amber-400', $dandoriSegs->first()['color']);
+        $this->assertEquals('bg-purple-500', $fcSegs->first()['color']);
+        $this->assertEquals('Dandori', $dandoriSegs->first()['label']);
+        $this->assertEquals('1st Check', $fcSegs->first()['label']);
     }
 
     /**
@@ -1214,29 +1214,31 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
 
         $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $finish);
 
-        $dandori = collect($timeline)->firstWhere('type', 'dandori');
-        $fc = collect($timeline)->firstWhere('type', '1st_check');
-        $tryout = collect($timeline)->firstWhere('type', 'tryout');
+        $dandoriSegs = collect($timeline)->where('type', 'dandori');
+        $fcSegs = collect($timeline)->where('type', '1st_check');
+        $tryoutSegs = collect($timeline)->where('type', 'tryout');
 
-        $this->assertNotNull($dandori);
-        $this->assertNotNull($fc);
-        $this->assertNotNull($tryout);
+        $this->assertTrue($dandoriSegs->isNotEmpty());
+        $this->assertTrue($fcSegs->isNotEmpty());
+        $this->assertTrue($tryoutSegs->isNotEmpty());
 
         // Verify distinct lanes (0, 1, 2)
-        $this->assertEquals(0, $dandori['lane']);
-        $this->assertEquals(1, $fc['lane']);
-        $this->assertEquals(2, $tryout['lane']);
+        $this->assertTrue($dandoriSegs->pluck('lane')->contains(0));
+        $this->assertTrue($fcSegs->pluck('lane')->contains(1));
+        $this->assertTrue($tryoutSegs->pluck('lane')->contains(2));
 
-        // Verify exact durations
-        $this->assertEquals(1800, $dandori['duration_sec']);
-        $this->assertEquals(900, $fc['duration_sec']);
-        $this->assertEquals(300, $tryout['duration_sec']);
+        // Verify exact total durations
+        $this->assertEquals(1800, $dandoriSegs->sum('duration_sec'));
+        $this->assertEquals(900, $fcSegs->sum('duration_sec'));
+        $this->assertEquals(300, $tryoutSegs->sum('duration_sec'));
     }
 
     /**
      * 21. Verifikasi Partisi Lane Interval Spatially:
-     * - Ketika Dandori dan 1st Check overlap, keduanya memiliki total_lanes = 2 (terbagi 50% & 50%).
-     * - Ketika 1st Check selesai dan produksi tunggal dimulai, produksi memiliki total_lanes = 1 (memenuhi tinggi 100%).
+     * - Sebelum overlap (08:00 - 08:10): Dandori berada di lane 0 dengan total_lanes = 1 (tinggi 100%).
+     * - Selama overlap (08:10 - 08:25): Dandori dan 1st Check berbagi lane dengan total_lanes = 2 (tinggi 50% & 50%).
+     * - Setelah overlap (08:25 - 08:30): Dandori kembali memiliki total_lanes = 1 (tinggi 100%).
+     * - Setelah Dandori selesai (08:30 - 09:30): Produksi tunggal memiliki total_lanes = 1 (tinggi 100%).
      */
     public function test_individual_activity_after_overlap_recovers_full_height()
     {
@@ -1282,21 +1284,35 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
 
         $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $pFinish);
 
-        $dandori = collect($timeline)->firstWhere('type', 'dandori');
-        $fc = collect($timeline)->firstWhere('type', '1st_check');
-        $prod = collect($timeline)->firstWhere('type', 'production');
+        $dandoriSegs = collect($timeline)->where('type', 'dandori')->values();
+        $fcSegs = collect($timeline)->where('type', '1st_check')->values();
+        $prodSegs = collect($timeline)->where('type', 'production')->values();
 
-        $this->assertNotNull($dandori);
-        $this->assertNotNull($fc);
-        $this->assertNotNull($prod);
+        $this->assertCount(3, $dandoriSegs); // 08:00-08:10, 08:10-08:25, 08:25-08:30
+        $this->assertCount(1, $fcSegs);      // 08:10-08:25
+        $this->assertCount(1, $prodSegs);    // 08:30-09:30
 
-        // During overlap: total_lanes must be 2 (sharing height 50% each)
-        $this->assertEquals(2, $dandori['total_lanes']);
-        $this->assertEquals(2, $fc['total_lanes']);
+        // 1. Sebelum overlap (08:00 - 08:10): Dandori total_lanes = 1 (100% tinggi penuh)
+        $this->assertEquals(1, $dandoriSegs[0]['total_lanes']);
+        $this->assertEquals(600, $dandoriSegs[0]['duration_sec']);
 
-        // After overlap finishes: Single Production segment MUST have total_lanes = 1 (100% full height)
-        $this->assertEquals(1, $prod['total_lanes']);
-        $this->assertEquals(0, $prod['lane']);
-        $this->assertEquals(3600, $prod['duration_sec']);
+        // 2. Selama overlap (08:10 - 08:25): Dandori & 1st Check total_lanes = 2 (50% & 50%)
+        $this->assertEquals(2, $dandoriSegs[1]['total_lanes']);
+        $this->assertEquals(2, $fcSegs[0]['total_lanes']);
+        $this->assertEquals(900, $dandoriSegs[1]['duration_sec']);
+        $this->assertEquals(900, $fcSegs[0]['duration_sec']);
+
+        // 3. Setelah 1st Check selesai (08:25 - 08:30): Dandori kembali total_lanes = 1 (100% tinggi penuh)
+        $this->assertEquals(1, $dandoriSegs[2]['total_lanes']);
+        $this->assertEquals(300, $dandoriSegs[2]['duration_sec']);
+
+        // 4. Setelah Dandori selesai (08:30 - 09:30): Produksi tunggal total_lanes = 1 (100% tinggi penuh)
+        $this->assertEquals(1, $prodSegs[0]['total_lanes']);
+        $this->assertEquals(3600, $prodSegs[0]['duration_sec']);
+
+        // Total akumulasi durasi tetap presisi
+        $this->assertEquals(1800, $dandoriSegs->sum('duration_sec'));
+        $this->assertEquals(900, $fcSegs->sum('duration_sec'));
+        $this->assertEquals(3600, $prodSegs->sum('duration_sec'));
     }
 }
