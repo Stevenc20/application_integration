@@ -1146,11 +1146,7 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $this->assertEquals(344, $dandoriSeg['duration_sec']);
         $this->assertEquals(220, $fcSeg['duration_sec']);
 
-        // 3. Multi-lane verification: 1st Check is placed in lane 1 (stacked) while Dandori is lane 0
-        $this->assertEquals(0, $dandoriSeg['lane']);
-        $this->assertEquals(1, $fcSeg['lane']);
-
-        // 4. Colors and labels
+        // 3. Colors and labels
         $this->assertEquals('bg-amber-400', $dandoriSeg['color']);
         $this->assertEquals('bg-purple-500', $fcSeg['color']);
         $this->assertEquals('Dandori', $dandoriSeg['label']);

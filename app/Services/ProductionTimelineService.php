@@ -291,7 +291,6 @@ class ProductionTimelineService
                         'detail' => 'Actual Production Time',
                         'link' => null,
                         'is_incomplete' => false,
-                        'lane' => 0,
                     ];
                 }
                 if ($oDur > 0) {
@@ -305,7 +304,6 @@ class ProductionTimelineService
                         'detail' => 'Outside Scheduled Shift',
                         'link' => null,
                         'is_incomplete' => false,
-                        'lane' => 0,
                     ];
                 }
             } elseif ($prodDeadline && $s >= $prodDeadline) {
@@ -319,7 +317,6 @@ class ProductionTimelineService
                     'detail' => 'Outside Scheduled Shift',
                     'link' => null,
                     'is_incomplete' => false,
-                    'lane' => 0,
                 ];
             } else {
                 $segments[] = [
@@ -332,7 +329,6 @@ class ProductionTimelineService
                     'detail' => 'Actual Production Time',
                     'link' => null,
                     'is_incomplete' => false,
-                    'lane' => 0,
                 ];
             }
         };
@@ -355,22 +351,6 @@ class ProductionTimelineService
                 $lastPos = $evStart->copy();
             }
 
-            // Determine if this event overlaps with an existing segment of different type
-            // e.g. 1st Check overlapping with Dandori
-            $isOverlapping = false;
-            foreach ($segments as $prevSeg) {
-                if ($prevSeg['type'] === 'planned') continue;
-                $oStart = max($prevSeg['start']->timestamp, $evStart->timestamp);
-                $oEnd = min($prevSeg['end']->timestamp, $evEnd->timestamp);
-                if ($oEnd > $oStart) {
-                    $isOverlapping = true;
-                    break;
-                }
-            }
-
-            // Assign lane: 1 if overlapping with an existing segment, otherwise 0
-            $lane = $isOverlapping ? 1 : 0;
-
             $segments[] = [
                 'type' => $ev['type'],
                 'label' => self::getActivityLabel($ev['type'], $ev['detail'] ?? null),
@@ -381,13 +361,9 @@ class ProductionTimelineService
                 'detail' => $ev['detail'] ?? '',
                 'link' => $ev['link'] ?? null,
                 'is_incomplete' => false,
-                'lane' => $lane,
             ];
 
-            // Only advance the sequential baseline if this event extends beyond lastPos
-            if ($evEnd > $lastPos) {
-                $lastPos = $evEnd->copy();
-            }
+            $lastPos = $evEnd->copy();
         }
 
         // Trailing gap after last event until timelineEnd
@@ -410,7 +386,6 @@ class ProductionTimelineService
                     'detail' => 'Unstarted Schedule',
                     'link' => null,
                     'is_incomplete' => false,
-                    'lane' => 0,
                 ];
             }
         }
