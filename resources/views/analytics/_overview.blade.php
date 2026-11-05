@@ -241,6 +241,7 @@
 
             {{-- ACTUAL SEGMENTED EXECUTION BAR (powered by ProductionTimelineService) --}}
             @php
+                $planDate = $plan->plan_date ? \Carbon\Carbon::parse($plan->plan_date)->format('Y-m-d') : ($dateFrom ?? now()->toDateString());
                 $timelineService = app(\App\Services\ProductionTimelineService::class);
                 $segments = $timelineService->buildJobTimeline($job, $plan, $planDate);
 
