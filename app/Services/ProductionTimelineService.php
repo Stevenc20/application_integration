@@ -268,7 +268,7 @@ class ProductionTimelineService
             $prodDeadline = $timelineStart->copy()->addSeconds($durationSec);
         }
 
-        // 6. ASSEMBLE ORDERED TIMELINE WITH CHRONOLOGICAL GAP FILLING
+        // 6. ASSEMBLE ORDERED TIMELINE WITH CHRONOLOGICAL GAP FILLING AND MULTI-LANE CONCURRENCY
         $segments = [];
         $lastPos = $timelineStart->copy();
 
@@ -291,6 +291,7 @@ class ProductionTimelineService
                         'detail' => 'Actual Production Time',
                         'link' => null,
                         'is_incomplete' => false,
+                        'lane' => 0,
                     ];
                 }
                 if ($oDur > 0) {
@@ -304,6 +305,7 @@ class ProductionTimelineService
                         'detail' => 'Outside Scheduled Shift',
                         'link' => null,
                         'is_incomplete' => false,
+                        'lane' => 0,
                     ];
                 }
             } elseif ($prodDeadline && $s >= $prodDeadline) {
@@ -317,6 +319,7 @@ class ProductionTimelineService
                     'detail' => 'Outside Scheduled Shift',
                     'link' => null,
                     'is_incomplete' => false,
+                    'lane' => 0,
                 ];
             } else {
                 $segments[] = [
@@ -329,6 +332,7 @@ class ProductionTimelineService
                     'detail' => 'Actual Production Time',
                     'link' => null,
                     'is_incomplete' => false,
+                    'lane' => 0,
                 ];
             }
         };
@@ -336,11 +340,12 @@ class ProductionTimelineService
         foreach ($nonProdEvents as $ev) {
             $evStart = $ev['start'];
             $evEnd = $ev['end'];
+            $evDur = (int) abs($evEnd->diffInSeconds($evStart));
+            if ($evDur <= 0) continue;
 
-            // Gap before event: fill with production ONLY if production has begun or output/activity exists
+            // Fill production gap up to event start if start is ahead of lastPos
             if ($evStart > $lastPos) {
                 if ($jobStartedAt && $lastPos < $jobStartedAt && $evStart > $jobStartedAt) {
-                    // Production starts at $jobStartedAt
                     $appendProd($jobStartedAt, $evStart);
                 } elseif ($jobStartedAt && $lastPos >= $jobStartedAt) {
                     $appendProd($lastPos, $evStart);
@@ -350,22 +355,38 @@ class ProductionTimelineService
                 $lastPos = $evStart->copy();
             }
 
-            // Push the non-production event (Dandori, 1st Check, Break, Tryout, Downtime)
-            $actualSegStart = $evStart < $lastPos ? $lastPos->copy() : $evStart->copy();
-            $actualSegEnd = $evEnd;
-            if ($actualSegEnd > $actualSegStart) {
-                $segments[] = [
-                    'type' => $ev['type'],
-                    'label' => self::getActivityLabel($ev['type'], $ev['detail'] ?? null),
-                    'color' => self::getActivityColor($ev['type']),
-                    'start' => $actualSegStart,
-                    'end' => $actualSegEnd,
-                    'duration_sec' => (int) abs($actualSegEnd->diffInSeconds($actualSegStart)),
-                    'detail' => $ev['detail'] ?? '',
-                    'link' => $ev['link'] ?? null,
-                    'is_incomplete' => false,
-                ];
-                $lastPos = $actualSegEnd->copy();
+            // Determine if this event overlaps with an existing segment of different type
+            // e.g. 1st Check overlapping with Dandori
+            $isOverlapping = false;
+            foreach ($segments as $prevSeg) {
+                if ($prevSeg['type'] === 'planned') continue;
+                $oStart = max($prevSeg['start']->timestamp, $evStart->timestamp);
+                $oEnd = min($prevSeg['end']->timestamp, $evEnd->timestamp);
+                if ($oEnd > $oStart) {
+                    $isOverlapping = true;
+                    break;
+                }
+            }
+
+            // Assign lane: 1 if overlapping with an existing segment, otherwise 0
+            $lane = $isOverlapping ? 1 : 0;
+
+            $segments[] = [
+                'type' => $ev['type'],
+                'label' => self::getActivityLabel($ev['type'], $ev['detail'] ?? null),
+                'color' => self::getActivityColor($ev['type']),
+                'start' => $evStart->copy(),
+                'end' => $evEnd->copy(),
+                'duration_sec' => $evDur,
+                'detail' => $ev['detail'] ?? '',
+                'link' => $ev['link'] ?? null,
+                'is_incomplete' => false,
+                'lane' => $lane,
+            ];
+
+            // Only advance the sequential baseline if this event extends beyond lastPos
+            if ($evEnd > $lastPos) {
+                $lastPos = $evEnd->copy();
             }
         }
 
@@ -389,6 +410,7 @@ class ProductionTimelineService
                     'detail' => 'Unstarted Schedule',
                     'link' => null,
                     'is_incomplete' => false,
+                    'lane' => 0,
                 ];
             }
         }

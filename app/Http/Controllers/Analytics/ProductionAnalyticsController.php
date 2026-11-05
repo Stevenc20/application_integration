@@ -122,10 +122,30 @@ class ProductionAnalyticsController extends Controller
                     COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('idle','idle time') THEN duration_seconds ELSE 0 END), 0) as idle_sec,
                     COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime))='repair' THEN duration_seconds ELSE 0 END), 0) as repair_sec,
                     COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('dandori', 'setup') THEN duration_seconds ELSE 0 END), 0) as dandori_sec,
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('1st_check', '1st check', 'first_check', 'firstcheck') THEN duration_seconds ELSE 0 END), 0) as first_check_sec,
                     COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('try out','tryout','trial') THEN duration_seconds ELSE 0 END), 0) as tryout_sec,
                     COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_downtime)) IN ('break time','break','breaktime','istirahat') THEN duration_seconds ELSE 0 END), 0) as break_sec
                 ")->first()
-            : (object) ['idle_sec' => 0, 'repair_sec' => 0, 'dandori_sec' => 0, 'tryout_sec' => 0, 'break_sec' => 0];
+            : (object) ['idle_sec' => 0, 'repair_sec' => 0, 'dandori_sec' => 0, 'first_check_sec' => 0, 'tryout_sec' => 0, 'break_sec' => 0];
+
+        // Also harvest 1st check and dandori duration from \App\Models\Dandori if present
+        if ($dpJobIds->isNotEmpty()) {
+            $dandoriRecordsAgg = \App\Models\Dandori::whereIn('next_job_id', $dpJobIds)
+                ->whereBetween('start_time', [$dateFrom.' 00:00:00', $effectiveDtEnd])
+                ->selectRaw("
+                    COALESCE(SUM(CASE WHEN LOWER(TRIM(jenis_dandori)) IN ('1st_check', '1st check', 'first_check') OR UPPER(TRIM(activity))='1ST CHECK' THEN ROUND(duration_minutes * 60) ELSE 0 END), 0) as d_first_check_sec,
+                    COALESCE(SUM(CASE WHEN NOT (LOWER(TRIM(jenis_dandori)) IN ('1st_check', '1st check', 'first_check') OR UPPER(TRIM(activity))='1ST CHECK') THEN ROUND(duration_minutes * 60) ELSE 0 END), 0) as d_dandori_sec
+                ")->first();
+
+            if ($dandoriRecordsAgg) {
+                if (($downtimeAgg->first_check_sec ?? 0) <= 0 && $dandoriRecordsAgg->d_first_check_sec > 0) {
+                    $downtimeAgg->first_check_sec = (int) $dandoriRecordsAgg->d_first_check_sec;
+                }
+                if (($downtimeAgg->dandori_sec ?? 0) <= 0 && $dandoriRecordsAgg->d_dandori_sec > 0) {
+                    $downtimeAgg->dandori_sec = (int) $dandoriRecordsAgg->d_dandori_sec;
+                }
+            }
+        }
 
         // 2. Get PPC plans as the primary job list (like Input Harian)
         $plans = ProductionPlan::whereBetween('plan_date', [$dateFrom, $dateTo])

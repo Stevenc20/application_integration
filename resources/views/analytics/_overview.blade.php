@@ -32,14 +32,16 @@
 @php
     $tRepair = $downtimeAgg->repair_sec ?? 0;
     $tDandori = $downtimeAgg->dandori_sec ?? 0;
+    $tFirstCheck = $downtimeAgg->first_check_sec ?? 0;
     $tTryout = $downtimeAgg->tryout_sec ?? 0;
     $tBreak = $downtimeAgg->break_sec ?? 0;
     $tProd = $stats->total_runtime ?? 0;
-    $tTimeTotal = max($tRepair + $tDandori + $tTryout + $tBreak + $tProd, 1);
+    $tTimeTotal = max($tRepair + $tDandori + $tFirstCheck + $tTryout + $tBreak + $tProd, 1);
 
     $segments = [
         ['label'=>'Downtime', 'color'=>'bg-red-600', 'sec'=>$tRepair],
         ['label'=>'Dandori', 'color'=>'bg-amber-500', 'sec'=>$tDandori],
+        ['label'=>'1st Check', 'color'=>'bg-purple-500', 'sec'=>$tFirstCheck],
         ['label'=>'Try Out', 'color'=>'bg-orange-500', 'sec'=>$tTryout],
         ['label'=>'Break Time', 'color'=>'bg-slate-500', 'sec'=>$tBreak],
         ['label'=>'Production', 'color'=>'bg-blue-500', 'sec'=>$tProd],
@@ -372,9 +374,11 @@
                                     if (!$duration || $duration === '0 seconds') $duration = round($seg['end']->timestamp - $seg['start']->timestamp).'s';
                                     $cursorClass = !empty($seg['link']) ? 'cursor-pointer' : 'cursor-default';
                                     $clickHandler = !empty($seg['link']) ? "window.location.href='".$seg['link']."'" : "void(0)";
+                                    $isLane1 = ($seg['lane'] ?? 0) === 1;
+                                    $topStyle = $isLane1 ? 'top: 0%; height: 50%; z-index: 20;' : 'top: 0%; height: 100%; z-index: 10;';
                                 @endphp
-                                <div class="absolute h-full {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all"
-                                     style="left: {{ $left }}%; width: {{ $widthP }}%;"
+                                <div class="absolute {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all rounded-[2px]"
+                                     style="left: {{ $left }}%; width: {{ $widthP }}%; {{ $topStyle }}"
                                      onclick="{{ $clickHandler }}"
                                      onmouseover="showTimelineTooltip(event, '{{ $seg['label'] }}', '{{ $from }}', '{{ $to }}', '{{ $duration }}', '{{ $seg['detail'] ?? '' }}')"
                                      onmouseout="hideTimelineTooltip()"
@@ -403,7 +407,11 @@
                     @else
                         <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-amber-400"></span>Dandori 00:00</span>
                     @endif
-                    @if($jFirstCheck > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>1st Check {{ gmdate('H:i', $jFirstCheck) }}</span>@endif
+                    @if($jFirstCheck > 0)
+                        <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>1st Check {{ gmdate('H:i', $jFirstCheck) }}</span>
+                    @else
+                        <span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-purple-500"></span>1st Check 00:00</span>
+                    @endif
                     @if($jTryOut > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>Try Out {{ gmdate('H:i', $jTryOut) }}</span>@endif
                     @if($jBreakTime > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-slate-500"></span>Break Time {{ gmdate('H:i', $jBreakTime) }}</span>@endif
                     @if($jOvertime > 0)<span class="flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full bg-red-600 ring-1 ring-red-300"></span>Overtime {{ gmdate('H:i', $jOvertime) }}</span>@endif

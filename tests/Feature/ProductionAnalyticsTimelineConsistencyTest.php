@@ -1085,4 +1085,75 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $totalSpan = array_sum(array_column($timeline, 'duration_sec'));
         $this->assertEquals(16200, $totalSpan);
     }
+
+    /**
+     * 19. Kasus Aktual Server IPPI: Overlapping Dandori dan 1st Check
+     * Dandori: 11:06 - 11:12 (344 detik / 5m 44s)
+     * 1st Check: 11:08 - 11:12 (220 detik / 3m 40s)
+     * Keduanya harus tetap muncul terpisah, dengan durasi tepat, multi-lane, dan identitas berbeda.
+     */
+    public function test_actual_case_dandori_and_first_check_overlapping_rendered_separately()
+    {
+        $dStart = Carbon::parse('2026-11-05 11:06:16');
+        $dFinish = Carbon::parse('2026-11-05 11:12:00'); // 344 detik (5m 44s)
+        $fcStart = Carbon::parse('2026-11-05 11:08:20');
+        $fcFinish = Carbon::parse('2026-11-05 11:12:00'); // 220 detik (3m 40s)
+
+        $job = JobMaster::create([
+            'job_number' => 'JOB-DANDORI-FC-OVERLAP',
+            'line' => 'PRESS A',
+            'status' => 'complete',
+            'started_at' => $dStart,
+            'finished_at' => $dFinish,
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Dandori Dies Mold',
+            'jenis_dandori' => 'dandori',
+            'start_time' => $dStart,
+            'finish_time' => $dFinish,
+            'duration_minutes' => 5.73,
+            'work_date' => '2026-11-05',
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => '1ST CHECK',
+            'jenis_dandori' => '1st_check',
+            'start_time' => $fcStart,
+            'finish_time' => $fcFinish,
+            'duration_minutes' => 3.67,
+            'work_date' => '2026-11-05',
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $dFinish);
+
+        // 1. Both segments MUST be present
+        $dandoriSeg = collect($timeline)->firstWhere('type', 'dandori');
+        $fcSeg = collect($timeline)->firstWhere('type', '1st_check');
+
+        $this->assertNotNull($dandoriSeg, 'Segmen Dandori harus ada');
+        $this->assertNotNull($fcSeg, 'Segmen 1st Check harus ada dan tidak boleh tereliminasi');
+
+        // 2. Exact durations must match source timestamps
+        $this->assertEquals(344, $dandoriSeg['duration_sec']);
+        $this->assertEquals(220, $fcSeg['duration_sec']);
+
+        // 3. Multi-lane verification: 1st Check is placed in lane 1 (stacked) while Dandori is lane 0
+        $this->assertEquals(0, $dandoriSeg['lane']);
+        $this->assertEquals(1, $fcSeg['lane']);
+
+        // 4. Colors and labels
+        $this->assertEquals('bg-amber-400', $dandoriSeg['color']);
+        $this->assertEquals('bg-purple-500', $fcSeg['color']);
+        $this->assertEquals('Dandori', $dandoriSeg['label']);
+        $this->assertEquals('1st Check', $fcSeg['label']);
+    }
 }

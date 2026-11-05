@@ -27,13 +27,15 @@
 @php
     $tRepair = $downtimeAgg->repair_sec ?? 0;
     $tDandori = $downtimeAgg->dandori_sec ?? 0;
+    $tFirstCheck = $downtimeAgg->first_check_sec ?? 0;
     $tTryout = $downtimeAgg->tryout_sec ?? 0;
     $tBreak = $downtimeAgg->break_sec ?? 0;
     $tProd = $stats->total_runtime ?? 0;
-    $tTimeTotal = max($tRepair + $tDandori + $tTryout + $tBreak + $tProd, 1);
+    $tTimeTotal = max($tRepair + $tDandori + $tFirstCheck + $tTryout + $tBreak + $tProd, 1);
     $segments = [
         ['label'=>'Repair', 'color'=>'bg-red-600', 'sec'=>$tRepair],
         ['label'=>'Dandori', 'color'=>'bg-amber-500', 'sec'=>$tDandori],
+        ['label'=>'1st Check', 'color'=>'bg-purple-500', 'sec'=>$tFirstCheck],
         ['label'=>'Try Out', 'color'=>'bg-orange-500', 'sec'=>$tTryout],
         ['label'=>'Break', 'color'=>'bg-slate-500', 'sec'=>$tBreak],
         ['label'=>'Production', 'color'=>'bg-blue-500', 'sec'=>$tProd],
