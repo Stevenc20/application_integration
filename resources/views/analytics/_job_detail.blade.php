@@ -377,8 +377,15 @@
                                 if (!$duration || $duration === '0 seconds') $duration = round($seg['end']->timestamp - $seg['start']->timestamp).'s';
                                 $cursorClass = !empty($seg['link']) ? 'cursor-pointer' : 'cursor-default';
                                 $clickHandler = !empty($seg['link']) ? "window.location.href='".$seg['link']."'" : "void(0)";
-                                $isLane1 = ($seg['lane'] ?? 0) === 1;
-                                $topStyle = $isLane1 ? 'top: 0%; height: 50%; z-index: 20;' : 'top: 0%; height: 100%; z-index: 10;';
+                                $lane = (int) ($seg['lane'] ?? 0);
+                                if ($lane === 0) {
+                                    $topStyle = 'top: 0%; height: 100%; z-index: 10;';
+                                } elseif ($lane === 1) {
+                                    $topStyle = 'top: 0%; height: 50%; z-index: 20;';
+                                } else {
+                                    $topPct = min(66, $lane * 33);
+                                    $topStyle = "top: {$topPct}%; height: 33%; z-index: " . (20 + $lane) . ";";
+                                }
                             @endphp
                             <div class="absolute {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all rounded-[2px]"
                                  style="left: {{ $left }}%; width: {{ $widthP }}%; {{ $topStyle }}"

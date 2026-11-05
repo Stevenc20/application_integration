@@ -1156,4 +1156,80 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $this->assertEquals('Dandori', $dandoriSeg['label']);
         $this->assertEquals('1st Check', $fcSeg['label']);
     }
+
+    /**
+     * 20. Overlap lebih dari 2 event secara bersamaan (misal Dandori, 1st Check, dan Downtime Quality Inspection).
+     * Masing-masing harus mendapatkan lane terpisah (0, 1, 2) dan tidak saling menimpa.
+     */
+    public function test_three_concurrent_overlapping_events_receive_distinct_lanes()
+    {
+        $start = Carbon::parse('2026-11-05 10:00:00');
+        $finish = Carbon::parse('2026-11-05 10:30:00');
+
+        $job = JobMaster::create([
+            'job_number' => 'JOB-THREE-WAY-OVERLAP',
+            'line' => 'PRESS A',
+            'status' => 'complete',
+            'started_at' => $start,
+            'finished_at' => $finish,
+        ]);
+
+        // Event 1: Dandori 10:00 - 10:30 (1800s)
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Changeover',
+            'jenis_dandori' => 'dandori',
+            'start_time' => $start,
+            'finish_time' => $finish,
+            'duration_minutes' => 30,
+            'work_date' => '2026-11-05',
+        ]);
+
+        // Event 2: 1st Check 10:05 - 10:20 (900s)
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => '1ST CHECK',
+            'jenis_dandori' => '1st_check',
+            'start_time' => Carbon::parse('2026-11-05 10:05:00'),
+            'finish_time' => Carbon::parse('2026-11-05 10:20:00'),
+            'duration_minutes' => 15,
+            'work_date' => '2026-11-05',
+        ]);
+
+        // Event 3: Downtime trial inspection 10:10 - 10:15 (300s)
+        Downtime::create([
+            'job_master_id' => $job->id,
+            'jenis_downtime' => 'tryout',
+            'problem' => 'Trial Sample Check',
+            'start_time' => Carbon::parse('2026-11-05 10:10:00'),
+            'finish_time' => Carbon::parse('2026-11-05 10:15:00'),
+            'duration_seconds' => 300,
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $finish);
+
+        $dandori = collect($timeline)->firstWhere('type', 'dandori');
+        $fc = collect($timeline)->firstWhere('type', '1st_check');
+        $tryout = collect($timeline)->firstWhere('type', 'tryout');
+
+        $this->assertNotNull($dandori);
+        $this->assertNotNull($fc);
+        $this->assertNotNull($tryout);
+
+        // Verify distinct lanes (0, 1, 2)
+        $this->assertEquals(0, $dandori['lane']);
+        $this->assertEquals(1, $fc['lane']);
+        $this->assertEquals(2, $tryout['lane']);
+
+        // Verify exact durations
+        $this->assertEquals(1800, $dandori['duration_sec']);
+        $this->assertEquals(900, $fc['duration_sec']);
+        $this->assertEquals(300, $tryout['duration_sec']);
+    }
 }

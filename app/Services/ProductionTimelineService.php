@@ -355,21 +355,21 @@ class ProductionTimelineService
                 $lastPos = $evStart->copy();
             }
 
-            // Determine if this event overlaps with an existing segment of different type
-            // e.g. 1st Check overlapping with Dandori
-            $isOverlapping = false;
+            // Assign lane using interval-graph coloring so that concurrent events
+            // each get a distinct visible lane (0, 1, 2, ...) without colliding
+            $usedLanes = [];
             foreach ($segments as $prevSeg) {
                 if ($prevSeg['type'] === 'planned') continue;
                 $oStart = max($prevSeg['start']->timestamp, $evStart->timestamp);
                 $oEnd = min($prevSeg['end']->timestamp, $evEnd->timestamp);
                 if ($oEnd > $oStart) {
-                    $isOverlapping = true;
-                    break;
+                    $usedLanes[] = $prevSeg['lane'] ?? 0;
                 }
             }
-
-            // Assign lane: 1 if overlapping with an existing segment, otherwise 0
-            $lane = $isOverlapping ? 1 : 0;
+            $lane = 0;
+            while (in_array($lane, $usedLanes)) {
+                $lane++;
+            }
 
             $segments[] = [
                 'type' => $ev['type'],
