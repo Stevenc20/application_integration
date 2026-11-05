@@ -96,16 +96,23 @@
         $jobDandoriSum = $job ? (int)($job->dandoris->sum('duration_minutes') * 60) : 0;
         $runtime = max(0, $sessionSeconds - $jobDowntime);
 
+        $isJobPending = !$job || in_array(strtolower($job->status ?? ''), ['pending', 'queued', 'unstarted']);
+        $hasJobActivity = ($actualOk + $actualRepair + $actualReject > 0) || ($job && $job->started_at) || ($job && in_array(strtolower($job->status ?? ''), ['running', 'complete', 'completed', 'finished', 'paused']));
+
         // Fallback: If no explicit productionSessions but job started/has output, compute runtime from started_at to finished_at (or now)
-        if ($runtime <= 0 && $job && $job->started_at) {
+        if ($isJobPending && !$hasJobActivity) {
+            $runtime = 0;
+        } elseif ($runtime <= 0 && $job && $job->started_at) {
             $jStart = \Carbon\Carbon::parse($job->started_at);
             $jEnd = $job->finished_at ? \Carbon\Carbon::parse($job->finished_at) : now();
             if ($jEnd > $jStart) {
                 $totalSpan = (int)$jEnd->diffInSeconds($jStart);
                 $runtime = max(0, $totalSpan - $jobDowntime - $jobDandoriSum);
             }
-        } elseif ($runtime <= 0 && $dp && (int)($dp->runtime_seconds ?? 0) > 0) {
+        } elseif ($runtime <= 0 && $dp && (int)($dp->runtime_seconds ?? 0) > 0 && $hasJobActivity) {
             $runtime = (int)$dp->runtime_seconds;
+        } else {
+            $runtime = max(0, $runtime);
         }
         $target = ($dp && (int)$dp->target_qty > 0) 
             ? (int)$dp->target_qty 

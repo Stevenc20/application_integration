@@ -787,4 +787,302 @@ class ProductionAnalyticsTimelineConsistencyTest extends TestCase
         $this->assertTrue($tlData['downtimes']->contains('id', $downtime->id));
         $this->assertEquals('tryout', $tlData['downtimes']->firstWhere('id', $downtime->id)->jenis_downtime);
     }
+
+    /**
+     * 14. PENDING Job tanpa aktivitas aktual harus menampilkan Planned Schedule bar (bukan Dandori / Production bar)
+     */
+    public function test_pending_job_without_activity_renders_planned_schedule()
+    {
+        $plan = ProductionPlan::create([
+            'job_no' => 'GT-6246 FNS',
+            'job_master' => 'GT-6246 FNS',
+            'press_name' => 'PRESS A',
+            'shift_name' => 'Shift 1',
+            'plan_date' => '2026-11-05',
+            'start_time' => '07:30',
+            'finish_time' => '16:00',
+            'plan' => 0,
+        ]);
+
+        $job = JobMaster::create([
+            'job_number' => 'GT-6246 FNS-'.$plan->id,
+            'job_name' => 'GT-6246 FNS',
+            'line' => 'PRESS A',
+            'status' => 'pending',
+            'started_at' => null,
+            'finished_at' => null,
+            'target_qty' => 0,
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, $plan, '2026-11-05');
+
+        $this->assertCount(1, $timeline);
+        $this->assertEquals('planned', $timeline[0]['type']);
+        $this->assertEquals(0, collect($timeline)->where('type', 'dandori')->sum('duration_sec'));
+        $this->assertEquals(0, collect($timeline)->where('type', 'production')->sum('duration_sec'));
+    }
+
+    /**
+     * 15. PENDING Job dengan Dandori historis valid (30m) HANYA menampilkan 30m Dandori diikuti Planned Schedule
+     * dan TIDAK menutupi seluruh timeline ke now().
+     */
+    public function test_pending_job_with_valid_historical_dandori_does_not_expand_to_full_timeline()
+    {
+        $plan = ProductionPlan::create([
+            'job_no' => 'GT-6246 FNS',
+            'job_master' => 'GT-6246 FNS',
+            'press_name' => 'PRESS A',
+            'shift_name' => 'Shift 1',
+            'plan_date' => '2026-11-05',
+            'start_time' => '07:30',
+            'finish_time' => '16:00',
+            'plan' => 500,
+        ]);
+
+        $job = JobMaster::create([
+            'job_number' => 'GT-6246 FNS-'.$plan->id,
+            'job_name' => 'GT-6246 FNS',
+            'line' => 'PRESS A',
+            'status' => 'pending',
+            'started_at' => null,
+            'finished_at' => null,
+            'target_qty' => 500,
+        ]);
+
+        // Historical dandori 07:30 - 08:00 (1800 detik / 30 menit)
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Dandori Mold GT-6246',
+            'jenis_dandori' => 'dandori',
+            'start_time' => Carbon::parse('2026-11-05 07:30:00'),
+            'finish_time' => Carbon::parse('2026-11-05 08:00:00'),
+            'duration_minutes' => 30,
+            'work_date' => '2026-11-05',
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, $plan, '2026-11-05', Carbon::parse('2026-11-05 18:00:00'));
+
+        $dandoriSegs = collect($timeline)->where('type', 'dandori');
+        $this->assertEquals(1800, $dandoriSegs->sum('duration_sec'));
+
+        // Trailing part must be planned schedule, NOT production
+        $this->assertEquals(0, collect($timeline)->where('type', 'production')->sum('duration_sec'));
+        $plannedSegs = collect($timeline)->where('type', 'planned');
+        $this->assertTrue($plannedSegs->isNotEmpty());
+    }
+
+    /**
+     * 16. PENDING Job dengan Dandori tanpa finish_time dan durasi 0 tidak expand ke now()
+     */
+    public function test_pending_job_with_uncompleted_zero_dandori_does_not_expand_to_now()
+    {
+        $plan = ProductionPlan::create([
+            'job_no' => 'GT-6246 FNS',
+            'job_master' => 'GT-6246 FNS',
+            'press_name' => 'PRESS A',
+            'shift_name' => 'Shift 1',
+            'plan_date' => '2026-11-05',
+            'start_time' => '07:30',
+            'finish_time' => '16:00',
+            'plan' => 0,
+        ]);
+
+        $job = JobMaster::create([
+            'job_number' => 'GT-6246 FNS-'.$plan->id,
+            'job_name' => 'GT-6246 FNS',
+            'line' => 'PRESS A',
+            'status' => 'pending',
+            'started_at' => null,
+            'finished_at' => null,
+            'target_qty' => 0,
+        ]);
+
+        // Uncompleted / stale record with start_time but no finish_time and 0 duration
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Dandori Mold',
+            'jenis_dandori' => 'dandori',
+            'start_time' => Carbon::parse('2026-11-05 07:30:00'),
+            'finish_time' => null,
+            'duration_minutes' => 0,
+            'work_date' => '2026-11-05',
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, $plan, '2026-11-05', Carbon::parse('2026-11-05 18:00:00'));
+
+        // Zero-duration open dandori on pending job must not create a massive bar
+        $this->assertEquals(0, collect($timeline)->where('type', 'dandori')->sum('duration_sec'));
+        $this->assertEquals('planned', $timeline[0]['type']);
+    }
+
+    /**
+     * 17. RUNNING Job: Active ongoing Dandori (finish_time is null) expands to now(),
+     * sedangkan completed events retain their exact historical duration.
+     */
+    public function test_running_job_active_ongoing_dandori_expands_to_now_while_finished_remains_exact()
+    {
+        $start = Carbon::parse('2026-11-05 08:00:00');
+        $d1Start = Carbon::parse('2026-11-05 08:00:00');
+        $d1Finish = Carbon::parse('2026-11-05 08:30:00'); // Completed 30m
+        $d2Start = Carbon::parse('2026-11-05 09:00:00'); // Active ongoing, no finish_time
+        $currentTime = Carbon::parse('2026-11-05 09:45:00'); // 45m ongoing
+
+        $job = JobMaster::create([
+            'job_number' => 'JOB-RUNNING-ACTIVE-DANDORI',
+            'line' => 'PRESS A',
+            'status' => 'running',
+            'started_at' => $start,
+            'finished_at' => null,
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Initial Setup',
+            'jenis_dandori' => 'dandori',
+            'start_time' => $d1Start,
+            'finish_time' => $d1Finish,
+            'duration_minutes' => 30,
+            'work_date' => '2026-11-05',
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Second Setup Ongoing',
+            'jenis_dandori' => 'dandori',
+            'start_time' => $d2Start,
+            'finish_time' => null,
+            'duration_minutes' => 0,
+            'work_date' => '2026-11-05',
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $currentTime);
+
+        // First completed dandori must remain 1800s (30m)
+        $firstDandori = collect($timeline)->where('type', 'dandori')->firstWhere('start', $d1Start);
+        $this->assertNotNull($firstDandori);
+        $this->assertEquals(1800, $firstDandori['duration_sec']);
+
+        // Second ongoing dandori must expand to $currentTime (09:00:00 to 09:45:00 = 2700s)
+        $secondDandori = collect($timeline)->where('type', 'dandori')->firstWhere('start', $d2Start);
+        $this->assertNotNull($secondDandori);
+        $this->assertEquals(2700, $secondDandori['duration_sec']);
+
+        // Production gap between 08:30 and 09:00 = 1800s
+        $prodSeg = collect($timeline)->firstWhere('type', 'production');
+        $this->assertNotNull($prodSeg);
+        $this->assertEquals(1800, $prodSeg['duration_sec']);
+    }
+
+    /**
+     * 18. COMPLETED Job: All historical activities (Production, Dandori, 1st Check, Tryout, Break, Downtime)
+     * are perfectly preserved up to finished_at without being stretched to now().
+     */
+    public function test_completed_job_preserves_all_historical_activities_intact()
+    {
+        $start = Carbon::parse('2026-11-05 07:30:00');
+        $dandoriEnd = Carbon::parse('2026-11-05 08:00:00'); // 30m Dandori
+        $fcEnd = Carbon::parse('2026-11-05 08:15:00');      // 15m 1st Check
+        $breakStart = Carbon::parse('2026-11-05 09:30:00');
+        $breakEnd = Carbon::parse('2026-11-05 10:00:00');   // 30m Break
+        $dtStart = Carbon::parse('2026-11-05 10:30:00');
+        $dtEnd = Carbon::parse('2026-11-05 10:50:00');      // 20m Downtime
+        $tryStart = Carbon::parse('2026-11-05 11:10:00');
+        $tryEnd = Carbon::parse('2026-11-05 11:30:00');     // 20m Tryout
+        $finish = Carbon::parse('2026-11-05 12:00:00');     // 4.5 hours total = 16200s
+        $afterFinishNow = Carbon::parse('2026-11-05 17:00:00');
+
+        $job = JobMaster::create([
+            'job_number' => 'JOB-COMPLETED-FULL-HISTORICAL',
+            'line' => 'PRESS A',
+            'status' => 'complete',
+            'started_at' => $start,
+            'finished_at' => $finish,
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => 'Dandori Mold',
+            'jenis_dandori' => 'dandori',
+            'start_time' => $start,
+            'finish_time' => $dandoriEnd,
+            'duration_minutes' => 30,
+            'work_date' => '2026-11-05',
+        ]);
+
+        Dandori::create([
+            'next_job_id' => $job->id,
+            'line' => 'PRESS A',
+            'shift' => 'Shift 1',
+            'activity' => '1st Check Quality',
+            'jenis_dandori' => '1st_check',
+            'start_time' => $dandoriEnd,
+            'finish_time' => $fcEnd,
+            'duration_minutes' => 15,
+            'work_date' => '2026-11-05',
+        ]);
+
+        Downtime::create([
+            'job_master_id' => $job->id,
+            'jenis_downtime' => 'break',
+            'problem' => 'Istirahat Pagi',
+            'start_time' => $breakStart,
+            'finish_time' => $breakEnd,
+            'duration_seconds' => 1800,
+        ]);
+
+        Downtime::create([
+            'job_master_id' => $job->id,
+            'jenis_downtime' => 'repair',
+            'problem' => 'Dies Jammed',
+            'start_time' => $dtStart,
+            'finish_time' => $dtEnd,
+            'duration_seconds' => 1200,
+        ]);
+
+        Downtime::create([
+            'job_master_id' => $job->id,
+            'jenis_downtime' => 'tryout',
+            'problem' => 'Trial Sample',
+            'start_time' => $tryStart,
+            'finish_time' => $tryEnd,
+            'duration_seconds' => 1200,
+        ]);
+
+        $job->load(['downtimes', 'dandoris']);
+
+        $timeline = $this->service->buildJobTimeline($job, null, '2026-11-05', $afterFinishNow);
+
+        // Timeline MUST NOT extend to $afterFinishNow (17:00:00). Max end must be $finish (12:00:00)
+        $latestEnd = collect($timeline)->max('end');
+        $this->assertEquals($finish->format('Y-m-d H:i:s'), $latestEnd->format('Y-m-d H:i:s'));
+
+        // All activities must exist and have accurate durations
+        $this->assertEquals(1800, collect($timeline)->where('type', 'dandori')->sum('duration_sec'));
+        $this->assertEquals(900, collect($timeline)->where('type', '1st_check')->sum('duration_sec'));
+        $this->assertEquals(1800, collect($timeline)->where('type', 'break')->sum('duration_sec'));
+        $this->assertEquals(1200, collect($timeline)->where('type', 'downtime')->sum('duration_sec'));
+        $this->assertEquals(1200, collect($timeline)->where('type', 'tryout')->sum('duration_sec'));
+
+        // Total sum of timeline must equal 16,200s (07:30 to 12:00)
+        $totalSpan = array_sum(array_column($timeline, 'duration_sec'));
+        $this->assertEquals(16200, $totalSpan);
+    }
 }

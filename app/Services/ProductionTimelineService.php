@@ -99,6 +99,8 @@ class ProductionTimelineService
         }
 
         $isComplete = $job && in_array(strtolower($job->status ?? ''), ['complete', 'completed', 'finished', 'closed', 'done']);
+        $isPending = !$job || in_array(strtolower($job->status ?? ''), ['pending', 'queued', 'unstarted']);
+        $isRunning = $job && strtolower($job->status ?? '') === 'running';
         $rawEvents = [];
 
         // 1. HARVEST DANDORI SESSIONS (from DandoriSession model if loaded or exists)
@@ -106,7 +108,8 @@ class ProductionTimelineService
             foreach ($job->dandoriSessions as $ds) {
                 if (!$ds->start_time) continue;
                 $s = Carbon::parse($ds->start_time);
-                $e = $ds->finish_time ? Carbon::parse($ds->finish_time) : ($ds->total_minutes > 0 ? $s->copy()->addSeconds((int) round($ds->total_minutes * 60)) : ($isComplete ? ($job->finished_at ? Carbon::parse($job->finished_at) : null) : $now->copy()));
+                $fallbackEnd = $ds->total_minutes > 0 ? $s->copy()->addSeconds((int) round($ds->total_minutes * 60)) : ($isRunning ? $now->copy() : ($isComplete && $job->finished_at ? Carbon::parse($job->finished_at) : $s->copy()));
+                $e = $ds->finish_time ? Carbon::parse($ds->finish_time) : $fallbackEnd;
                 if (!$e || $e < $s) $e = $s->copy();
 
                 $rawEvents[] = [
@@ -132,7 +135,8 @@ class ProductionTimelineService
                     $typeNorm = 'dandori';
                 }
 
-                $e = $dRec->finish_time ? Carbon::parse($dRec->finish_time) : ($durMin > 0 ? $s->copy()->addSeconds((int) round($durMin * 60)) : ($isComplete ? ($job->finished_at ? Carbon::parse($job->finished_at) : null) : $now->copy()));
+                $fallbackEnd = $durMin > 0 ? $s->copy()->addSeconds((int) round($durMin * 60)) : ($isRunning ? $now->copy() : ($isComplete && $job->finished_at ? Carbon::parse($job->finished_at) : $s->copy()));
+                $e = $dRec->finish_time ? Carbon::parse($dRec->finish_time) : $fallbackEnd;
                 if (!$e || $e < $s) $e = $s->copy();
 
                 $rawEvents[] = [
@@ -155,7 +159,8 @@ class ProductionTimelineService
                 $durSec = (int) ($dt->duration_seconds ?? 0);
                 $typeNorm = self::normalizeActivityType($dt->jenis_downtime);
 
-                $e = $dt->finish_time ? Carbon::parse($dt->finish_time) : ($durSec > 0 ? $s->copy()->addSeconds($durSec) : ($isComplete ? ($job->finished_at ? Carbon::parse($job->finished_at) : null) : $now->copy()));
+                $fallbackEnd = $durSec > 0 ? $s->copy()->addSeconds($durSec) : ($isRunning ? $now->copy() : ($isComplete && $job->finished_at ? Carbon::parse($job->finished_at) : $s->copy()));
+                $e = $dt->finish_time ? Carbon::parse($dt->finish_time) : $fallbackEnd;
                 if (!$e || $e < $s) $e = $s->copy();
 
                 $rawEvents[] = [
@@ -180,6 +185,14 @@ class ProductionTimelineService
         $actualTotal = $actualOk + $actualRepair + $actualReject;
 
         $hasOutputOrActivity = ($actualTotal > 0) || ($job && $job->started_at) || ($job && in_array(strtolower($job->status ?? ''), ['running', 'complete', 'completed', 'finished', 'paused']));
+
+        // Filter out empty zero-duration uncompleted events for non-running jobs
+        $nonProdEvents = array_values(array_filter($nonProdEvents, function ($ev) use ($isRunning) {
+            if ($ev['end'] <= $ev['start'] && !$isRunning) {
+                return false;
+            }
+            return true;
+        }));
 
         // If no events and no activity, show planned schedule block
         if (empty($nonProdEvents) && !$hasOutputOrActivity) {
@@ -229,6 +242,14 @@ class ProductionTimelineService
             $timelineEnd = $jobFinishedAt ?: ($latestEventEnd ?: $now->copy());
             if ($latestEventEnd && $latestEventEnd > $timelineEnd) {
                 $timelineEnd = $latestEventEnd->copy();
+            }
+        } elseif ($isPending && !$hasOutputOrActivity) {
+            // Pending job with non-prod events (e.g. historical dandori):
+            // Timeline bounds to latest event end or planned finish, NOT current time ($now)
+            $schedEnd = $plan?->finish_time ? Carbon::parse($workDate . ' ' . substr($plan->finish_time, 0, 5)) : null;
+            $timelineEnd = $latestEventEnd ?: ($schedEnd ?: $timelineStart->copy()->addMinutes(60));
+            if ($schedEnd && $schedEnd > $timelineEnd) {
+                $timelineEnd = $schedEnd->copy();
             }
         } else {
             $timelineEnd = $latestEventEnd && $latestEventEnd > $now ? $latestEventEnd->copy() : $now->copy();
@@ -349,11 +370,26 @@ class ProductionTimelineService
         }
 
         // Trailing gap after last event until timelineEnd
-        if ($timelineEnd > $lastPos && $hasOutputOrActivity) {
-            if ($jobStartedAt && $lastPos < $jobStartedAt) {
-                $appendProd($jobStartedAt, $timelineEnd);
-            } else {
-                $appendProd($lastPos, $timelineEnd);
+        if ($timelineEnd > $lastPos) {
+            if ($hasOutputOrActivity) {
+                if ($jobStartedAt && $lastPos < $jobStartedAt) {
+                    $appendProd($jobStartedAt, $timelineEnd);
+                } else {
+                    $appendProd($lastPos, $timelineEnd);
+                }
+            } elseif ($isPending) {
+                // For pending jobs with non-prod events, fill remainder as planned schedule
+                $segments[] = [
+                    'type' => 'planned',
+                    'label' => 'Planned Schedule',
+                    'color' => 'bg-slate-700/60 border border-dashed border-slate-500/50',
+                    'start' => $lastPos->copy(),
+                    'end' => $timelineEnd->copy(),
+                    'duration_sec' => (int) $timelineEnd->diffInSeconds($lastPos),
+                    'detail' => 'Unstarted Schedule',
+                    'link' => null,
+                    'is_incomplete' => false,
+                ];
             }
         }
 
