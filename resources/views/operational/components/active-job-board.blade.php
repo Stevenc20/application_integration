@@ -342,16 +342,11 @@
                     @php
                         $nextJob = null;
                         if (isset($activeJob) && isset($pendingJobs)) {
-                            $activeCleanNo = (strpos($activeJob->job_number, '-') !== false) ? substr($activeJob->job_number, 0, strrpos($activeJob->job_number, '-')) : $activeJob->job_number;
+                            // Only skip segments that belong to the exact same break-split job
                             $foundActive = false;
                             foreach ($pendingJobs as $pj) {
                                 if ($pj->id == $activeJob->id) {
                                     $foundActive = true;
-                                    continue;
-                                }
-                                $pjCleanNo = (strpos($pj->job_number, '-') !== false) ? substr($pj->job_number, 0, strrpos($pj->job_number, '-')) : $pj->job_number;
-                                // Skip parts of the same item currently processing
-                                if (strcasecmp($pjCleanNo, $activeCleanNo) === 0) {
                                     continue;
                                 }
                                 if ($foundActive && strtolower($pj->status) === 'pending') {
@@ -361,8 +356,7 @@
                             }
                             if (!$nextJob) {
                                 foreach ($pendingJobs as $pj) {
-                                    $pjCleanNo = (strpos($pj->job_number, '-') !== false) ? substr($pj->job_number, 0, strrpos($pj->job_number, '-')) : $pj->job_number;
-                                    if ($pj->id != $activeJob->id && strcasecmp($pjCleanNo, $activeCleanNo) !== 0 && strtolower($pj->status) === 'pending') {
+                                    if ($pj->id != $activeJob->id && strtolower($pj->status) === 'pending') {
                                         $nextJob = $pj;
                                         break;
                                     }

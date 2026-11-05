@@ -1562,16 +1562,15 @@ class ProductionService
         if (is_numeric($planId)) {
             $currentPlan = \App\Models\ProductionPlan::find($planId);
             if ($currentPlan) {
-                // Find all plan IDs that belong to the same logical job/sibling to skip them
+                // Find all plan IDs that belong to the same logical break-split tree to skip only them
+                $rootParentId = $currentPlan->parent_job_id ?: $currentPlan->id;
                 $siblingPlanIds = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
                     ->where('shift_name', $currentPlan->shift_name)
                     ->where('press_name', $currentPlan->press_name)
                     ->where('row_type', 'job')
-                    ->where(function ($q) use ($currentPlan) {
-                        $q->where('job_no', $currentPlan->job_no);
-                        if (!empty($currentPlan->job_master)) {
-                            $q->orWhere('job_master', $currentPlan->job_master);
-                        }
+                    ->where(function ($q) use ($rootParentId) {
+                        $q->where('id', $rootParentId)
+                          ->orWhere('parent_job_id', $rootParentId);
                     })
                     ->pluck('id')
                     ->all();
@@ -1772,32 +1771,22 @@ class ProductionService
         $planId = $this->resolvePlanId($jobId);
         $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
 
-        $parts = explode('-', $job->job_number);
-        $baseJobNo = count($parts) > 1 ? implode('-', array_slice($parts, 0, -1)) : $job->job_number;
-
         $targetDate = $plan ? $plan->plan_date : $this->resolveWorkDate($jobId);
         $targetShift = $plan ? $plan->shift_name : null;
         $targetLine = $job->line;
 
-        // Find all plans matching the same job_no / job_master on the same date/shift/line
-        // Include parent-child relationship (parent_job_id) if this job was split across breaks
-        // NOTE: Strictly scoped to the SAME date and shift to prevent cross-shift corruption (e.g. pull-ahead items)
+        // CRITICAL FIX: Only TRUE break-split segments (linked via parent_job_id)
+        // are siblings of the same logical job.
+        // Independent schedules with the same job_no/part_number must NOT be treated as siblings!
         $matchingPlanIds = collect();
         if ($plan) {
             $rootParentId = $plan->parent_job_id ?: $plan->id;
             $matchingPlanIds = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
                 ->where('shift_name', $targetShift)
                 ->where('row_type', 'job')
-                ->where(function ($q) use ($plan, $baseJobNo, $rootParentId) {
-                    $q->where('job_no', $plan->job_no)
-                      ->orWhere('job_no', $baseJobNo)
-                      ->orWhere('id', $rootParentId)
-                      ->orWhere('parent_job_id', $rootParentId)
-                      ->orWhere(function ($sub) use ($plan) {
-                          if (!empty($plan->job_master)) {
-                              $sub->where('job_master', $plan->job_master);
-                          }
-                      });
+                ->where(function ($q) use ($rootParentId) {
+                    $q->where('id', $rootParentId)
+                      ->orWhere('parent_job_id', $rootParentId);
                 })
                 ->pluck('id');
         }
@@ -1807,7 +1796,7 @@ class ProductionService
             $query->where('line', $targetLine);
         }
 
-        // Only match sibling JobMasters that belong to the SAME date & shift
+        // Only match sibling JobMasters that belong to the SAME date & shift and belong to this break-split tree
         if ($matchingPlanIds->isNotEmpty()) {
             $query->where(function ($q) use ($matchingPlanIds) {
                 foreach ($matchingPlanIds as $pid) {
@@ -1815,7 +1804,7 @@ class ProductionService
                 }
             });
         } else {
-            // If no matching plan in the same shift, then there are NO siblings for this job
+            // If no matching break-split plan, then there are NO siblings for this job
             return new \Illuminate\Database\Eloquent\Collection();
         }
 
