@@ -368,8 +368,13 @@
                         <div class="absolute inset-0 rounded-lg">
                             @foreach($segments as $seg)
                             @php
-                                $left = max(0, (($seg['start']->timestamp - $earliest->timestamp) / $totalDur) * 100);
-                                $widthP = max(0.1, (($seg['end']->timestamp - $seg['start']->timestamp) / $totalDur) * 100);
+                                $rawLeft = (($seg['start']->timestamp - $earliest->timestamp) / $totalDur) * 100;
+                                $rawWidth = (($seg['end']->timestamp - $seg['start']->timestamp) / $totalDur) * 100;
+                                if ($rawWidth <= 0) continue;
+
+                                $left = max(0, min(100, $rawLeft));
+                                $widthP = max(0.1, min(100 - $left, $rawWidth));
+
                                 $segIdx++;
                                 $from = $seg['start']->format('H:i:s');
                                 $to = $seg['end']->format('H:i:s');
