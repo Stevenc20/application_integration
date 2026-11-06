@@ -359,9 +359,9 @@
                 
                 <div class="relative w-full overflow-x-auto select-none py-1 scrollbar-thin scrollbar-thumb-slate-300" id="scroll-container-{{ $plan->id }}">
                     <div class="relative flex flex-col gap-1.5 transition-all duration-200" style="width: 100%; min-width: 100%;" id="aseg-container-{{ $plan->id }}">
-                        {{-- Timeline Bar --}}
-                        <div class="relative h-10 bg-slate-900 rounded-xl border-2 border-slate-800 shadow-2xl overflow-hidden">
-                            <div class="absolute inset-0 rounded-lg" id="aseg-{{ $plan->id }}">
+                        {{-- Timeline Bar (exact match to Input Harian: h-9 bg-slate-900 rounded-xl border-2 border-slate-800) --}}
+                        <div class="relative h-9 w-full bg-slate-900 rounded-xl border-2 border-slate-800 shadow-2xl overflow-hidden flex items-center">
+                            <div class="absolute inset-0 rounded-lg overflow-hidden" id="aseg-{{ $plan->id }}">
                                 @foreach($segments as $seg)
                                 @php
                                     $rawLeft = (($seg['start']->timestamp - $earliest->timestamp) / $totalDur) * 100;
