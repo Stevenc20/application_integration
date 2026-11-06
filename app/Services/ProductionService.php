@@ -41,6 +41,41 @@ class ProductionService
 
         return ProductionMetricsService::currentProductionDate();
     }
+
+    /**
+     * Production logs are stored with their real wall-clock timestamp, while a
+     * Shift Malam work date continues until 07:30 on the next calendar day.
+     * Always aggregate logs against the actual shift window, never the calendar
+     * date alone, otherwise post-midnight entries disappear from DailyProduction.
+     */
+    private function productionLogWindow(int $jobId, string $workDate): array
+    {
+        $planId = $this->resolvePlanId($jobId);
+        $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+        $shift = $plan?->shift_name;
+
+        if (! $shift) {
+            $session = ProductionSession::where('job_master_id', $jobId)
+                ->whereDate('work_date', $workDate)
+                ->orderByDesc('id')
+                ->first()
+                ?: ProductionSession::where('job_master_id', $jobId)
+                    ->orderByDesc('id')
+                    ->first();
+
+            if ($session?->start_time) {
+                $shift = ProductionMetricsService::currentProductionShift(
+                    Carbon::parse($session->start_time)
+                );
+            }
+        }
+
+        return ProductionMetricsService::shiftWindow(
+            $workDate,
+            $shift ?: ProductionMetricsService::currentProductionShift()
+        );
+    }
+
     /**
      * Start a job and its session.
      */
@@ -523,12 +558,20 @@ class ProductionService
                 'work_date' => $workDate
             ]);
             
+            [$logStart, $logEnd] = $this->productionLogWindow($jobId, $workDate);
+
             $actualQty = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', $workDate)->sum('ok_qty');
+                ->where('created_at', '>=', $logStart)
+                ->where('created_at', '<', $logEnd)
+                ->sum('ok_qty');
             $actualRepair = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', $workDate)->sum('repair_qty');
+                ->where('created_at', '>=', $logStart)
+                ->where('created_at', '<', $logEnd)
+                ->sum('repair_qty');
             $actualReject = ProductionLog::where('job_master_id', $jobId)
-                ->whereDate('created_at', $workDate)->sum('reject_qty');
+                ->where('created_at', '>=', $logStart)
+                ->where('created_at', '<', $logEnd)
+                ->sum('reject_qty');
 
             $job = JobMaster::find($jobId);
             $targetQty = $job?->capacity ?? 0;
@@ -687,6 +730,7 @@ class ProductionService
     {
         return DB::transaction(function () use ($jobId, $nextJobId, $skipIdle, $finalOk, $finalRepair, $finalReject, $skippedActions, $reasonNotAchieved) {
             $workDate = $this->resolveWorkDate($jobId);
+            [$logStart, $logEnd] = $this->productionLogWindow($jobId, $workDate);
 
             // Auto-close any active downtimes for this job
             $now = now();
@@ -738,9 +782,18 @@ class ProductionService
             if ($finalOk !== null || $finalRepair !== null || $finalReject !== null) {
                 $totalOutput = (float)($finalOk ?? 0) + (float)($finalRepair ?? 0) + (float)($finalReject ?? 0);
             } else {
-                $currOk = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('ok_qty');
-                $currRep = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('repair_qty');
-                $currRej = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('reject_qty');
+                $currOk = ProductionLog::where('job_master_id', $jobId)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('ok_qty');
+                $currRep = ProductionLog::where('job_master_id', $jobId)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('repair_qty');
+                $currRej = ProductionLog::where('job_master_id', $jobId)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('reject_qty');
                 $totalOutput = (float)$currOk + (float)$currRep + (float)$currRej;
             }
 
@@ -840,11 +893,13 @@ class ProductionService
                 // Finalisasi: ambil nilai repair & reject yang valid dari form R&R (harus punya foto evidence)
                 $loggedRepair = (int) RepairRejectLog::where('job_master_id', $jobId)
                     ->where('type', 'repair')
-                    ->whereDate('created_at', $workDate)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
                     ->sum('qty_a');
                 $loggedReject = (int) RepairRejectLog::where('job_master_id', $jobId)
                     ->where('type', 'reject')
-                    ->whereDate('created_at', $workDate)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
                     ->sum('qty_a');
 
                 $resolvedRepair = $loggedRepair > 0 ? $loggedRepair : ($finalRepair ?? 0);
@@ -852,7 +907,8 @@ class ProductionService
 
                 // Replace semua log dengan nilai final yang terverifikasi
                 ProductionLog::where('job_master_id', $jobId)
-                    ->whereDate('created_at', $workDate)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
                     ->delete();
                 ProductionLog::create([
                     'job_master_id' => $jobId,
@@ -864,9 +920,18 @@ class ProductionService
                 $totalRepair = $resolvedRepair;
                 $totalReject = $resolvedReject;
             } else {
-                $totalOk     = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('ok_qty');
-                $totalRepair = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('repair_qty');
-                $totalReject = ProductionLog::where('job_master_id', $jobId)->whereDate('created_at', $workDate)->sum('reject_qty');
+                $totalOk     = ProductionLog::where('job_master_id', $jobId)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('ok_qty');
+                $totalRepair = ProductionLog::where('job_master_id', $jobId)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('repair_qty');
+                $totalReject = ProductionLog::where('job_master_id', $jobId)
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('reject_qty');
             }
 
             DailyProduction::updateOrCreate(
@@ -1663,12 +1728,20 @@ class ProductionService
                     $repair = $repair ?? ($daily->actual_repair ?: $daily->repair_qty);
                     $reject = $reject ?? ($daily->actual_reject ?: $daily->reject_qty);
                 } else {
+                    [$logStart, $logEnd] = $this->productionLogWindow($jobId, $workDate);
+
                     $ok = $ok ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', $workDate)->sum('ok_qty');
+                        ->where('created_at', '>=', $logStart)
+                        ->where('created_at', '<', $logEnd)
+                        ->sum('ok_qty');
                     $repair = $repair ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', $workDate)->sum('repair_qty');
+                        ->where('created_at', '>=', $logStart)
+                        ->where('created_at', '<', $logEnd)
+                        ->sum('repair_qty');
                     $reject = $reject ?? \App\Models\ProductionLog::where('job_master_id', $jobId)
-                        ->whereDate('created_at', $workDate)->sum('reject_qty');
+                        ->where('created_at', '>=', $logStart)
+                        ->where('created_at', '<', $logEnd)
+                        ->sum('reject_qty');
                 }
             }
 

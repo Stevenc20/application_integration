@@ -137,7 +137,8 @@ class DashboardRealtimeService
             if (! empty($stillMissingIds)) {
                 // 1 query to aggregate production logs for all missing jobs on this work_date
                 $logAggMap = \App\Models\ProductionLog::whereIn('job_master_id', $stillMissingIds)
-                    ->whereDate('created_at', $workDate)
+                    ->where('created_at', '>=', $shiftStartDt)
+                    ->where('created_at', '<', $shiftEndDt)
                     ->groupBy('job_master_id')
                     ->selectRaw('job_master_id, COALESCE(SUM(ok_qty),0) as total_ok, COALESCE(SUM(repair_qty),0) as total_repair, COALESCE(SUM(reject_qty),0) as total_reject')
                     ->get()
@@ -406,10 +407,8 @@ class DashboardRealtimeService
 
         $repairRejectLogs = \App\Models\RepairRejectLog::with(['creator', 'jobMaster', 'images'])
             ->whereIn('job_master_id', $allTargetJobIds)
-            ->where(function ($q) use ($shiftStartDt, $shiftEndDt, $workDate) {
-                $q->whereBetween('created_at', [$shiftStartDt, $shiftEndDt])
-                    ->orWhereDate('created_at', $workDate);
-            })
+            ->where('created_at', '>=', $shiftStartDt)
+            ->where('created_at', '<', $shiftEndDt)
             ->get();
 
         foreach ($repairRejectLogs as $rr) {
