@@ -339,7 +339,7 @@ class ProductionTimelineService
             $evDur = (int) abs($evEnd->diffInSeconds($evStart));
             if ($evDur <= 0) continue;
 
-            // Fill production gap up to event start if start is ahead of lastPos
+            // In Input Harian, if an event starts ahead of $lastPos, fill production gap
             if ($evStart > $lastPos) {
                 if ($jobStartedAt && $lastPos < $jobStartedAt && $evStart > $jobStartedAt) {
                     $appendProd($jobStartedAt, $evStart);
@@ -351,6 +351,7 @@ class ProductionTimelineService
                 $lastPos = $evStart->copy();
             }
 
+            // In Input Harian, addSegment(start, end, color, label) is called directly with each event's start & end
             $segments[] = [
                 'type' => $ev['type'],
                 'label' => self::getActivityLabel($ev['type'], $ev['detail'] ?? null),
@@ -363,7 +364,10 @@ class ProductionTimelineService
                 'is_incomplete' => false,
             ];
 
-            $lastPos = $evEnd->copy();
+            // In Input Harian: lastPos = Math.max(lastPos, end)
+            if ($evEnd > $lastPos) {
+                $lastPos = $evEnd->copy();
+            }
         }
 
         // Trailing gap after last event until timelineEnd
