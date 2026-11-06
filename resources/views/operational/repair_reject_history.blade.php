@@ -106,11 +106,19 @@
             <h2 class="font-semibold text-gray-800">Filter Data Lainnya</h2>
         </div>
         <div class="p-5">
-            <form method="GET" action="{{ route('operational.repair_reject.index') }}" class="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+            <form method="GET" action="{{ route('operational.repair_reject.index') }}" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
                 <input type="hidden" name="line" value="{{ request('line') }}">
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Tanggal</label>
                     <input type="date" name="date" value="{{ request()->has('date') ? request('date') : ($filterDate ?? now()->toDateString()) }}" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 focus:border-primary-red outline-none transition bg-white">
+                </div>
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Shift</label>
+                    <select name="shift" class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-red-200 focus:border-primary-red outline-none transition bg-white cursor-pointer">
+                        <option value="">Semua Shift</option>
+                        <option value="pagi" {{ $filterShift === 'pagi' ? 'selected' : '' }}>Shift Pagi</option>
+                        <option value="malam" {{ $filterShift === 'malam' ? 'selected' : '' }}>Shift Malam</option>
+                    </select>
                 </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Tipe</label>
@@ -143,6 +151,7 @@
                 <thead class="bg-slate-50 border-b border-slate-100">
                     <tr>
                         <th class="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Waktu</th>
+                        <th class="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Shift</th>
                         <th class="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Job</th>
                         <th class="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Tipe</th>
                         <th class="px-4 py-3 text-left text-[10px] font-black text-slate-500 uppercase tracking-widest">Defect</th>
@@ -161,6 +170,16 @@
                         <td class="px-4 py-3">
                             <div class="font-mono text-xs font-bold text-slate-700">{{ $log->created_at->format('H:i') }}</div>
                             <div class="text-[10px] text-slate-400">{{ $log->created_at->format('d M Y') }}</div>
+                        </td>
+                        @php
+                            $logShift = \App\Services\ProductionMetricsService::currentProductionShift($log->created_at);
+                        @endphp
+                        <td class="px-4 py-3">
+                            @if($logShift === 'Shift Pagi')
+                                <span class="inline-flex px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-600 font-black text-[10px] uppercase border border-emerald-200">Pagi</span>
+                            @else
+                                <span class="inline-flex px-2.5 py-1 rounded-lg bg-slate-100 text-slate-600 font-black text-[10px] uppercase border border-slate-200">Malam</span>
+                            @endif
                         </td>
                         <td class="px-4 py-3">
                             <div class="font-bold text-xs text-slate-800">{{ $log->jobMaster?->job_number ?? '-' }}</div>
@@ -237,7 +256,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="11" class="px-6 py-16 text-center">
+                        <td colspan="12" class="px-6 py-16 text-center">
                             <div class="flex flex-col items-center gap-3">
                                 <div class="w-14 h-14 rounded-2xl bg-slate-100 flex items-center justify-center">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-7 h-7 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>

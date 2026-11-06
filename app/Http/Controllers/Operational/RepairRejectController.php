@@ -72,10 +72,14 @@ class RepairRejectController extends Controller
         // Default tanggal: jika request tidak menyertakan 'date' dan user tidak sedang menekan 'Semua Tanggal' (date='')
         // maka otomatis arahkan / filter ke hari ini (atau tanggal data terbaru jika hari ini kosong)
         $filterDate = null;
+        $filterShift = strtolower((string) $request->query('shift', ''));
+        if (!in_array($filterShift, ['pagi', 'malam'], true)) {
+            $filterShift = '';
+        }
+
         if ($request->has('date')) {
             if ($request->filled('date')) {
                 $filterDate = $request->date;
-                $query->whereDate('created_at', $filterDate);
             }
         } else {
             // Default pertama kali buka: utamakan hari ini, jika hari ini belum ada data maka pakai tanggal terbaru yang ada
@@ -87,7 +91,16 @@ class RepairRejectController extends Controller
                 $latestLog = RepairRejectLog::latest('created_at')->first();
                 $filterDate = $latestLog ? $latestLog->created_at->toDateString() : $today;
             }
-            $query->whereDate('created_at', $filterDate);
+        }
+
+        if ($filterDate) {
+            if ($filterShift) {
+                [$shiftStart, $shiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($filterDate, $filterShift);
+                $query->where('created_at', '>=', $shiftStart)
+                    ->where('created_at', '<', $shiftEnd);
+            } else {
+                $query->whereDate('created_at', $filterDate);
+            }
         }
 
         if ($request->filled('line')) {
@@ -106,7 +119,7 @@ class RepairRejectController extends Controller
         $todayReject = RepairRejectLog::where('type', 'reject')->whereDate('created_at', today())->sum('qty_a');
 
         return view('operational.repair_reject_history', compact(
-            'logs', 'totalRepair', 'totalReject', 'todayRepair', 'todayReject', 'filterDate'
+            'logs', 'totalRepair', 'totalReject', 'todayRepair', 'todayReject', 'filterDate', 'filterShift'
         ));
     }
 
