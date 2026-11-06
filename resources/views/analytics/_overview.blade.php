@@ -380,7 +380,7 @@
                                     $cursorClass = !empty($seg['link']) ? 'cursor-pointer' : 'cursor-default';
                                     $clickHandler = !empty($seg['link']) ? "window.location.href='".$seg['link']."'" : "void(0)";
                                 @endphp
-                                <div class="absolute h-full {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all rounded-[2px]"
+                                <div class="absolute h-full {{ $seg['color'] }} {{ $cursorClass }} border-r border-white/20 hover:brightness-110 transition-all"
                                      style="left: {{ $left }}%; width: {{ $widthP }}%;"
                                      onclick="{{ $clickHandler }}"
                                      onmouseover="showTimelineTooltip(event, '{{ $seg['label'] }}', '{{ $from }}', '{{ $to }}', '{{ $duration }}', '{{ $seg['detail'] ?? '' }}')"
