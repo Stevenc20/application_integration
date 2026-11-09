@@ -1900,6 +1900,78 @@ class ProductionService
     }
 
     /**
+     * Batch-resolve sibling JobMaster IDs for a set of jobs using an optional in-memory plan pool.
+     * Returns only the siblings (the input job IDs are merged by the caller).
+     *
+     * @param  iterable<JobMaster>  $jobs
+     * @return array<int, int>
+     */
+    public function getSiblingJobMasterIdsForJobs(iterable $jobs, ?\Illuminate\Support\Collection $candidatePool = null): array
+    {
+        $planIdsByLine = [];
+        $unresolvedJobIds = [];
+        $inputJobIds = [];
+
+        foreach ($jobs as $job) {
+            if (! $job instanceof JobMaster) {
+                continue;
+            }
+
+            $jobId = (int) $job->id;
+            $inputJobIds[$jobId] = true;
+            $planId = $this->resolvePlanId($jobId, $job, $candidatePool);
+            $plan = $planId
+                ? ($candidatePool?->firstWhere('id', $planId) ?: \App\Models\ProductionPlan::find($planId))
+                : null;
+
+            if (! $plan) {
+                $unresolvedJobIds[] = $jobId;
+                continue;
+            }
+
+            $line = (string) ($job->line ?? '');
+            foreach ($plan->getScheduleGroupPlanIds($candidatePool) as $pid) {
+                $planIdsByLine[$line][(int) $pid] = true;
+            }
+        }
+
+        $siblingIds = [];
+
+        if (! empty($planIdsByLine)) {
+            $query = JobMaster::query();
+            $query->where(function ($outer) use ($planIdsByLine) {
+                foreach ($planIdsByLine as $line => $planIds) {
+                    $outer->orWhere(function ($q) use ($line, $planIds) {
+                        if ($line !== '') {
+                            $q->where('line', $line);
+                        }
+                        $q->where(function ($inner) use ($planIds) {
+                            foreach (array_keys($planIds) as $pid) {
+                                $inner->orWhere('job_number', 'LIKE', "%-{$pid}");
+                            }
+                        });
+                    });
+                }
+            });
+
+            $siblingIds = $query->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->all();
+        }
+
+        foreach ($unresolvedJobIds as $jobId) {
+            $siblingIds = array_merge(
+                $siblingIds,
+                $this->getSiblingJobMasters($jobId, $candidatePool)->pluck('id')->map(fn ($id) => (int) $id)->all()
+            );
+        }
+
+        $siblingIds = array_values(array_unique($siblingIds));
+
+        return array_values(array_diff($siblingIds, array_keys($inputJobIds)));
+    }
+
+    /**
      * Return all JobMaster IDs (including $jobId itself and any break-split siblings)
      * belonging to the same canonical schedule identity.
      *

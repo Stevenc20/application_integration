@@ -756,7 +756,12 @@ function setText(el, v) {
  */
 let LINE_DETAIL = {};
 
+let detailFetchInFlight = false;
+
 async function fetchDetailData() {
+    if (detailFetchInFlight) return;
+    detailFetchInFlight = true;
+
     const date = document.getElementById('dateInput').value;
     const shift = selectedShift;
     try {
@@ -771,6 +776,8 @@ async function fetchDetailData() {
         renderLineCards();
     } catch (error) {
         showDashError('Gagal memuat rincian: ' + error.message);
+    } finally {
+        detailFetchInFlight = false;
     }
 }
 
@@ -809,10 +816,15 @@ async function dashFetch(url) {
   }
 }
 
+let dashboardFetchInFlight = false;
+
 async function fetchDashboardData() {
+    if (dashboardFetchInFlight || document.hidden) return;
+    dashboardFetchInFlight = true;
+
     const date = document.getElementById('dateInput').value;
     const shift = selectedShift;
-    
+
     try {
         let url = `${DASH_API_DATA}?date=${date}&shift=${shift}`;
         if(SELECTED_LINE) url += `&line=${SELECTED_LINE}`;
@@ -834,9 +846,11 @@ async function fetchDashboardData() {
             renderLineCards();
             if(selectedDays === 1 && typeof renderTodayCharts === 'function') renderTodayCharts();
         }
-        fetchDetailData();
+        await fetchDetailData();
     } catch (error) {
         showDashError('Gagal memuat data dashboard: ' + error.message);
+    } finally {
+        dashboardFetchInFlight = false;
     }
 }
 
@@ -884,8 +898,8 @@ try {
     };
 } catch (e) { /* fallback to polling */ }
 
-// AUTO-REFRESH: Mengupdate data dashboard setiap 5 detik + BroadcastChannel dari Input Harian
-setInterval(fetchDashboardData, 5000);
+// AUTO-REFRESH: Mengupdate data dashboard setiap 10 detik + BroadcastChannel dari Input Harian
+setInterval(fetchDashboardData, 10000);
 
 function updateClock(){
   const now = new Date();

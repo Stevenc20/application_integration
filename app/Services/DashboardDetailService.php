@@ -203,12 +203,8 @@ class DashboardDetailService
         $allDetailJobIds = $jobIds->toArray();
         if (! empty($allDetailJobIds)) {
             $productionService = app(\App\Services\ProductionService::class);
-            $siblingJobIds = JobMaster::whereIn('id', $allDetailJobIds)
-                ->get()
-                ->flatMap(function ($j) use ($productionService, $plans) {
-                    return $productionService->getSiblingJobMasters($j->id, $plans, $j)->pluck('id');
-                })
-                ->all();
+            $targetJobs = JobMaster::whereIn('id', $allDetailJobIds)->get();
+            $siblingJobIds = $productionService->getSiblingJobMasterIdsForJobs($targetJobs, $plans);
             $allDetailJobIds = array_values(array_unique(array_merge($allDetailJobIds, $siblingJobIds)));
         }
 

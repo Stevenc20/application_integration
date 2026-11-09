@@ -984,7 +984,12 @@ function getMonDate() {
     return `${n.getFullYear()}-${pad(n.getMonth()+1)}-${pad(n.getDate())}`;
 }
 
+let monitorFetchInFlight = false;
+
 function fetchData(){
+    if (monitorFetchInFlight || document.hidden) return;
+    monitorFetchInFlight = true;
+
     const n=new Date();
     if (n.getHours() < 7 || (n.getHours() === 7 && n.getMinutes() < 30)) {
         n.setDate(n.getDate() - 1);
@@ -1013,6 +1018,8 @@ function fetchData(){
         console.error('fetch err',e);
         const eb=document.getElementById('monError');
         if(eb){eb.textContent='Gagal memuat data monitor: '+e.message;eb.style.display='block';}
+    }).finally(()=>{
+        monitorFetchInFlight = false;
     });
 }
 
@@ -1859,7 +1866,7 @@ function renderTable(){
 }
 
 fetchData();
-setInterval(fetchData, 1500);
+setInterval(fetchData, 10000);
 document.addEventListener('visibilitychange',function(){
     if(document.hidden){
         stopRotate();
