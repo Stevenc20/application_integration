@@ -86,120 +86,132 @@ if ($user->isRole(['ppc', 'manager'])) {
      */
     public function nextShiftData(Request $request)
     {
-        $line = $request->get('line', 'PRESS A');
-        $cleanLine = strtoupper(trim(preg_replace('/^(PRESS|LINE)\s*/i', '', (string)$line)));
+        try {
+            $line = $request->get('line', 'PRESS A');
+            $cleanLine = strtoupper(trim(preg_replace('/^(PRESS|LINE)\s*/i', '', (string)$line)));
 
-        // Helper filter Line yang fleksibel & konsisten dengan InputHarianController
-        $applyLineFilter = function($query) use ($cleanLine, $line) {
-            if (!empty($cleanLine) && $cleanLine !== 'ALL') {
-                $query->where(function($q) use ($cleanLine, $line) {
-                    $q->whereRaw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(press_name)), 'PRESS', ''), 'LINE', ''), ' ', '') LIKE ?", ["%{$cleanLine}%"])
-                      ->orWhere('press_name', $line)
-                      ->orWhere('press_name', 'PRESS ' . $cleanLine)
-                      ->orWhere('press_name', 'Line ' . $cleanLine)
-                      ->orWhere('press_name', 'PRESS' . $cleanLine)
-                      ->orWhere('press_name', 'Line' . $cleanLine);
-                });
-            }
-        };
+            // Helper filter Line yang fleksibel & konsisten dengan InputHarianController
+            $applyLineFilter = function($query) use ($cleanLine, $line) {
+                if (!empty($cleanLine) && $cleanLine !== 'ALL') {
+                    $query->where(function($q) use ($cleanLine, $line) {
+                        $q->whereRaw("REPLACE(REPLACE(REPLACE(UPPER(TRIM(COALESCE(press_name, ''))), 'PRESS', ''), 'LINE', ''), ' ', '') LIKE ?", ["%{$cleanLine}%"])
+                          ->orWhere('press_name', $line)
+                          ->orWhere('press_name', 'PRESS ' . $cleanLine)
+                          ->orWhere('press_name', 'Line ' . $cleanLine)
+                          ->orWhere('press_name', 'PRESS' . $cleanLine)
+                          ->orWhere('press_name', 'Line' . $cleanLine);
+                    });
+                }
+            };
 
-        $currentShift = $request->get('shift', 'Shift Pagi');
-        $date = $request->get('date', now()->toDateString());
+            $currentShift = $request->get('shift', 'Shift Pagi');
+            $date = $request->get('date', now()->toDateString());
 
-        // Cek apakah shift saat ini adalah Pagi / Shift 1
-        $isCurrentPagi = (stripos($currentShift, 'Pagi') !== false || stripos($currentShift, '1') !== false);
-        $tomorrow = Carbon::parse($date)->addDay()->toDateString();
+            // Cek apakah shift saat ini adalah Pagi / Shift 1
+            $isCurrentPagi = (stripos($currentShift, 'Pagi') !== false || stripos($currentShift, '1') !== false);
+            $tomorrow = Carbon::parse($date)->addDay()->toDateString();
 
-        // 1. Tentukan target shift berikutnya secara strictly berurutan:
-        // Jika sedang di Shift Pagi -> target mutlak shift berikutnya adalah Shift Malam pada TANGGAL YANG SAMA ($date).
-        // Jika sedang di Shift Malam -> target mutlak shift berikutnya adalah Shift Pagi pada BESOK HARI ($tomorrow).
-        $targetShiftName = $isCurrentPagi ? 'Shift Malam' : 'Shift Pagi';
-        $targetDate = $isCurrentPagi ? $date : $tomorrow;
-        $targetKeywords = $isCurrentPagi ? ['Malam', '2'] : ['Pagi', '1'];
+            // 1. Tentukan target shift berikutnya secara strictly berurutan:
+            // Jika sedang di Shift Pagi -> target mutlak shift berikutnya adalah Shift Malam pada TANGGAL YANG SAMA ($date).
+            // Jika sedang di Shift Malam -> target mutlak shift berikutnya adalah Shift Pagi pada BESOK HARI ($tomorrow).
+            $targetShiftName = $isCurrentPagi ? 'Shift Malam' : 'Shift Pagi';
+            $targetDate = $isCurrentPagi ? $date : $tomorrow;
+            $targetKeywords = $isCurrentPagi ? ['Malam', '2'] : ['Pagi', '1'];
 
-        // Cari item dari shift berikutnya sesuai target tepat
-        $planQuery = ProductionPlan::query();
-        $planQuery->activePpcRevision();
-        $applyLineFilter($planQuery);
-        $planQuery->whereDate('plan_date', $targetDate)
-                  ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                  ->where(function($q) {
-                      $q->where('row_type', 'job')
-                        ->orWhereNull('row_type');
-                  })
-                  ->where('shift_name', '!=', $currentShift)
-                  ->where('shift_name', 'not like', "{$currentShift}%")
-                  ->where(function($q) use ($targetKeywords) {
-                      foreach ($targetKeywords as $kw) {
-                          $q->orWhere('shift_name', 'like', "%{$kw}%");
-                      }
-                  })
-                  ->orderBy('row_no', 'asc');
-
-        $rawPlans = $planQuery->get();
-        $matchedDate = $targetDate;
-        $nextShift = $rawPlans->isNotEmpty() ? $rawPlans->first()->shift_name : $targetShiftName;
-        $emptyMessage = null;
-
-        if ($rawPlans->isEmpty()) {
-            $formattedTargetDate = Carbon::parse($targetDate)->translatedFormat('d M Y');
-            $emptyMessage = "Jadwal {$targetShiftName} untuk tanggal {$formattedTargetDate} belum di-upload oleh PPC.";
-        }
-
-        // Hitung Available Qty secara real-time dan jamin item tetap muncul
-        $validPlans = [];
-        foreach ($rawPlans as $plan) {
-            try {
-                $avail = $this->pullAheadService->calculateAvailableQty($plan);
-            } catch (\Throwable $e) {
-                Log::warning('[PullAhead] calculateAvailableQty gagal: ' . $e->getMessage());
-                $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
-            }
-            if ($avail <= 0) {
-                $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
-            }
-            $plan->available_qty = $avail;
-            $validPlans[] = $plan;
-        }
-        $nextShiftPlans = array_values($validPlans);
-
-        // Ambil plan shift aktif (untuk usulan posisi sequence)
-        $currPlanQuery = ProductionPlan::query();
-        $currPlanQuery->activePpcRevision();
-        $applyLineFilter($currPlanQuery);
-        $currPlanQuery->whereDate('plan_date', $date)
-                      ->where('shift_name', 'like', "{$currentShift}%")
+            // Cari item dari shift berikutnya sesuai target tepat
+            $planQuery = ProductionPlan::query();
+            $planQuery->activePpcRevision();
+            $applyLineFilter($planQuery);
+            $planQuery->whereDate('plan_date', $targetDate)
                       ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                       ->where(function($q) {
                           $q->where('row_type', 'job')
                             ->orWhereNull('row_type');
                       })
+                      ->where('shift_name', '!=', $currentShift)
+                      ->where('shift_name', 'not like', "{$currentShift}%")
+                      ->where(function($q) use ($targetKeywords) {
+                          foreach ($targetKeywords as $kw) {
+                              $q->orWhere('shift_name', 'like', "%{$kw}%");
+                          }
+                      })
                       ->orderBy('row_no', 'asc');
 
-        $currentShiftPlans = $currPlanQuery->get(['id', 'row_no', 'job_no', 'job_master']);
+            $rawPlans = $planQuery->get();
+            $matchedDate = $targetDate;
+            $nextShift = $rawPlans->isNotEmpty() ? $rawPlans->first()->shift_name : $targetShiftName;
+            $emptyMessage = null;
 
-        if ($currentShiftPlans->isEmpty()) {
-            $currFallback = ProductionPlan::query();
-            $currFallback->activePpcRevision();
-            $applyLineFilter($currFallback);
-            $currentShiftPlans = $currFallback->whereDate('plan_date', $date)
-                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                ->where(function($q) {
-                    $q->where('row_type', 'job')
-                      ->orWhereNull('row_type');
-                })
-                ->orderBy('row_no', 'asc')
-                ->get(['id', 'row_no', 'job_no', 'job_master']);
+            if ($rawPlans->isEmpty()) {
+                $formattedTargetDate = Carbon::parse($targetDate)->translatedFormat('d M Y');
+                $emptyMessage = "Jadwal {$targetShiftName} untuk tanggal {$formattedTargetDate} belum di-upload oleh PPC.";
+            }
+
+            // Hitung Available Qty secara real-time dan jamin item tetap muncul
+            $validPlans = [];
+            foreach ($rawPlans as $plan) {
+                try {
+                    $avail = $this->pullAheadService->calculateAvailableQty($plan);
+                } catch (\Throwable $e) {
+                    Log::warning('[PullAhead] calculateAvailableQty gagal: ' . $e->getMessage());
+                    $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
+                }
+                if ($avail <= 0) {
+                    $avail = (int)($plan->plan ?: ($plan->target_qty ?: 1));
+                }
+                $plan->available_qty = $avail;
+                $validPlans[] = $plan;
+            }
+            $nextShiftPlans = array_values($validPlans);
+
+            // Ambil plan shift aktif (untuk usulan posisi sequence)
+            $currPlanQuery = ProductionPlan::query();
+            $currPlanQuery->activePpcRevision();
+            $applyLineFilter($currPlanQuery);
+            $currPlanQuery->whereDate('plan_date', $date)
+                          ->where('shift_name', 'like', "{$currentShift}%")
+                          ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                          ->where(function($q) {
+                              $q->where('row_type', 'job')
+                                ->orWhereNull('row_type');
+                          })
+                          ->orderBy('row_no', 'asc');
+
+            $currentShiftPlans = $currPlanQuery->get(['id', 'row_no', 'job_no', 'job_master']);
+
+            if ($currentShiftPlans->isEmpty()) {
+                $currFallback = ProductionPlan::query();
+                $currFallback->activePpcRevision();
+                $applyLineFilter($currFallback);
+                $currentShiftPlans = $currFallback->whereDate('plan_date', $date)
+                    ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
+                    ->where(function($q) {
+                        $q->where('row_type', 'job')
+                          ->orWhereNull('row_type');
+                    })
+                    ->orderBy('row_no', 'asc')
+                    ->get(['id', 'row_no', 'job_no', 'job_master']);
+            }
+
+            return response()->json([
+                'success' => true,
+                'next_shift_plans' => $nextShiftPlans,
+                'current_shift_plans' => $currentShiftPlans,
+                'next_shift_name' => $nextShift,
+                'next_shift_date' => $matchedDate,
+                'empty_message' => $emptyMessage
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('[PullAhead] nextShiftData error: ' . $e->getMessage(), [
+                'trace' => $e->getTraceAsString()
+            ]);
+            return response()->json([
+                'success' => false,
+                'next_shift_plans' => [],
+                'current_shift_plans' => [],
+                'empty_message' => 'Terjadi kesalahan saat memuat data shift: ' . $e->getMessage()
+            ], 200);
         }
-
-        return response()->json([
-            'success' => true,
-            'next_shift_plans' => $nextShiftPlans,
-            'current_shift_plans' => $currentShiftPlans,
-            'next_shift_name' => $nextShift,
-            'next_shift_date' => $matchedDate,
-            'empty_message' => $emptyMessage
-        ]);
     }
 
     /**

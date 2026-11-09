@@ -1105,6 +1105,7 @@ function goToIssue(type, planId, jobMasterId, dtId) {
 
 // ── Tarik Shift (Pull Ahead) Functions ──
 let nextShiftPlansData = [];
+let tarikShiftAbortController = null;
 
 function openTarikShiftModal() {
     const modal = document.getElementById('tarikShiftModal');
@@ -1123,16 +1124,32 @@ function openTarikShiftModal() {
     const shift = params.get('shift') || (window.ProductionConfig && window.ProductionConfig.currentShift) || '{{ $currentShift ?? "Shift Pagi" }}';
     const date = params.get('date') || (window.ProductionConfig && window.ProductionConfig.currentDate) || '{{ $date }}';
 
+    // Abort previous pending fetch if any to avoid hanging requests
+    if (tarikShiftAbortController) {
+        try { tarikShiftAbortController.abort(); } catch (e) {}
+    }
+    tarikShiftAbortController = new AbortController();
+
+    // 10-second client-side timeout to avoid infinite spinning on unstable tablet Wi-Fi
+    const timeoutId = setTimeout(() => {
+        if (tarikShiftAbortController) {
+            tarikShiftAbortController.abort('Request timeout');
+        }
+    }, 10000);
+
     fetch(`/operational/pull-ahead/next-shift?line=${encodeURIComponent(line)}&shift=${encodeURIComponent(shift)}&date=${encodeURIComponent(date)}`, {
+        signal: tarikShiftAbortController.signal,
         headers: {
             'Accept': 'application/json'
         }
     })
     .then(r => {
+        clearTimeout(timeoutId);
         if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
         return r.json();
     })
     .then(res => {
+        clearTimeout(timeoutId);
         loading.classList.add('hidden');
         if (res.success && res.next_shift_plans && res.next_shift_plans.length > 0) {
             nextShiftPlansData = res.next_shift_plans;
@@ -1178,15 +1195,26 @@ function openTarikShiftModal() {
         }
     })
     .catch(err => {
+        clearTimeout(timeoutId);
         loading.classList.add('hidden');
         empty.classList.remove('hidden');
         const msg = empty.querySelector('p');
-        if (msg) msg.textContent = 'Gagal memuat data: ' + err.message;
+        const subMsg = empty.querySelectorAll('p')[1];
+        if (err.name === 'AbortError' || err === 'Request timeout') {
+            if (msg) msg.textContent = 'Koneksi ke server lambat atau timeout.';
+            if (subMsg) subMsg.innerHTML = '<button type="button" onclick="openTarikShiftModal()" class="mt-2 px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">Coba Lagi</button>';
+        } else {
+            if (msg) msg.textContent = 'Gagal memuat data: ' + err.message;
+            if (subMsg) subMsg.innerHTML = '<button type="button" onclick="openTarikShiftModal()" class="mt-2 px-3 py-1 bg-blue-600 text-white rounded-lg text-xs font-bold hover:bg-blue-700">Coba Lagi</button>';
+        }
         console.error('Error fetching next shift data:', err);
     });
 }
 
 function closeTarikShiftModal() {
+    if (tarikShiftAbortController) {
+        try { tarikShiftAbortController.abort(); } catch (e) {}
+    }
     const modal = document.getElementById('tarikShiftModal');
     if (modal) modal.classList.add('hidden');
 }
