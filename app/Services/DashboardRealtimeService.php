@@ -1137,7 +1137,11 @@ class DashboardRealtimeService
             return self::$resolvedDates[$date];
         }
 
-        $hasJobs = ProductionPlan::whereDate('plan_date', $date)
+        $dayStart = Carbon::parse($date)->startOfDay()->toDateString();
+        $dayEnd = Carbon::parse($date)->startOfDay()->addDay()->toDateString();
+
+        $hasJobs = ProductionPlan::where('plan_date', '>=', $dayStart)
+            ->where('plan_date', '<', $dayEnd)
             ->activePpcRevision()
             ->where('row_type', 'job')
             ->exists();
@@ -1165,7 +1169,11 @@ class DashboardRealtimeService
             return self::$plansCache[$cacheKey];
         }
 
-        $plans = ProductionPlan::whereDate('plan_date', $date)
+        $dayStart = Carbon::parse($date)->startOfDay()->toDateString();
+        $dayEnd = Carbon::parse($date)->startOfDay()->addDay()->toDateString();
+
+        $plans = ProductionPlan::where('plan_date', '>=', $dayStart)
+            ->where('plan_date', '<', $dayEnd)
             ->activePpcRevision()
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {

@@ -14,6 +14,7 @@ use App\Services\DashboardDetailService;
 use App\Services\DashboardRealtimeService;
 use App\Services\LineStatusService;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class DashboardController extends Controller
@@ -59,7 +60,8 @@ class DashboardController extends Controller
 
         $lines = $this->resolvePressMonitorLines($selectedLine);
 
-        $payload = $this->buildDashboardPayload($lines, $date, $shift);
+        $cacheKey = 'dash:api:'.md5($date.'|'.$shift.'|'.($selectedLine ?: 'all').'|'.implode(',', $lines));
+        $payload = Cache::remember($cacheKey, 5, fn () => $this->buildDashboardPayload($lines, $date, $shift));
 
         return response()->json($payload);
     }
@@ -145,13 +147,18 @@ class DashboardController extends Controller
         $selectedLine = request('line');
 
         $detailService = app(DashboardDetailService::class);
-        $result = [];
 
         $lines = $this->resolvePressMonitorLines($selectedLine);
 
-        foreach ($lines as $lineName) {
-            $result[$lineName] = $detailService->getLineDetail($lineName, $date, $shift);
-        }
+        $cacheKey = 'dash:detail:'.md5($date.'|'.$shift.'|'.($selectedLine ?: 'all').'|'.implode(',', $lines));
+        $result = Cache::remember($cacheKey, 5, function () use ($detailService, $lines, $date, $shift) {
+            $result = [];
+            foreach ($lines as $lineName) {
+                $result[$lineName] = $detailService->getLineDetail($lineName, $date, $shift);
+            }
+
+            return $result;
+        });
 
         return response()->json(['detail' => $result]);
     }
@@ -628,7 +635,8 @@ class DashboardController extends Controller
         $date = request('date') ?? request('date_from') ?? $this->defaultDashboardDate();
         $shift = (int) request('shift', $this->defaultDashboardShift());
 
-        $statuses = LineStatusService::getStatuses($shift, $date);
+        $cacheKey = 'dash:status:'.md5($date.'|'.$shift);
+        $statuses = Cache::remember($cacheKey, 3, fn () => LineStatusService::getStatuses($shift, $date));
 
         return response()->json(['line_statuses' => $statuses]);
     }
@@ -637,7 +645,8 @@ class DashboardController extends Controller
     {
         $date = request('date') ?? $this->defaultDashboardDate();
         $shift = (int) request('shift', $this->defaultDashboardShift());
-        $statuses = LineStatusService::getStatuses($shift, $date);
+        $cacheKey = 'dash:status:'.md5($date.'|'.$shift);
+        $statuses = Cache::remember($cacheKey, 3, fn () => LineStatusService::getStatuses($shift, $date));
         $status = $statuses[$line] ?? null;
         if (! $status) {
             $normTarget = LineStatusService::normalizeLineKey($line);

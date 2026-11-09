@@ -292,8 +292,10 @@ class ProductionPlan extends Model
                     && (string) $item->press_name === (string) $root->press_name;
             });
         } else {
+            $rootDate = \Carbon\Carbon::parse($root->plan_date)->toDateString();
             $query = self::query()
-                ->whereDate('plan_date', $root->plan_date)
+                ->where('plan_date', '>=', $rootDate)
+                ->where('plan_date', '<', \Carbon\Carbon::parse($rootDate)->addDay()->toDateString())
                 ->where('shift_name', $root->shift_name)
                 ->where('press_name', $root->press_name)
                 ->where(function ($q) use ($root) {

@@ -250,8 +250,11 @@ class DashboardDetailService
         // ── MERGE BREAK SPLITS / CONSECUTIVE SAME JOB INTERVALS ──
         // Menggabungkan baris yang terpecah karena jeda istirahat menjadi 1 baris produksi
         $parentIds = $plans->pluck('id')->filter()->toArray();
+        $dayStart = Carbon::parse($date)->startOfDay()->toDateString();
+        $dayEnd = Carbon::parse($date)->startOfDay()->addDay()->toDateString();
         $childPlansMap = ProductionPlan::whereIn('parent_job_id', $parentIds)
-            ->whereDate('plan_date', $date)
+            ->where('plan_date', '>=', $dayStart)
+            ->where('plan_date', '<', $dayEnd)
             ->get()
             ->groupBy('parent_job_id');
 
@@ -516,7 +519,11 @@ class DashboardDetailService
             return self::$plansCache[$cacheKey];
         }
 
-        $plans = ProductionPlan::whereDate('plan_date', $date)
+        $dayStart = Carbon::parse($date)->startOfDay()->toDateString();
+        $dayEnd = Carbon::parse($date)->startOfDay()->addDay()->toDateString();
+
+        $plans = ProductionPlan::where('plan_date', '>=', $dayStart)
+            ->where('plan_date', '<', $dayEnd)
             ->activePpcRevision()
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
@@ -587,7 +594,11 @@ class DashboardDetailService
             return self::$resolvedDates[$date];
         }
 
-        $hasJobs = ProductionPlan::whereDate('plan_date', $date)
+        $dayStart = Carbon::parse($date)->startOfDay()->toDateString();
+        $dayEnd = Carbon::parse($date)->startOfDay()->addDay()->toDateString();
+
+        $hasJobs = ProductionPlan::where('plan_date', '>=', $dayStart)
+            ->where('plan_date', '<', $dayEnd)
             ->activePpcRevision()
             ->where('row_type', 'job')
             ->exists();
