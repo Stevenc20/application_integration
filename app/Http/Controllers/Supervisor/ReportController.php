@@ -134,10 +134,30 @@ class ReportController extends Controller
         $childPlans = \App\Models\ProductionPlan::whereIn('parent_job_id', $plans->pluck('id')->filter())
             ->whereDate('plan_date', $date)
             ->where('shift_name', $latestShiftName)
+            ->orderBy('row_no', 'asc')
+            ->orderBy('id', 'asc')
             ->get()
             ->groupBy('parent_job_id');
 
         $plans = $plans->filter(fn ($p) => ! $p->parent_job_id)->values();
+
+        // Restore root plan target & finish time when break-split children exist
+        foreach ($plans as $planRow) {
+            if (($planRow->row_type ?? 'job') === 'job') {
+                $planRow->plan = $planRow->effectiveTargetQty();
+                $planRow->finish_time = $planRow->effectiveFinishTime() ?: $planRow->finish_time;
+                // Also propagate earliest act_start and latest act_finish from children if parent lacks them
+                $childrenOfRow = $childPlans->get($planRow->id, collect());
+                foreach ($childrenOfRow as $cSlice) {
+                    if (! $planRow->act_start && $cSlice->act_start) {
+                        $planRow->act_start = $cSlice->act_start;
+                    }
+                    if ($cSlice->act_finish) {
+                        $planRow->act_finish = $cSlice->act_finish;
+                    }
+                }
+            }
+        }
 
         // 5. Map plan to JobMaster with DailyProduction and Downtimes
         $jobNumbers = $plans->map(function ($p) {
@@ -156,54 +176,134 @@ class ReportController extends Controller
             }
         }
 
+        $nextDayStr = \Carbon\Carbon::parse($date)->addDay()->toDateString();
+        $isShiftMalamContext = str_contains(strtolower($latestShiftName), 'malam') || str_contains(strtolower($latestShiftName), '2');
+
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
             ->with([
-                'dailyProduction' => function ($q) use ($date) {
-                    $q->where('work_date', $date);
+                'dailyProduction' => function ($q) use ($date, $nextDayStr, $isShiftMalamContext) {
+                    if ($isShiftMalamContext) {
+                        // On Shift Malam, if a job was started after midnight with calendar date D+1 by legacy callers,
+                        // still match its DailyProduction while preferring work_date = D.
+                        $q->whereIn('work_date', [$date, $nextDayStr])
+                            ->orderByRaw('CASE WHEN work_date = ? THEN 0 ELSE 1 END', [$date]);
+                    } else {
+                        $q->where('work_date', $date);
+                    }
                 },
                 'downtimes',
                 'qChecks',
+                'productionSessions',
             ])
             ->get()
             ->keyBy('job_number');
 
+        // Preload dandoris for this date (and D+1 post-midnight window for Shift Malam) grouped by job master id
+        $dandoriByJob = Dandori::whereIn('next_job_id', $jobMasters->pluck('id'))
+            ->where(function ($q) use ($date, $nextDayStr, $isShiftMalamContext) {
+                if ($isShiftMalamContext) {
+                    $q->whereDate('work_date', $date)->orWhereDate('work_date', $nextDayStr);
+                } else {
+                    $q->whereDate('work_date', $date);
+                }
+            })
+            ->get()
+            ->groupBy('next_job_id');
+
         // Merge children's production data into parent's JobMaster
         foreach ($childPlans as $parentId => $children) {
-            $parent = $plans->firstWhere('id', $parentId);
+            $parent = $plans->firstWhere('id', (int) $parentId);
             if (! $parent) {
                 continue;
             }
-            $parentJm = $jobMasters->get(trim($parent->job_no ?? '').'-'.$parent->id);
+            $pJn = trim($parent->job_no ?? '');
+            $pJm = trim($parent->job_master ?? '');
+            $parentKey = $pJn ? ($pJn.'-'.$parent->id) : ('AUTO-'.\Illuminate\Support\Str::slug($pJm).'-'.$parent->id);
+            $parentJm = $jobMasters->get($parentKey);
+
+            // Jika parent belum memiliki JobMaster tetapi child memiliki JobMaster dan actual produksi,
+            // promosikan klon child pertama ke key parent agar actual produksi, dandori, downtime, dan waktu start/finish tidak hilang di LKH.
+            if (! $parentJm) {
+                foreach ($children as $childCandidate) {
+                    $cJn = trim($childCandidate->job_no ?? '');
+                    $cJm = trim($childCandidate->job_master ?? '');
+                    $cKey = $cJn ? ($cJn.'-'.$childCandidate->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cJm).'-'.$childCandidate->id);
+                    $foundChildJm = $jobMasters->get($cKey);
+                    if ($foundChildJm) {
+                        $parentJm = clone $foundChildJm;
+                        $parentJm->target_qty = $parent->effectiveTargetQty();
+                        $parentJm->setRelation('downtimes', collect($foundChildJm->downtimes ? $foundChildJm->downtimes->all() : []));
+                        $parentJm->setRelation('qChecks', collect($foundChildJm->qChecks ? $foundChildJm->qChecks->all() : []));
+                        $parentJm->setRelation('productionSessions', collect($foundChildJm->productionSessions ? $foundChildJm->productionSessions->all() : []));
+                        if ($foundChildJm->dailyProduction) {
+                            $parentJm->setRelation('dailyProduction', clone $foundChildJm->dailyProduction);
+                        }
+                        $jobMasters->put($parentKey, $parentJm);
+                        break;
+                    }
+                }
+            }
+
             if (! $parentJm) {
                 continue;
             }
+
+            $parentJm->target_qty = $parent->effectiveTargetQty();
+            $seenChildJmIds = [$parentJm->id];
+
             foreach ($children as $child) {
-                $childKey = trim($child->job_no ?? '').'-'.$child->id;
+                $cJn = trim($child->job_no ?? '');
+                $cJm = trim($child->job_master ?? '');
+                $childKey = $cJn ? ($cJn.'-'.$child->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cJm).'-'.$child->id);
                 $childJm = $jobMasters->get($childKey);
-                if (! $childJm) {
+                if (! $childJm || in_array($childJm->id, $seenChildJmIds, true)) {
                     continue;
                 }
+                $seenChildJmIds[] = $childJm->id;
+
+                // Sync status & earliest started_at / latest finished_at from child
+                $cStatus = strtolower($childJm->status ?? '');
+                $pStatus = strtolower($parentJm->status ?? '');
+                if (in_array($cStatus, ['running', 'paused'], true) && ! in_array($pStatus, ['running', 'paused'], true)) {
+                    $parentJm->status = $childJm->status;
+                } elseif (in_array($cStatus, ['complete', 'completed', 'finished', 'closed', 'done'], true) && $pStatus === 'pending') {
+                    $parentJm->status = $childJm->status;
+                }
+
+                if ($childJm->started_at && (! $parentJm->started_at || \Carbon\Carbon::parse($childJm->started_at)->lt(\Carbon\Carbon::parse($parentJm->started_at)))) {
+                    $parentJm->started_at = $childJm->started_at;
+                }
+                if ($childJm->finished_at && (! $parentJm->finished_at || \Carbon\Carbon::parse($childJm->finished_at)->gt(\Carbon\Carbon::parse($parentJm->finished_at)))) {
+                    $parentJm->finished_at = $childJm->finished_at;
+                }
+
                 if ($childJm->dailyProduction) {
                     if (! $parentJm->dailyProduction) {
-                        $parentJm->dailyProduction = clone $childJm->dailyProduction;
+                        $parentJm->setRelation('dailyProduction', clone $childJm->dailyProduction);
                     } else {
                         $parentJm->dailyProduction->actual_ok = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
                         $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
                         $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
+                        $parentJm->dailyProduction->actual_qty = ($parentJm->dailyProduction->actual_qty ?? 0) + ($childJm->dailyProduction->actual_qty ?? 0);
+                        $parentJm->dailyProduction->runtime_seconds = ($parentJm->dailyProduction->runtime_seconds ?? 0) + ($childJm->dailyProduction->runtime_seconds ?? 0);
                     }
                 }
-                // Merge downtimes too
+                // Merge downtimes, qChecks, productionSessions, and dandoris too
                 foreach ($childJm->downtimes ?? [] as $dt) {
                     $parentJm->downtimes->push($dt);
                 }
+                foreach ($childJm->qChecks ?? [] as $qc) {
+                    $parentJm->qChecks->push($qc);
+                }
+                foreach ($childJm->productionSessions ?? [] as $ps) {
+                    $parentJm->productionSessions->push($ps);
+                }
+                if ($dandoriByJob->has($childJm->id)) {
+                    $mergedDandoris = $dandoriByJob->get($parentJm->id, collect())->concat($dandoriByJob->get($childJm->id));
+                    $dandoriByJob->put($parentJm->id, $mergedDandoris);
+                }
             }
         }
-
-        // Preload dandoris for this date grouped by job master id
-        $dandoriByJob = Dandori::whereIn('next_job_id', $jobMasters->pluck('id'))
-            ->whereDate('work_date', $date)
-            ->get()
-            ->groupBy('next_job_id');
 
         // Preload all breaks - Prioritize PPC planning break rows, fallback to BreakTime table
         $ppcBreaksQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
@@ -391,7 +491,10 @@ class ReportController extends Controller
             return $finishTime;
         };
 
-        // ── MERGE CONSECUTIVE SAME-JOB PLANS INTO ONE ──
+        // ── MERGE SPLIT-GROUP PLANS ONLY (DO NOT MERGE INDEPENDENT SCHEDULES WITH SAME JOB_NO) ──
+        // Prinsip ONE SCHEDULE = ONE JOB IDENTITY:
+        // Dua schedule independen yang memiliki job_no sama TIDAK BOLEH digabungkan menjadi 1 baris.
+        // Hanya gabungkan apabila memang memiliki split_group non-kosong yang identik.
         $mergedPlans = collect();
         $mergedPlanIdsMap = [];
         $buffer = null;
@@ -406,7 +509,15 @@ class ReportController extends Controller
                 continue;
             }
             $currentJobNo = trim($plan->job_no ?? '');
-            if ($buffer && $currentJobNo === trim($buffer->job_no ?? '')) {
+            $currentSplitGroup = trim((string) ($plan->split_group ?? ''));
+            $bufferSplitGroup = $buffer ? trim((string) ($buffer->split_group ?? '')) : '';
+            $isSameSplitSchedule = $buffer
+                && $currentJobNo !== ''
+                && $currentJobNo === trim($buffer->job_no ?? '')
+                && $currentSplitGroup !== ''
+                && $currentSplitGroup === $bufferSplitGroup;
+
+            if ($isSameSplitSchedule) {
                 $buffer->plan = ($buffer->plan ?? 0) + ($plan->plan ?? $plan->target_qty ?? 0);
                 $buffer->target_qty = ($buffer->target_qty ?? 0) + ($plan->target_qty ?? 0);
                 $mergedPlanIdsMap[$buffer->id][] = $plan->id;
@@ -489,6 +600,17 @@ class ReportController extends Controller
                         $actualRepairSafe += (int) ($mJm->dailyProduction->actual_repair ?? 0);
                         $actualRejectSafe += (int) ($mJm->dailyProduction->actual_reject ?? 0);
                     }
+                }
+            }
+            if ($actualQtySafe === 0 && $actualRepairSafe === 0 && $actualRejectSafe === 0) {
+                // Fallback ke kolom ok/repair/reject pada ProductionPlan jika DailyProduction belum terbentuk
+                $actualQtySafe = (int) ($plan->ok ?? 0);
+                $actualRepairSafe = (int) ($plan->repair ?? 0);
+                $actualRejectSafe = (int) ($plan->reject ?? 0);
+                foreach ($childPlans->get($plan->id, collect()) as $cFallback) {
+                    $actualQtySafe += (int) ($cFallback->ok ?? 0);
+                    $actualRepairSafe += (int) ($cFallback->repair ?? 0);
+                    $actualRejectSafe += (int) ($cFallback->reject ?? 0);
                 }
             }
             $cycleTimeSafe = floatval($plan->ct_detik ?? 0.0);

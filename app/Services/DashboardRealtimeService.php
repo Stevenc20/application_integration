@@ -78,11 +78,16 @@ class DashboardRealtimeService
             ->get()
             ->keyBy('job_number');
 
+        // ONE SCHEDULE = ONE JOB IDENTITY:
+        // Only auto-create JobMasters for ROOT schedules (!isChildSlice()).
+        // Child slices must NEVER spawn separate JobMaster records when Dashboard/TV opens before Input Harian.
         $insertJobs = [];
         foreach ($plans as $p) {
-            $jn = trim($p->job_no ?? '');
-            $jm = trim($p->job_master ?? '');
-            $identifier = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
+            if ($p->isChildSlice()) {
+                continue;
+            }
+            $identifier = $p->canonicalJobNumber();
+            $effectiveFinish = $p->effectiveFinishTime() ?: $p->finish_time;
 
             if (! $jobMasters->has($identifier)) {
                 $jobName = $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB');
@@ -90,11 +95,11 @@ class DashboardRealtimeService
                     'job_number' => $identifier,
                     'job_name' => $jobName,
                     'line' => $p->press_name ?? $lineName,
-                    'target_qty' => (int) ($p->plan ?? 0),
+                    'target_qty' => $p->effectiveTargetQty(),
                     'sequence_no' => $p->row_no ?? 1,
                     'status' => 'pending',
                     'plan_start' => $p->start_time ? Carbon::parse($date.' '.$p->start_time)->startOfMinute() : null,
-                    'plan_end' => $p->finish_time ? Carbon::parse($date.' '.$p->finish_time)->startOfMinute() : null,
+                    'plan_end' => $effectiveFinish ? Carbon::parse($date.' '.$effectiveFinish)->startOfMinute() : null,
                     'capacity' => (int) ($p->qty_plt ?? 0),
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -110,86 +115,232 @@ class DashboardRealtimeService
         }
 
         $jobIds = $jobMasters->pluck('id');
+        $nextDayStr = Carbon::parse($workDate)->addDay()->toDateString();
 
-        $dailyRecords = DailyProduction::with('jobMaster')
-            ->where('work_date', $workDate)
+        // Load actual DailyProduction records (for Shift Malam, also include D+1 if a post-midnight session created it)
+        $rawDailies = DailyProduction::with('jobMaster')
             ->whereIn('job_master_id', $jobIds)
+            ->where(function ($q) use ($workDate, $nextDayStr, $shift) {
+                if ($shift === 2) {
+                    $q->whereIn('work_date', [$workDate, $nextDayStr]);
+                } else {
+                    $q->where('work_date', $workDate);
+                }
+            })
             ->get();
 
-        $activeJobIds = $dailyRecords->pluck('job_master_id')->toArray();
-        $missingJobs = $jobMasters->whereNotIn('id', $activeJobIds);
+        $dailiesByJobId = $rawDailies->groupBy('job_master_id');
 
-        if ($missingJobs->isNotEmpty()) {
-            $missingJobIds = $missingJobs->pluck('id')->toArray();
-
-            // 1 query to get existing dailies strictly for this work_date
-            $existingDailiesMap = DailyProduction::where('work_date', $workDate)
-                ->whereIn('job_master_id', $missingJobIds)
+        $logsByJobId = collect();
+        $dtSecsByJobId = collect();
+        if ($jobIds->isNotEmpty()) {
+            $logsByJobId = \App\Models\ProductionLog::whereIn('job_master_id', $jobIds)
+                ->where('created_at', '>=', $shiftStartDt)
+                ->where('created_at', '<', $shiftEndDt)
+                ->groupBy('job_master_id')
+                ->selectRaw('job_master_id, COALESCE(SUM(ok_qty),0) as total_ok, COALESCE(SUM(repair_qty),0) as total_repair, COALESCE(SUM(reject_qty),0) as total_reject')
                 ->get()
                 ->keyBy('job_master_id');
 
-            // Find which jobs actually have no daily for this work_date
-            $stillMissingIds = array_diff($missingJobIds, $existingDailiesMap->keys()->toArray());
+            $dtSecsByJobId = Downtime::whereIn('job_master_id', $jobIds)
+                ->where('start_time', '>=', $shiftStartDt)
+                ->where('start_time', '<', $shiftEndDt)
+                ->where('jenis_downtime', '!=', 'dandori')
+                ->groupBy('job_master_id')
+                ->selectRaw('job_master_id, COALESCE(SUM(duration_seconds),0) as total_dt')
+                ->pluck('total_dt', 'job_master_id');
+        }
 
-            $logAggMap = collect();
-            $downtimeSecsMap = collect();
+        $sessionsMap = \App\Models\ProductionSession::whereIn('job_master_id', $jobIds)
+            ->where(function ($q) use ($workDate, $nextDayStr, $shift) {
+                if ($shift === 2) {
+                    $q->whereIn('work_date', [$workDate, $nextDayStr]);
+                } else {
+                    $q->where('work_date', $workDate);
+                }
+            })
+            ->get()
+            ->keyBy('job_master_id');
 
-            if (! empty($stillMissingIds)) {
-                // 1 query to aggregate production logs for all missing jobs on this work_date
-                $logAggMap = \App\Models\ProductionLog::whereIn('job_master_id', $stillMissingIds)
-                    ->where('created_at', '>=', $shiftStartDt)
-                    ->where('created_at', '<', $shiftEndDt)
-                    ->groupBy('job_master_id')
-                    ->selectRaw('job_master_id, COALESCE(SUM(ok_qty),0) as total_ok, COALESCE(SUM(repair_qty),0) as total_repair, COALESCE(SUM(reject_qty),0) as total_reject')
-                    ->get()
-                    ->keyBy('job_master_id');
-
-                // 1 query to aggregate downtimes for all missing jobs
-                $downtimeSecsMap = Downtime::whereIn('job_master_id', $stillMissingIds)
-                    ->where('start_time', '>=', $shiftStartDt)
-                    ->where('start_time', '<', $shiftEndDt)
-                    ->where('jenis_downtime', '!=', 'dandori')
-                    ->groupBy('job_master_id')
-                    ->selectRaw('job_master_id, COALESCE(SUM(duration_seconds),0) as total_dt')
-                    ->pluck('total_dt', 'job_master_id');
+        // Helper to resolve runtime for a single JobMaster & its DailyProduction
+        $resolveSingleRuntime = function (?JobMaster $jm, ?DailyProduction $dp) use ($sessionsMap): float {
+            $sec = $dp ? (float) ($dp->runtime_seconds ?? 0) : 0.0;
+            if ($sec > 0 || ! $jm) {
+                return max(0.0, $sec);
+            }
+            $st = strtolower((string) $jm->status);
+            $sess = $sessionsMap->get($jm->id);
+            if ($st === 'running') {
+                if ($sess && $sess->start_time) {
+                    $sec = (float) ($sess->total_seconds ?? 0);
+                    if ($sess->status === 'running') {
+                        $sec += abs(Carbon::now()->diffInSeconds(Carbon::parse($sess->start_time)));
+                    }
+                } elseif ($jm->started_at) {
+                    $sec = abs(Carbon::now()->diffInSeconds(Carbon::parse($jm->started_at)));
+                }
+            } elseif ($st === 'paused') {
+                $sec = (float) ($sess->total_seconds ?? 0);
+            } elseif ($jm->started_at) {
+                $endAt = $jm->finished_at ?: Carbon::now();
+                $sec = abs(Carbon::parse($endAt)->diffInSeconds(Carbon::parse($jm->started_at)));
             }
 
-            foreach ($missingJobs as $mj) {
-                $existingDaily = $existingDailiesMap->get($mj->id);
+            return max(0.0, $sec);
+        };
 
-                if ($existingDaily) {
-                    $existingDaily->work_date = $workDate;
-                    $existingDaily->setRelation('jobMaster', $mj);
-                    $dailyRecords->push($existingDaily);
-                } else {
-                    $logAgg = $logAggMap->get($mj->id);
-                    $dtSecs = (int) ($downtimeSecsMap->get($mj->id) ?? 0);
-                    $matchedPlan = $plansByIdentifier[$mj->job_number ?? ''] ?? null;
+        // Group plans by root schedule identity so each root schedule produces AT MOST ONE consolidated DailyProduction entry
+        $rootPlans = $plans->filter(fn ($p) => ! $p->isChildSlice())->values();
+        $dailyRecords = collect();
+        $rootToGroupJobIds = [];
 
-                    $virtualOk = (int) ($logAgg?->total_ok ?? ($matchedPlan?->ok ?? 0));
-                    $virtualRepair = (int) ($logAgg?->total_repair ?? ($matchedPlan?->repair ?? 0));
-                    $virtualReject = (int) ($logAgg?->total_reject ?? ($matchedPlan?->reject ?? 0));
+        foreach ($rootPlans as $rootPlan) {
+            $groupSlices = $plans->filter(function ($p) use ($rootPlan) {
+                if ((int) $p->id === (int) $rootPlan->id) {
+                    return true;
+                }
+                if (! empty($p->parent_job_id) && (int) $p->parent_job_id === (int) $rootPlan->id) {
+                    return true;
+                }
+                if (! empty($rootPlan->split_group) && $p->split_group === $rootPlan->split_group) {
+                    return true;
+                }
 
-                    $virtual = new DailyProduction([
-                        'job_master_id' => $mj->id,
-                        'work_date' => $workDate,
-                        'actual_ok' => $virtualOk,
-                        'actual_qty' => $virtualOk,
-                        'actual_repair' => $virtualRepair,
-                        'actual_reject' => $virtualReject,
-                        'runtime_seconds' => 0,
-                        'downtime_seconds' => $dtSecs,
-                        'line' => $lineName,
-                        'shift' => self::SHIFT_MAP[$shift] ?? 'Shift Pagi',
-                    ]);
-                    $virtual->setRelation('jobMaster', $mj);
-                    $dailyRecords->push($virtual);
+                return false;
+            })->values();
+
+            $rootIdent = $rootPlan->canonicalJobNumber();
+            $rootJm = $jobMasters->get($rootIdent);
+
+            $groupJms = collect();
+            foreach ($groupSlices as $slice) {
+                $sjn = trim($slice->job_no ?? '');
+                $sjm = trim($slice->job_master ?? '');
+                $sIdent = $sjn ? ($sjn.'-'.$slice->id) : ('AUTO-'.\Illuminate\Support\Str::slug($sjm).'-'.$slice->id);
+                $foundJm = $jobMasters->get($sIdent);
+                if ($foundJm && ! $groupJms->contains('id', $foundJm->id)) {
+                    $groupJms->push($foundJm);
                 }
             }
+
+            if (! $rootJm && $groupJms->isNotEmpty()) {
+                $rootJm = clone $groupJms->first();
+            }
+            if (! $rootJm) {
+                continue;
+            }
+
+            $rootJm->target_qty = $rootPlan->effectiveTargetQty();
+
+            $groupOk = 0;
+            $groupRepair = 0;
+            $groupReject = 0;
+            $groupRuntime = 0.0;
+            $groupDtSecs = 0;
+            $hasAnyDailyOrLog = false;
+            $groupStatus = strtolower((string) $rootJm->status);
+            $earliestStart = $rootJm->started_at ? Carbon::parse($rootJm->started_at) : null;
+            $latestFinish = $rootJm->finished_at ? Carbon::parse($rootJm->finished_at) : null;
+
+            foreach ($groupJms as $gJm) {
+                $jmDailies = $dailiesByJobId->get($gJm->id, collect());
+                $logAgg = $logsByJobId->get($gJm->id);
+                $dtSecs = (int) ($dtSecsByJobId->get($gJm->id) ?? 0);
+
+                if ($jmDailies->isNotEmpty()) {
+                    $hasAnyDailyOrLog = true;
+                    $dOk = (int) $jmDailies->sum('actual_ok');
+                    $dRep = (int) $jmDailies->sum('actual_repair');
+                    $dRej = (int) $jmDailies->sum('actual_reject');
+                    $dDt = (int) $jmDailies->sum('downtime_seconds');
+                    $groupOk += $dOk;
+                    $groupRepair += $dRep;
+                    $groupReject += $dRej;
+                    $groupDtSecs += max($dDt, $dtSecs);
+                    $groupRuntime += $resolveSingleRuntime($gJm, $jmDailies->first());
+                } elseif ($logAgg) {
+                    $hasAnyDailyOrLog = true;
+                    $groupOk += (int) $logAgg->total_ok;
+                    $groupRepair += (int) $logAgg->total_repair;
+                    $groupReject += (int) $logAgg->total_reject;
+                    $groupDtSecs += $dtSecs;
+                    $groupRuntime += $resolveSingleRuntime($gJm, null);
+                } else {
+                    $groupDtSecs += $dtSecs;
+                    $groupRuntime += $resolveSingleRuntime($gJm, null);
+                }
+
+                $gSt = strtolower((string) $gJm->status);
+                if (in_array($gSt, ['running', 'paused'], true) && ! in_array($groupStatus, ['running', 'paused'], true)) {
+                    $groupStatus = $gJm->status;
+                } elseif (in_array($gSt, ['complete', 'completed', 'finished', 'closed', 'done'], true) && $groupStatus === 'pending') {
+                    $groupStatus = $gJm->status;
+                }
+
+                if ($gJm->started_at) {
+                    $sAt = Carbon::parse($gJm->started_at);
+                    if (! $earliestStart || $sAt->lt($earliestStart)) {
+                        $earliestStart = $sAt;
+                    }
+                }
+                if ($gJm->finished_at) {
+                    $fAt = Carbon::parse($gJm->finished_at);
+                    if (! $latestFinish || $fAt->gt($latestFinish)) {
+                        $latestFinish = $fAt;
+                    }
+                }
+            }
+
+            if (! $hasAnyDailyOrLog) {
+                // Fallback to plan ok/repair/reject only if no DailyProduction or ProductionLog exists for the group
+                foreach ($groupSlices as $slice) {
+                    $groupOk += (int) ($slice->ok ?? 0);
+                    $groupRepair += (int) ($slice->repair ?? 0);
+                    $groupReject += (int) ($slice->reject ?? 0);
+                }
+            }
+
+            $consolidatedJm = clone $rootJm;
+            $consolidatedJm->status = $groupStatus;
+            $consolidatedJm->started_at = $earliestStart;
+            $consolidatedJm->finished_at = $latestFinish;
+            $consolidatedJm->target_qty = $rootPlan->effectiveTargetQty();
+
+            $consolidatedDp = new DailyProduction([
+                'job_master_id' => $consolidatedJm->id,
+                'work_date' => $workDate,
+                'actual_ok' => $groupOk,
+                'actual_qty' => $groupOk,
+                'actual_repair' => $groupRepair,
+                'actual_reject' => $groupReject,
+                'runtime_seconds' => (int) round($groupRuntime),
+                'downtime_seconds' => $groupDtSecs,
+                'line' => $lineName,
+                'shift' => self::SHIFT_MAP[$shift] ?? 'Shift Pagi',
+            ]);
+            $consolidatedDp->setRelation('jobMaster', $consolidatedJm);
+            $dailyRecords->push($consolidatedDp);
+
+            $rootToGroupJobIds[$consolidatedJm->id] = $groupJms->pluck('id')->all();
         }
 
         if ($dailyRecords->isEmpty()) {
             return $this->emptyMetrics($lineName);
+        }
+
+        $groupToRootJobId = [];
+        $jobKeyToRootJobKey = [];
+        foreach ($dailyRecords as $dp) {
+            $rootJobId = (int) $dp->job_master_id;
+            $rootJobKey = $dp->jobMaster?->job_number ?? '-';
+            foreach ($rootToGroupJobIds[$rootJobId] ?? [$rootJobId] as $gId) {
+                $groupToRootJobId[(int) $gId] = $rootJobId;
+            }
+            foreach ($jobMasters as $jmItem) {
+                if (in_array((int) $jmItem->id, $rootToGroupJobIds[$rootJobId] ?? [$rootJobId], true)) {
+                    $jobKeyToRootJobKey[$jmItem->job_number ?? '-'] = $rootJobKey;
+                }
+            }
         }
 
         $ok = (int) $dailyRecords->sum('actual_ok');
@@ -220,11 +371,6 @@ class DashboardRealtimeService
         $currOk = $hasRunning ? (int) $runningRecord->actual_ok : 0;
         $currRepair = $hasRunning ? (int) $runningRecord->actual_repair : 0;
         $currReject = $hasRunning ? (int) $runningRecord->actual_reject : 0;
-
-        $sessionsMap = \App\Models\ProductionSession::whereIn('job_master_id', $jobIds)
-            ->where('work_date', $workDate)
-            ->get()
-            ->keyBy('job_master_id');
 
         $runtime = 0;
         $currRuntime = 0;
@@ -257,14 +403,10 @@ class DashboardRealtimeService
         }
         $dtSecs = (int) $dailyRecords->sum('downtime_seconds');
 
-        $planQty = (int) $plans->sum('plan');
+        $planQty = (int) $rootPlans->sum(fn ($p) => $p->effectiveTargetQty());
 
         if ($planQty <= 0) {
-            $planQty = (int) JobMaster::whereIn('id', $jobIds)
-                ->whereHas('dailyProduction', function ($q) use ($workDate) {
-                    $q->where('work_date', $workDate);
-                })
-                ->sum('target_qty');
+            $planQty = (int) $dailyRecords->sum(fn ($dp) => (int) ($dp->jobMaster?->target_qty ?? 0));
         }
 
         $allDowntimes = Downtime::with(['jobMaster', 'hambatanJalur'])->whereIn('job_master_id', $jobIds)
@@ -310,7 +452,8 @@ class DashboardRealtimeService
         $currDtProd = 0;
         if ($runningRecord) {
             $runningJobId = $runningRecord->job_master_id;
-            $runningDt = $allDowntimes->where('job_master_id', $runningJobId);
+            $runningGroupJobIds = $rootToGroupJobIds[$runningJobId] ?? [$runningJobId];
+            $runningDt = $allDowntimes->whereIn('job_master_id', $runningGroupJobIds);
             foreach ($runningDt as $dt) {
                 $type = strtoupper(trim($dt->jenis_downtime ?? ''));
                 if (ProductionMetricsService::isExcludedDowntimeType($type)) {
@@ -423,11 +566,13 @@ class DashboardRealtimeService
             }
             $timeFormatted = $rr->created_at ? \Carbon\Carbon::parse($rr->created_at)->format('H:i') : '-';
             $job = $rr->jobMaster;
+            $rawJobKey = $job?->job_number ?? '-';
+            $canonicalJobKey = $jobKeyToRootJobKey[$rawJobKey] ?? $rawJobKey;
             $itemData = [
                 'no' => 0,
                 'type' => strtoupper($logType),
                 'item' => $shortJob($job?->job_name),
-                'job' => $job?->job_number ?? '-',
+                'job' => $canonicalJobKey,
                 'defect_name' => $rr->defect_name ?: '-',
                 'problem' => $rr->defect_name ?: '-',
                 'qty' => (int) ($rr->qty_a ?: 1),
@@ -566,6 +711,10 @@ class DashboardRealtimeService
             }
         }
 
+        $runningGroupJobIds = ($runningRecord && $runningRecord->job_master_id)
+            ? ($rootToGroupJobIds[$runningRecord->job_master_id] ?? [$runningRecord->job_master_id])
+            : [];
+
         $dandoriTotalMinutes = 0.0;
         $currDandoriMinutes = 0.0;
         foreach ($dandoriModels as $d) {
@@ -575,13 +724,13 @@ class DashboardRealtimeService
                 $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
             }
             $dandoriTotalMinutes += $dur;
-            if ($runningRecord && $d->next_job_id === $runningRecord->job_master_id) {
+            if ($runningRecord && in_array((int) $d->next_job_id, $runningGroupJobIds, true)) {
                 $currDandoriMinutes += $dur;
             }
         }
         foreach ($qcheckByJob as $qcJobId => $qcDur) {
             $dandoriTotalMinutes += $qcDur;
-            if ($runningRecord && (int) $qcJobId === (int) $runningRecord->job_master_id) {
+            if ($runningRecord && in_array((int) $qcJobId, $runningGroupJobIds, true)) {
                 $currDandoriMinutes += $qcDur;
             }
         }
@@ -638,6 +787,14 @@ class DashboardRealtimeService
             }
         }
 
+        $expandedIncludedJobIds = [];
+        foreach ($includedJobIds as $incId) {
+            foreach ($rootToGroupJobIds[$incId] ?? [$incId] as $gId) {
+                $expandedIncludedJobIds[] = (int) $gId;
+            }
+        }
+        $expandedIncludedJobIds = array_values(array_unique($expandedIncludedJobIds));
+
         // Sum qty for included jobs (use actual_ok as output qty)
         $okCum = 0;
         foreach ($dailyRecords as $dp) {
@@ -686,7 +843,7 @@ class DashboardRealtimeService
         // Dandori + 1st check for included jobs
         $dandoriCumMinutes = 0.0;
         foreach ($dandoriModels as $d) {
-            if ($d->next_job_id && in_array($d->next_job_id, $includedJobIds)) {
+            if ($d->next_job_id && in_array((int) $d->next_job_id, $expandedIncludedJobIds, true)) {
                 $dur = (float) ($d->duration_minutes ?? 0);
                 if ($dur <= 0 && $d->start_time) {
                     $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
@@ -698,7 +855,7 @@ class DashboardRealtimeService
             }
         }
         foreach ($qcheckByJob as $qcJobId => $qcDur) {
-            if (in_array($qcJobId, $includedJobIds) && $qcDur > 0) {
+            if (in_array((int) $qcJobId, $expandedIncludedJobIds, true) && $qcDur > 0) {
                 $dandoriCumMinutes += $qcDur;
             }
         }
@@ -707,7 +864,7 @@ class DashboardRealtimeService
         // Downtime for included jobs
         $dtCumMinutes = 0.0;
         foreach ($allDowntimes as $dt) {
-            if ($dt->job_master_id && in_array($dt->job_master_id, $includedJobIds)) {
+            if ($dt->job_master_id && in_array((int) $dt->job_master_id, $expandedIncludedJobIds, true)) {
                 $type = strtoupper(trim($dt->jenis_downtime ?? ''));
                 if (ProductionMetricsService::isExcludedDowntimeType($type)) {
                     continue;
@@ -862,7 +1019,7 @@ class DashboardRealtimeService
         $planStrokeTotal = 0;
         foreach ($uniqueBasePlans as $bp) {
             $mCount = $resolveMachineCount($bp);
-            $planStrokeTotal += ((int) ($bp->plan ?? 0)) * $mCount;
+            $planStrokeTotal += $bp->effectiveTargetQty() * $mCount;
         }
 
         // Actual Stroke = Total Qty (ok + repair + reject) * jumlah mesin yang dipakai

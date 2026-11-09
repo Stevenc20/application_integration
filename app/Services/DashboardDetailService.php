@@ -57,22 +57,27 @@ class DashboardDetailService
             ->get()
             ->keyBy('job_number');
 
+        // ONE SCHEDULE = ONE JOB IDENTITY:
+        // Only auto-create JobMasters for ROOT schedules (!isChildSlice()).
+        // Child slices must NEVER spawn separate JobMaster records when Monitoring TV / Dashboard Rincian QTY opens before Input Harian.
         $insertJobs = [];
         foreach ($plans as $p) {
-            $jn = trim($p->job_no ?? '');
-            $jm = trim($p->job_master ?? '');
-            $identifier = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
+            if ($p->isChildSlice()) {
+                continue;
+            }
+            $identifier = $p->canonicalJobNumber();
+            $effectiveFinish = $p->effectiveFinishTime() ?: $p->finish_time;
 
             if (! $jobMasters->has($identifier)) {
                 $insertJobs[] = [
                     'job_number' => $identifier,
                     'job_name' => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
                     'line' => $p->press_name ?? $lineName,
-                    'target_qty' => (int) ($p->plan ?? 0),
+                    'target_qty' => $p->effectiveTargetQty(),
                     'sequence_no' => $p->row_no ?? 1,
                     'status' => 'pending',
                     'plan_start' => $p->start_time ? Carbon::parse($date.' '.$p->start_time)->startOfMinute() : null,
-                    'plan_end' => $p->finish_time ? Carbon::parse($date.' '.$p->finish_time)->startOfMinute() : null,
+                    'plan_end' => $effectiveFinish ? Carbon::parse($date.' '.$effectiveFinish)->startOfMinute() : null,
                     'capacity' => (int) ($p->qty_plt ?? 0),
                     'created_at' => now(),
                     'updated_at' => now(),
@@ -88,14 +93,27 @@ class DashboardDetailService
         }
 
         $jobIds = $jobMasters->pluck('id');
+        $nextDayStr = Carbon::parse($workDate)->addDay()->toDateString();
 
-        $dailyRecords = DailyProduction::where('work_date', $workDate)
-            ->whereIn('job_master_id', $jobIds)
+        $dailyRecordsByJobId = DailyProduction::whereIn('job_master_id', $jobIds)
+            ->where(function ($q) use ($workDate, $nextDayStr, $shift) {
+                if ($shift === 2) {
+                    $q->whereIn('work_date', [$workDate, $nextDayStr]);
+                } else {
+                    $q->where('work_date', $workDate);
+                }
+            })
             ->get()
-            ->keyBy('job_master_id');
+            ->groupBy('job_master_id');
 
         $sessionsMap = \App\Models\ProductionSession::whereIn('job_master_id', $jobIds)
-            ->where('work_date', $workDate)
+            ->where(function ($q) use ($workDate, $nextDayStr, $shift) {
+                if ($shift === 2) {
+                    $q->whereIn('work_date', [$workDate, $nextDayStr]);
+                } else {
+                    $q->where('work_date', $workDate);
+                }
+            })
             ->get()
             ->keyBy('job_master_id');
 
@@ -241,93 +259,111 @@ class DashboardDetailService
             ->groupBy('parent_job_id');
 
         // Filter out child plans agar hanya parent (atau non-child) yang menjadi baris utama
-        $displayPlans = $plans->filter(fn ($p) => empty($p->parent_job_id))->values();
+        $displayPlans = $plans->filter(fn ($p) => ! $p->isChildSlice())->values();
 
         $rows = [];
         $no = 0;
 
         foreach ($displayPlans as $plan) {
             $no++;
-            $jn = trim($plan->job_no ?? '');
-            $jm = trim($plan->job_master ?? '');
-            $identifier = $jn ? ($jn.'-'.$plan->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$plan->id);
-
+            $identifier = $plan->canonicalJobNumber();
             $job = $jobMasters->get($identifier);
-            $daily = $job ? ($dailyRecords->get($job->id) ?? null) : null;
 
-            // Kumpulkan anak-anak dari parent_job_id
+            // Kumpulkan anak-anak dari parent_job_id dan split_group
             $children = collect();
             if ($childPlansMap->has($plan->id)) {
                 $children = $children->merge($childPlansMap->get($plan->id));
             }
-
-            // Juga deteksi jika ada split item yang memiliki split_group sama
             if (! empty($plan->split_group)) {
                 $siblingSplits = $plans->filter(fn ($p) => $p->id !== $plan->id && $p->split_group === $plan->split_group);
                 $children = $children->merge($siblingSplits);
             }
+            $sameJobs = $plans->filter(fn ($p) => $p->id !== $plan->id && ! empty($p->parent_job_id) && (int) $p->parent_job_id === (int) $plan->id);
+            $children = $children->merge($sameJobs)->unique('id')->values();
 
-            // Atau jika ada baris berurutan dengan JOB NO & JOB MASTER yang sama persis di line & shift ini
-            $sameJobs = $plans->filter(fn ($p) => $p->id !== $plan->id && ! empty($p->parent_job_id) && $p->parent_job_id === $plan->id);
-            $children = $children->merge($sameJobs)->unique('id');
-
-            // Akumulasi Plan Qty
-            $planQty = (int) ($plan->plan ?? 0);
-            foreach ($children as $c) {
-                $planQty += (int) ($c->plan ?? 0);
+            // Kumpulkan seluruh JobMaster unik dalam satu schedule group (induk + potongan child historis)
+            $groupJobs = collect();
+            if ($job) {
+                $groupJobs->push($job);
             }
-            if ($plan->original_plan && $plan->original_plan > $planQty) {
-                $planQty = (int) $plan->original_plan;
-            }
-
-            // Akumulasi Actual Qty dari parent & children (fallback ke plan actual jika DailyProduction belum ada)
-            $actualQty = $daily ? (int) $daily->actual_qty : (int) ($plan->ok ?? 0);
-            $actualOk = $daily ? (int) $daily->actual_ok : (int) ($plan->ok ?? 0);
-            $actualRepair = $daily ? (int) ($daily->actual_repair ?? 0) : (int) ($plan->repair ?? 0);
-            $actualReject = $daily ? (int) ($daily->actual_reject ?? 0) : (int) ($plan->reject ?? 0);
-            $runtimeSeconds = $this->resolveRuntimeSeconds($job, $daily, $sessionsMap);
-            $jobId = $job?->id;
-            $dandori = $jobId ? round($dandoriMinutes[$jobId] ?? 0, 1) : 0;
-            $iqCheck = $jobId ? round($firstCheckMinutes[$jobId] ?? 0, 1) : 0;
-            $downtime = $jobId ? round($downtimeMinutes[$jobId] ?? 0, 1) : 0;
-
-            $isRunning = $job && in_array(strtolower((string) $job->status), ['running', 'paused'], true);
-            $latestFinishedAt = $job?->finished_at ? Carbon::parse($job->finished_at) : null;
-
             foreach ($children as $c) {
                 $cjn = trim($c->job_no ?? '');
                 $cjm = trim($c->job_master ?? '');
                 $cIdent = $cjn ? ($cjn.'-'.$c->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$c->id);
                 $cJob = $jobMasters->get($cIdent);
-                if ($cJob) {
-                    $cDaily = $dailyRecords->get($cJob->id);
-                    if ($cDaily) {
-                        $actualQty += (int) $cDaily->actual_qty;
-                        $actualOk += (int) $cDaily->actual_ok;
-                        $actualRepair += (int) ($cDaily->actual_repair ?? 0);
-                        $actualReject += (int) ($cDaily->actual_reject ?? 0);
-                    } else {
-                        $actualQty += (int) ($c->ok ?? 0);
-                        $actualOk += (int) ($c->ok ?? 0);
-                        $actualRepair += (int) ($c->repair ?? 0);
-                        $actualReject += (int) ($c->reject ?? 0);
-                    }
-                    $cJobId = $cJob->id;
-                    $runtimeSeconds += $this->resolveRuntimeSeconds($cJob, $cDaily, $sessionsMap);
-                    $dandori += round($dandoriMinutes[$cJobId] ?? 0, 1);
-                    $iqCheck += round($firstCheckMinutes[$cJobId] ?? 0, 1);
-                    $downtime += round($downtimeMinutes[$cJobId] ?? 0, 1);
+                if ($cJob && ! $groupJobs->contains('id', $cJob->id)) {
+                    $groupJobs->push($cJob);
+                }
+            }
 
-                    if (in_array(strtolower((string) $cJob->status), ['running', 'paused'], true)) {
-                        $isRunning = true;
-                    }
-                    if ($cJob->finished_at) {
-                        $cFin = Carbon::parse($cJob->finished_at);
-                        if (! $latestFinishedAt || $cFin->gt($latestFinishedAt)) {
-                            $latestFinishedAt = $cFin;
-                        }
+            if (! $job && $groupJobs->isNotEmpty()) {
+                $job = $groupJobs->first();
+            }
+            $jobId = $job?->id;
+
+            // Target Plan Qty berdasarkan effectiveTargetQty() pada root schedule
+            $planQty = $plan->effectiveTargetQty();
+
+            // Akumulasi Actual Qty dari seluruh JobMaster unik dalam group tepat 1 kali
+            $actualQty = 0;
+            $actualOk = 0;
+            $actualRepair = 0;
+            $actualReject = 0;
+            $runtimeSeconds = 0.0;
+            $dandori = 0.0;
+            $iqCheck = 0.0;
+            $downtime = 0.0;
+            $isRunning = false;
+            $latestFinishedAt = null;
+            $hasAnyDailyInGroup = false;
+
+            $allDtList = [];
+            $allRepairList = [];
+            $allRejectList = [];
+
+            foreach ($groupJobs as $gJob) {
+                $gJobId = $gJob->id;
+                $gDailies = $dailyRecordsByJobId->get($gJobId, collect());
+                if ($gDailies->isNotEmpty()) {
+                    $hasAnyDailyInGroup = true;
+                    $actualQty += (int) $gDailies->sum('actual_qty');
+                    $actualOk += (int) $gDailies->sum('actual_ok');
+                    $actualRepair += (int) $gDailies->sum('actual_repair');
+                    $actualReject += (int) $gDailies->sum('actual_reject');
+                }
+
+                $runtimeSeconds += $this->resolveRuntimeSeconds($gJob, $gDailies->first(), $sessionsMap);
+                $dandori += round($dandoriMinutes[$gJobId] ?? 0, 1);
+                $iqCheck += round($firstCheckMinutes[$gJobId] ?? 0, 1);
+                $downtime += round($downtimeMinutes[$gJobId] ?? 0, 1);
+
+                if (in_array(strtolower((string) $gJob->status), ['running', 'paused'], true)) {
+                    $isRunning = true;
+                }
+                if ($gJob->finished_at) {
+                    $gFin = Carbon::parse($gJob->finished_at);
+                    if (! $latestFinishedAt || $gFin->gt($latestFinishedAt)) {
+                        $latestFinishedAt = $gFin;
                     }
                 }
+
+                if (isset($downtimeItems[$gJobId])) {
+                    $allDtList = array_merge($allDtList, $downtimeItems[$gJobId]);
+                }
+                if (isset($repairItems[$gJobId])) {
+                    $allRepairList = array_merge($allRepairList, $repairItems[$gJobId]);
+                }
+                if (isset($rejectItems[$gJobId])) {
+                    $allRejectList = array_merge($allRejectList, $rejectItems[$gJobId]);
+                }
+            }
+
+            if (! $hasAnyDailyInGroup) {
+                // Fallback ke kolom ok/repair/reject pada ProductionPlan hanya jika belum ada DailyProduction sama sekali di group ini
+                $actualQty = (int) ($plan->ok ?? 0) + (int) $children->sum('ok');
+                $actualOk = (int) ($plan->ok ?? 0) + (int) $children->sum('ok');
+                $actualRepair = (int) ($plan->repair ?? 0) + (int) $children->sum('repair');
+                $actualReject = (int) ($plan->reject ?? 0) + (int) $children->sum('reject');
             }
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
@@ -343,50 +379,10 @@ class DashboardDetailService
             // GSPH Actual: Total QTY Good / TPT * 60
             $gsphActual = $tpt > 0 ? (int) round(($actualOk / $tpt) * 60) : 0;
 
-            // Plan Finish: Ambil jam selesai terakhir dari interval (termasuk interval setelah istirahat)
-            $planFinish = $plan->finish_time;
-            if ($children->isNotEmpty()) {
-                $lastChildFinish = $children->sortByDesc('finish_time')->first()?->finish_time;
-                if ($lastChildFinish && strcmp($lastChildFinish, $planFinish) > 0) {
-                    $planFinish = $lastChildFinish;
-                }
-            }
+            // Plan Finish: Ambil jam selesai efektif dari root plan (termasuk interval setelah istirahat)
+            $planFinish = $plan->effectiveFinishTime() ?: $plan->finish_time;
 
             $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : ($plan->act_finish ? substr((string) $plan->act_finish, 0, 5) : '-');
-
-            $allDtList = [];
-            $allRepairList = [];
-            $allRejectList = [];
-
-            if ($jobId) {
-                if (isset($downtimeItems[$jobId])) {
-                    $allDtList = array_merge($allDtList, $downtimeItems[$jobId]);
-                }
-                if (isset($repairItems[$jobId])) {
-                    $allRepairList = array_merge($allRepairList, $repairItems[$jobId]);
-                }
-                if (isset($rejectItems[$jobId])) {
-                    $allRejectList = array_merge($allRejectList, $rejectItems[$jobId]);
-                }
-            }
-            foreach ($children as $c) {
-                $cjn = trim($c->job_no ?? '');
-                $cjm = trim($c->job_master ?? '');
-                $cIdent = $cjn ? ($cjn.'-'.$c->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$c->id);
-                $cJob = $jobMasters->get($cIdent);
-                if ($cJob) {
-                    $cJobId = $cJob->id;
-                    if (isset($downtimeItems[$cJobId])) {
-                        $allDtList = array_merge($allDtList, $downtimeItems[$cJobId]);
-                    }
-                    if (isset($repairItems[$cJobId])) {
-                        $allRepairList = array_merge($allRepairList, $repairItems[$cJobId]);
-                    }
-                    if (isset($rejectItems[$cJobId])) {
-                        $allRejectList = array_merge($allRejectList, $rejectItems[$cJobId]);
-                    }
-                }
-            }
 
             // Catatan: Jika kuantitas agregat produksi lebih besar dari total kuantitas log manual yang tercatat
             // (misal log manual parsial atau seluruhnya diinput via finalisasi job atau LKH),

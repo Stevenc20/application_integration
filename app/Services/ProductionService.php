@@ -37,6 +37,18 @@ class ProductionService
             if ($sessionDate) {
                 return $sessionDate;
             }
+
+            // Fallback ke plan_date dari jadwal PPC yang tertaut pada JobMaster ini
+            // (Penting untuk Shift Malam ketika job baru di-start setelah tengah malam 00:00)
+            $job = JobMaster::find($jobId);
+            if ($job) {
+                $rootPlan = $job->resolveRootPlan();
+                if ($rootPlan && $rootPlan->plan_date) {
+                    return $rootPlan->plan_date instanceof Carbon
+                        ? $rootPlan->plan_date->toDateString()
+                        : Carbon::parse($rootPlan->plan_date)->toDateString();
+                }
+            }
         }
 
         return ProductionMetricsService::currentProductionDate();
@@ -92,6 +104,7 @@ class ProductionService
 
             // VALIDASI TARGET: Jika job ini (atau gabungan split-nya) sudah tercapai targetnya (actual_ok >= target_qty),
             // dilarang menjalankan ulang agar tidak terjadi anomali run sendiri / over-production.
+            $currentJobMaster = JobMaster::find($jobId);
             $planId = $this->resolvePlanId($jobId);
             $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
             $siblingJobs = $this->getSiblingJobMasters($jobId);
@@ -102,12 +115,10 @@ class ProductionService
                 ->sum('actual_ok');
 
             $targetLimit = 0;
-            if ($plan && $plan->original_plan && (int) $plan->original_plan > 0) {
-                $targetLimit = (int) $plan->original_plan;
-            } elseif ($plan && (int) $plan->plan > 0) {
-                $targetLimit = (int) $plan->plan;
+            if ($plan) {
+                $targetLimit = $plan->effectiveTargetQty();
             } else {
-                $targetLimit = (int) ($currentJobMaster?->target_qty ?? 0);
+                $targetLimit = (int) ($currentJobMaster?->effectiveTargetQty() ?? $currentJobMaster?->target_qty ?? 0);
             }
 
             if ($targetLimit > 0 && $totalAchievedOk >= $targetLimit) {
@@ -210,12 +221,10 @@ class ProductionService
                 ->sum('actual_ok');
 
             $targetLimit = 0;
-            if ($plan && $plan->original_plan && (int) $plan->original_plan > 0) {
-                $targetLimit = (int) $plan->original_plan;
-            } elseif ($plan && (int) $plan->plan > 0) {
-                $targetLimit = (int) $plan->plan;
+            if ($plan) {
+                $targetLimit = $plan->effectiveTargetQty();
             } else {
-                $targetLimit = (int) ($job->target_qty ?? 0);
+                $targetLimit = (int) ($job->effectiveTargetQty() ?: ($job->target_qty ?? 0));
             }
 
             if ($targetLimit > 0 && $totalAchievedOk >= $targetLimit) {
@@ -450,12 +459,10 @@ class ProductionService
                 ->sum('actual_ok');
 
             $targetLimit = 0;
-            if ($plan && $plan->original_plan && (int) $plan->original_plan > 0) {
-                $targetLimit = (int) $plan->original_plan;
-            } elseif ($plan && (int) $plan->plan > 0) {
-                $targetLimit = (int) $plan->plan;
+            if ($plan) {
+                $targetLimit = $plan->effectiveTargetQty();
             } else {
-                $targetLimit = (int) ($job->target_qty ?? 0);
+                $targetLimit = (int) ($job->effectiveTargetQty() ?: ($job->target_qty ?? 0));
             }
 
             if ($targetLimit > 0 && $totalAchievedOk >= $targetLimit) {
@@ -574,7 +581,8 @@ class ProductionService
                 ->sum('reject_qty');
 
             $job = JobMaster::find($jobId);
-            $targetQty = $job?->capacity ?? 0;
+            $effectiveTarget = $plan ? $plan->effectiveTargetQty() : ($job?->effectiveTargetQty() ?: ($job?->target_qty ?: ($job?->capacity ?? 0)));
+            $targetQty = $effectiveTarget > 0 ? $effectiveTarget : ($job?->capacity ?? 0);
             
             $efficiency = 0;
             if ($targetQty > 0) {
@@ -582,17 +590,21 @@ class ProductionService
             }
 
             $runtimeSeconds = $this->calculateRuntime($jobId);
+            $resolvedShift = $plan?->shift_name ?: $this->getShift();
 
             $daily->update([
                 'line' => $job?->line,
-                'shift' => $this->getShift(),
+                'shift' => $resolvedShift,
+                'target_qty' => $targetQty,
                 'actual_ok' => $actualQty,
                 'actual_qty' => $actualQty,
                 'actual_repair' => $actualRepair,
                 'actual_reject' => $actualReject,
                 'runtime_seconds' => $runtimeSeconds,
                 'downtime_seconds' => Downtime::where('job_master_id', $jobId)
-                    ->whereDate('created_at', $workDate)->sum('duration_seconds'),
+                    ->where('created_at', '>=', $logStart)
+                    ->where('created_at', '<', $logEnd)
+                    ->sum('duration_seconds'),
                 'efficiency' => $efficiency
             ]);
 
@@ -983,14 +995,21 @@ class ProductionService
                 }
 
                 $plan = \App\Models\ProductionPlan::find($planId);
-                $planQty = (float) (($plan && (float) ($plan->plan ?? 0) > 0) ? $plan->plan : ($job->target_qty ?? 0));
-                if ($planQty > 0 && $actualQtyTotal < $planQty) {
-                    $recoveryQty = $planQty - $actualQtyOk;
+                $planQty = (float) ($plan ? $plan->effectiveTargetQty() : ($job->effectiveTargetQty() ?: ($job->target_qty ?? 0)));
+                $groupJobIds = $this->getScheduleGroupJobMasterIds($jobId);
+                $otherGroupIds = array_values(array_diff($groupJobIds, [$jobId]));
+                $otherGroupOk = empty($otherGroupIds) ? 0.0 : (float) DailyProduction::whereIn('job_master_id', $otherGroupIds)->where('work_date', $workDate)->sum('actual_ok');
+                $otherGroupTotal = empty($otherGroupIds) ? 0.0 : (float) DailyProduction::whereIn('job_master_id', $otherGroupIds)->where('work_date', $workDate)->selectRaw('COALESCE(SUM(actual_ok + actual_repair + actual_reject), 0) as t')->value('t');
+                $groupActualOk = $actualQtyOk + $otherGroupOk;
+                $groupActualTotal = $actualQtyTotal + $otherGroupTotal;
+                if ($planQty > 0 && $groupActualTotal < $planQty) {
+                    $recoveryQty = $planQty - $groupActualOk;
                     if ($recoveryQty < 0) {
-                        $recoveryQty = $planQty - $actualQtyTotal;
+                        $recoveryQty = $planQty - $groupActualTotal;
                     }
                     if ($recoveryQty > 0) {
-                        $autoRecoveryItem = $this->createRecoveryItem($plan, $job, $actualQtyOk, $recoveryQty, 'waiting_approval');
+                        $rootPlanForRecovery = $plan ? $plan->resolveRootPlan() : null;
+                        $autoRecoveryItem = $this->createRecoveryItem($rootPlanForRecovery ?: $plan, $job, $groupActualOk, $recoveryQty, 'waiting_approval');
                     }
                     if ($reasonNotAchieved && \Illuminate\Support\Facades\Schema::hasTable('job_finish_reasons')) {
                         try {
@@ -1288,10 +1307,9 @@ class ProductionService
             }
 
             // Calculate shift window bounds for the target session to accurately scope downtimes
-            // Shift Pagi: work_date 07:00 -> work_date 19:00
-            // Shift Malam: work_date 19:00 -> work_date + 1 day 07:00
-            $windowStart = Carbon::parse($targetWorkDate)->setTime(7, 0, 0);
-            $windowEnd = Carbon::parse($targetWorkDate)->addDay()->setTime(7, 0, 0);
+            // Shift Pagi: work_date 07:30 -> work_date 21:00
+            // Shift Malam: work_date 21:00 -> work_date + 1 day 07:30
+            [$windowStart, $windowEnd] = $this->productionLogWindow($downtime->job_master_id, $targetWorkDate);
 
             // Sum finished downtimes for this job that strictly fall within this session's window
             $totalDowntime = Downtime::where('job_master_id', $downtime->job_master_id)

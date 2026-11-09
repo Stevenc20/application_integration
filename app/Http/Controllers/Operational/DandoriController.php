@@ -24,12 +24,13 @@ class DandoriController extends Controller
 
         $jobId = $request->job_id;
         $line  = $request->line;
-        $shift = $request->shift ?? 'Shift 1';
+        $workDate = $request->date ?: \App\Services\ProductionMetricsService::currentProductionDate();
+        $shift = $request->shift ?: \App\Services\ProductionMetricsService::currentProductionShift();
 
         $todayStats = [
-            'total_events' => \App\Models\Dandori::whereDate('work_date', now())->distinct('next_job_id')->count(),
-            'avg_duration' => \App\Models\Dandori::whereDate('work_date', now())->avg('duration_minutes') ?? 0,
-            'total_duration' => \App\Models\Dandori::whereDate('work_date', now())->sum('duration_minutes') ?? 0
+            'total_events' => \App\Models\Dandori::whereDate('work_date', $workDate)->distinct('next_job_id')->count(),
+            'avg_duration' => \App\Models\Dandori::whereDate('work_date', $workDate)->avg('duration_minutes') ?? 0,
+            'total_duration' => \App\Models\Dandori::whereDate('work_date', $workDate)->sum('duration_minutes') ?? 0
         ];
 
         return view('operational.dandori', compact(
@@ -152,14 +153,22 @@ class DandoriController extends Controller
             ]);
         }
 
+        $rootPlan = $job->resolveRootPlan();
+        $resolvedWorkDate = $request->date
+            ?: ($rootPlan && $rootPlan->plan_date ? ($rootPlan->plan_date instanceof Carbon ? $rootPlan->plan_date->toDateString() : Carbon::parse($rootPlan->plan_date)->toDateString()) : null)
+            ?: \App\Services\ProductionMetricsService::currentProductionDate();
+        $resolvedShift = $request->shift
+            ?: ($rootPlan && $rootPlan->shift_name ? $rootPlan->shift_name : null)
+            ?: \App\Services\ProductionMetricsService::currentProductionShift();
+
         Dandori::create([
             'next_job_id'   => $job->id,
             'line'          => $job->line,
-            'shift'         => $request->shift ?? 'Shift 1',
+            'shift'         => $resolvedShift,
             'activity'      => $activityName,
             'jenis_dandori' => $jenisDandori,
             'start_time'    => $now,
-            'work_date'     => now()->toDateString(),
+            'work_date'     => $resolvedWorkDate,
             'created_by'    => Auth::id()
         ]);
 
@@ -386,13 +395,17 @@ class DandoriController extends Controller
     public function direct(int|string $jobId)
     {
         $job = JobMaster::findOrFail($jobId);
+        $rootPlan = $job->resolveRootPlan();
+        $resolvedShift = ($rootPlan && $rootPlan->shift_name)
+            ? $rootPlan->shift_name
+            : \App\Services\ProductionMetricsService::currentProductionShift();
 
         return redirect()->route(
             'operational.dandori',
             [
                 'job_id' => $job->id,
                 'line'   => $job->line,
-                'shift'  => 'Shift 1'
+                'shift'  => $resolvedShift
             ]
         );
     }
@@ -400,6 +413,13 @@ class DandoriController extends Controller
     public function create(int|string $jobId)
 {
     $job = JobMaster::findOrFail($jobId);
+    $rootPlan = $job->resolveRootPlan();
+    $resolvedWorkDate = ($rootPlan && $rootPlan->plan_date)
+        ? ($rootPlan->plan_date instanceof Carbon ? $rootPlan->plan_date->toDateString() : Carbon::parse($rootPlan->plan_date)->toDateString())
+        : \App\Services\ProductionMetricsService::currentProductionDate();
+    $resolvedShift = ($rootPlan && $rootPlan->shift_name)
+        ? $rootPlan->shift_name
+        : \App\Services\ProductionMetricsService::currentProductionShift();
 
     /*
     =====================================
@@ -408,14 +428,14 @@ class DandoriController extends Controller
     */
 
     $check = Dandori::where('next_job_id', $job->id)
-        ->whereDate('work_date', now())
+        ->whereDate('work_date', $resolvedWorkDate)
         ->first();
 
     if ($check) {
         return redirect()->route('operational.dandori', [
             'job_id' => $job->id,
             'line'   => $job->line,
-            'shift'  => 'Shift 1'
+            'shift'  => $resolvedShift
         ]);
     }
 
@@ -434,9 +454,9 @@ class DandoriController extends Controller
         Dandori::create([
             'next_job_id' => $job->id,
             'line'        => $job->line,
-            'shift'       => 'Shift 1',
+            'shift'       => $resolvedShift,
             'activity'    => $activity,
-            'work_date'   => now()->toDateString(),
+            'work_date'   => $resolvedWorkDate,
             'created_by'  => Auth::id()
         ]);
     }
@@ -452,7 +472,7 @@ class DandoriController extends Controller
     return redirect()->route('operational.dandori', [
         'job_id' => $job->id,
         'line'   => $job->line,
-        'shift'  => 'Shift 1'
+        'shift'  => $resolvedShift
     ]);
 }
 }

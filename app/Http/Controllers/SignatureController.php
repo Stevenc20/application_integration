@@ -392,6 +392,7 @@ class SignatureController extends Controller
         }
 
         $workDate = \App\Services\ProductionMetricsService::currentProductionDate();
+        $yesterdayDate = \Carbon\Carbon::parse($workDate)->subDay()->toDateString();
 
         $userId = Auth::id();
         $assignments = LineAssignment::where(function ($q) use ($userId, $sigRole) {
@@ -422,56 +423,66 @@ class SignatureController extends Controller
 
             $targetShift = $this->normalizeShift($standardShift);
 
-            $hasPlan = ProductionPlan::whereDate('plan_date', $workDate)
-                ->whereHas('line', function ($q) use ($standardLine) {
-                    $q->where('line_name', $standardLine);
-                })
-                ->where(function ($q) use ($targetShift) {
-                    if ($targetShift === '2') {
-                        $q->where(function ($w) {
-                            $w->whereNull('shift_name')
-                                ->orWhereRaw("UPPER(COALESCE(TRIM(shift_name), '')) = ''")
-                                ->orWhereRaw("UPPER(TRIM(shift_name)) LIKE '%MALAM%'");
-                        });
-                    } else {
-                        $q->where(function ($w) {
-                            $w->whereNull('shift_name')
-                                ->orWhereRaw("UPPER(COALESCE(TRIM(shift_name), '')) = ''")
-                                ->orWhereRaw("UPPER(TRIM(shift_name)) LIKE '%PAGI%'");
-                        });
-                    }
-                })
-                ->exists();
+            // Untuk penugasan Shift Malam (targetShift === '2'), periksa juga tanggal produksi kemarin (H-1)
+            // terlebih dahulu agar setelah jam melewati pukul 07:30 pagi, LKH Shift Malam yang baru selesai
+            // tetap ternotifikasi pada work_date & shift asalnya (tidak hilang atau bocor ke Shift Pagi).
+            $candidateDates = ($targetShift === '2')
+                ? [$yesterdayDate, $workDate]
+                : [$workDate];
 
-            if (! $hasPlan) {
-                continue;
-            }
+            foreach ($candidateDates as $candidateDate) {
+                $hasPlan = ProductionPlan::whereDate('plan_date', $candidateDate)
+                    ->whereHas('line', function ($q) use ($standardLine) {
+                        $q->where('line_name', $standardLine);
+                    })
+                    ->where(function ($q) use ($targetShift) {
+                        if ($targetShift === '2') {
+                            $q->where(function ($w) {
+                                $w->whereNull('shift_name')
+                                    ->orWhereRaw("UPPER(COALESCE(TRIM(shift_name), '')) = ''")
+                                    ->orWhereRaw("UPPER(TRIM(shift_name)) LIKE '%MALAM%'");
+                            });
+                        } else {
+                            $q->where(function ($w) {
+                                $w->whereNull('shift_name')
+                                    ->orWhereRaw("UPPER(COALESCE(TRIM(shift_name), '')) = ''")
+                                    ->orWhereRaw("UPPER(TRIM(shift_name)) LIKE '%PAGI%'");
+                            });
+                        }
+                    })
+                    ->exists();
 
-            $signedRoles = Signature::whereIn('role', $chain)
-                ->where('work_date', $workDate)
-                ->where('line_name', $standardLine)
-                ->where('shift_name', $standardShift)
-                ->pluck('role')->toArray();
-
-            $prevSigned = true;
-            for ($i = 0; $i < $idx; $i++) {
-                if (! in_array($chain[$i], $signedRoles)) {
-                    $prevSigned = false;
-                    break;
+                if (! $hasPlan) {
+                    continue;
                 }
-            }
 
-            $pending = $prevSigned && ! in_array($sigRole, $signedRoles);
+                $signedRoles = Signature::whereIn('role', $chain)
+                    ->where('work_date', $candidateDate)
+                    ->where('line_name', $standardLine)
+                    ->where('shift_name', $standardShift)
+                    ->pluck('role')->toArray();
 
-            if ($pending) {
-                return response()->json([
-                    'pending' => true,
-                    'role' => $sigRole,
-                    'roleLabel' => $labels[$sigRole],
-                    'url' => route('supervisor.reports.daily_production', ['line' => $standardLine, 'shift' => $standardShift, 'date' => $workDate]),
-                    'lineName' => $standardLine,
-                    'date' => $workDate,
-                ]);
+                $prevSigned = true;
+                for ($i = 0; $i < $idx; $i++) {
+                    if (! in_array($chain[$i], $signedRoles)) {
+                        $prevSigned = false;
+                        break;
+                    }
+                }
+
+                $pending = $prevSigned && ! in_array($sigRole, $signedRoles);
+
+                if ($pending) {
+                    return response()->json([
+                        'pending' => true,
+                        'role' => $sigRole,
+                        'roleLabel' => $labels[$sigRole],
+                        'url' => route('supervisor.reports.daily_production', ['line' => $standardLine, 'shift' => $standardShift, 'date' => $candidateDate]),
+                        'lineName' => $standardLine,
+                        'shiftName' => $standardShift,
+                        'date' => $candidateDate,
+                    ]);
+                }
             }
         }
 

@@ -242,43 +242,6 @@ class InputHarianController extends Controller
             ->get()
             ->keyBy('job_number');
 
-        // Merge children's production data into parent's JobMaster
-        foreach ($childPlans as $parentId => $children) {
-            $parent = $plans->firstWhere('id', (int) $parentId);
-            if (!$parent) continue;
-            $parentJm = $jobMasters->get(trim($parent->job_no ?? '') . '-' . $parent->id);
-            if (!$parentJm) continue;
-            foreach ($children as $child) {
-                $childKey = trim($child->job_no ?? '') . '-' . $child->id;
-                $childJm = $jobMasters->get($childKey);
-                if (!$childJm) continue;
-
-                // Sync status from child if child is running/paused or complete
-                $cStatus = strtolower($childJm->status ?? '');
-                $pStatus = strtolower($parentJm->status ?? '');
-                if (in_array($cStatus, ['running', 'paused']) && !in_array($pStatus, ['running', 'paused'])) {
-                    $parentJm->status = $childJm->status;
-                }
-
-                if ($childJm->dailyProduction) {
-                    if (!$parentJm->dailyProduction) {
-                        $parentJm->dailyProduction = clone $childJm->dailyProduction;
-                    } else {
-                        $parentJm->dailyProduction->actual_ok     = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
-                        $parentJm->dailyProduction->actual_repair = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
-                        $parentJm->dailyProduction->actual_reject = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
-                        $parentJm->dailyProduction->actual_qty    = ($parentJm->dailyProduction->actual_qty ?? 0) + ($childJm->dailyProduction->actual_qty ?? 0);
-                    }
-                }
-                foreach ($childJm->downtimes ?? [] as $dt) {
-                    $parentJm->downtimes->push($dt);
-                }
-                foreach ($childJm->repairRejects ?? [] as $rr) {
-                    $parentJm->repairRejects->push($rr);
-                }
-            }
-        }
-
         // Load production sessions for the selected date to use date-specific timestamps
         $sessionMap = \App\Models\ProductionSession::whereIn(
             'job_master_id',
@@ -287,6 +250,110 @@ class InputHarianController extends Controller
             ->whereDate('work_date', $date)
             ->get()
             ->keyBy('job_master_id');
+
+        // Restore root plan target & finish time when break-split children exist
+        foreach ($plans as $planRow) {
+            if (($planRow->row_type ?? 'job') === 'job') {
+                $planRow->plan = $planRow->effectiveTargetQty();
+                $planRow->finish_time = $planRow->effectiveFinishTime() ?: $planRow->finish_time;
+            }
+        }
+
+        // Merge children's production data into parent's JobMaster
+        foreach ($childPlans as $parentId => $children) {
+            $parent = $plans->firstWhere('id', (int) $parentId);
+            if (!$parent) continue;
+            $pJn = trim($parent->job_no ?? '');
+            $pJm = trim($parent->job_master ?? '');
+            $parentKey = $pJn ? ($pJn . '-' . $parent->id) : ('AUTO-' . \Illuminate\Support\Str::slug($pJm) . '-' . $parent->id);
+            $parentJm = $jobMasters->get($parentKey);
+
+            // Jika parent belum memiliki JobMaster tetapi child sudah punya JobMaster dan actual produksi (kasus historis),
+            // promosikan klon child pertama sebagai wadah agregat agar actual & sesi child tetap tampil utuh pada baris parent.
+            if (!$parentJm) {
+                foreach ($children as $childCandidate) {
+                    $cJn = trim($childCandidate->job_no ?? '');
+                    $cJm = trim($childCandidate->job_master ?? '');
+                    $cKey = $cJn ? ($cJn . '-' . $childCandidate->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cJm) . '-' . $childCandidate->id);
+                    $foundChildJm = $jobMasters->get($cKey);
+                    if ($foundChildJm) {
+                        $parentJm = clone $foundChildJm;
+                        $parentJm->target_qty = $parent->effectiveTargetQty();
+                        $parentJm->setRelation('downtimes', collect($foundChildJm->downtimes ? $foundChildJm->downtimes->all() : []));
+                        $parentJm->setRelation('dandoris', collect($foundChildJm->dandoris ? $foundChildJm->dandoris->all() : []));
+                        $parentJm->setRelation('repairRejects', collect($foundChildJm->repairRejects ? $foundChildJm->repairRejects->all() : []));
+                        if ($foundChildJm->dailyProduction) {
+                            $parentJm->setRelation('dailyProduction', clone $foundChildJm->dailyProduction);
+                        }
+                        $jobMasters->put($parentKey, $parentJm);
+                        break;
+                    }
+                }
+            }
+
+            if (!$parentJm) continue;
+            $parentJm->target_qty = $parent->effectiveTargetQty();
+            $seenChildJmIds = [$parentJm->id];
+
+            foreach ($children as $child) {
+                $cJn = trim($child->job_no ?? '');
+                $cJm = trim($child->job_master ?? '');
+                $childKey = $cJn ? ($cJn . '-' . $child->id) : ('AUTO-' . \Illuminate\Support\Str::slug($cJm) . '-' . $child->id);
+                $childJm = $jobMasters->get($childKey);
+                if (!$childJm || in_array($childJm->id, $seenChildJmIds, true)) continue;
+                $seenChildJmIds[] = $childJm->id;
+
+                // Sync status from child if child is running/paused or complete
+                $cStatus = strtolower($childJm->status ?? '');
+                $pStatus = strtolower($parentJm->status ?? '');
+                if (in_array($cStatus, ['running', 'paused']) && !in_array($pStatus, ['running', 'paused'])) {
+                    $parentJm->status = $childJm->status;
+                } elseif (in_array($cStatus, ['complete', 'completed', 'finished', 'closed', 'done']) && $pStatus === 'pending') {
+                    $parentJm->status = $childJm->status;
+                }
+
+                // Earliest started_at & latest finished_at across slices
+                if ($childJm->started_at && (!$parentJm->started_at || \Carbon\Carbon::parse($childJm->started_at)->lt(\Carbon\Carbon::parse($parentJm->started_at)))) {
+                    $parentJm->started_at = $childJm->started_at;
+                }
+                if ($childJm->finished_at && (!$parentJm->finished_at || \Carbon\Carbon::parse($childJm->finished_at)->gt(\Carbon\Carbon::parse($parentJm->finished_at)))) {
+                    $parentJm->finished_at = $childJm->finished_at;
+                }
+
+                if ($childJm->dailyProduction) {
+                    if (!$parentJm->dailyProduction) {
+                        $parentJm->setRelation('dailyProduction', clone $childJm->dailyProduction);
+                    } else {
+                        $parentJm->dailyProduction->actual_ok        = ($parentJm->dailyProduction->actual_ok ?? 0) + ($childJm->dailyProduction->actual_ok ?? 0);
+                        $parentJm->dailyProduction->actual_repair    = ($parentJm->dailyProduction->actual_repair ?? 0) + ($childJm->dailyProduction->actual_repair ?? 0);
+                        $parentJm->dailyProduction->actual_reject    = ($parentJm->dailyProduction->actual_reject ?? 0) + ($childJm->dailyProduction->actual_reject ?? 0);
+                        $parentJm->dailyProduction->actual_qty       = ($parentJm->dailyProduction->actual_qty ?? 0) + ($childJm->dailyProduction->actual_qty ?? 0);
+                        $parentJm->dailyProduction->runtime_seconds  = ($parentJm->dailyProduction->runtime_seconds ?? 0) + ($childJm->dailyProduction->runtime_seconds ?? 0);
+                        $parentJm->dailyProduction->downtime_seconds = ($parentJm->dailyProduction->downtime_seconds ?? 0) + ($childJm->dailyProduction->downtime_seconds ?? 0);
+                    }
+                }
+
+                $childSession = $sessionMap->get($childJm->id);
+                if ($childSession) {
+                    $parentSession = $sessionMap->get($parentJm->id);
+                    if (!$parentSession) {
+                        $sessionMap->put($parentJm->id, clone $childSession);
+                    } else {
+                        $parentSession->total_seconds = ($parentSession->total_seconds ?? 0) + ($childSession->total_seconds ?? 0);
+                    }
+                }
+
+                foreach ($childJm->downtimes ?? [] as $dt) {
+                    $parentJm->downtimes->push($dt);
+                }
+                foreach ($childJm->dandoris ?? [] as $dd) {
+                    $parentJm->dandoris->push($dd);
+                }
+                foreach ($childJm->repairRejects ?? [] as $rr) {
+                    $parentJm->repairRejects->push($rr);
+                }
+            }
+        }
 
         $plans->transform(function($plan) use ($jobMasters) {
             $jn = trim($plan->job_no ?? '');
@@ -534,12 +601,42 @@ class InputHarianController extends Controller
             }
         }
 
-        // Production Logs — always filtered by selected date
+        // Production Logs — filtered by shift window so Shift Malam logs after 00:00 remain visible
         $productionLogs = collect();
         $lastInputAt    = null;
         if ($activeJob) {
-            $productionLogs = \App\Models\ProductionLog::where('job_master_id', $activeJob->id)
-                ->whereDate('created_at', $date)
+            // Ensure activeJob displays full root schedule target qty and aggregates sibling actuals if split
+            $effectiveActiveTarget = $activeJob->effectiveTargetQty();
+            if ($effectiveActiveTarget > 0) {
+                $activeJob->target_qty = $effectiveActiveTarget;
+            }
+            $activeGroupIds = $this->productionService->getScheduleGroupJobMasterIds($activeJob->id);
+            if (count($activeGroupIds) > 1) {
+                $otherGroupIds = array_values(array_diff($activeGroupIds, [$activeJob->id]));
+                if (!empty($otherGroupIds)) {
+                    $otherDailies = \App\Models\DailyProduction::whereIn('job_master_id', $otherGroupIds)
+                        ->whereDate('work_date', $date)
+                        ->get();
+                    foreach ($otherDailies as $odp) {
+                        if (!$activeJob->dailyProduction) {
+                            $activeJob->setRelation('dailyProduction', clone $odp);
+                        } else {
+                            $activeJob->dailyProduction->actual_ok     = ($activeJob->dailyProduction->actual_ok ?? 0) + ($odp->actual_ok ?? 0);
+                            $activeJob->dailyProduction->actual_repair = ($activeJob->dailyProduction->actual_repair ?? 0) + ($odp->actual_repair ?? 0);
+                            $activeJob->dailyProduction->actual_reject = ($activeJob->dailyProduction->actual_reject ?? 0) + ($odp->actual_reject ?? 0);
+                            $activeJob->dailyProduction->actual_qty    = ($activeJob->dailyProduction->actual_qty ?? 0) + ($odp->actual_qty ?? 0);
+                        }
+                    }
+                }
+            }
+
+            [$shiftWinStart, $shiftWinEnd] = \App\Services\ProductionMetricsService::shiftWindow(
+                $date,
+                $currentShift !== 'all' ? $currentShift : $this->getShift()
+            );
+            $productionLogs = \App\Models\ProductionLog::whereIn('job_master_id', $activeGroupIds)
+                ->where('created_at', '>=', $shiftWinStart)
+                ->where('created_at', '<', $shiftWinEnd)
                 ->orderBy('created_at', 'desc')
                 ->take(5)
                 ->get();
@@ -547,12 +644,30 @@ class InputHarianController extends Controller
         }
 
         // 5. Cari Job Pending untuk Queue Selector (Dropdown Standby)
-        // $scheduledJobNumbers sudah disusun mengikuti row_no PPC (parent + split child).
-        $ppcQueueOrder = array_flip($scheduledJobNumbers);
+        // Hanya tampilkan identitas jadwal induk ($plans sudah difilter !parent_job_id) agar potongan istirahat tidak muncul ganda.
+        $rootScheduledJobNumbers = $plans
+            ->filter(fn($p) => ($p->row_type ?? 'job') === 'job')
+            ->sortBy(fn($p) => [(int) ($p->row_no ?? 999999), (int) $p->id])
+            ->map(function($p) {
+                $jn = trim($p->job_no ?? '');
+                $jm = trim($p->job_master ?? '');
+                return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+            })
+            ->unique()
+            ->values()
+            ->toArray();
+
+        $ppcQueueOrder = array_flip($rootScheduledJobNumbers);
 
         $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running', 'paused'])
-            ->whereIn('job_number', $scheduledJobNumbers)
+            ->whereIn('job_number', $rootScheduledJobNumbers)
             ->get()
+            ->each(function($job) {
+                $eff = $job->effectiveTargetQty();
+                if ($eff > 0) {
+                    $job->target_qty = $eff;
+                }
+            })
             ->sortBy(fn($job) => $ppcQueueOrder[$job->job_number] ?? PHP_INT_MAX)
             ->values();
 
@@ -686,6 +801,7 @@ class InputHarianController extends Controller
         $plans = $planQuery->orderBy('row_no')->get();
 
         // Batch fetch existing JobMasters to eliminate N+1 query overhead
+        // ONE SCHEDULE = ONE JOB IDENTITY: Only sync root schedule rows (!isChildSlice()).
         $identifiers = [];
         $validPlans = [];
         foreach ($plans as $seq => $plan) {
@@ -694,8 +810,9 @@ class InputHarianController extends Controller
             if (blank($jn) && blank($jm)) continue;
             if ($plan->row_type === 'break') continue;
             if (in_array($jn, ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])) continue;
+            if ($plan->isChildSlice()) continue;
 
-            $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . Str::slug($jm) . '-' . $plan->id);
+            $identifier = $plan->canonicalJobNumber();
             $identifiers[] = $identifier;
             $validPlans[] = ['plan' => $plan, 'seq' => $seq, 'identifier' => $identifier];
         }
@@ -710,13 +827,14 @@ class InputHarianController extends Controller
             $existing = $existingJobMasters->get($identifier);
 
             $lineName = $plan->press_name ?: ($plan->line ?: 'PRESS A');
+            $effectiveFinish = $plan->effectiveFinishTime() ?: $plan->finish_time;
             $data = [
                 'job_name'    => $plan->job_master ?: ($plan->job_no ?: 'UNKNOWN JOB'),
                 'line'        => $lineName,
-                'target_qty'  => (int) ($plan->plan ?? 0),
+                'target_qty'  => $plan->effectiveTargetQty(),
                 'sequence_no' => $plan->row_no ?? ($seq + 1), // Gunakan row_no asli dari Excel
                 'plan_start'  => $plan->start_time ? (str_contains($plan->start_time, '-') ? Carbon::parse($plan->start_time)->startOfMinute() : Carbon::parse($date . ' ' . $plan->start_time)->startOfMinute()) : null,
-                'plan_end'    => $plan->finish_time ? (str_contains($plan->finish_time, '-') ? Carbon::parse($plan->finish_time)->startOfMinute() : Carbon::parse($date . ' ' . $plan->finish_time)->startOfMinute()) : null,
+                'plan_end'    => $effectiveFinish ? (str_contains($effectiveFinish, '-') ? Carbon::parse($effectiveFinish)->startOfMinute() : Carbon::parse($date . ' ' . $effectiveFinish)->startOfMinute()) : null,
                 'capacity'    => (int) ($plan->qty_plt ?? 0),
             ];
 
@@ -1126,21 +1244,54 @@ class InputHarianController extends Controller
             return response()->json([]);
         }
 
-        $siblingJobs = $this->productionService->getSiblingJobMasters($id);
-        $excludeIds = $siblingJobs->pluck('id')->push($id)->all();
+        $rootCurrent = $current->resolveRootJobMaster();
+        $siblingJobs = $this->productionService->getSiblingJobMasters($rootCurrent->id);
+        $excludeIds = $siblingJobs->pluck('id')->push($current->id)->push($rootCurrent->id)->unique()->values()->all();
 
-        $jobs = JobMaster::whereNotIn('id', $excludeIds)
-            ->whereIn('status', ['pending', 'paused'])
-            ->orderBy('sequence_no')
+        $query = JobMaster::whereNotIn('id', $excludeIds)
+            ->whereIn('status', ['pending', 'paused']);
+
+        if ($rootCurrent->line) {
+            $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $rootCurrent->line)));
+            $query->whereRaw("REPLACE(REPLACE(UPPER(TRIM(line)), 'PRESS ', ''), 'LINE ', '') LIKE ?", ["%{$normalizedLine}%"]);
+        }
+
+        $currentPlan = $rootCurrent->production_plan ?: $current->production_plan;
+        $jobs = $query->orderBy('sequence_no')
             ->orderBy('job_number')
-            ->get();
+            ->get()
+            ->filter(function (JobMaster $j) use ($currentPlan) {
+                $plan = $j->production_plan;
+                if ($plan) {
+                    // Never expose child slices as selectable Next Items
+                    if ($plan->isChildSlice()) {
+                        return false;
+                    }
+                    // If current job is bound to a specific plan_date & shift_name, scope candidates to the same date & shift
+                    if ($currentPlan && $currentPlan->plan_date && $plan->plan_date) {
+                        if (\Carbon\Carbon::parse($plan->plan_date)->toDateString() !== \Carbon\Carbon::parse($currentPlan->plan_date)->toDateString()) {
+                            return false;
+                        }
+                    }
+                    if ($currentPlan && $currentPlan->shift_name && $plan->shift_name) {
+                        if ($plan->shift_name !== $currentPlan->shift_name) {
+                            return false;
+                        }
+                    }
+                }
 
-        $formatted = $jobs->map(function($j) {
+                return true;
+            })
+            ->values();
+
+        $formatted = $jobs->map(function ($j) {
+            $effQty = $j->effectiveTargetQty() ?: ($j->target_qty ?: 0);
+
             return [
                 'id' => $j->id,
                 'job_number' => $j->job_number,
                 'job_name' => $j->job_name,
-                'label' => "{$j->job_name} - {$j->job_number} (" . ($j->target_qty ?: 0) . " pcs)"
+                'label' => "{$j->job_name} - {$j->job_number} ({$effQty} pcs)"
             ];
         });
 
@@ -1156,8 +1307,11 @@ class InputHarianController extends Controller
         // 1. Finish the current job and optionally start the next one
         $this->productionService->finishJob($id, $nextJobId, $skipIdle);
 
-        // 2. Get the next job
-        $next = $this->productionService->getNextJob($id, $request->next_id);
+        // 2. Get the next job (automatically skips internal break-split child slices via P0 getNextJob)
+        $next = $this->productionService->getNextJob($id, $request->next_id ?: $nextJobId);
+        if ($next) {
+            $next = $next->resolveRootJobMaster();
+        }
 
         if ($next) {
             $this->productionService->startJob($next->id);
@@ -1693,31 +1847,45 @@ class InputHarianController extends Controller
             ];
 
             if ($plans->isNotEmpty()) {
-                $parentPlans = $plans->filter(fn($p) => !$p->parent_job_id);
-                $parentIdentifiers = $parentPlans->map(function($p) {
+                [$shiftStart, $shiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $latestShiftName ?: $shiftName);
+                $isNightShift = ((int) $shiftValue === 2) || str_contains(strtoupper((string) ($latestShiftName ?: $shiftName)), 'MALAM');
+                $nextDayDate = \Carbon\Carbon::parse($date)->addDay()->toDateString();
+                $validWorkDates = $isNightShift ? [$date, $nextDayDate] : [$date];
+
+                $parentPlans = $plans->filter(fn ($p) => ! $p->isChildSlice())->values();
+                $parentIdentifiers = $parentPlans->map(function ($p) {
                     $jn = trim($p->job_no ?? '');
                     $jm = trim($p->job_master ?? '');
-                    if (blank($jn) && blank($jm)) return null;
-                    return $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+                    if (blank($jn) && blank($jm)) {
+                        return null;
+                    }
+
+                    return $p->canonicalJobNumber();
                 })->filter()->values()->toArray();
 
                 $rawParentJobNos = $parentPlans->pluck('job_no')->filter()->values()->toArray();
 
-                $parentJobMasters = \App\Models\JobMaster::where(function($q) use ($parentIdentifiers, $rawParentJobNos) {
+                $parentJobMasters = \App\Models\JobMaster::where(function ($q) use ($parentIdentifiers, $rawParentJobNos) {
                         $q->whereIn('job_number', $parentIdentifiers);
-                        if (!empty($rawParentJobNos)) {
+                        if (! empty($rawParentJobNos)) {
                             $q->orWhereIn('job_number', $rawParentJobNos);
                         }
                     })
                     ->with([
-                        'dailyProduction' => function ($q) use ($date) {
-                            $q->whereDate('work_date', $date);
+                        'dailyProduction' => function ($q) use ($validWorkDates) {
+                            $q->whereIn('work_date', $validWorkDates);
                         },
-                        'downtimes' => function ($q) use ($date) {
-                            $q->whereDate('start_time', $date);
+                        'downtimes' => function ($q) use ($shiftStart, $shiftEnd, $date) {
+                            $q->where(function ($sq) use ($shiftStart, $shiftEnd, $date) {
+                                $sq->whereBetween('start_time', [$shiftStart, $shiftEnd])
+                                    ->orWhereDate('start_time', $date);
+                            });
                         },
-                        'repairRejects' => function ($q) use ($date) {
-                            $q->whereDate('created_at', $date);
+                        'repairRejects' => function ($q) use ($shiftStart, $shiftEnd, $date) {
+                            $q->where(function ($sq) use ($shiftStart, $shiftEnd, $date) {
+                                $sq->whereBetween('created_at', [$shiftStart, $shiftEnd])
+                                    ->orWhereDate('created_at', $date);
+                            });
                         },
                     ])
                     ->get();
@@ -1729,21 +1897,36 @@ class InputHarianController extends Controller
                     ->get()
                     ->groupBy('parent_job_id');
 
-                $childIdentifiers = $childPlansMap->flatten()->map(function($c) {
+                $allChildSlices = $childPlansMap->flatten()->merge(
+                    $plans->filter(fn ($p) => $p->isChildSlice())
+                )->unique('id')->values();
+
+                $childIdentifiers = $allChildSlices->map(function ($c) {
                     $cjn = trim($c->job_no ?? '');
-                    return $cjn ? ($cjn . '-' . $c->id) : null;
+                    $cjm = trim($c->job_master ?? '');
+                    if (blank($cjn) && blank($cjm)) {
+                        return null;
+                    }
+
+                    return $cjn ? ($cjn.'-'.$c->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$c->id);
                 })->filter()->values()->toArray();
 
                 $childJobMasters = \App\Models\JobMaster::whereIn('job_number', $childIdentifiers)
                     ->with([
-                        'dailyProduction' => function ($q) use ($date) {
-                            $q->whereDate('work_date', $date);
+                        'dailyProduction' => function ($q) use ($validWorkDates) {
+                            $q->whereIn('work_date', $validWorkDates);
                         },
-                        'downtimes' => function ($q) use ($date) {
-                            $q->whereDate('start_time', $date);
+                        'downtimes' => function ($q) use ($shiftStart, $shiftEnd, $date) {
+                            $q->where(function ($sq) use ($shiftStart, $shiftEnd, $date) {
+                                $sq->whereBetween('start_time', [$shiftStart, $shiftEnd])
+                                    ->orWhereDate('start_time', $date);
+                            });
                         },
-                        'repairRejects' => function ($q) use ($date) {
-                            $q->whereDate('created_at', $date);
+                        'repairRejects' => function ($q) use ($shiftStart, $shiftEnd, $date) {
+                            $q->where(function ($sq) use ($shiftStart, $shiftEnd, $date) {
+                                $sq->whereBetween('created_at', [$shiftStart, $shiftEnd])
+                                    ->orWhereDate('created_at', $date);
+                            });
                         },
                     ])
                     ->get()
@@ -1756,141 +1939,182 @@ class InputHarianController extends Controller
                     ->values()
                     ->all();
 
-                $dailyForDate = \App\Models\DailyProduction::whereIn('job_master_id', $allDailyJmIds)
-                    ->whereDate('work_date', $date)
+                $dailiesByJmId = \App\Models\DailyProduction::whereIn('job_master_id', $allDailyJmIds)
+                    ->whereIn('work_date', $validWorkDates)
                     ->orderBy('id', 'desc')
                     ->get()
-                    ->keyBy('job_master_id');
+                    ->groupBy('job_master_id');
 
-                // ── VALIDATION: Kumpulkan JobMaster yang sesuai jadwal shift ini saja ──
-                $allJmsToValidate = collect();
-
-                foreach ($plans as $plan) {
-                    if ($plan->parent_job_id) continue;
-
+                // ── VALIDATION: Evaluasi SATU jadwal utuh per root plan (ONE SCHEDULE = ONE JOB IDENTITY) ──
+                foreach ($parentPlans as $plan) {
                     $jn = trim($plan->job_no ?? '');
                     $jm = trim($plan->job_master ?? '');
-                    if (blank($jn) && blank($jm)) continue;
-                    $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
+                    if (blank($jn) && blank($jm)) {
+                        continue;
+                    }
+                    $identifier = $plan->canonicalJobNumber();
 
                     $jobMaster = $parentJobMastersByIdentifier->get($identifier)
-                        ?? $parentJobMasters->first(fn($j) => $jn && $j->job_number === $jn)
-                        ?? $parentJobMasters->first(fn($j) => $jn && str_starts_with($j->job_number, $jn . '-'))
-                        ?? $parentJobMasters->first(fn($j) => $jm && $j->job_name === $jm);
+                        ?? $parentJobMasters->first(fn ($j) => $jn && $j->job_number === $jn);
 
-                    if (!$jobMaster) {
+                    if (! $jobMaster) {
                         $jobMaster = \App\Models\JobMaster::where('job_number', $identifier)
-                            ->orWhere('job_number', $jn)
-                            ->orWhere('job_number', 'like', $jn . '-%')
+                            ->when($jn !== '', fn ($q) => $q->orWhere('job_number', $jn))
                             ->with([
-                                'dailyProduction' => function ($q) use ($date) {
-                                    $q->whereDate('work_date', $date);
+                                'dailyProduction' => function ($q) use ($validWorkDates) {
+                                    $q->whereIn('work_date', $validWorkDates);
                                 },
-                                'downtimes' => function ($q) use ($date) {
-                                    $q->whereDate('start_time', $date);
+                                'downtimes' => function ($q) use ($shiftStart, $shiftEnd, $date) {
+                                    $q->where(function ($sq) use ($shiftStart, $shiftEnd, $date) {
+                                        $sq->whereBetween('start_time', [$shiftStart, $shiftEnd])
+                                            ->orWhereDate('start_time', $date);
+                                    });
                                 },
-                                'repairRejects' => function ($q) use ($date) {
-                                    $q->whereDate('created_at', $date);
+                                'repairRejects' => function ($q) use ($shiftStart, $shiftEnd, $date) {
+                                    $q->where(function ($sq) use ($shiftStart, $shiftEnd, $date) {
+                                        $sq->whereBetween('created_at', [$shiftStart, $shiftEnd])
+                                            ->orWhereDate('created_at', $date);
+                                    });
                                 },
                             ])
                             ->first();
                     }
 
+                    // Kumpulkan seluruh JobMaster dalam satu schedule group (root + child slices)
+                    $groupJms = collect();
                     if ($jobMaster) {
-                        $jobMaster->validation_item_name = $plan->job_no ?: $plan->job_master;
-                        $jobMaster->validation_plan_id = $plan->id;
-                        $allJmsToValidate->put($jobMaster->id, $jobMaster);
+                        $groupJms->push($jobMaster);
                     }
 
                     $children = $childPlansMap->get($plan->id, collect());
+                    if (! empty($plan->split_group)) {
+                        $splitSiblings = $plans->filter(fn ($p) => $p->id !== $plan->id && $p->split_group === $plan->split_group);
+                        $children = $children->merge($splitSiblings)->unique('id');
+                    }
+
                     foreach ($children as $child) {
-                        $childKey = trim($child->job_no ?? '') . '-' . $child->id;
+                        $cjn = trim($child->job_no ?? '');
+                        $cjm = trim($child->job_master ?? '');
+                        $childKey = $cjn ? ($cjn.'-'.$child->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$child->id);
                         $childJm = $childJobMasters->get($childKey);
-                        if ($childJm) {
-                            $childJm->validation_item_name = $child->job_no ?: $child->job_master;
-                            $childJm->validation_plan_id = $child->id;
-                            $allJmsToValidate->put($childJm->id, $childJm);
-                        }
-                    }
-                }
-
-                // ── VALIDATION LOOP: Periksa downtime, repair, reject ──
-                foreach ($allJmsToValidate as $jm) {
-                    $itemName = $jm->validation_item_name ?? ($jm->job_name ?: $jm->job_number);
-                    $planId = $jm->validation_plan_id ?? 0;
-
-                    foreach ($jm->downtimes ?? [] as $dt) {
-                        if ($dt->start_time && \Carbon\Carbon::parse($dt->start_time)->toDateString() !== $date) {
-                            continue;
-                        }
-                        if (in_array(trim($dt->jenis_downtime ?? ''), ['dandori', 'idle time', 'idle', 'break time'])) {
-                            continue;
-                        }
-                        if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
-                            $issues['dt'][] = [
-                                'item'          => $itemName,
-                                'issue'         => 'problem/penyebab/action belum lengkap',
-                                'dt_id'         => $dt->id,
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $planId,
-                            ];
+                        if ($childJm && ! $groupJms->contains('id', $childJm->id)) {
+                            $groupJms->push($childJm);
                         }
                     }
 
-                    foreach ($jm->repairRejects ?? [] as $rr) {
-                        $key = $rr->type === 'reject' ? 'reject' : 'repair';
-                        $missingFields = [];
-                        if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
-                            $missingFields[] = 'area_problem/root_cause/countermeasure belum lengkap';
-                        }
-                        if ($rr->images()->count() === 0) {
-                            $missingFields[] = 'Foto bukti (evidence) ' . ucfirst($key) . ' wajib diunggah';
-                        }
-                        if (!empty($missingFields)) {
-                            $issues[$key][] = [
-                                'item'          => $itemName,
-                                'issue'         => implode(' & ', $missingFields),
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $planId,
-                            ];
+                    if ($groupJms->isEmpty()) {
+                        continue;
+                    }
+
+                    $primaryJm = $jobMaster ?: $groupJms->first();
+                    $itemName = $plan->job_no ?: ($plan->job_master ?: ($primaryJm->job_name ?: $primaryJm->job_number));
+                    $planId = $plan->id;
+                    $groupJmIds = $groupJms->pluck('id')->unique()->values()->all();
+
+                    // 1. Evaluasi Downtimes di seluruh slice dalam schedule group
+                    $seenDtIds = [];
+                    foreach ($groupJms as $gJm) {
+                        foreach ($gJm->downtimes ?? [] as $dt) {
+                            if (isset($seenDtIds[$dt->id])) {
+                                continue;
+                            }
+                            $seenDtIds[$dt->id] = true;
+
+                            if ($dt->start_time) {
+                                $dtStart = \Carbon\Carbon::parse($dt->start_time);
+                                $inWindow = $dtStart->betweenIncluded($shiftStart, $shiftEnd)
+                                    || $dtStart->toDateString() === $date;
+                                if (! $inWindow) {
+                                    continue;
+                                }
+                            }
+                            if (in_array(strtolower(trim($dt->jenis_downtime ?? '')), ['dandori', 'idle time', 'idle', 'break time'], true)) {
+                                continue;
+                            }
+                            if (blank($dt->problem) || blank($dt->penyebab) || blank($dt->action)) {
+                                $issues['dt'][] = [
+                                    'item'          => $itemName,
+                                    'issue'         => 'problem/penyebab/action belum lengkap',
+                                    'dt_id'         => $dt->id,
+                                    'job_master_id' => $primaryJm->id,
+                                    'plan_id'       => $planId,
+                                ];
+                            }
                         }
                     }
 
-                    // Ambil actual repair & reject khusus work_date jadwal shift ini
-                    $daily = $dailyForDate->get($jm->id);
+                    // 2. Evaluasi kelengkapan form Repair & Reject di seluruh slice dalam schedule group
+                    $groupRrLogs = collect();
+                    $seenRrIds = [];
+                    foreach ($groupJms as $gJm) {
+                        foreach ($gJm->repairRejects ?? [] as $rr) {
+                            if (isset($seenRrIds[$rr->id])) {
+                                continue;
+                            }
+                            $seenRrIds[$rr->id] = true;
+                            $groupRrLogs->push($rr);
 
-                    $repairQty = (int)($daily->actual_repair ?? 0);
-                    $rejectQty = (int)($daily->actual_reject ?? 0);
+                            $key = $rr->type === 'reject' ? 'reject' : 'repair';
+                            $missingFields = [];
+                            if (blank($rr->area_problem) || blank($rr->root_cause) || blank($rr->countermeasure)) {
+                                $missingFields[] = 'area_problem/root_cause/countermeasure belum lengkap';
+                            }
+                            if ($rr->images()->count() === 0) {
+                                $missingFields[] = 'Foto bukti (evidence) '.ucfirst($key).' wajib diunggah';
+                            }
+                            if (! empty($missingFields)) {
+                                $issues[$key][] = [
+                                    'item'          => $itemName,
+                                    'issue'         => implode(' & ', $missingFields),
+                                    'job_master_id' => $primaryJm->id,
+                                    'plan_id'       => $planId,
+                                ];
+                            }
+                        }
+                    }
 
-                    // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog pada tanggal shift ini
+                    // 3. Akumulasi actual repair & reject untuk 1 schedule group utuh tepat 1 kali
+                    $repairQty = 0;
+                    $rejectQty = 0;
+                    foreach ($groupJmIds as $gId) {
+                        $jmDailies = $dailiesByJmId->get($gId, collect());
+                        if ($jmDailies->isNotEmpty()) {
+                            $repairQty += (int) $jmDailies->sum('actual_repair');
+                            $rejectQty += (int) $jmDailies->sum('actual_reject');
+                        }
+                    }
+
+                    // Fallback jika belum tersinkron di DailyProduction tapi sudah ada di ProductionLog pada window shift ini
                     if ($repairQty === 0) {
-                        $repairQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)
-                            ->whereDate('created_at', $date)
+                        $repairQty = (int) \App\Models\ProductionLog::whereIn('job_master_id', $groupJmIds)
+                            ->where(function ($q) use ($shiftStart, $shiftEnd, $date) {
+                                $q->whereBetween('created_at', [$shiftStart, $shiftEnd])
+                                    ->orWhereDate('created_at', $date);
+                            })
                             ->sum('repair_qty');
                     }
                     if ($rejectQty === 0) {
-                        $rejectQty = (int) \App\Models\ProductionLog::where('job_master_id', $jm->id)
-                            ->whereDate('created_at', $date)
+                        $rejectQty = (int) \App\Models\ProductionLog::whereIn('job_master_id', $groupJmIds)
+                            ->where(function ($q) use ($shiftStart, $shiftEnd, $date) {
+                                $q->whereBetween('created_at', [$shiftStart, $shiftEnd])
+                                    ->orWhereDate('created_at', $date);
+                            })
                             ->sum('reject_qty');
                     }
 
-                    // Cek form detail Repair & Reject yang tersimpan
-                    $rrLogs = $jm->repairRejects ?? \App\Models\RepairRejectLog::where('job_master_id', $jm->id)
-                        ->whereDate('created_at', $date)
-                        ->get();
-                    $totalRepairLogged = (int) $rrLogs->where('type', 'repair')->sum('qty_a');
-                    $totalRejectLogged = (int) $rrLogs->where('type', 'reject')->sum('qty_a');
+                    $totalRepairLogged = (int) $groupRrLogs->where('type', 'repair')->sum('qty_a');
+                    $totalRejectLogged = (int) $groupRrLogs->where('type', 'reject')->sum('qty_a');
 
                     if ($repairQty > 0 || $totalRepairLogged > 0) {
                         $review['repair'][] = [
                             'item'          => $itemName,
                             'issue'         => $totalRepairLogged >= $repairQty
-                                ? $totalRepairLogged . ' pcs sudah ada form lengkap'
-                                : max(0, $repairQty - $totalRepairLogged) . ' pcs Repair belum ada form (Lapor: ' . $repairQty . ', Form: ' . $totalRepairLogged . ')',
+                                ? $totalRepairLogged.' pcs sudah ada form lengkap'
+                                : max(0, $repairQty - $totalRepairLogged).' pcs Repair belum ada form (Lapor: '.$repairQty.', Form: '.$totalRepairLogged.')',
                             'status'        => $totalRepairLogged >= $repairQty ? 'ok' : 'incomplete',
                             'qty'           => $repairQty,
                             'logged'        => $totalRepairLogged,
-                            'job_master_id' => $jm->id,
+                            'job_master_id' => $primaryJm->id,
                             'plan_id'       => $planId,
                         ];
                     }
@@ -1899,38 +2123,34 @@ class InputHarianController extends Controller
                         $review['reject'][] = [
                             'item'          => $itemName,
                             'issue'         => $totalRejectLogged >= $rejectQty
-                                ? $totalRejectLogged . ' pcs sudah ada form lengkap'
-                                : max(0, $rejectQty - $totalRejectLogged) . ' pcs Reject belum ada form (Lapor: ' . $rejectQty . ', Form: ' . $totalRejectLogged . ')',
+                                ? $totalRejectLogged.' pcs sudah ada form lengkap'
+                                : max(0, $rejectQty - $totalRejectLogged).' pcs Reject belum ada form (Lapor: '.$rejectQty.', Form: '.$totalRejectLogged.')',
                             'status'        => $totalRejectLogged >= $rejectQty ? 'ok' : 'incomplete',
                             'qty'           => $rejectQty,
                             'logged'        => $totalRejectLogged,
-                            'job_master_id' => $jm->id,
+                            'job_master_id' => $primaryJm->id,
                             'plan_id'       => $planId,
                         ];
                     }
 
-                    if ($repairQty > 0) {
-                        if ($totalRepairLogged < $repairQty) {
-                            $missingRepair = $repairQty - $totalRepairLogged;
-                            $issues['repair'][] = [
-                                'item'          => $itemName,
-                                'issue'         => $missingRepair . ' pcs Repair belum ada form detail (Lapor: ' . $repairQty . ', Form: ' . $totalRepairLogged . ')',
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $planId,
-                            ];
-                        }
+                    if ($repairQty > 0 && $totalRepairLogged < $repairQty) {
+                        $missingRepair = $repairQty - $totalRepairLogged;
+                        $issues['repair'][] = [
+                            'item'          => $itemName,
+                            'issue'         => $missingRepair.' pcs Repair belum ada form detail (Lapor: '.$repairQty.', Form: '.$totalRepairLogged.')',
+                            'job_master_id' => $primaryJm->id,
+                            'plan_id'       => $planId,
+                        ];
                     }
 
-                    if ($rejectQty > 0) {
-                        if ($totalRejectLogged < $rejectQty) {
-                            $missingReject = $rejectQty - $totalRejectLogged;
-                            $issues['reject'][] = [
-                                'item'          => $itemName,
-                                'issue'         => $missingReject . ' pcs Reject belum ada form detail (Lapor: ' . $rejectQty . ', Form: ' . $totalRejectLogged . ')',
-                                'job_master_id' => $jm->id,
-                                'plan_id'       => $planId,
-                            ];
-                        }
+                    if ($rejectQty > 0 && $totalRejectLogged < $rejectQty) {
+                        $missingReject = $rejectQty - $totalRejectLogged;
+                        $issues['reject'][] = [
+                            'item'          => $itemName,
+                            'issue'         => $missingReject.' pcs Reject belum ada form detail (Lapor: '.$rejectQty.', Form: '.$totalRejectLogged.')',
+                            'job_master_id' => $primaryJm->id,
+                            'plan_id'       => $planId,
+                        ];
                     }
                 }
 
