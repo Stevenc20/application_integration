@@ -72,9 +72,25 @@ class InputHarianController extends Controller
                 $lineFilter = 'Shearing';
             } elseif ($userRole === 'handwork') {
                 $lineFilter = 'Handwork';
-            } elseif ($userRole === 'supervisor') {
+            } elseif (str_starts_with($userRole, 'leader')) {
+                $suffix = trim(substr($userRole, 6));
+                if (in_array(strtoupper($suffix), ['A', 'B', 'C', 'D'])) {
+                    $lineFilter = 'Line ' . strtoupper($suffix);
+                }
+            }
+
+            if (!$lineFilter) {
+                $assignment = \App\Models\LineAssignment::where('leader_user_id', Auth::id())->first();
+                if ($assignment) {
+                    $lineFilter = $assignment->line_name;
+                }
+            }
+
+            // Fallback default hanya jika bukan supervisor/admin/ppc/management (user tanpa role line spesifik)
+            if (!$lineFilter && !in_array($userRole, ['supervisor', 'spv', 'admin', 'superadmin', 'ppc', 'manager', 'kadiv', 'direktur', 'quality'])) {
                 $lineFilter = 'Line A';
             }
+
             if ($lineFilter) {
                 $request->merge(['line' => $lineFilter]);
             }
@@ -415,6 +431,23 @@ class InputHarianController extends Controller
 
             if ($requestedJob) {
                 $activeJob = $requestedJob;
+
+                // Jika user membuka specific job_id, sinkronkan lineFilter ke line milik job tersebut
+                // agar tabel antrean di bawah langsung menampilkan line yang relevan dengan job yang dibuka
+                if (!empty($requestedJob->line)) {
+                    $jobLineRaw = strtoupper(trim($requestedJob->line));
+                    $targetLine = match(true) {
+                        str_contains($jobLineRaw, 'A') => 'Line A',
+                        str_contains($jobLineRaw, 'B') => 'Line B',
+                        str_contains($jobLineRaw, 'C') => 'Line C',
+                        str_contains($jobLineRaw, 'D') => 'Line D',
+                        str_contains($jobLineRaw, 'SHEAR') => 'Shearing',
+                        str_contains($jobLineRaw, 'HAND') => 'Handwork',
+                        default => $requestedJob->line,
+                    };
+                    $lineFilter = $targetLine;
+                    $request->merge(['line' => $targetLine]);
+                }
             }
         }
 
