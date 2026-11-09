@@ -440,10 +440,10 @@ def parse_press_section(section_rows, offset, sheet_name, press_name):
 # ── sheet selection ────────────────────────────────────────────────────────────
 
 def _match_sheet(name):
-    """Find actual sheet name matching ``name`` (case-insensitive)."""
-    name_upper = name.upper()
+    """Find actual sheet name matching ``name`` (case-insensitive, trimmed)."""
+    name_upper = name.strip().upper()
     for sn in sheetnames:
-        if sn.upper() == name_upper:
+        if sn.strip().upper() == name_upper:
             return sn
     return None
 
@@ -459,23 +459,21 @@ def choose_sheets(wb, target_shift_req):
     def base_sheets(base):
         """Return sheet names for a base shift. When a Rev variant exists,
         returns [Rev, non-Rev] so non-Rev can supply presses missing from Rev."""
-        rev = f"{base} (Rev)"
-        rev_variants = [rev]
+        base_up = base.strip().upper()
+        short_key = 'PAGI' if 'PAGI' in base_up else ('MALAM' if 'MALAM' in base_up else base_up)
+        rev_candidates = []
         for sn in sheetnames:
-            su = sn.upper()
-            if base.upper() in su and 'REV' in su and sn != base:
-                if sn not in rev_variants:
-                    rev_variants.append(sn)
-        rev_found = None
-        for rv in rev_variants:
-            actual = _match_sheet(rv)
-            if actual:
-                rev_found = actual
-                break
-        base_actual = _match_sheet(base)
+            su = sn.strip().upper()
+            if 'MASTER' in su:
+                continue
+            if (base_up in su or short_key in su) and 'REV' in su and su != base_up:
+                rev_candidates.append(sn)
+        # Prefer the last/latest revision sheet if multiple exist (e.g. Rev 1, Rev 2)
+        rev_found = rev_candidates[-1] if rev_candidates else _match_sheet(f"{base} (Rev)")
+        base_actual = _match_sheet(base) or _match_sheet(short_key)
         if rev_found:
             sheets = [rev_found]
-            if base_actual:
+            if base_actual and base_actual != rev_found:
                 sheets.append(base_actual)
             return sheets
         if base_actual:

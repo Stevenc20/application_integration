@@ -14,10 +14,32 @@ class ExcelScheduleParser
     public function parse(string $filePath, string $originalName): array
     {
         try {
-            $spreadsheet = IOFactory::load($filePath);
-            $sheetNames = $spreadsheet->getSheetNames();
+            $reader = IOFactory::createReaderForFile($filePath);
+            if (method_exists($reader, 'setReadDataOnly')) {
+                $reader->setReadDataOnly(true);
+            }
+            if (method_exists($reader, 'setReadEmptyCells')) {
+                $reader->setReadEmptyCells(false);
+            }
 
-            $sheetsToProcess = $this->chooseSheets($sheetNames);
+            $sheetNames = method_exists($reader, 'listWorksheetNames')
+                ? $reader->listWorksheetNames($filePath)
+                : [];
+
+            $sheetsToProcess = ! empty($sheetNames)
+                ? $this->chooseSheets($sheetNames)
+                : [];
+
+            if (! empty($sheetsToProcess) && method_exists($reader, 'setLoadSheetsOnly')) {
+                $reader->setLoadSheetsOnly($sheetsToProcess);
+            }
+
+            $spreadsheet = $reader->load($filePath);
+            if (empty($sheetsToProcess)) {
+                $sheetNames = $spreadsheet->getSheetNames();
+                $sheetsToProcess = $this->chooseSheets($sheetNames);
+            }
+
             if (empty($sheetsToProcess)) {
                 return ['error' => 'Tidak ada sheet Shift Pagi / Shift Malam yang ditemukan di file ini.'];
             }
@@ -97,16 +119,19 @@ class ExcelScheduleParser
         $result = [];
 
         foreach ($targets as $base) {
-            $rev = $base . ' (Rev)';
             $foundRev = null;
             $foundBase = null;
+            $baseUpper = strtoupper($base);
+            $shortKey = str_contains($baseUpper, 'PAGI') ? 'PAGI' : 'MALAM';
 
             foreach ($sheetNames as $sn) {
-                $su = strtoupper($sn);
-                $baseUpper = strtoupper($base);
-                if (strtoupper($sn) === $baseUpper) {
+                $su = strtoupper(trim((string) $sn));
+                if (str_contains($su, 'MASTER')) {
+                    continue;
+                }
+                if ($su === $baseUpper || $su === $shortKey) {
                     $foundBase = $sn;
-                } elseif (str_contains($su, $baseUpper) && str_contains($su, 'REV')) {
+                } elseif ((str_contains($su, $baseUpper) || str_contains($su, $shortKey)) && str_contains($su, 'REV')) {
                     $foundRev = $sn;
                 }
             }
@@ -132,7 +157,7 @@ class ExcelScheduleParser
 
     private function parseSheet(Worksheet $ws, string $sheetName): array
     {
-        $allRows = $ws->toArray();
+        $allRows = $ws->toArray(null, false, true, false);
         $total = count($allRows);
         $result = [];
 
