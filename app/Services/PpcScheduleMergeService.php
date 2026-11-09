@@ -104,6 +104,7 @@ class PpcScheduleMergeService
                 $pressName = $sheetData['press_name'];
                 $lineId = $this->matchLineId($pressName, $lineMap);
                 $importedSectionKeys[$this->sectionKeyFrom($cleanShift, $pressName)] = true;
+                $sectionRetainedPlans = [];
 
                 foreach ($sheetData['rows'] as $item) {
                     $rawJobMaster = $this->safeVal($item['job_master'] ?? null, '');
@@ -170,9 +171,9 @@ class PpcScheduleMergeService
                         continue;
                     }
 
-                    $planQty = (float) $this->safeVal($item['plan'], 0);
+                    $planQty = (float) $this->safeVal($item['plan'] ?? null, 0);
                     $ctDetik = (float) $this->safeVal($item['ct_detik'] ?? ($item['ct'] ?? 0), 0);
-                    $processTimeRaw = (float) $this->safeVal($item['process_time'], 0);
+                    $processTimeRaw = (float) $this->safeVal($item['process_time'] ?? null, 0);
 
                     $isSummaryPattern = str_contains($upperJobMaster, 'TOTAL FINISH')
                         || str_contains($upperJobNo, 'TOTAL FINISH')
@@ -232,7 +233,7 @@ class PpcScheduleMergeService
                     }
                     $importedJobKeys[$dedupKey] = true;
 
-                    $finalRowNo = (int) $this->safeVal($item['row_no'], 0);
+                    $finalRowNo = (int) $this->safeVal($item['row_no'] ?? null, 0);
 
                     $rowAttributes = [
                         'line_master_id' => $lineId,
@@ -249,18 +250,18 @@ class PpcScheduleMergeService
                         'row_type' => $rowType,
                         'source_type' => 'ppc',
                         'type_plt' => $item['type_plt'] ?? null,
-                        'qty_plt' => $this->safeVal($item['qty_plt'], 0),
-                        'keb_mtl' => $this->safeVal($item['keb_mtl'], 0),
-                        'total_plt' => $this->safeVal($item['total_plt'], 0),
+                        'qty_plt' => $this->safeVal($item['qty_plt'] ?? null, 0),
+                        'keb_mtl' => $this->safeVal($item['keb_mtl'] ?? null, 0),
+                        'total_plt' => $this->safeVal($item['total_plt'] ?? null, 0),
                         'each_part' => $item['each_part'] ?? null,
                         'plan' => $planQty,
                         'ct_detik' => $ctDetik,
                         'process_time' => $rowType === 'job' ? $processTimeRaw : 0,
-                        'reg_active' => $this->safeVal($item['reg_active'], 0),
-                        'dct' => $this->safeVal($item['dct'], 0),
-                        'mct' => $this->safeVal($item['mct'], 0),
-                        'plan_dct' => $this->safeVal($item['plan_dct'], 0),
-                        'tpt' => $this->safeVal($item['tpt'], 0),
+                        'reg_active' => $this->safeVal($item['reg_active'] ?? null, 0),
+                        'dct' => $this->safeVal($item['dct'] ?? null, 0),
+                        'mct' => $this->safeVal($item['mct'] ?? null, 0),
+                        'plan_dct' => $this->safeVal($item['plan_dct'] ?? null, 0),
+                        'tpt' => $this->safeVal($item['tpt'] ?? null, 0),
                         'gsph_item' => $this->safeVal($item['gsph_item'] ?? ($item['gsph'] ?? 0), 0),
                         'start_time' => $cleanStart,
                         'finish_time' => $cleanFinish,
@@ -331,11 +332,14 @@ class PpcScheduleMergeService
 
                         $retainedPlanIds[] = $matchedPlan->id;
                         $usedPlanIds[(int) $matchedPlan->id] = true;
-                        $this->syncJobMasterSchedule($matchedPlan->fresh(), $jobsByPlanId, $parsedDate);
+                        $freshMatched = $matchedPlan->fresh();
+                        $sectionRetainedPlans[] = $freshMatched;
+                        $this->syncJobMasterSchedule($freshMatched, $jobsByPlanId, $parsedDate);
                     } else {
                         $newPlan = ProductionPlan::create(array_merge($rowAttributes, ['status' => 'pending']));
                         $retainedPlanIds[] = $newPlan->id;
                         $usedPlanIds[(int) $newPlan->id] = true;
+                        $sectionRetainedPlans[] = $newPlan;
                         $added[] = $this->snapshotPlan($newPlan);
                         $imported++;
 
@@ -344,6 +348,10 @@ class PpcScheduleMergeService
 
                     $imported++;
                 }
+
+                // ONE SCHEDULE = ONE JOB IDENTITY:
+                // Link break-split continuations in the imported section to their root schedule
+                $this->linkBreakSplitContinuations($sectionRetainedPlans, $jobsByPlanId, $parsedDate);
             }
 
             $notInRevision = $existingPlans
@@ -635,7 +643,153 @@ class PpcScheduleMergeService
         );
     }
 
-    private function syncJobMasterSchedule(ProductionPlan $plan, array &$jobsByPlanId, string $parsedDate): void
+    /**
+     * Identify and link break-split schedule slices within an imported section so that
+     * ONE SCHEDULE = ONE JOB IDENTITY holds directly after Excel import.
+     *
+     * Rules:
+     * - A job row immediately following one or more 'break' rows is linked to the job row
+     *   immediately preceding the break(s) ONLY IF:
+     *   1) Both rows have the exact same non-empty job_no and job_master.
+     *   2) Either:
+     *      (a) the post-break row has no new changeover (dct == 0 and reg_active == 0), OR
+     *      (b) the pre-break slice was Dandori-only (pre-break plan == 0 and post-break plan > 0), OR
+     *      (c) the pre-break finish_time matches the break start_time AND the post-break start_time
+     *          matches the break finish_time AND post-break dct == 0.
+     * - Independent schedules with the same job_no / part_number (e.g. separated by another job
+     *   or having their own changeover/dandori after a completed batch) remain separate root schedules!
+     *
+     * @param  array<int, ProductionPlan>  $sectionPlans
+     * @param  array<int, JobMaster>  $jobsByPlanId
+     */
+    private function linkBreakSplitContinuations(array $sectionPlans, array &$jobsByPlanId, string $parsedDate): void
+    {
+        if (count($sectionPlans) < 2) {
+            return;
+        }
+
+        // Sort by row_no ascending, then id ascending to follow exact sheet sequence
+        usort($sectionPlans, function (ProductionPlan $a, ProductionPlan $b) {
+            $rA = (int) ($a->row_no ?? 0);
+            $rB = (int) ($b->row_no ?? 0);
+            return $rA !== $rB ? ($rA <=> $rB) : ((int) $a->id <=> (int) $b->id);
+        });
+
+        /** @var ProductionPlan|null $lastJobPlan */
+        $lastJobPlan = null;
+        /** @var ProductionPlan|null $currentRootPlan */
+        $currentRootPlan = null;
+        $currentSessionNo = 1;
+        $sawBreakSinceLastJob = false;
+
+        /** @var array<int, array<int, ProductionPlan>> $groupsByRootId */
+        $groupsByRootId = [];
+
+        foreach ($sectionPlans as $plan) {
+            $type = $plan->row_type ?? 'job';
+            if ($type === 'break') {
+                if ($lastJobPlan !== null) {
+                    $sawBreakSinceLastJob = true;
+                }
+                continue;
+            }
+
+            if ($type !== 'job') {
+                continue;
+            }
+
+            $jn = strtoupper(trim((string) ($plan->job_no ?? '')));
+            $jm = strtoupper(trim((string) ($plan->job_master ?? '')));
+
+            if ($jn === '' && $jm === '') {
+                $lastJobPlan = null;
+                $currentRootPlan = null;
+                $sawBreakSinceLastJob = false;
+                continue;
+            }
+
+            $isBreakContinuation = false;
+            if ($sawBreakSinceLastJob && $lastJobPlan !== null && $currentRootPlan !== null) {
+                $prevJn = strtoupper(trim((string) ($lastJobPlan->job_no ?? '')));
+                $prevJm = strtoupper(trim((string) ($lastJobPlan->job_master ?? '')));
+
+                $sameIdentity = ($jn !== '' && $jn === $prevJn)
+                    && ($jm === '' || $prevJm === '' || $jm === $prevJm);
+
+                if ($sameIdentity) {
+                    $postDct = (float) ($plan->dct ?? 0);
+                    $postReg = (float) ($plan->reg_active ?? 0);
+                    $prePlanQty = (float) ($lastJobPlan->plan ?? 0);
+                    $postPlanQty = (float) ($plan->plan ?? 0);
+
+                    // Continuing across a break: either post-break has 0 DCT/RegActive,
+                    // or pre-break was a Dandori-only slice (plan == 0) before the break.
+                    if (($postDct <= 0 && $postReg <= 0) || ($prePlanQty <= 0 && $postPlanQty > 0)) {
+                        $isBreakContinuation = true;
+                    }
+                }
+            }
+
+            if ($isBreakContinuation && $currentRootPlan !== null) {
+                $currentSessionNo++;
+                $splitGroup = $currentRootPlan->split_group ?: ('SPLIT-' . $currentRootPlan->id);
+
+                if ($currentRootPlan->session_no === null) {
+                    $currentRootPlan->session_no = 1;
+                }
+                if ($currentRootPlan->split_group !== $splitGroup) {
+                    $currentRootPlan->split_group = $splitGroup;
+                }
+
+                $plan->parent_job_id = $currentRootPlan->id;
+                $plan->session_no = $currentSessionNo;
+                $plan->split_group = $splitGroup;
+                $plan->save();
+
+                $groupsByRootId[(int) $currentRootPlan->id][] = $plan;
+            } else {
+                // Ensure an independent root schedule does not keep a stale parent_job_id
+                if ($plan->parent_job_id !== null) {
+                    $plan->parent_job_id = null;
+                    $plan->session_no = null;
+                    $plan->split_group = null;
+                    $plan->save();
+                }
+                $currentRootPlan = $plan;
+                $currentSessionNo = 1;
+                $groupsByRootId[(int) $currentRootPlan->id] = [$currentRootPlan];
+            }
+
+            $lastJobPlan = $plan;
+            $sawBreakSinceLastJob = false;
+        }
+
+        // Update original_plan on root schedules that have break-split continuations
+        $candidatePool = collect($sectionPlans);
+        foreach ($groupsByRootId as $rootId => $slices) {
+            /** @var ProductionPlan $root */
+            $root = $slices[0];
+            if (count($slices) > 1) {
+                $totalPlanQty = collect($slices)->sum(fn (ProductionPlan $s) => (float) ($s->plan ?? 0));
+                $root->original_plan = $totalPlanQty;
+                $root->session_no = 1;
+                $root->split_group = $root->split_group ?: ('SPLIT-' . $root->id);
+                $root->save();
+
+                foreach ($slices as $slice) {
+                    if ((int) $slice->id !== (int) $root->id && empty($slice->original_plan)) {
+                        $slice->original_plan = $slice->plan;
+                        $slice->save();
+                    }
+                }
+            }
+
+            // Re-sync root JobMaster with the canonical effective target quantity
+            $this->syncJobMasterSchedule($root->fresh(), $jobsByPlanId, $parsedDate, $candidatePool);
+        }
+    }
+
+    private function syncJobMasterSchedule(ProductionPlan $plan, array &$jobsByPlanId, string $parsedDate, ?Collection $candidatePool = null): void
     {
         if ($plan->row_type !== 'job') {
             return;
@@ -649,8 +803,15 @@ class PpcScheduleMergeService
         }
 
         $identifier = $this->identifierFor($plan);
+        $effectiveTarget = $plan->isChildSlice()
+            ? (int) ($plan->plan ?? 0)
+            : $plan->effectiveTargetQty($candidatePool);
+        $effectiveFinish = $plan->isChildSlice()
+            ? $plan->finish_time
+            : $plan->effectiveFinishTime($candidatePool);
+
         $updates = [
-            'target_qty' => (int) ($plan->plan ?? 0),
+            'target_qty' => $effectiveTarget,
             'sequence_no' => $plan->row_no ?: ($jobMaster->sequence_no ?? 1),
             'capacity' => (int) ($plan->qty_plt ?? 0),
         ];
@@ -658,8 +819,8 @@ class PpcScheduleMergeService
         if ($plan->start_time) {
             $updates['plan_start'] = Carbon::parse($parsedDate.' '.$plan->start_time)->startOfMinute();
         }
-        if ($plan->finish_time) {
-            $updates['plan_end'] = Carbon::parse($parsedDate.' '.$plan->finish_time)->startOfMinute();
+        if ($effectiveFinish) {
+            $updates['plan_end'] = Carbon::parse($parsedDate.' '.$effectiveFinish)->startOfMinute();
         }
         if ((string) $jobMaster->job_name !== (string) $plan->job_master) {
             $updates['job_name'] = $plan->job_master;

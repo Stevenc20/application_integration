@@ -485,8 +485,16 @@ foreach ($breakWindows as $idx => $b) {
             ceil($sessionAProcessTime + $dct);
 
         // UPDATE ITEM ASLI
-        $itemPlan->original_plan =
-            $planQty;
+        $rootParentId = $itemPlan->parent_job_id ?: $itemPlan->id;
+        $currentSessionNo = (int) ($itemPlan->session_no ?: 1);
+        $splitGroup = $itemPlan->split_group ?: ($rootParentId ? ('SPLIT-' . $rootParentId) : null);
+
+        if (empty($itemPlan->original_plan)) {
+            $itemPlan->original_plan = $planQty;
+        }
+
+        $itemPlan->session_no = $currentSessionNo;
+        $itemPlan->split_group = $splitGroup;
 
         $itemPlan->plan =
             $processableQty;
@@ -506,6 +514,13 @@ foreach ($breakWindows as $idx => $b) {
             $b['start'];
 
         $itemPlan->save();
+
+        if (!$rootParentId) {
+            $rootParentId = $itemPlan->id;
+            $splitGroup = 'SPLIT-' . $rootParentId;
+            $itemPlan->split_group = $splitGroup;
+            $itemPlan->save();
+        }
 
         // Add Session A to output sequence — stops exactly at break start
         $outputSequence[] = [
@@ -557,7 +572,10 @@ foreach ($breakWindows as $idx => $b) {
         if ($remainingQty > 0) {
             $clone = $itemPlan->replicate();
             $clone->id = null;
-            $clone->parent_job_id = $itemPlan->id;
+            $clone->parent_job_id = $rootParentId;
+            $clone->session_no = $currentSessionNo + 1;
+            $clone->split_group = $splitGroup;
+            $clone->original_plan = $remainingQty;
             $clone->plan = $remainingQty;
             $clone->start_time = $b['finish'];
 

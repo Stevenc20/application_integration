@@ -100,18 +100,13 @@ class CutOffService
                 ->filter()
                 ->toArray();
 
-            $unfinishedPlansQuery = ProductionPlan::whereDate('plan_date', $date)
+            $sectionPlansQuery = ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', 'like', "{$shiftName}%")
                 ->where('row_type', 'job')
-                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
-                ->whereNotIn('id', $existingPlanIds)
-                ->where(function ($q) {
-                    $q->whereRaw('COALESCE(ok, 0) < COALESCE(plan, 0)')
-                      ->orWhereNull('ok');
-                });
+                ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
             if ($normalizedPress !== null) {
-                $unfinishedPlansQuery->whereRaw("
+                $sectionPlansQuery->whereRaw("
                     REPLACE(
                         REPLACE(
                             UPPER(TRIM(press_name)),
@@ -124,13 +119,58 @@ class CutOffService
                 ", [$normalizedPress]);
             }
 
-            $unfinishedPlans = $unfinishedPlansQuery->get();
+            $allSectionPlans = $sectionPlansQuery->orderBy('row_no')->orderBy('id')->get();
+
+            // ONE SCHEDULE = ONE JOB IDENTITY:
+            // Evaluate cut-off only per ROOT schedule identity (whereNull('parent_job_id')),
+            // aggregating target and actuals across the root + all child slices so break-split
+            // schedules never create duplicate RecoveryItems or false deficits.
+            $rootPlans = $allSectionPlans
+                ->filter(fn (ProductionPlan $p) => !$p->isChildSlice() && !in_array($p->id, $existingPlanIds, true))
+                ->values();
+
+            $unfinishedPlans = collect();
+            $groupStatsByRootId = [];
+
+            foreach ($rootPlans as $rootPlan) {
+                $groupSlices = $rootPlan->getScheduleGroupPlans($allSectionPlans);
+                $planQty = (float) $rootPlan->effectiveTargetQty($allSectionPlans);
+
+                // Avoid double-counting ok/repair/reject if root and child slices were both synced with the same total:
+                // When ProductionPlanController::index() or syncPlan() updates slices, check if slices hold distinct actuals or mirrored actuals.
+                $sumOk = (float) $groupSlices->sum(fn (ProductionPlan $s) => (float) ($s->ok ?? 0));
+                $maxOk = (float) $groupSlices->max(fn (ProductionPlan $s) => (float) ($s->ok ?? 0));
+                $allNonZeroIdentical = $groupSlices->count() > 1
+                    && $maxOk > 0
+                    && $groupSlices->filter(fn (ProductionPlan $s) => (float) ($s->ok ?? 0) > 0)->every(fn (ProductionPlan $s) => (float) $s->ok === $maxOk);
+
+                $actualQty = $allNonZeroIdentical ? $maxOk : $sumOk;
+                $repairQty = $allNonZeroIdentical
+                    ? (float) $groupSlices->max(fn (ProductionPlan $s) => (float) ($s->repair ?? 0))
+                    : (float) $groupSlices->sum(fn (ProductionPlan $s) => (float) ($s->repair ?? 0));
+                $rejectQty = $allNonZeroIdentical
+                    ? (float) $groupSlices->max(fn (ProductionPlan $s) => (float) ($s->reject ?? 0))
+                    : (float) $groupSlices->sum(fn (ProductionPlan $s) => (float) ($s->reject ?? 0));
+
+                if ($actualQty < $planQty) {
+                    $unfinishedPlans->push($rootPlan);
+                    $groupStatsByRootId[(int) $rootPlan->id] = [
+                        'plan_qty'   => $planQty,
+                        'actual_qty' => $actualQty,
+                        'repair_qty' => $repairQty,
+                        'reject_qty' => $rejectQty,
+                    ];
+                }
+            }
 
             $stats['total_unfinished'] = $unfinishedPlans->count();
 
             foreach ($unfinishedPlans as $plan) {
-                $actualQty = (float)($plan->ok ?? 0);
-                $planQty = (float)($plan->plan ?? 0);
+                $gStat = $groupStatsByRootId[(int) $plan->id] ?? null;
+                $actualQty = $gStat ? $gStat['actual_qty'] : (float) ($plan->ok ?? 0);
+                $planQty = $gStat ? $gStat['plan_qty'] : (float) $plan->effectiveTargetQty($allSectionPlans);
+                $repairQty = $gStat ? $gStat['repair_qty'] : (float) ($plan->repair ?? 0);
+                $rejectQty = $gStat ? $gStat['reject_qty'] : (float) ($plan->reject ?? 0);
                 $recoveryQty = max(0, $planQty - $actualQty);
 
                 if ($recoveryQty <= 0) {
@@ -164,8 +204,8 @@ class CutOffService
                     'press_name'           => $plan->press_name,
                     'plan_qty'             => $planQty,
                     'ok'                   => $actualQty,
-                    'repair'               => (float)($plan->repair ?? 0),
-                    'reject'               => (float)($plan->reject ?? 0),
+                    'repair'               => $repairQty,
+                    'reject'               => $rejectQty,
                     'ct_detik'             => $ctDetik,
                     'dct'                  => $dct,
                     'reg_active'           => (float)($plan->reg_active ?? 0),

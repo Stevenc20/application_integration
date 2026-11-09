@@ -37,34 +37,32 @@ class ProductionPlanController extends Controller
         try {
             $plansForDate = ProductionPlan::whereDate('plan_date', $date)->get();
             $mergeService = app(\App\Services\PpcScheduleMergeService::class);
-            foreach ($plansForDate as $plan) {
-                $jn = trim($plan->job_no ?? '');
-                $jm = trim($plan->job_master ?? '');
+
+            // Process per root schedule identity (ONE SCHEDULE = ONE JOB IDENTITY)
+            // Never fall back to JobMaster::where('job_number', 'LIKE', "{$jn}-%"), which would
+            // cross-contaminate independent schedules that share the same job_no!
+            $rootPlans = $plansForDate->filter(fn (ProductionPlan $p) => ($p->row_type ?? 'job') === 'job' && !$p->isChildSlice());
+
+            foreach ($rootPlans as $rootPlan) {
+                $jn = trim($rootPlan->job_no ?? '');
+                $jm = trim($rootPlan->job_master ?? '');
                 if (blank($jn) && blank($jm)) {
                     continue;
                 }
 
-                // Cari JobMaster terhubung: via format -{$plan->id}, atau slug AUTO-{jm}-{$plan->id}, atau job_number sama
-                $job = $mergeService->findLinkedJobMaster((int) $plan->id);
-                if (! $job && $jn !== '') {
-                    $job = \App\Models\JobMaster::where('job_number', $jn)
-                        ->orWhere('job_number', 'LIKE', "{$jn}-%")
-                        ->first();
-                }
+                $groupSlices = $rootPlan->getScheduleGroupPlans($plansForDate);
+                $groupPlanIds = $groupSlices->pluck('id')->map(fn ($id) => (int) $id)->all();
 
-                if ($job) {
-                    // Cari juga child job masters jika job ini di-split
-                    $childPlanIds = ProductionPlan::where('parent_job_id', $plan->id)->pluck('id')->toArray();
-                    $targetJobIds = [$job->id];
-                    if (! empty($childPlanIds)) {
-                        $childJobs = \App\Models\JobMaster::where(function ($q) use ($childPlanIds) {
-                            foreach ($childPlanIds as $cId) {
-                                $q->orWhere('job_number', 'LIKE', "%-{$cId}");
-                            }
-                        })->pluck('id')->toArray();
-                        $targetJobIds = array_unique(array_merge($targetJobIds, $childJobs));
+                $targetJobIds = [];
+                foreach ($groupPlanIds as $pid) {
+                    $linkedJob = $mergeService->findLinkedJobMaster($pid);
+                    if ($linkedJob) {
+                        $targetJobIds[] = (int) $linkedJob->id;
                     }
+                }
+                $targetJobIds = array_values(array_unique($targetJobIds));
 
+                if (! empty($targetJobIds)) {
                     $dailyRecords = \App\Models\DailyProduction::whereIn('job_master_id', $targetJobIds)
                         ->whereDate('work_date', $date)
                         ->get();
@@ -74,16 +72,41 @@ class ProductionPlanController extends Controller
                         $repair = $dailyRecords->sum(fn ($d) => $d->actual_repair ?? $d->repair_qty ?? 0);
                         $reject = $dailyRecords->sum(fn ($d) => $d->actual_reject ?? $d->reject_qty ?? 0);
                     } else {
-                        $ok = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)->sum('ok_qty');
-                        $repair = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)->sum('repair_qty');
-                        $reject = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)->sum('reject_qty');
+                        [$winStart, $winEnd] = \App\Services\ProductionMetricsService::shiftWindow($date, $rootPlan->shift_name ?? 'Shift Pagi');
+                        $ok = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)
+                            ->where('created_at', '>=', $winStart)
+                            ->where('created_at', '<', $winEnd)
+                            ->sum('ok_qty');
+                        $repair = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)
+                            ->where('created_at', '>=', $winStart)
+                            ->where('created_at', '<', $winEnd)
+                            ->sum('repair_qty');
+                        $reject = \App\Models\ProductionLog::whereIn('job_master_id', $targetJobIds)
+                            ->where('created_at', '>=', $winStart)
+                            ->where('created_at', '<', $winEnd)
+                            ->sum('reject_qty');
                     }
 
-                    $plan->update([
+                    // Store the schedule identity's actuals on the root plan, and zero out child slices'
+                    // ok/repair/reject so that summing $jobPlans->sum('ok') in TOTAL FINISH never double-counts!
+                    $rootPlan->update([
                         'ok' => (float) $ok,
                         'repair' => (float) $repair,
                         'reject' => (float) $reject,
                     ]);
+
+                    if ($groupSlices->count() > 1) {
+                        $childIds = $groupSlices->filter(fn (ProductionPlan $s) => (int) $s->id !== (int) $rootPlan->id)
+                            ->pluck('id')
+                            ->all();
+                        if (! empty($childIds)) {
+                            ProductionPlan::whereIn('id', $childIds)->update([
+                                'ok' => 0,
+                                'repair' => 0,
+                                'reject' => 0,
+                            ]);
+                        }
+                    }
                 }
             }
         } catch (\Throwable $e) {
@@ -264,6 +287,9 @@ class ProductionPlanController extends Controller
 
         $totalJobs = $allPlans->where('row_type', 'job')
             ->filter(function ($p) {
+                if (! empty($p->parent_job_id)) {
+                    return false;
+                }
                 return (! empty($p->job_no) && $p->job_no !== '—') || (! empty($p->job_master) && $p->job_master !== '—');
             })
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
@@ -1291,27 +1317,24 @@ class ProductionPlanController extends Controller
             return;
         }
 
-        // Gunakan job_no dari excel jika ada, jika tidak generate
-        $jobNumber = $plan->job_no;
-        if (! $jobNumber) {
-            $dateStr = $plan->plan_date ? $plan->plan_date->format('Ymd') : now()->format('Ymd');
-            $lineName = $plan->press_name ?? ($plan->line ? $plan->line->line_name : 'UNKNOWN');
-            $jobNumber = 'JOB-'.$dateStr.'-'.strtoupper(Str::slug($lineName));
-        }
+        // ONE SCHEDULE = ONE JOB IDENTITY:
+        // Always resolve the root schedule plan and use canonicalJobNumber() ("{job_no}-{root_id}")
+        // so separate schedules with the same job_no never collide, and child slices update the root JobMaster.
+        $rootPlan = $plan->resolveRootPlan();
+        $jobNumber = $rootPlan->canonicalJobNumber();
 
         // Map data plan ke JobMaster
         JobMaster::updateOrCreate(
             ['job_number' => $jobNumber],
             [
-                'job_name' => $plan->job_master ?? ('Plan: '.($plan->press_name ?? 'Line')),
-                'line' => $plan->press_name ?? ($plan->line ? $plan->line->line_name : null),
-                'capacity' => $plan->qty_plt ?? 0,
+                'job_name' => $rootPlan->job_master ?? ('Plan: '.($rootPlan->press_name ?? 'Line')),
+                'line' => $rootPlan->press_name ?? ($rootPlan->line ? $rootPlan->line->line_name : null),
+                'capacity' => $rootPlan->qty_plt ?? 0,
                 'status' => 'active',
-                'sequence_no' => $plan->row_no ?? 1,
-                'plan_start' => $plan->start_time,
-                'plan_end' => $plan->finish_time,
-                // Kita simpan target_qty (PLAN di excel)
-                'target_qty' => $plan->plan ?? 0,
+                'sequence_no' => $rootPlan->row_no ?? 1,
+                'plan_start' => $rootPlan->start_time,
+                'plan_end' => $rootPlan->effectiveFinishTime(),
+                'target_qty' => $rootPlan->effectiveTargetQty(),
             ]
         );
     }
