@@ -122,20 +122,26 @@
             $trueSessionStart = $firstDandori ? $firstDandori->start_time : ($effectiveStartedAt ?? ($isRunningStatus ? now() : null));
 
             $prodPlan = $activeJob->production_plan;
-            $schedStart = $prodPlan ? $prodPlan->start_time : ($activeJob->plan_start ? \Carbon\Carbon::parse($activeJob->plan_start)->format('H:i') : '07:40');
-            $schedFinish = $prodPlan ? $prodPlan->finish_time : ($activeJob->plan_end ? \Carbon\Carbon::parse($activeJob->plan_end)->format('H:i') : '10:40');
+            $rootProdPlan = $prodPlan ? $prodPlan->resolveRootPlan() : null;
+            $effectiveProdPlan = $rootProdPlan ?: $prodPlan;
+
+            $schedStart = $effectiveProdPlan ? $effectiveProdPlan->start_time : ($activeJob->plan_start ? \Carbon\Carbon::parse($activeJob->plan_start)->format('H:i') : '07:40');
+            $schedFinish = $effectiveProdPlan ? ($effectiveProdPlan->effectiveFinishTime() ?: $effectiveProdPlan->finish_time) : ($activeJob->plan_end ? \Carbon\Carbon::parse($activeJob->plan_end)->format('H:i') : '10:40');
             $actStartVal = $trueSessionStart
                 ? \Carbon\Carbon::parse($trueSessionStart)->format('H:i')
-                : ($prodPlan && $prodPlan->act_start ? $prodPlan->act_start : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->format('H:i') : null));
-            $actFinishVal = $prodPlan && $prodPlan->act_finish ? $prodPlan->act_finish : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->format('H:i') : null);
+                : ($effectiveProdPlan && $effectiveProdPlan->act_start ? $effectiveProdPlan->act_start : ($activeJob->started_at ? \Carbon\Carbon::parse($activeJob->started_at)->format('H:i') : null));
+            $actFinishVal = $effectiveProdPlan && $effectiveProdPlan->act_finish ? $effectiveProdPlan->act_finish : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->format('H:i') : null);
 
             $actEndEstimate = null;
             if ($actStartVal && $schedStart && $schedFinish) {
                 $ppcStartCalc = \Carbon\Carbon::parse($date . ' ' . $schedStart);
                 $ppcEndCalc = \Carbon\Carbon::parse($date . ' ' . $schedFinish);
-                $tptMinutes = ($prodPlan && (float)($prodPlan->tpt ?? 0) > 0)
-                    ? (float)$prodPlan->tpt
-                    : $ppcStartCalc->diffInMinutes($ppcEndCalc);
+                $effectiveTpt = $effectiveProdPlan ? $effectiveProdPlan->effectiveTptMinutes() : 0;
+                $tptMinutes = $effectiveTpt > 0
+                    ? $effectiveTpt
+                    : (($effectiveProdPlan && (float)($effectiveProdPlan->tpt ?? 0) > 0)
+                        ? (float)$effectiveProdPlan->tpt
+                        : $ppcStartCalc->diffInMinutes($ppcEndCalc));
                 $actualStartCalc = \Carbon\Carbon::parse($date . ' ' . $actStartVal);
                 $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
             }
@@ -223,8 +229,8 @@
 
                         <!-- Current Time Marker Line -->
                         @php
-                            $ppcStart = $prodPlan?->start_time ? \Carbon\Carbon::parse($date . ' ' . $prodPlan->start_time) : null;
-                            $ppcEnd = $prodPlan?->finish_time ? \Carbon\Carbon::parse($date . ' ' . $prodPlan->finish_time) : null;
+                            $ppcStart = $effectiveProdPlan?->start_time ? \Carbon\Carbon::parse($date . ' ' . $effectiveProdPlan->start_time) : null;
+                            $ppcEnd = $effectiveProdPlan?->effectiveFinishTime() ? \Carbon\Carbon::parse($date . ' ' . $effectiveProdPlan->effectiveFinishTime()) : ($effectiveProdPlan?->finish_time ? \Carbon\Carbon::parse($date . ' ' . $effectiveProdPlan->finish_time) : null);
                             $planStart = $ppcStart ?? \Carbon\Carbon::parse($activeJob->plan_start ?? now()->startOfDay()->addHours(7)->addMinutes(40));
                             $planEnd = $ppcEnd ?? \Carbon\Carbon::parse($activeJob->plan_end ?? now()->startOfDay()->addHours(10)->addMinutes(40));
                             $totalDur = max(1, $planEnd->diffInSeconds($planStart));

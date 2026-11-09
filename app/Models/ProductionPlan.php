@@ -413,6 +413,19 @@ class ProductionPlan extends Model
     }
 
     /**
+     * Resolve the effective total TPT (Total Process Time in minutes) across all slices of this schedule identity.
+     */
+    public function effectiveTptMinutes(?\Illuminate\Support\Collection $candidatePool = null): float
+    {
+        $group = $this->getScheduleGroupPlans($candidatePool);
+        if ($group->count() <= 1) {
+            return (float) ($this->tpt ?? 0);
+        }
+
+        return (float) $group->sum(fn(self $slice) => (float) ($slice->tpt ?? 0));
+    }
+
+    /**
      * Canonical JobMaster job_number using the ROOT ProductionPlan ID.
      * Format: "{job_no}-{root_id}" or "AUTO-{slug}-{root_id}".
      */

@@ -259,6 +259,10 @@ class InputHarianController extends Controller
             if (($planRow->row_type ?? 'job') === 'job') {
                 $planRow->plan = $planRow->effectiveTargetQty();
                 $planRow->finish_time = $planRow->effectiveFinishTime() ?: $planRow->finish_time;
+                $effectiveTpt = $planRow->effectiveTptMinutes();
+                if ($effectiveTpt > 0) {
+                    $planRow->tpt = $effectiveTpt;
+                }
             }
         }
 

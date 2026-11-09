@@ -608,9 +608,16 @@ window.jobMasterData = {
         id: {{ $activeJob->id }},
         status: "{{ $activeJob->status }}",
         @php $activeDate = request('date', now()->toDateString()); @endphp
-        @php $activeProdPlan = $activeJob->production_plan ?: $activeJob->productionPlans->first(); @endphp
-        plan_start: {{ $activeProdPlan?->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $activeProdPlan->start_time)->timestamp * 1000 : (\Carbon\Carbon::parse($activeJob->plan_start ?: $activeDate . ' 07:40')->timestamp * 1000) }},
-        plan_end: {{ $activeProdPlan?->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $activeProdPlan->finish_time)->timestamp * 1000 : (\Carbon\Carbon::parse($activeJob->plan_end ?: $activeDate . ' 10:40')->timestamp * 1000) }},
+        @php 
+            $activeProdPlan = $activeJob->production_plan ?: $activeJob->productionPlans->first();
+            $activeRootPlan = $activeProdPlan ? $activeProdPlan->resolveRootPlan() : null;
+            $activeEffectivePlan = $activeRootPlan ?: $activeProdPlan;
+            $activeEffectiveFinish = $activeEffectivePlan ? ($activeEffectivePlan->effectiveFinishTime() ?: $activeEffectivePlan->finish_time) : null;
+            $activeEffectiveTpt = $activeEffectivePlan ? $activeEffectivePlan->effectiveTptMinutes() : 0;
+            $activeTargetQty = $activeEffectivePlan ? $activeEffectivePlan->effectiveTargetQty() : ($activeJob->target_qty ?? 0);
+        @endphp
+        plan_start: {{ $activeEffectivePlan?->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $activeEffectivePlan->start_time)->timestamp * 1000 : (\Carbon\Carbon::parse($activeJob->plan_start ?: $activeDate . ' 07:40')->timestamp * 1000) }},
+        plan_end: {{ $activeEffectiveFinish ? \Carbon\Carbon::parse($activeDate . ' ' . $activeEffectiveFinish)->timestamp * 1000 : (\Carbon\Carbon::parse($activeJob->plan_end ?: $activeDate . ' 10:40')->timestamp * 1000) }},
         started_at: {{ 
             (isset($sessionMap) && $sessionMap->has($activeJob->id) && $sessionMap->get($activeJob->id)?->start_time) 
                 ? \Carbon\Carbon::parse($sessionMap->get($activeJob->id)->start_time)->timestamp * 1000 
@@ -623,13 +630,13 @@ window.jobMasterData = {
                 : ($activeJob->finished_at ? \Carbon\Carbon::parse($activeJob->finished_at)->timestamp * 1000 : (in_array(strtolower($activeJob->status), ['complete', 'completed', 'finished', 'closed', 'done']) && $activeJob->updated_at ? \Carbon\Carbon::parse($activeJob->updated_at)->timestamp * 1000 : 'null')) 
         }},
         base_seconds: {{ $activeJob->dailyProduction ? (int)$activeJob->dailyProduction->runtime_seconds : 0 }},
-        target_qty: {{ ($activeProdPlan?->plan ?? $activeJob->target_qty) ?? 0 }},
+        target_qty: {{ $activeTargetQty }},
         actual_ok: {{ $activeJob->dailyProduction?->actual_ok ?? 0 }},
         actual_repair: {{ $activeJob->dailyProduction?->actual_repair ?? 0 }},
         actual_reject: {{ $activeJob->dailyProduction?->actual_reject ?? 0 }},
         dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($activeJob->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
-        tpt: {{ (float)(($activeProdPlan?->tpt ?? 0) > 0 ? $activeProdPlan->tpt : (($activeProdPlan?->start_time && $activeProdPlan?->finish_time) ? \Carbon\Carbon::parse($activeProdPlan->start_time)->diffInMinutes(\Carbon\Carbon::parse($activeProdPlan->finish_time)) : 0)) }},
+        tpt: {{ (float)($activeEffectiveTpt > 0 ? $activeEffectiveTpt : (($activeEffectivePlan?->tpt ?? 0) > 0 ? $activeEffectivePlan->tpt : (($activeEffectivePlan?->start_time && $activeEffectiveFinish) ? \Carbon\Carbon::parse($activeEffectivePlan->start_time)->diffInMinutes(\Carbon\Carbon::parse($activeEffectiveFinish)) : 0))) }},
         line: "{{ $activeJob->line ?? '' }}"
     },
     @endif
