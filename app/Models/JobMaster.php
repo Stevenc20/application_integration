@@ -80,15 +80,96 @@ class JobMaster extends Model
     }
 
     /**
+     * Extract trailing numeric ProductionPlan ID from job_number ("{job_no}-{plan_id}" or "AUTO-{slug}-{plan_id}").
+     */
+    public function extractPlanId(): ?int
+    {
+        if (empty($this->job_number)) {
+            return null;
+        }
+
+        $parts = explode('-', (string) $this->job_number);
+        $planId = end($parts);
+
+        return is_numeric($planId) && (int) $planId > 0 ? (int) $planId : null;
+    }
+
+    /**
      * Get specific ProductionPlan using the ID suffix from job_number
      */
     public function getProductionPlanAttribute()
     {
-        $parts = explode('-', $this->job_number);
-        $planId = end($parts);
-        if (is_numeric($planId)) {
+        $planId = $this->extractPlanId();
+        if ($planId !== null) {
             return \App\Models\ProductionPlan::find($planId);
         }
         return null;
+    }
+
+    /**
+     * Resolve the root ProductionPlan for this JobMaster (ONE SCHEDULE = ONE JOB IDENTITY).
+     */
+    public function resolveRootPlan(?\Illuminate\Support\Collection $candidatePool = null): ?\App\Models\ProductionPlan
+    {
+        $planId = $this->extractPlanId();
+        if ($planId === null) {
+            return null;
+        }
+
+        $plan = $candidatePool
+            ? $candidatePool->firstWhere('id', $planId)
+            : null;
+
+        if (!$plan) {
+            $plan = \App\Models\ProductionPlan::find($planId);
+        }
+
+        return $plan ? $plan->resolveRootPlan($candidatePool) : null;
+    }
+
+    /**
+     * Resolve the canonical root JobMaster for this schedule identity.
+     * If this JobMaster was created for a child break-split slice, returns the JobMaster
+     * linked to the root ProductionPlan (falling back to $this if not found so historical records never break).
+     */
+    public function resolveRootJobMaster(?\Illuminate\Support\Collection $candidatePool = null): self
+    {
+        $rootPlan = $this->resolveRootPlan($candidatePool);
+        if (!$rootPlan) {
+            return $this;
+        }
+
+        $currentPlanId = $this->extractPlanId();
+        if ($currentPlanId !== null && (int) $rootPlan->id === $currentPlanId) {
+            return $this;
+        }
+
+        $canonicalNumber = $rootPlan->canonicalJobNumber($candidatePool);
+        $rootJob = self::where('job_number', $canonicalNumber)->first();
+
+        if (!$rootJob) {
+            $rootJob = self::where('line', $this->line)
+                ->where('job_number', 'LIKE', '%-' . $rootPlan->id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        return $rootJob ?: $this;
+    }
+
+    /**
+     * Effective PPC target quantity for this job identity (evaluated from the root ProductionPlan group).
+     */
+    public function effectiveTargetQty(?\Illuminate\Support\Collection $candidatePool = null): int
+    {
+        $rootPlan = $this->resolveRootPlan($candidatePool);
+        if ($rootPlan) {
+            $planTarget = $rootPlan->effectiveTargetQty($candidatePool);
+            if ($planTarget > 0) {
+                return $planTarget;
+            }
+        }
+
+        return (int) round((float) ($this->target_qty ?? 0));
     }
 }

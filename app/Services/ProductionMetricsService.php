@@ -313,4 +313,37 @@ class ProductionMetricsService
 
         return 'Shift Malam';
     }
+
+    /**
+     * Normalize shift representation (1/2, 'Shift 1'/'Shift 2', 'Pagi'/'Malam') to canonical 'Shift Pagi' or 'Shift Malam'.
+     */
+    public static function normalizeShiftName(string|int|null $shift, ?\Carbon\CarbonInterface $now = null): string
+    {
+        if ($shift === null || trim((string) $shift) === '') {
+            return self::currentProductionShift($now);
+        }
+
+        if (is_numeric($shift)) {
+            return (int) $shift === 2 ? 'Shift Malam' : 'Shift Pagi';
+        }
+
+        $lower = strtolower(trim((string) $shift));
+        if (str_contains($lower, 'malam') || str_contains($lower, 'night') || $lower === 'shift 2' || $lower === 's2') {
+            return 'Shift Malam';
+        }
+
+        return 'Shift Pagi';
+    }
+
+    /**
+     * Canonical PPC target quantity for a ProductionPlan identity (ONE SCHEDULE = ONE JOB IDENTITY).
+     * Evaluates the root plan and all break-split slices without double-counting.
+     *
+     * @param  \App\Models\ProductionPlan  $plan
+     * @param  \Illuminate\Support\Collection<int, \App\Models\ProductionPlan>|null  $candidatePool
+     */
+    public static function effectivePlanQty(\App\Models\ProductionPlan $plan, ?\Illuminate\Support\Collection $candidatePool = null): int
+    {
+        return $plan->effectiveTargetQty($candidatePool);
+    }
 }

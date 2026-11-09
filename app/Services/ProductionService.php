@@ -1627,18 +1627,9 @@ class ProductionService
         if (is_numeric($planId)) {
             $currentPlan = \App\Models\ProductionPlan::find($planId);
             if ($currentPlan) {
-                // Find all plan IDs that belong to the same logical break-split tree to skip only them
-                $rootParentId = $currentPlan->parent_job_id ?: $currentPlan->id;
-                $siblingPlanIds = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
-                    ->where('shift_name', $currentPlan->shift_name)
-                    ->where('press_name', $currentPlan->press_name)
-                    ->where('row_type', 'job')
-                    ->where(function ($q) use ($rootParentId) {
-                        $q->where('id', $rootParentId)
-                          ->orWhere('parent_job_id', $rootParentId);
-                    })
-                    ->pluck('id')
-                    ->all();
+                // Find all plan IDs that belong to the same logical break-split tree (including multi-break chains) to skip only them
+                $siblingPlanIds = $currentPlan->getScheduleGroupPlanIds();
+                $maxSiblingRowNo = \App\Models\ProductionPlan::whereIn('id', $siblingPlanIds)->max('row_no') ?? $currentPlan->row_no;
 
                 $nextPlan = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
                     ->where('shift_name', $currentPlan->shift_name)
@@ -1646,15 +1637,23 @@ class ProductionService
                     ->where('row_type', 'job')
                     ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
                     ->whereNotIn('id', $siblingPlanIds)
-                    ->where('row_no', '>', $currentPlan->row_no)
+                    ->where('row_no', '>', $maxSiblingRowNo)
                     ->orderBy('row_no', 'asc')
                     ->first();
 
                 if ($nextPlan) {
-                    $nextIdentifier = $nextPlan->job_no ? ($nextPlan->job_no . '-' . $nextPlan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($nextPlan->job_master) . '-' . $nextPlan->id);
+                    $nextIdentifier = $nextPlan->canonicalJobNumber();
                     $nextJob = JobMaster::where('job_number', $nextIdentifier)
                         ->whereNotIn(DB::raw('LOWER(status)'), ['complete'])
                         ->first();
+                    if (!$nextJob) {
+                        $fallbackIdentifier = $nextPlan->job_no
+                            ? ($nextPlan->job_no . '-' . $nextPlan->id)
+                            : ('AUTO-' . \Illuminate\Support\Str::slug($nextPlan->job_master) . '-' . $nextPlan->id);
+                        $nextJob = JobMaster::where('job_number', $fallbackIdentifier)
+                            ->whereNotIn(DB::raw('LOWER(status)'), ['complete'])
+                            ->first();
+                    }
                     if ($nextJob) {
                         return $nextJob;
                     }
@@ -1830,7 +1829,7 @@ class ProductionService
 
     /**
      * Find sibling JobMaster records that belong to the same logical job
-     * (e.g. split across breaks in the same date/shift/line).
+     * (e.g. split across breaks in the same date/shift/line, including multi-break chains).
      *
      * @return \Illuminate\Database\Eloquent\Collection<int, JobMaster>
      */
@@ -1844,24 +1843,14 @@ class ProductionService
         $planId = $this->resolvePlanId($jobId);
         $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
 
-        $targetDate = $plan ? $plan->plan_date : $this->resolveWorkDate($jobId);
-        $targetShift = $plan ? $plan->shift_name : null;
         $targetLine = $job->line;
 
-        // CRITICAL FIX: Only TRUE break-split segments (linked via parent_job_id)
+        // CRITICAL FIX: Only TRUE break-split segments (linked via parent_job_id tree or split_group)
         // are siblings of the same logical job.
         // Independent schedules with the same job_no/part_number must NOT be treated as siblings!
         $matchingPlanIds = collect();
         if ($plan) {
-            $rootParentId = $plan->parent_job_id ?: $plan->id;
-            $matchingPlanIds = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
-                ->where('shift_name', $targetShift)
-                ->where('row_type', 'job')
-                ->where(function ($q) use ($rootParentId) {
-                    $q->where('id', $rootParentId)
-                      ->orWhere('parent_job_id', $rootParentId);
-                })
-                ->pluck('id');
+            $matchingPlanIds = collect($plan->getScheduleGroupPlanIds());
         }
 
         $query = JobMaster::where('id', '!=', $jobId);
@@ -1882,6 +1871,36 @@ class ProductionService
         }
 
         return $query->get();
+    }
+
+    /**
+     * Return all JobMaster IDs (including $jobId itself and any break-split siblings)
+     * belonging to the same canonical schedule identity.
+     *
+     * @return array<int, int>
+     */
+    public function getScheduleGroupJobMasterIds(int $jobId): array
+    {
+        $siblings = $this->getSiblingJobMasters($jobId);
+        return $siblings->pluck('id')
+            ->push($jobId)
+            ->map(fn($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * Resolve the canonical root JobMaster for a given JobMaster ID or model.
+     */
+    public function resolveRootJobMaster(int|JobMaster $job): ?JobMaster
+    {
+        $model = $job instanceof JobMaster ? $job : JobMaster::find($job);
+        if (!$model) {
+            return null;
+        }
+
+        return $model->resolveRootJobMaster();
     }
 
     private function signalDashboard(int $jobId): void
