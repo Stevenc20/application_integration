@@ -24,10 +24,10 @@ class ProductionPlanController extends Controller
     public function index(Request $request)
     {
         // 1. DATA CONTEXT: Cari data terbaru hanya untuk default awal
-        $maxDateRecord = ProductionPlan::orderBy('plan_date', 'desc')->first();
+        $maxDateRecord = ProductionPlan::activePpcRevision()->orderBy('plan_date', 'desc')->first();
         $maxDate = $maxDateRecord ? $maxDateRecord->plan_date->toDateString() : now()->toDateString();
 
-        $latestImport = ProductionPlan::orderBy('created_at', 'desc')->first();
+        $latestImport = ProductionPlan::activePpcRevision()->orderBy('created_at', 'desc')->first();
         $lastImportAt = $latestImport ? $latestImport->created_at->format('d M Y H:i') : '—';
 
         $rawDate = $request->get('date');
@@ -175,6 +175,7 @@ class ProductionPlanController extends Controller
         // No extra filters — includes total_finish, note, etc.
         // =====================================
         $allPlans = ProductionPlan::with('line')
+            ->activePpcRevision()
             ->whereDate('plan_date', $date);
 
         if ($currentPress !== 'ALL') {
@@ -194,6 +195,7 @@ class ProductionPlanController extends Controller
         // Exclude total_finish, note, summary, and ghost rows
         // =====================================
         $plans = ProductionPlan::with('line')
+            ->activePpcRevision()
             ->whereDate('plan_date', $date);
 
         if ($currentPress !== 'ALL') {
@@ -311,6 +313,7 @@ class ProductionPlanController extends Controller
 
         // QUERY OVERFLOW: items that went through timeline engine but couldn't fit
         $overflowQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->whereNull('start_time')
             ->whereNull('finish_time')
@@ -467,22 +470,30 @@ class ProductionPlanController extends Controller
 
             $imported = 0;
 
-            // APPLY SHIFT FILTER FROM MODAL
-            $shiftFilter = $request->get('shift_filter', 'all');
-            $sheets = array_values($result['sheets'] ?? []);
-            if ($shiftFilter !== 'all') {
-                $sheets = array_values(array_filter($sheets, function ($s) use ($shiftFilter) {
-                    $name = strtolower($s['shift_name'] ?? '');
+            // APPLY SHIFT FILTER FROM MODAL (case-insensitive & normalized)
+            $rawShiftFilter = trim((string) $request->get('shift_filter', 'all'));
+            $shiftFilter = strtolower($rawShiftFilter);
+            $mergeService = app(\App\Services\PpcScheduleMergeService::class);
+            $mergeService->assertRevisionSchemaReady();
 
-                    return str_contains($name, $shiftFilter);
+            $sheets = array_values($result['sheets'] ?? []);
+            if ($shiftFilter !== '' && $shiftFilter !== 'all') {
+                $targetShiftKey = $mergeService->cleanShift($rawShiftFilter);
+                $sheets = array_values(array_filter($sheets, function ($s) use ($mergeService, $targetShiftKey, $shiftFilter) {
+                    $sheetShiftName = (string) ($s['shift_name'] ?? '');
+                    if ($mergeService->cleanShift($sheetShiftName) === $targetShiftKey) {
+                        return true;
+                    }
+
+                    return str_contains(strtolower($sheetShiftName), $shiftFilter);
                 }));
             }
             $result['sheets'] = $sheets;
 
-            $mergeResult = app(\App\Services\PpcScheduleMergeService::class)
+            $mergeResult = $mergeService
                 ->merge($result['sheets'] ?? [], $parsedDate, Auth::id(), [
                     'source_filename' => $originalName,
-                    'shift_scope' => $shiftFilter,
+                    'shift_scope' => $shiftFilter ?: 'all',
                 ]);
             $imported = $mergeResult['counts']['rows_imported'] ?? 0;
             $importPreview = $mergeResult['preview'] ?? null;
@@ -514,11 +525,9 @@ class ProductionPlanController extends Controller
             if (! empty($result['sheets'])) {
                 $firstKey = array_key_first($result['sheets']);
                 $firstSheet = $result['sheets'][$firstKey];
-                $redirectShift = $firstSheet['shift_name'] ?? null;
-                if ($redirectShift) {
-                    $redirectShift = preg_replace('/[\(\s]REV.*|[\(\s]REVISI.*|\d+/i', '', $redirectShift);
-                    $redirectShift = trim(ucwords(strtolower($redirectShift)));
-                }
+                $redirectShift = isset($firstSheet['shift_name'])
+                    ? $mergeService->displayShift($firstSheet['shift_name'])
+                    : null;
 
                 return redirect()->route('ppc.planning.production_plan', [
                     'date' => $parsedDate,

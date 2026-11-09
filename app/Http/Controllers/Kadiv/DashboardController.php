@@ -22,7 +22,7 @@ class DashboardController extends Controller
         $totalReject = DailyProduction::where('work_date', $today)->sum('actual_reject');
         $totalProduction = $totalOk + $totalRepair + $totalReject;
 
-        $targetQty = ProductionPlan::where('plan_date', $today)->where('row_type', 'job')->sum('plan');
+        $targetQty = ProductionPlan::activePpcRevision()->where('plan_date', $today)->where('row_type', 'job')->sum('plan');
         $achievementPercent = $targetQty > 0 ? round(($totalOk / $targetQty) * 100, 1) : 0;
         $rejectRate = $totalProduction > 0 ? round(($totalReject / $totalProduction) * 100, 2) : 0;
         $repairRate = $totalProduction > 0 ? round(($totalRepair / $totalProduction) * 100, 2) : 0;
@@ -31,7 +31,7 @@ class DashboardController extends Controller
         $lineAchievement = [];
         foreach ($lines as $line) {
             $lineOk = DailyProduction::where('work_date', $today)->where('line', $line)->sum('actual_ok');
-            $lineTarget = ProductionPlan::where('plan_date', $today)->whereHas('jobMaster', function ($q) use ($line) {
+            $lineTarget = ProductionPlan::activePpcRevision()->where('plan_date', $today)->whereHas('jobMaster', function ($q) use ($line) {
                 $q->where('line', $line);
             })->sum('plan');
             $lineAchievement[$line] = [

@@ -223,12 +223,14 @@ test('revision merge keeps unlisted plans and production actuals while updating 
     expect($planC->fresh())->not->toBeNull();
 
     $planB->refresh();
-    expect($planB->plan)->toBe(130.0)
+    expect($planB->plan)->toBe(100.0)
         ->and($planB->ok)->toBe(50.0)
         ->and($planB->repair)->toBe(2.0)
         ->and($planB->reject)->toBe(1.0)
         ->and($planB->status)->toBe('running')
         ->and($planB->act_start)->toBe('07:30');
+
+    expect($result['blocked_changes'])->not->toBeEmpty();
 
     expect($jobB->fresh()->status)->toBe('running');
     expect(app(PpcScheduleMergeService::class)->planHasProductionActivity($planB->fresh()))->toBeTrue();
@@ -604,11 +606,12 @@ test('ten old plans survive with all actuals when two are revised and one is add
 
     expect($result['counts'])->toMatchArray([
         'added' => 1,
-        'updated' => 2,
-        'unchanged' => 8,
+        'updated' => 0,
+        'unchanged' => 10,
         'not_in_revision' => 0,
         'rows_imported' => 11,
     ]);
+    expect($result['blocked_changes'])->toHaveCount(2);
 
     expect(ProductionPlan::whereDate('plan_date', $date)->count())->toBe(11);
 
@@ -624,8 +627,8 @@ test('ten old plans survive with all actuals when two are revised and one is add
         }
     }
 
-    expect($oldPlans[0]->fresh()->plan)->toBe(120.0);
-    expect($oldPlans[1]->fresh()->plan)->toBe(130.0);
+    expect($oldPlans[0]->fresh()->plan)->toBe(100.0);
+    expect($oldPlans[1]->fresh()->plan)->toBe(100.0);
     expect($jobOne->fresh()->job_number)->toBe('J1-'.$oldPlans[0]->id);
     expect($jobFive->fresh()->job_number)->toBe('J5-'.$oldPlans[4]->id);
 
@@ -793,6 +796,15 @@ test('revision changes row order while preserving completed and running items wi
         'password' => bcrypt('secret'),
         'role' => 'leader a',
     ]);
+
+    $inputHarianFeature = \App\Models\Feature::firstOrCreate(
+        ['feature_code' => 'input_harian'],
+        ['feature_name' => 'Input Harian', 'group_name' => 'Operational']
+    );
+    \App\Models\RoleFeature::firstOrCreate(
+        ['role' => 'leader', 'feature_id' => $inputHarianFeature->id],
+        ['enabled' => true]
+    );
 
     $response = $this->actingAs($leader)
         ->get(route('operational.input_harian', [

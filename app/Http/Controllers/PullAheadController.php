@@ -119,6 +119,7 @@ if ($user->isRole(['ppc', 'manager'])) {
 
         // Cari item dari shift berikutnya sesuai target tepat
         $planQuery = ProductionPlan::query();
+        $planQuery->activePpcRevision();
         $applyLineFilter($planQuery);
         $planQuery->whereDate('plan_date', $targetDate)
                   ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
@@ -164,6 +165,7 @@ if ($user->isRole(['ppc', 'manager'])) {
 
         // Ambil plan shift aktif (untuk usulan posisi sequence)
         $currPlanQuery = ProductionPlan::query();
+        $currPlanQuery->activePpcRevision();
         $applyLineFilter($currPlanQuery);
         $currPlanQuery->whereDate('plan_date', $date)
                       ->where('shift_name', 'like', "{$currentShift}%")
@@ -178,6 +180,7 @@ if ($user->isRole(['ppc', 'manager'])) {
 
         if ($currentShiftPlans->isEmpty()) {
             $currFallback = ProductionPlan::query();
+            $currFallback->activePpcRevision();
             $applyLineFilter($currFallback);
             $currentShiftPlans = $currFallback->whereDate('plan_date', $date)
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])

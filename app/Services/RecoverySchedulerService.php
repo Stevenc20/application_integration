@@ -79,6 +79,7 @@ class RecoverySchedulerService
 
         // 4. Priority 2: Get new PPC items not yet scheduled
         $newPlans = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->where('press_name', $pressName)
             ->where('row_type', 'job')

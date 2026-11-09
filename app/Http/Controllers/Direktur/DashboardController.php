@@ -22,18 +22,18 @@ class DashboardController extends Controller
         $totalReject = DailyProduction::where('work_date', $today)->sum('actual_reject');
         $totalProduction = $totalOk + $totalRepair + $totalReject;
 
-        $targetQty = ProductionPlan::where('plan_date', $today)->where('row_type', 'job')->sum('plan');
+        $targetQty = ProductionPlan::activePpcRevision()->where('plan_date', $today)->where('row_type', 'job')->sum('plan');
         $achievementPercent = $targetQty > 0 ? round(($totalOk / $targetQty) * 100, 1) : 0;
         $rejectRate = $totalProduction > 0 ? round(($totalReject / $totalProduction) * 100, 2) : 0;
 
         $weeklyOk = DailyProduction::whereBetween('work_date', [$weekStart, $today])->sum('actual_ok');
-        $weeklyTarget = ProductionPlan::whereBetween('plan_date', [$weekStart, $today])->where('row_type', 'job')->sum('plan');
+        $weeklyTarget = ProductionPlan::activePpcRevision()->whereBetween('plan_date', [$weekStart, $today])->where('row_type', 'job')->sum('plan');
         $weeklyAchievement = $weeklyTarget > 0 ? round(($weeklyOk / $weeklyTarget) * 100, 1) : 0;
 
         $lineSummaries = [];
         foreach ($lines as $line) {
             $lineOk = DailyProduction::where('work_date', $today)->where('line', $line)->sum('actual_ok');
-            $lineTarget = ProductionPlan::where('plan_date', $today)->whereHas('jobMaster', function ($q) use ($line) {
+            $lineTarget = ProductionPlan::activePpcRevision()->where('plan_date', $today)->whereHas('jobMaster', function ($q) use ($line) {
                 $q->where('line', $line);
             })->sum('plan');
             $lineSummaries[$line] = [

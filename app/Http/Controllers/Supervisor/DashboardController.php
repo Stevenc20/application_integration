@@ -303,7 +303,7 @@ class DashboardController extends Controller
         $targetQty = $targetQuery->sum('target_qty');
 
         if ($targetQty <= 0) {
-            $prodPlanQuery = ProductionPlan::where('plan_date', $dateFrom)
+            $prodPlanQuery = ProductionPlan::activePpcRevision()->where('plan_date', $dateFrom)
                 ->where('shift_name', 'like', $shiftText.'%')
                 ->where('row_type', 'job');
             if ($selectedLine !== 'all') {

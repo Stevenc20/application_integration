@@ -1495,15 +1495,19 @@ class ProductionService
     }
 
 
-    private function resolvePlanId(int $jobId): ?int
+    private function resolvePlanId(int $jobId, ?JobMaster $job = null, ?\Illuminate\Support\Collection $candidatePool = null): ?int
     {
-        $job = \App\Models\JobMaster::find($jobId);
+        $job = $job ?: JobMaster::find($jobId);
         if (!$job) return null;
 
         $parts = explode('-', $job->job_number);
         $planId = end($parts);
 
         if (is_numeric($planId)) {
+            if ($candidatePool && $candidatePool->contains('id', (int) $planId)) {
+                return (int) $planId;
+            }
+
             $exists = \App\Models\ProductionPlan::where('id', $planId)->exists();
             if ($exists) {
                 return (int) $planId;
@@ -1650,6 +1654,7 @@ class ProductionService
                 $maxSiblingRowNo = \App\Models\ProductionPlan::whereIn('id', $siblingPlanIds)->max('row_no') ?? $currentPlan->row_no;
 
                 $nextPlan = \App\Models\ProductionPlan::where('plan_date', $currentPlan->plan_date)
+                    ->activePpcRevision()
                     ->where('shift_name', $currentPlan->shift_name)
                     ->where('press_name', $currentPlan->press_name)
                     ->where('row_type', 'job')
@@ -1681,6 +1686,7 @@ class ProductionService
 
         // Fallback to old query, tetapi batasi agar tetap di shift yang sama bila plan terdeteksi
         $fallbackQuery = JobMaster::whereNotIn(DB::raw('LOWER(status)'), ['complete'])
+            ->activePpcRevision()
             ->where('line', $current->line)
             ->whereNotIn('id', $excludeJobIds);
 
@@ -1851,15 +1857,17 @@ class ProductionService
      *
      * @return \Illuminate\Database\Eloquent\Collection<int, JobMaster>
      */
-    public function getSiblingJobMasters(int $jobId): \Illuminate\Database\Eloquent\Collection
+    public function getSiblingJobMasters(int $jobId, ?\Illuminate\Support\Collection $candidatePool = null, ?JobMaster $job = null): \Illuminate\Database\Eloquent\Collection
     {
-        $job = JobMaster::find($jobId);
+        $job = $job ?: JobMaster::find($jobId);
         if (!$job) {
             return new \Illuminate\Database\Eloquent\Collection();
         }
 
-        $planId = $this->resolvePlanId($jobId);
-        $plan = $planId ? \App\Models\ProductionPlan::find($planId) : null;
+        $planId = $this->resolvePlanId($jobId, $job, $candidatePool);
+        $plan = $planId
+            ? ($candidatePool?->firstWhere('id', $planId) ?: \App\Models\ProductionPlan::find($planId))
+            : null;
 
         $targetLine = $job->line;
 
@@ -1868,7 +1876,7 @@ class ProductionService
         // Independent schedules with the same job_no/part_number must NOT be treated as siblings!
         $matchingPlanIds = collect();
         if ($plan) {
-            $matchingPlanIds = collect($plan->getScheduleGroupPlanIds());
+            $matchingPlanIds = collect($plan->getScheduleGroupPlanIds($candidatePool));
         }
 
         $query = JobMaster::where('id', '!=', $jobId);

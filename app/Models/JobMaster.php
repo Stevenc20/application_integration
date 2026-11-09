@@ -22,8 +22,37 @@ class JobMaster extends Model
         'finished_at',
         'plan_start',
         'plan_end',
-        'target_qty'
+        'target_qty',
+        'ppc_revision_id',
+        'ppc_revision_active',
     ];
+
+    protected $casts = [
+        'ppc_revision_id' => 'integer',
+        'ppc_revision_active' => 'boolean',
+    ];
+
+    /**
+     * Jobs that are valid members of the latest PPC revision.
+     * Legacy/non-PPC jobs have no revision marker and remain active.
+     */
+    public function scopeActivePpcRevision($query)
+    {
+        return $query->where(function ($q) {
+            $q->whereNull('ppc_revision_active')
+                ->orWhere('ppc_revision_active', true);
+        });
+    }
+
+    public function scopeOmittedFromPpcRevision($query)
+    {
+        return $query->where('ppc_revision_active', false);
+    }
+
+    public function isActivePpcRevision(): bool
+    {
+        return $this->ppc_revision_active === null || (bool) $this->ppc_revision_active;
+    }
 
     public function dailyProduction()
     {

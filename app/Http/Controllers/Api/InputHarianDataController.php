@@ -20,6 +20,7 @@ class InputHarianDataController extends Controller
         $shift = $request->get('shift');
 
         $planQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->whereIn('row_type', ['job', 'break'])
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 

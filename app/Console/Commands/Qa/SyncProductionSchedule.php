@@ -61,6 +61,7 @@ class SyncProductionSchedule extends Command
 
                 // Ambil semua job dari PPC untuk tanggal ini (hanya row_type = job, bukan break/note)
                 $plans = \App\Models\ProductionPlan::whereDate('plan_date', $targetDate)
+                            ->activePpcRevision()
                             ->where('row_type', 'job')
                             ->whereNotNull('job_master')
                             ->where('job_master', '!=', '')

@@ -58,6 +58,7 @@ class TimelineGenerationService
 
         // 2. Clean slate — remove previous computed data
         $previousChildren = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->whereNotNull('parent_job_id');
         if ($pressName) {
@@ -66,6 +67,7 @@ class TimelineGenerationService
         $previousChildren->delete();
 
         $parents = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->whereNotNull('original_plan')
             ->where(function ($q) {
@@ -98,6 +100,7 @@ class TimelineGenerationService
         }
 
         $previousBreaks = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->where('row_type', 'break');
         if ($pressName) {
@@ -107,6 +110,7 @@ class TimelineGenerationService
 
         // Hanya reset timing recovery items (start/finish dihapus)
         $resetRecovery = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->where('row_type', 'job')
             ->where('source_type', 'recovery');
@@ -122,6 +126,7 @@ class TimelineGenerationService
 
         // Reset perhitungan PPC items (timing dari import dipertahankan)
         $resetPpcCalc = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->where('row_type', 'job')
             ->where(function ($q) {
@@ -139,6 +144,7 @@ class TimelineGenerationService
         // 3. Build merged queue: Recovery items first, then PPC items
         $baseConditions = function ($q) use ($date, $shiftName, $pressName) {
             $q->whereDate('plan_date', $date)
+              ->activePpcRevision()
               ->where('shift_name', $shiftName)
               ->where('row_type', 'job');
             if ($pressName) {
@@ -267,6 +273,7 @@ class TimelineGenerationService
             $ppcAnchorMins = MasterBreakTime::timeToMinutes($pressMeta->production_start);
         } else {
             $importedStart = ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('shift_name', $shiftName)
                 ->where('press_name', $resolvedPressName)
                 ->whereNull('source_type')
@@ -931,6 +938,7 @@ foreach ($breakWindows as $idx => $b) {
             if (!$exists) {
                 // Determine a good row_no for this break based on its start time
                 $jobsQuery = ProductionPlan::whereDate('plan_date', $date)
+                    ->activePpcRevision()
                     ->where('shift_name', $shiftName)
                     ->where('row_type', 'job');
                 $this->applyPressFilter($jobsQuery, $pressName);
@@ -1338,6 +1346,7 @@ foreach ($breakWindows as $idx => $b) {
         $isActive = filter_var($proposed['is_active'] ?? true, FILTER_VALIDATE_BOOLEAN);
 
         $query = ProductionPlan::query()
+            ->activePpcRevision()
             ->whereDate('plan_date', $date)
             ->where('shift_name', $shiftName)
             ->whereIn('row_type', ['job', 'break'])
@@ -1478,6 +1487,7 @@ foreach ($breakWindows as $idx => $b) {
         $errors = [];
 
         $plans = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('shift_name', $shiftName)
             ->where('press_name', $pressName)
             ->whereIn('row_type', ['job', 'break'])

@@ -86,8 +86,8 @@ class DashboardRealtimeService
             if ($p->isChildSlice()) {
                 continue;
             }
-            $identifier = $p->canonicalJobNumber();
-            $effectiveFinish = $p->effectiveFinishTime() ?: $p->finish_time;
+            $identifier = $p->canonicalJobNumber($plans);
+            $effectiveFinish = $p->effectiveFinishTime($plans) ?: $p->finish_time;
 
             if (! $jobMasters->has($identifier)) {
                 $jobName = $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB');
@@ -95,7 +95,7 @@ class DashboardRealtimeService
                     'job_number' => $identifier,
                     'job_name' => $jobName,
                     'line' => $p->press_name ?? $lineName,
-                    'target_qty' => $p->effectiveTargetQty(),
+                    'target_qty' => $p->effectiveTargetQty($plans),
                     'sequence_no' => $p->row_no ?? 1,
                     'status' => 'pending',
                     'plan_start' => $p->start_time ? Carbon::parse($date.' '.$p->start_time)->startOfMinute() : null,
@@ -209,7 +209,7 @@ class DashboardRealtimeService
                 return false;
             })->values();
 
-            $rootIdent = $rootPlan->canonicalJobNumber();
+            $rootIdent = $rootPlan->canonicalJobNumber($plans);
             $rootJm = $jobMasters->get($rootIdent);
 
             $groupJms = collect();
@@ -230,7 +230,7 @@ class DashboardRealtimeService
                 continue;
             }
 
-            $rootJm->target_qty = $rootPlan->effectiveTargetQty();
+            $rootJm->target_qty = $rootPlan->effectiveTargetQty($plans);
 
             $groupOk = 0;
             $groupRepair = 0;
@@ -304,7 +304,7 @@ class DashboardRealtimeService
             $consolidatedJm->status = $groupStatus;
             $consolidatedJm->started_at = $earliestStart;
             $consolidatedJm->finished_at = $latestFinish;
-            $consolidatedJm->target_qty = $rootPlan->effectiveTargetQty();
+            $consolidatedJm->target_qty = $rootPlan->effectiveTargetQty($plans);
 
             $consolidatedDp = new DailyProduction([
                 'job_master_id' => $consolidatedJm->id,
@@ -403,7 +403,7 @@ class DashboardRealtimeService
         }
         $dtSecs = (int) $dailyRecords->sum('downtime_seconds');
 
-        $planQty = (int) $rootPlans->sum(fn ($p) => $p->effectiveTargetQty());
+        $planQty = (int) $rootPlans->sum(fn ($p) => $p->effectiveTargetQty($plans));
 
         if ($planQty <= 0) {
             $planQty = (int) $dailyRecords->sum(fn ($dp) => (int) ($dp->jobMaster?->target_qty ?? 0));
@@ -539,10 +539,11 @@ class DashboardRealtimeService
 
         $allTargetJobIds = $jobIds->toArray();
         if (! empty($allTargetJobIds)) {
+            $productionService = app(\App\Services\ProductionService::class);
             $siblingJobIds = JobMaster::whereIn('id', $allTargetJobIds)
                 ->get()
-                ->flatMap(function ($j) {
-                    return app(\App\Services\ProductionService::class)->getSiblingJobMasters($j->id)->pluck('id');
+                ->flatMap(function ($j) use ($productionService, $plans) {
+                    return $productionService->getSiblingJobMasters($j->id, $plans, $j)->pluck('id');
                 })
                 ->all();
             $allTargetJobIds = array_values(array_unique(array_merge($allTargetJobIds, $siblingJobIds)));
@@ -1019,7 +1020,7 @@ class DashboardRealtimeService
         $planStrokeTotal = 0;
         foreach ($uniqueBasePlans as $bp) {
             $mCount = $resolveMachineCount($bp);
-            $planStrokeTotal += $bp->effectiveTargetQty() * $mCount;
+            $planStrokeTotal += $bp->effectiveTargetQty($plans) * $mCount;
         }
 
         // Actual Stroke = Total Qty (ok + repair + reject) * jumlah mesin yang dipakai
@@ -1141,6 +1142,7 @@ class DashboardRealtimeService
         }
 
         $hasJobs = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->exists();
 
@@ -1150,7 +1152,7 @@ class DashboardRealtimeService
             return $date;
         }
 
-        $latest = ProductionPlan::where('row_type', 'job')->max('plan_date');
+        $latest = ProductionPlan::activePpcRevision()->where('row_type', 'job')->max('plan_date');
         $resolved = $latest ? Carbon::parse($latest)->toDateString() : $date;
         self::$resolvedDates[$date] = $resolved;
 
@@ -1168,6 +1170,7 @@ class DashboardRealtimeService
         }
 
         $plans = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')

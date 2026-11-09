@@ -160,6 +160,8 @@ class ScheduleBackupService
                 'plan' => $p['plan'] ?? 0,
                 'start_time' => $p['start_time'] ?? null,
                 'finish_time' => $p['finish_time'] ?? null,
+                'ppc_revision_id' => $p['ppc_revision_id'] ?? null,
+                'ppc_revision_active' => $p['ppc_revision_active'] ?? null,
             ])->all(),
         ]);
         $checksum = hash('sha256', (string) $checksumSource);
@@ -543,6 +545,9 @@ class ScheduleBackupService
                         foreach (self::PROTECTED_PLAN_FIELDS as $protectedField) {
                             unset($updateData[$protectedField]);
                         }
+                        // Jangan mengaktifkan/menonaktifkan ulang plan yang sudah punya
+                        // aktivitas produksi hanya karena snapshot lama.
+                        unset($updateData['ppc_revision_id'], $updateData['ppc_revision_active']);
                         $preservedActiveCount++;
                     } else {
                         // Even if live has no activity, if snapshot had actuals, keep the higher/non-empty value
@@ -656,6 +661,16 @@ class ScheduleBackupService
                     }
                     if ($targetPlan && $targetPlan->finish_time) {
                         $jobUpdate['plan_end'] = Carbon::parse($parsedDate.' '.$targetPlan->finish_time)->startOfMinute();
+                    }
+
+                    if (! $hasJobActivity) {
+                        if ($targetPlan) {
+                            $jobUpdate['ppc_revision_id'] = $targetPlan->ppc_revision_id;
+                            $jobUpdate['ppc_revision_active'] = $targetPlan->ppc_revision_active;
+                        } elseif (array_key_exists('ppc_revision_id', $snapJob)) {
+                            $jobUpdate['ppc_revision_id'] = $snapJob['ppc_revision_id'];
+                            $jobUpdate['ppc_revision_active'] = $snapJob['ppc_revision_active'] ?? null;
+                        }
                     }
 
                     if (! $hasJobActivity && isset($snapJob['status'])) {

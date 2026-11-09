@@ -11,6 +11,8 @@ class ScheduleRevision extends Model
         'plan_date',
         'shift_name',
         'action',
+        'section_scope',
+        'source_filename',
         'snapshot_before',
         'snapshot_after',
         'created_by',
@@ -18,6 +20,7 @@ class ScheduleRevision extends Model
 
     protected $casts = [
         'plan_date' => 'date',
+        'section_scope' => 'array',
         'snapshot_before' => 'json',
         'snapshot_after' => 'json',
     ];

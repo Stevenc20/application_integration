@@ -204,7 +204,7 @@ test('transactional restore recovers original schedule while preserving post-sna
 
     // Step 4: Simulate an erroneous PPC revision import + accidental deletion of PART BETA
     // Revision changes PART ALPHA plan to 500, adds idle PART IDLE-NEW, and adds active PART ACTIVE-NEW
-    $mergeService->merge([
+    $blockedRevision = $mergeService->merge([
         [
             'shift_name' => 'Shift Pagi (Rev)',
             'press_name' => 'PRESS A',
@@ -215,6 +215,12 @@ test('transactional restore recovers original schedule while preserving post-sna
             ],
         ],
     ], $date, $user->id, ['source_filename' => 'wrong_revision.xlsx']);
+
+    // P0 lock: a running plan must not have its target or planned times rewritten by a revision.
+    expect((float) $planAlpha->fresh()->plan)->toBe(200.0)
+        ->and($planAlpha->fresh()->start_time)->toBe('07:30')
+        ->and(collect($blockedRevision['blocked_changes'])->pluck('field')->all())
+        ->toContain('plan', 'start_time', 'finish_time');
 
     // Mark PART ACTIVE NEW as having actual production so restore must NOT delete it
     $planActiveNew = ProductionPlan::whereDate('plan_date', $date)->where('job_no', 'JN-88')->firstOrFail();
@@ -227,7 +233,7 @@ test('transactional restore recovers original schedule while preserving post-sna
     // Verify compareWithLive accurately detects the differences
     $diff = $backupService->compareWithLive($initialBackup);
     expect($diff['counts']['will_restore_missing'])->toBe(1)
-        ->and($diff['counts']['will_update_schedule'])->toBe(1)
+        ->and($diff['counts']['will_update_schedule'])->toBe(0)
         ->and($diff['counts']['protected_active_plans'])->toBe(1)
         ->and($diff['counts']['post_snapshot_plans'])->toBe(2);
 

@@ -220,16 +220,17 @@ test('revision sheet sync with delete instruction, qty change, new item, and run
     expect($planUnchanged->fresh())->not->toBeNull();
     expect($result['counts']['unchanged'])->toBe(1);
 
-    // 2. Verify Qty update preserves actual progress & updates job master target_qty
+    // 2. Running item target/planned times are frozen, actual progress remains intact
     $planQtyChange->refresh();
-    expect($planQtyChange->plan)->toBe(400.0)
+    expect($planQtyChange->plan)->toBe(500.0)
         ->and($planQtyChange->ok)->toBe(120.0)
         ->and($planQtyChange->repair)->toBe(5.0)
         ->and($planQtyChange->reject)->toBe(2.0)
         ->and($planQtyChange->status)->toBe('running')
         ->and($planQtyChange->act_start)->toBe('07:30');
 
-    expect($jobQty->fresh()->target_qty)->toBe(400);
+    expect($jobQty->fresh()->target_qty)->toBe(500);
+    expect(collect($result['blocked_changes'])->pluck('field')->all())->toContain('plan');
 
     // 3. Verify New item is added
     expect($result['counts']['added'])->toBe(1);

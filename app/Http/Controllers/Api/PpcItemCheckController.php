@@ -43,12 +43,14 @@ class PpcItemCheckController extends Controller
 
         // CORE QUERY (Same logic as InputHarianController)
         $planQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
         if ($shift) {
             // Find latest revision shift name
             $latestShiftName = ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('shift_name', 'like', "{$shift}%")
                 ->orderByDesc('updated_at')
                 ->value('shift_name');

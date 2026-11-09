@@ -110,7 +110,7 @@ class PullAheadService
                     $targetRowNo = $afterPlan->row_no + 1;
                     
                     // Shift ke bawah semua plan di shift target (hari, line, shift yg sama) yg >= targetRowNo
-                    $shiftQuery = ProductionPlan::whereDate('plan_date', $afterPlan->plan_date)
+                    $shiftQuery = ProductionPlan::activePpcRevision()->whereDate('plan_date', $afterPlan->plan_date)
                         ->where('shift_name', $request->target_shift)
                         ->where('row_no', '>=', $targetRowNo);
 
@@ -123,7 +123,7 @@ class PullAheadService
                 }
             } else {
                 // Jika tidak ada usulan/keputusan, taruh di paling bawah
-                $maxRowQuery = ProductionPlan::whereDate('plan_date', $originalPlan->plan_date)
+                $maxRowQuery = ProductionPlan::activePpcRevision()->whereDate('plan_date', $originalPlan->plan_date)
                     ->where('shift_name', $request->target_shift);
 
                 if (!empty($originalPlan->line_master_id)) {

@@ -16,6 +16,7 @@ class DashboardController extends Controller
 
         $requestDate = request('date');
         $hasScheduleToday = ProductionPlan::whereDate('plan_date', $today)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->exists();
 
@@ -26,13 +27,15 @@ class DashboardController extends Controller
             $activeDate = $today;
         } else {
             // Jika hari ini belum ada schedule, fallback ke tanggal schedule terbaru
-            $latestPlanDate = ProductionPlan::where('row_type', 'job')
+            $latestPlanDate = ProductionPlan::activePpcRevision()
+                ->where('row_type', 'job')
                 ->max('plan_date');
 
             $activeDate = $latestPlanDate ? Carbon::parse($latestPlanDate)->toDateString() : $today;
         }
 
         $baseQuery = fn () => ProductionPlan::whereDate('plan_date', $activeDate)
+            ->activePpcRevision()
             ->where('row_type', 'job');
 
         // 1. Total Rencana Produksi (Hanya tipe 'job')

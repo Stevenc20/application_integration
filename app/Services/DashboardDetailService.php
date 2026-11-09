@@ -65,15 +65,15 @@ class DashboardDetailService
             if ($p->isChildSlice()) {
                 continue;
             }
-            $identifier = $p->canonicalJobNumber();
-            $effectiveFinish = $p->effectiveFinishTime() ?: $p->finish_time;
+            $identifier = $p->canonicalJobNumber($plans);
+            $effectiveFinish = $p->effectiveFinishTime($plans) ?: $p->finish_time;
 
             if (! $jobMasters->has($identifier)) {
                 $insertJobs[] = [
                     'job_number' => $identifier,
                     'job_name' => $p->job_master ?: ($p->job_no ?: 'UNKNOWN JOB'),
                     'line' => $p->press_name ?? $lineName,
-                    'target_qty' => $p->effectiveTargetQty(),
+                    'target_qty' => $p->effectiveTargetQty($plans),
                     'sequence_no' => $p->row_no ?? 1,
                     'status' => 'pending',
                     'plan_start' => $p->start_time ? Carbon::parse($date.' '.$p->start_time)->startOfMinute() : null,
@@ -202,10 +202,11 @@ class DashboardDetailService
         // ── REPAIR & REJECT LOGS ──
         $allDetailJobIds = $jobIds->toArray();
         if (! empty($allDetailJobIds)) {
+            $productionService = app(\App\Services\ProductionService::class);
             $siblingJobIds = JobMaster::whereIn('id', $allDetailJobIds)
                 ->get()
-                ->flatMap(function ($j) {
-                    return app(\App\Services\ProductionService::class)->getSiblingJobMasters($j->id)->pluck('id');
+                ->flatMap(function ($j) use ($productionService, $plans) {
+                    return $productionService->getSiblingJobMasters($j->id, $plans, $j)->pluck('id');
                 })
                 ->all();
             $allDetailJobIds = array_values(array_unique(array_merge($allDetailJobIds, $siblingJobIds)));
@@ -266,7 +267,7 @@ class DashboardDetailService
 
         foreach ($displayPlans as $plan) {
             $no++;
-            $identifier = $plan->canonicalJobNumber();
+            $identifier = $plan->canonicalJobNumber($plans);
             $job = $jobMasters->get($identifier);
 
             // Kumpulkan anak-anak dari parent_job_id dan split_group
@@ -302,7 +303,7 @@ class DashboardDetailService
             $jobId = $job?->id;
 
             // Target Plan Qty berdasarkan effectiveTargetQty() pada root schedule
-            $planQty = $plan->effectiveTargetQty();
+            $planQty = $plan->effectiveTargetQty($plans);
 
             // Akumulasi Actual Qty dari seluruh JobMaster unik dalam group tepat 1 kali
             $actualQty = 0;
@@ -380,7 +381,7 @@ class DashboardDetailService
             $gsphActual = $tpt > 0 ? (int) round(($actualOk / $tpt) * 60) : 0;
 
             // Plan Finish: Ambil jam selesai efektif dari root plan (termasuk interval setelah istirahat)
-            $planFinish = $plan->effectiveFinishTime() ?: $plan->finish_time;
+            $planFinish = $plan->effectiveFinishTime($plans) ?: $plan->finish_time;
 
             $actualFinish = $latestFinishedAt ? $latestFinishedAt->format('H:i') : ($plan->act_finish ? substr((string) $plan->act_finish, 0, 5) : '-');
 
@@ -520,6 +521,7 @@ class DashboardDetailService
         }
 
         $plans = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where(function ($q) use ($isMorning) {
                 if ($isMorning) {
                     $q->where('shift_name', 'like', '%Pagi%')
@@ -590,6 +592,7 @@ class DashboardDetailService
         }
 
         $hasJobs = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->exists();
 
@@ -599,7 +602,7 @@ class DashboardDetailService
             return $date;
         }
 
-        $latest = ProductionPlan::where('row_type', 'job')->max('plan_date');
+        $latest = ProductionPlan::activePpcRevision()->where('row_type', 'job')->max('plan_date');
         $resolved = $latest ? Carbon::parse($latest)->toDateString() : $date;
         self::$resolvedDates[$date] = $resolved;
 

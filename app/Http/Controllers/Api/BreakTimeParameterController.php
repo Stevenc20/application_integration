@@ -116,6 +116,7 @@ class BreakTimeParameterController extends Controller
         // Jalankan regenerasi timeline hanya untuk tanggal hari ini dan yang akan datang (atau 7 hari terakhir)
         // agar tidak looping meregenerate seluruh riwayat historis masa lalu yang membuat request freeze/timeout
         $recentDates = \App\Models\ProductionPlan::select('plan_date', 'shift_name', 'press_name')
+            ->activePpcRevision()
             ->whereNotNull('plan_date')
             ->whereNotNull('shift_name')
             ->where('plan_date', '>=', now()->subDays(3)->toDateString())

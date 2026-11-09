@@ -212,7 +212,7 @@ class GrafikController extends Controller
 
         // Default: pakai tanggal schedule terakhir yang punya job, bukan hardcode hari ini
         if (! $date) {
-            $latestPlanDate = ProductionPlan::where('row_type', 'job')->max('plan_date');
+            $latestPlanDate = ProductionPlan::activePpcRevision()->where('row_type', 'job')->max('plan_date');
             $date = $latestPlanDate
                 ? Carbon::parse($latestPlanDate)->toDateString()
                 : Carbon::now()->toDateString();

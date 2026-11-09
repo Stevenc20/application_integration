@@ -127,6 +127,7 @@ class MasterBreakTime extends Model
 
         // Check if there are break rows in production_plans for this date and shift
         $planBreakQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'break')
             ->where(function($q) use ($normalizedShift, $shiftName) {
                 $q->where('shift_name', $normalizedShift)
@@ -170,6 +171,7 @@ class MasterBreakTime extends Model
         // tetapi TIDAK ADA baris break di jadwal PPC tersebut, berarti PPC memang menjadwalkan
         // produksi non-stop atau jam istirahatnya tidak berlaku / berbeda. Jangan fallback ke MasterBreakTime!
         $hasPpcJobSchedule = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->where(function($q) use ($normalizedShift, $shiftName) {
                 $q->where('shift_name', $normalizedShift)

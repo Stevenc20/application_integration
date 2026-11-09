@@ -146,6 +146,7 @@ class BreaktimeController extends Controller
         }
 
         $recentDates = \App\Models\ProductionPlan::select('plan_date', 'shift_name', 'press_name')
+            ->activePpcRevision()
             ->whereNotNull('plan_date')
             ->whereNotNull('shift_name')
             ->where('plan_date', '>=', now()->subDays(3)->toDateString())

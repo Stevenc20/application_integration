@@ -30,6 +30,12 @@
                     <span class="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-700 ring-1 ring-amber-200">Updated: {{ $importPreview['counts']['updated'] ?? 0 }}</span>
                     <span class="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-600 ring-1 ring-slate-200">Unchanged: {{ $importPreview['counts']['unchanged'] ?? 0 }}</span>
                     <span class="px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 ring-1 ring-rose-200">Not in revision: {{ $importPreview['counts']['not_in_revision'] ?? 0 }}</span>
+                    @if(!empty($importPreview['counts']['blocked_changes']))
+                    <span class="px-2.5 py-1 rounded-lg bg-orange-50 text-orange-700 ring-1 ring-orange-200">Blocked changes: {{ $importPreview['counts']['blocked_changes'] }}</span>
+                    @endif
+                    @if(!empty($importPreview['counts']['protected_from_deletion']))
+                    <span class="px-2.5 py-1 rounded-lg bg-purple-50 text-purple-700 ring-1 ring-purple-200">Protected delete: {{ $importPreview['counts']['protected_from_deletion'] }}</span>
+                    @endif
                     @if(!empty($importPreview['counts']['deleted']))
                     <span class="px-2.5 py-1 rounded-lg bg-red-100 text-red-800 ring-1 ring-red-300">Deleted by instruction: {{ $importPreview['counts']['deleted'] }}</span>
                     @endif
@@ -106,6 +112,35 @@
                             @endforelse
                         </div>
                     </details>
+                    @if(!empty($importPreview['blocked_changes']))
+                    <details open class="mt-3">
+                        <summary class="cursor-pointer text-xs font-black text-orange-700">Perubahan Diblokir / Terkunci Aktivitas ({{ count($importPreview['blocked_changes']) }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @foreach($importPreview['blocked_changes'] as $item)
+                            <div class="text-[11px] text-orange-700 border-b border-orange-50 pb-1">
+                                <div class="flex items-center justify-between gap-2">
+                                    <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> ({{ strtoupper($item['lock_state'] ?? 'locked') }})</span>
+                                    <span class="shrink-0 font-bold">{{ $item['field'] ?? '-' }}: {{ $item['before'] ?? '-' }} &rarr; {{ $item['after'] ?? '-' }}</span>
+                                </div>
+                                <div class="text-[10px] text-orange-600 italic truncate">{{ $item['reason'] ?? 'Memiliki aktivitas produksi; perubahan diblokir.' }}</div>
+                            </div>
+                            @endforeach
+                        </div>
+                    </details>
+                    @endif
+                    @if(!empty($importPreview['protected_from_deletion']))
+                    <details open class="mt-3">
+                        <summary class="cursor-pointer text-xs font-black text-purple-700">Dilindungi dari Instruksi Delete ({{ count($importPreview['protected_from_deletion']) }})</summary>
+                        <div class="mt-2 max-h-48 overflow-auto space-y-1">
+                            @foreach($importPreview['protected_from_deletion'] as $item)
+                            <div class="text-[11px] text-purple-700 flex items-center justify-between gap-2 border-b border-purple-50 pb-1">
+                                <span class="truncate">{{ $item['shift'] ?? '-' }} &bull; {{ $item['press'] ?? '-' }} &bull; <b>{{ $item['job_no'] ?? '-' }}</b> (Row {{ $item['row_no'] ?? '-' }})</span>
+                                <span class="shrink-0 text-[10px] text-purple-600 italic">{{ $item['reason'] ?? 'Protected: has production activity' }}</span>
+                            </div>
+                            @endforeach
+                        </div>
+                    </details>
+                    @endif
                     @if(!empty($importPreview['deleted']))
                     <details class="mt-3">
                         <summary class="cursor-pointer text-xs font-black text-red-700">Dihapus via Instruksi Revisi ({{ count($importPreview['deleted']) }})</summary>
@@ -1068,7 +1103,7 @@
 
                         <div>
                             <label class="block text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5 ml-1">Tanggal Rencana</label>
-                            <input type="date" name="date" value="{{ date('Y-m-d') }}"
+                            <input type="date" name="date" value="{{ $date }}"
                                    class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 transition-all">
                         </div>
                     </div>

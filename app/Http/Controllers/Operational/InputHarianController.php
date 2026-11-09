@@ -103,6 +103,7 @@ class InputHarianController extends Controller
         $latestShiftName = $currentShift;
         if ($currentShift !== 'all') {
             $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('shift_name', 'like', "{$currentShift}%")
                 ->orderByDesc('updated_at')
                 ->value('shift_name') ?: $currentShift;
@@ -131,6 +132,7 @@ class InputHarianController extends Controller
 
         // 2. QUERY UTAMA: Langsung dari ProductionPlan (Source of Truth)
         $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->whereIn('row_type', ['job', 'break'])
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 
@@ -190,6 +192,7 @@ class InputHarianController extends Controller
         // ── MERGE BREAK SPLITS ──
         $parentIds = $plans->pluck('id');
         $childPlans = \App\Models\ProductionPlan::whereIn('parent_job_id', $parentIds->filter())
+            ->activePpcRevision()
             ->whereDate('plan_date', $date)
             ->where('shift_name', $latestShiftName)
             ->orderBy('row_no', 'asc')
@@ -379,6 +382,7 @@ class InputHarianController extends Controller
         $currentWorkDate = \App\Services\ProductionMetricsService::currentProductionDate();
         if ($date < $currentWorkDate) {
             $allPlans = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('shift_name', $latestShiftName)
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH'])
@@ -785,12 +789,14 @@ class InputHarianController extends Controller
         $latestShiftName = $shift;
         if ($shift !== 'all') {
             $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('shift_name', 'like', "{$shift}%")
                 ->orderByDesc('updated_at')
                 ->value('shift_name') ?: $shift;
         }
 
         $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
             ->where('row_type', 'job')
             ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
         
@@ -818,6 +824,7 @@ class InputHarianController extends Controller
         }
 
         $existingJobMasters = \App\Models\JobMaster::whereIn('job_number', $identifiers)->get()->keyBy('job_number');
+        $mergeService = app(\App\Services\PpcScheduleMergeService::class);
 
         foreach ($validPlans as $item) {
             $plan = $item['plan'];
@@ -836,6 +843,8 @@ class InputHarianController extends Controller
                 'plan_start'  => $plan->start_time ? (str_contains($plan->start_time, '-') ? Carbon::parse($plan->start_time)->startOfMinute() : Carbon::parse($date . ' ' . $plan->start_time)->startOfMinute()) : null,
                 'plan_end'    => $effectiveFinish ? (str_contains($effectiveFinish, '-') ? Carbon::parse($effectiveFinish)->startOfMinute() : Carbon::parse($date . ' ' . $effectiveFinish)->startOfMinute()) : null,
                 'capacity'    => (int) ($plan->qty_plt ?? 0),
+                'ppc_revision_id' => $plan->ppc_revision_id,
+                'ppc_revision_active' => true,
             ];
 
             if ($existing) {
@@ -848,11 +857,18 @@ class InputHarianController extends Controller
                     }
                 }
                 if ($needsUpdate) {
-                    // Jangan paksa update status jika sudah jalan/selesai (Preserve state)
-                    if (!in_array($existing->status, ['running', 'paused', 'complete', 'finished', 'closed'])) {
+                    // Job yang sudah punya aktivitas produksi tidak boleh diubah target/jadwalnya
+                    // secara diam-diam oleh revisi PPC. Status dan actuals juga selalu dipertahankan.
+                    if (!in_array($existing->status, ['running', 'paused', 'complete', 'finished', 'closed'])
+                        && ! $mergeService->jobHasActivity($existing)) {
                         $existing->update($data);
                     } else {
-                        $existing->update(array_diff_key($data, ['status' => '']));
+                        $existing->update(array_diff_key($data, [
+                            'target_qty' => true,
+                            'plan_start' => true,
+                            'plan_end' => true,
+                            'status' => true,
+                        ]));
                     }
                 }
             } else {
@@ -867,7 +883,6 @@ class InputHarianController extends Controller
         // namun ID plan-nya sudah dihapus oleh PPC (misal revisi PPC menghapus item tersebut),
         // hapus JobMaster orphan tersebut agar tidak muncul di antrean atau dropdown proses selanjutnya.
         if (!empty($identifiers)) {
-            $mergeService = app(\App\Services\PpcScheduleMergeService::class);
             $candidateJobs = \App\Models\JobMaster::where('status', 'pending')
                 ->where('job_number', 'like', '%-%')
                 ->whereNotIn('job_number', $identifiers)
@@ -1814,6 +1829,7 @@ class InputHarianController extends Controller
             $latestShiftName = $shiftName;
             if ($shiftName && !str_contains($shiftName, 'all')) {
                 $latestShiftName = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                    ->activePpcRevision()
                     ->where('shift_name', 'like', "{$shiftName}%")
                     ->orderByDesc('updated_at')
                     ->value('shift_name') ?: $shiftName;
@@ -1821,6 +1837,7 @@ class InputHarianController extends Controller
 
             // 2. Query ProductionPlan KHUSUS jadwal shift dan tanggal saat ini untuk line ini
             $planQuery = \App\Models\ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
 

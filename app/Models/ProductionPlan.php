@@ -66,6 +66,8 @@ class ProductionPlan extends Model
         'remaining_plan',
         'recovery_id',
         'source_type',
+        'ppc_revision_id',
+        'ppc_revision_active',
     ];
 
     protected $casts = [
@@ -94,7 +96,9 @@ class ProductionPlan extends Model
         'parent_job_id' => 'integer',
         'session_no'   => 'integer',
         'original_plan' => 'float',
-        'remaining_plan' => 'float'
+        'remaining_plan' => 'float',
+        'ppc_revision_id' => 'integer',
+        'ppc_revision_active' => 'boolean',
     ];
 
     public function line()
@@ -146,6 +150,28 @@ class ProductionPlan extends Model
     public function scopePpc(Builder $query)
     {
         return $query->where('source_type', 'ppc');
+    }
+
+    /**
+     * Rows that are valid members of the latest PPC revision for their section.
+     * Legacy rows with no revision marker are treated as active.
+     */
+    public function scopeActivePpcRevision(Builder $query)
+    {
+        return $query->where(function (Builder $q) {
+            $q->whereNull('ppc_revision_active')
+                ->orWhere('ppc_revision_active', true);
+        });
+    }
+
+    public function scopeOmittedFromPpcRevision(Builder $query)
+    {
+        return $query->where('ppc_revision_active', false);
+    }
+
+    public function isActivePpcRevision(): bool
+    {
+        return $this->ppc_revision_active === null || (bool) $this->ppc_revision_active;
     }
 
     public function scopeRecovery(Builder $query)
@@ -270,8 +296,14 @@ class ProductionPlan extends Model
                 ->whereDate('plan_date', $root->plan_date)
                 ->where('shift_name', $root->shift_name)
                 ->where('press_name', $root->press_name)
-                ->where(function ($q) {
+                ->where(function ($q) use ($root) {
                     $q->where('row_type', 'job')->orWhereNull('row_type');
+                })
+                ->where(function ($q) use ($root) {
+                    $q->where(function ($inner) {
+                        $inner->whereNull('ppc_revision_active')
+                            ->orWhere('ppc_revision_active', true);
+                    })->orWhere('id', $root->id);
                 });
             $sameContext = $query->orderBy('row_no')->orderBy('id')->get();
         }

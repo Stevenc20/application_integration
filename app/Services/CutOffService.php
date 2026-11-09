@@ -101,6 +101,7 @@ class CutOffService
                 ->toArray();
 
             $sectionPlansQuery = ProductionPlan::whereDate('plan_date', $date)
+                ->activePpcRevision()
                 ->where('shift_name', 'like', "{$shiftName}%")
                 ->where('row_type', 'job')
                 ->whereNotIn('job_no', ['TOTAL FINISH', 'TOTAL FNISH', 'FINISH']);
