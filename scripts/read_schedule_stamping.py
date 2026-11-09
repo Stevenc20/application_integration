@@ -464,11 +464,13 @@ def choose_sheets(wb, target_shift_req):
         rev_candidates = []
         for sn in sheetnames:
             su = sn.strip().upper()
-            if 'MASTER' in su:
+            if 'MASTER' in su or 'FORMAT' in su:
                 continue
-            if (base_up in su or short_key in su) and 'REV' in su and su != base_up:
+            # Match variants like 'Shift Pagi (Rev)', 'Shift Pagi (2)', 'Shift Pagi Rev 1', 'Pagi (2)'
+            is_rev = ('REV' in su) or bool(re.search(r'\(\s*\d+\s*\)', su))
+            if (base_up in su or short_key in su) and is_rev and su != base_up:
                 rev_candidates.append(sn)
-        # Prefer the last/latest revision sheet if multiple exist (e.g. Rev 1, Rev 2)
+        # Prefer the last/latest revision sheet if multiple exist (e.g. Shift Pagi (2), Rev 2)
         rev_found = rev_candidates[-1] if rev_candidates else _match_sheet(f"{base} (Rev)")
         base_actual = _match_sheet(base) or _match_sheet(short_key)
         if rev_found:

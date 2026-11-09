@@ -126,12 +126,13 @@ class ExcelScheduleParser
 
             foreach ($sheetNames as $sn) {
                 $su = strtoupper(trim((string) $sn));
-                if (str_contains($su, 'MASTER')) {
+                if (str_contains($su, 'MASTER') || str_contains($su, 'FORMAT')) {
                     continue;
                 }
+                $isRev = str_contains($su, 'REV') || (bool) preg_match('/\(\s*\d+\s*\)/', $su);
                 if ($su === $baseUpper || $su === $shortKey) {
                     $foundBase = $sn;
-                } elseif ((str_contains($su, $baseUpper) || str_contains($su, $shortKey)) && str_contains($su, 'REV')) {
+                } elseif ((str_contains($su, $baseUpper) || str_contains($su, $shortKey)) && $isRev) {
                     $foundRev = $sn;
                 }
             }
