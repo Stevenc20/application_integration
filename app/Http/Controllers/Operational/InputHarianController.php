@@ -386,9 +386,23 @@ class InputHarianController extends Controller
             return $plan;
         });
 
-        // Urutan antrean mengikuti jadwal PPC murni (row_no, lalu id).
-        // Job running/paused tidak dipindah ke atas agar urutan tetap sama dengan PPC.
-        $plans = $plans->values();
+        // Pin active 'Running' / 'Paused' job ke baris paling atas agar terlihat sedang jalan.
+        // Saat job berstatus 'completed' (atau status selain running/paused), otomatis kembali ke urutan nomor antrean PPC murni (row_no, lalu id).
+        $plans = $plans->sort(function ($a, $b) {
+            $isRunA = in_array(strtolower($a->job_data?->status ?? $a->status ?? 'pending'), ['running', 'paused']) ? 0 : 1;
+            $isRunB = in_array(strtolower($b->job_data?->status ?? $b->status ?? 'pending'), ['running', 'paused']) ? 0 : 1;
+
+            if ($isRunA === $isRunB) {
+                $rowA = (int) ($a->row_no ?? 999999);
+                $rowB = (int) ($b->row_no ?? 999999);
+                if ($rowA === $rowB) {
+                    return $a->id <=> $b->id;
+                }
+                return $rowA <=> $rowB;
+            }
+
+            return $isRunA <=> $isRunB;
+        })->values();
 
         // Determine if all jobs are done (for showing "Akhiri Shift" button)
         $jobPlans = $plans->filter(fn($p) => ($p->row_type ?? 'job') === 'job');
