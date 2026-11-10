@@ -37,20 +37,24 @@ class LineStatusService
                 ? ($plan->plan_date instanceof \Carbon\Carbon ? $plan->plan_date->toDateString() : substr((string) $plan->plan_date, 0, 10))
                 : null;
 
-            // Accept job if its plan matches activeWorkDate or today, or if it has an active session/daily on activeWorkDate
+            // 1. Terima jika tanggal plan sesuai activeWorkDate atau today
             if ($plan && in_array($planDateStr, [$activeWorkDate, $today], true)) {
                 $validRunningJobs->push($job);
-
                 continue;
             }
 
-            if (! $plan) {
-                $hasTodayActivity = \App\Models\DailyProduction::where('job_master_id', $job->id)
-                    ->whereIn('work_date', [$activeWorkDate, $today])
-                    ->exists();
-                if ($hasTodayActivity) {
-                    $validRunningJobs->push($job);
-                }
+            // 2. Terima jika memiliki aktivitas DailyProduction pada activeWorkDate atau today
+            $hasActivity = \App\Models\DailyProduction::where('job_master_id', $job->id)
+                ->whereIn('work_date', [$activeWorkDate, $today])
+                ->exists();
+            if ($hasActivity) {
+                $validRunningJobs->push($job);
+                continue;
+            }
+
+            // 3. Jika statusnya memang 'running' realtime di JobMaster (misal ditarik shift / baru dimulai), tetap valid
+            if (strtolower((string) $job->status) === 'running') {
+                $validRunningJobs->push($job);
             }
         }
 
@@ -195,8 +199,8 @@ class LineStatusService
                 continue;
             }
 
-            // 6. PRODUCTION (running session, or running job with started_at and no open pause/downtime)
-            $hasRunningJob = $lineJobs->contains(fn ($j) => strtolower((string) $j->status) === 'running' && ! empty($j->started_at));
+            // 6. PRODUCTION (running session, atau running job tanpa open downtime/dandori)
+            $hasRunningJob = $lineJobs->contains(fn ($j) => strtolower((string) $j->status) === 'running');
             if (array_intersect($lineJobIds, $activeSessionJobIds) || $hasRunningJob) {
                 $statuses[$line] = ['label' => 'PRODUCTION', 'color' => 'green', 'pulse' => true];
 
