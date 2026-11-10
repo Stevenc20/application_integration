@@ -136,14 +136,13 @@
             if ($actStartVal && $schedStart && $schedFinish) {
                 $ppcStartCalc = \Carbon\Carbon::parse($date . ' ' . $schedStart);
                 $ppcEndCalc = \Carbon\Carbon::parse($date . ' ' . $schedFinish);
-                $effectiveTpt = $effectiveProdPlan ? $effectiveProdPlan->effectiveTptMinutes() : 0;
-                $tptMinutes = $effectiveTpt > 0
-                    ? $effectiveTpt
-                    : (($effectiveProdPlan && (float)($effectiveProdPlan->tpt ?? 0) > 0)
-                        ? (float)$effectiveProdPlan->tpt
-                        : $ppcStartCalc->diffInMinutes($ppcEndCalc));
+                // Durasi jadwal PPC (termasuk istirahat jika ada di jadwal): schedFinish - schedStart
+                $schedDurationMinutes = abs($ppcEndCalc->diffInMinutes($ppcStartCalc));
+                $effectiveTpt = $schedDurationMinutes > 0
+                    ? $schedDurationMinutes
+                    : ($effectiveProdPlan ? $effectiveProdPlan->effectiveTptMinutes() : (float)($effectiveProdPlan->tpt ?? 0));
                 $actualStartCalc = \Carbon\Carbon::parse($date . ' ' . $actStartVal);
-                $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($tptMinutes)->format('H:i') : null;
+                $actEndEstimate = $actStartVal ? $actualStartCalc->copy()->addMinutes($effectiveTpt)->format('H:i') : null;
             }
 
             $isBreakDowntime = $activeDowntime && in_array(strtolower(trim($activeDowntime->jenis_downtime ?? '')), ['break time', 'break']);

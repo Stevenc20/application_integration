@@ -46,9 +46,9 @@
         }
         if (!$actEndDerived) {
             $planWindowMinutes = (!empty($job->start_time) && !empty($job->finish_time))
-                ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time))
+                ? abs(\Carbon\Carbon::parse($job->finish_time)->diffInMinutes(\Carbon\Carbon::parse($job->start_time)))
                 : null;
-            $tptMinutesDerived = $planWindowMinutes ?: (float)($job->tpt ?? 0);
+            $tptMinutesDerived = ($planWindowMinutes && $planWindowMinutes > 0) ? $planWindowMinutes : (float)($job->tpt ?? 0);
             if ($tptMinutesDerived > 0) {
                 $actEndDerived = $actStartDerived->copy()->addMinutes($tptMinutesDerived);
             }
