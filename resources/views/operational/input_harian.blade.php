@@ -578,11 +578,15 @@ window.jobMasterData = {
         @php $activeDate = request('date', now()->toDateString()); @endphp
         plan_start: {{ $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : (\Carbon\Carbon::parse($jd->plan_start ?: $activeDate . ' 07:40')->timestamp * 1000) }},
         plan_end: {{ $job->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->finish_time)->timestamp * 1000 : (\Carbon\Carbon::parse($jd->plan_end ?: $activeDate . ' 10:40')->timestamp * 1000) }},
-        started_at: {{ 
-            (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->start_time) 
-                ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->start_time)->timestamp * 1000 
-                : ($jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : 'null') 
-        }},
+        @php
+            $firstDanDt = $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
+            $effectiveStartTs = (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->start_time)
+                ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->start_time)->timestamp * 1000
+                : ($jd->started_at
+                    ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000
+                    : ($firstDanDt ? \Carbon\Carbon::parse($firstDanDt->start_time)->timestamp * 1000 : 'null'));
+        @endphp
+        started_at: {{ $effectiveStartTs }},
         prod_start: {{ $jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : 'null' }},
         finished_at: {{ 
             (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time) 

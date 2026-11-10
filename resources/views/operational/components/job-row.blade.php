@@ -244,8 +244,11 @@
         @else
             @php
                 $timerSecs = $runtime;
-                if (in_array($status, ['running', 'paused']) && !empty($job->job_data->started_at)) {
-                    $timerSecs = $runtime + max(0, \Carbon\Carbon::parse($job->job_data->started_at)->diffInSeconds(now()));
+                $effectiveStart = $job->job_data?->started_at
+                    ?? (isset($sessionMap) ? $sessionMap->get($jobId)?->start_time : null)
+                    ?? ($firstDan?->start_time ?? null);
+                if (in_array($status, ['running', 'paused']) && !empty($effectiveStart)) {
+                    $timerSecs = $runtime + max(0, \Carbon\Carbon::parse($effectiveStart)->diffInSeconds(now()));
                 }
             @endphp
             <div id="timer-{{ $jobId }}" class="font-mono text-2xl font-black text-slate-800 tracking-tighter tabular-nums mb-1">{{ sprintf('%02d:%02d:%02d', intdiv($timerSecs, 3600), intdiv($timerSecs % 3600, 60), $timerSecs % 60) }}</div>

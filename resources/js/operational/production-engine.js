@@ -207,7 +207,8 @@ function updateTimers() {
             if (isRunning) {
                 let jS = job.started_at ? new Date(job.started_at) : null;
                 const firstDandori = job.dandori_start ? new Date(job.dandori_start) : null;
-                const anchorTime = firstDandori || jS;
+                const firstDandoriHistorical = job.first_dandori_start ? new Date(job.first_dandori_start) : null;
+                const anchorTime = firstDandori || jS || firstDandoriHistorical;
                 if (anchorTime) {
                     let diffInSeconds = Math.floor((now.getTime() - anchorTime.getTime()) / 1000);
                     timerEl.textContent = formatSeconds(job.base_seconds + Math.max(0, diffInSeconds));
