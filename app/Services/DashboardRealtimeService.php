@@ -450,6 +450,7 @@ class DashboardRealtimeService
         $currDtMat = 0;
         $currDtLog = 0;
         $currDtProd = 0;
+        $currItemAllDtMinutes = 0.0;
         if ($runningRecord) {
             $runningJobId = $runningRecord->job_master_id;
             $runningGroupJobIds = $rootToGroupJobIds[$runningJobId] ?? [$runningJobId];
@@ -460,17 +461,23 @@ class DashboardRealtimeService
                     continue;
                 }
                 $dur = $this->downtimeDurationSeconds($dt) / 60;
-                $currDtTotal += $dur;
-                if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
-                    $currDtMach += $dur;
-                } elseif (str_contains($type, 'DIES')) {
-                    $currDtDies += $dur;
-                } elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) {
-                    $currDtMat += $dur;
-                } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
-                    $currDtLog += $dur;
-                } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
-                    $currDtProd += $dur;
+                $currItemAllDtMinutes += $dur;
+
+                // Hanya hitung ke kolom CURR jika downtime tersebut SEDANG AKTIF (belum selesai/finish_time kosong)
+                $isActiveDt = empty($dt->finish_time) && ! empty($dt->start_time);
+                if ($isActiveDt) {
+                    $currDtTotal += $dur;
+                    if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
+                        $currDtMach += $dur;
+                    } elseif (str_contains($type, 'DIES')) {
+                        $currDtDies += $dur;
+                    } elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) {
+                        $currDtMat += $dur;
+                    } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
+                        $currDtLog += $dur;
+                    } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
+                        $currDtProd += $dur;
+                    }
                 }
             }
             $currDtTotal = round($currDtTotal, 1);
@@ -479,6 +486,7 @@ class DashboardRealtimeService
             $currDtMat = round($currDtMat, 1);
             $currDtLog = round($currDtLog, 1);
             $currDtProd = round($currDtProd, 1);
+            $currItemAllDtMinutes = round($currItemAllDtMinutes, 1);
         }
 
         $dtRows = [];
@@ -896,7 +904,7 @@ class DashboardRealtimeService
             }
             $currPressTime = (float) $currRuntimeMinutes;
             $currDandori = (float) $currDandoriMinutes; // includes dandori + 1st check
-            $currDowntime = (float) $currDtTotal;
+            $currDowntime = (float) ($currItemAllDtMinutes ?? $currDtTotal);
             $currDenom = $currPressTime + $currDandori + $currDowntime;
             if ($currQtyRunning > 0 && $currDenom > 0 && is_finite($currDenom)) {
                 $currGsph = (int) round(($currQtyRunning / $currDenom) * 60);
