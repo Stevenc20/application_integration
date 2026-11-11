@@ -18,5 +18,14 @@ return Application::configure(basePath: dirname(__DIR__))
     ]);
 })
     ->withExceptions(function (Exceptions $exceptions): void {
-        //
+        $exceptions->render(function (\Illuminate\Session\TokenMismatchException $e, $request) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'message' => 'CSRF token mismatch. Silakan refresh halaman.',
+                    'csrf_token' => csrf_token(),
+                ], 419);
+            }
+
+            return redirect()->route('login')->with('error', 'Sesi Anda telah kedaluwarsa. Silakan coba login kembali.');
+        });
     })->create();

@@ -876,6 +876,37 @@
             window.location.reload();
         }
     });
+
+    // AUTO REFRESH JIKA STAY DI HALAMAN LOGIN:
+    // 1. Refresh otomatis setiap 15 menit jika user tidak mengetik, agar token CSRF tetap selalu baru dan tidak pernah 419.
+    // 2. Deteksi tab kembali aktif (visibilitychange): jika tab ditinggal lama (> 10 menit), reload otomatis saat tab dibuka kembali.
+    let pageOpenedAt = Date.now();
+    const AUTO_REFRESH_INTERVAL = 15 * 60 * 1000; // 15 menit
+
+    setInterval(function() {
+        const nrpInput = document.getElementById('nrp');
+        const pwdInput = document.getElementById('password');
+        const isUserTyping = (nrpInput && nrpInput.value.trim().length > 0) || (pwdInput && pwdInput.value.length > 0);
+        
+        // Hanya reload jika user belum mengisi input form
+        if (!isUserTyping) {
+            window.location.reload();
+        }
+    }, AUTO_REFRESH_INTERVAL);
+
+    document.addEventListener('visibilitychange', function() {
+        if (document.visibilityState === 'visible') {
+            const timeElapsed = Date.now() - pageOpenedAt;
+            const nrpInput = document.getElementById('nrp');
+            const pwdInput = document.getElementById('password');
+            const isUserTyping = (nrpInput && nrpInput.value.trim().length > 0) || (pwdInput && pwdInput.value.length > 0);
+
+            // Jika tab ditinggal di latar belakang lebih dari 10 menit dan form kosong, reload halaman agar CSRF token fresh
+            if (timeElapsed > 10 * 60 * 1000 && !isUserTyping) {
+                window.location.reload();
+            }
+        }
+    });
 </script>
 
 </body>
