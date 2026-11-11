@@ -130,6 +130,11 @@
                 <tbody>
                     @forelse($karyawans as $i => $k)
                     @php
+                    $kNama = $k->name ?? $k->nama_karyawan;
+                    $kNrp = $k->nrp ?? $k->nrp_karyawan;
+                    $kJabatan = $k->role ?? $k->jabatan;
+                    $kId = $k->id ?? $k->id_karyawan;
+
                     $jabatanConfig = [
                         'admin'         => ['bg'=>'bg-slate-100','text'=>'text-slate-700','border'=>'border-slate-200'],
                         'operator'      => ['bg'=>'bg-sky-50','text'=>'text-sky-700','border'=>'border-sky-100'],
@@ -154,33 +159,33 @@
                         'irm'           => ['bg'=>'bg-pink-50','text'=>'text-pink-700','border'=>'border-pink-100'],
                         'logistik'      => ['bg'=>'bg-gray-50','text'=>'text-gray-700','border'=>'border-gray-100'],
                     ];
-                    $jc = $jabatanConfig[$k->jabatan] ?? ['bg'=>'bg-slate-100','text'=>'text-slate-600','border'=>'border-slate-200'];
+                    $jc = $jabatanConfig[$kJabatan] ?? ['bg'=>'bg-slate-100','text'=>'text-slate-600','border'=>'border-slate-200'];
                     @endphp
                     <tr class="border-b border-slate-100 hover:bg-rose-50/30 transition-colors group">
                         <td class="px-4 py-3 text-center text-[11px] font-bold text-slate-400 border-r border-slate-100">{{ $karyawans->firstItem() + $i }}</td>
                         <td class="px-4 py-3 border-r border-slate-100">
                             <span class="inline-flex items-center gap-1.5">
                                 <span class="w-1.5 h-1.5 rounded-full bg-rose-400 flex-shrink-0"></span>
-                                <span class="text-sm font-black text-slate-800 tracking-tight">{{ $k->nrp_karyawan }}</span>
+                                <span class="text-sm font-black text-slate-800 tracking-tight">{{ $kNrp }}</span>
                             </span>
                         </td>
                         <td class="px-4 py-3 border-r border-slate-100">
-                            <span class="text-sm font-medium text-slate-700">{{ $k->nama_karyawan }}</span>
+                            <span class="text-sm font-medium text-slate-700">{{ $kNama }}</span>
                         </td>
                         <td class="px-4 py-3 text-center border-r border-slate-100">
-                            <span class="inline-block px-2.5 py-1 rounded-lg {{ $jc['bg'] }} {{ $jc['text'] }} text-[10px] font-black uppercase tracking-wider border {{ $jc['border'] }}">{{ $k->jabatan }}</span>
+                            <span class="inline-block px-2.5 py-1 rounded-lg {{ $jc['bg'] }} {{ $jc['text'] }} text-[10px] font-black uppercase tracking-wider border {{ $jc['border'] }}">{{ $kJabatan }}</span>
                         </td>
                         <td class="px-4 py-3 text-center">
                             <div class="flex items-center justify-center gap-1.5">
                                 <button type="button"
-                                    onclick="openKaryawanEditModal({id:'{{ $k->id_karyawan }}',nama:'{{ addslashes($k->nama_karyawan) }}',nrp:'{{ addslashes($k->nrp_karyawan) }}',jabatan:'{{ $k->jabatan }}'})"
+                                    onclick="openKaryawanEditModal({id:'{{ $kId }}',nama:'{{ addslashes($kNama) }}',nrp:'{{ addslashes($kNrp) }}',jabatan:'{{ $kJabatan }}'})"
                                     class="w-7 h-7 flex items-center justify-center rounded-lg bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 transition-all hover:scale-110 active:scale-95" title="Edit">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                                 </button>
                                 <button type="button"
-                                    data-id="{{ $k->id_karyawan }}"
-                                    data-nama="{{ $k->nama_karyawan }}"
-                                    data-nrp="{{ $k->nrp_karyawan }}"
+                                    data-id="{{ $kId }}"
+                                    data-nama="{{ $kNama }}"
+                                    data-nrp="{{ $kNrp }}"
                                     onclick="openKaryawanDeleteModal(this)"
                                     class="w-7 h-7 flex items-center justify-center rounded-lg bg-slate-100 text-slate-500 hover:bg-red-50 hover:text-red-600 transition-all hover:scale-110 active:scale-95" title="Hapus">
                                     <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
