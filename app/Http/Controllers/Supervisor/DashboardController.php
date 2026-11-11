@@ -61,7 +61,7 @@ class DashboardController extends Controller
         $lines = $this->resolvePressMonitorLines($selectedLine);
 
         $cacheKey = 'dash:api:'.md5($date.'|'.$shift.'|'.($selectedLine ?: 'all').'|'.implode(',', $lines));
-        $payload = Cache::remember($cacheKey, 5, fn () => $this->buildDashboardPayload($lines, $date, $shift));
+        $payload = Cache::remember($cacheKey, 15, fn () => $this->buildDashboardPayload($lines, $date, $shift));
 
         return response()->json($payload);
     }
@@ -151,7 +151,7 @@ class DashboardController extends Controller
         $lines = $this->resolvePressMonitorLines($selectedLine);
 
         $cacheKey = 'dash:detail:'.md5($date.'|'.$shift.'|'.($selectedLine ?: 'all').'|'.implode(',', $lines));
-        $result = Cache::remember($cacheKey, 5, function () use ($detailService, $lines, $date, $shift) {
+        $result = Cache::remember($cacheKey, 15, function () use ($detailService, $lines, $date, $shift) {
             $result = [];
             foreach ($lines as $lineName) {
                 $result[$lineName] = $detailService->getLineDetail($lineName, $date, $shift);

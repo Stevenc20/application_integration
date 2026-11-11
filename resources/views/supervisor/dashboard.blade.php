@@ -818,6 +818,8 @@ async function dashFetch(url) {
 
 let dashboardFetchInFlight = false;
 
+let dashConsecutiveErrors = 0;
+
 async function fetchDashboardData() {
     if (dashboardFetchInFlight || document.hidden) return;
     dashboardFetchInFlight = true;
@@ -833,6 +835,7 @@ async function fetchDashboardData() {
         const data = await readDashJson(response, url);
         if (!data.line_kpi) throw new Error('Respons API tidak memuat line_kpi');
 
+        dashConsecutiveErrors = 0;
         clearDashError();
         const newHash = JSON.stringify(data.line_kpi);
         const detailChanged = newHash !== LAST_KPI_HASH;
@@ -848,7 +851,13 @@ async function fetchDashboardData() {
         }
         await fetchDetailData();
     } catch (error) {
-        showDashError('Gagal memuat data dashboard: ' + error.message);
+        dashConsecutiveErrors++;
+        // Hanya tampilkan banner error ke user jika gagal lebih dari 2 kali berturut-turut (mencegah blink error akibat 1 glitch jaringan sementara)
+        if (dashConsecutiveErrors >= 3) {
+            showDashError('Gagal memuat data dashboard: ' + error.message);
+        } else {
+            console.warn('[SupervisorDashboard] Transient fetch error (retrying next cycle):', error.message);
+        }
     } finally {
         dashboardFetchInFlight = false;
     }
@@ -898,8 +907,8 @@ try {
     };
 } catch (e) { /* fallback to polling */ }
 
-// AUTO-REFRESH: Mengupdate data dashboard setiap 10 detik + BroadcastChannel dari Input Harian
-setInterval(fetchDashboardData, 10000);
+// AUTO-REFRESH: Mengupdate data dashboard setiap 20 detik + BroadcastChannel dari Input Harian
+setInterval(fetchDashboardData, 20000);
 
 function updateClock(){
   const now = new Date();
