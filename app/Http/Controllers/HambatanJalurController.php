@@ -6,8 +6,11 @@ use App\Models\HambatanJalur;
 use App\Models\RepairRejectLog;
 use App\Models\User;
 use App\Notifications\HambatanJalurSigned;
+use App\Services\ProductionMetricsService;
+use App\Support\SignatureScopeNormalizer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
 class HambatanJalurController extends Controller
@@ -57,7 +60,7 @@ class HambatanJalurController extends Controller
         return view('hambatan-jalur.index', compact('items', 'jenis', 'counts', 'currentTab'));
     }
 
-    public function show($id)
+    public function show(int $id)
     {
         $item = HambatanJalur::with('downtime.jobMaster', 'signer', 'leaderSigner', 'foremanSigner')->findOrFail($id);
 
@@ -85,12 +88,50 @@ class HambatanJalurController extends Controller
 
         $items = collect();
         if (str_starts_with($userRole, 'leader')) {
-            $items = HambatanJalur::where('status', 'pic_signed')
+            $sessLine = session('active_leader_line');
+            $sessDate = session('active_leader_date');
+            $sessShiftNum = session('active_leader_shift_number');
+
+            $items = HambatanJalur::with('downtime')
+                ->where('status', 'pic_signed')
                 ->orderByDesc('signed_at')
                 ->get()
-                ->filter(function ($hambatan) use ($userRole) {
-                    $letter = trim(str_ireplace('press', '', (string) $hambatan->line_name));
-                    return ('leader ' . strtolower($letter)) === $userRole;
+                ->filter(function ($hambatan) use ($userRole, $sessLine, $sessDate, $sessShiftNum) {
+                    $rawLine = (string) $hambatan->line_name;
+                    $letter = trim(str_ireplace('press', '', $rawLine));
+                    $isMatchRole = ('leader ' . strtolower($letter)) === $userRole;
+                    if (!$isMatchRole) {
+                        return false;
+                    }
+
+                    // Jika leader memiliki session kerja aktif, filter strictly pada line, date, & shift number tersebut
+                    if ($sessLine || $sessDate || $sessShiftNum) {
+                        if ($sessLine) {
+                            $stdHambatanLine = SignatureScopeNormalizer::standardLine($rawLine);
+                            $stdSessLine = SignatureScopeNormalizer::standardLine((string) $sessLine);
+                            if ($stdHambatanLine !== $stdSessLine) {
+                                return false;
+                            }
+                        }
+
+                        // Cek tanggal & shift event downtime
+                        $eventTime = $hambatan->waktu ?? $hambatan->signed_at ?? $hambatan->created_at;
+                        if ($eventTime) {
+                            $carbonEvent = \Carbon\Carbon::parse($eventTime);
+                            $itemWorkDate = ProductionMetricsService::currentProductionDate($carbonEvent);
+                            $itemShiftName = ProductionMetricsService::currentProductionShift($carbonEvent);
+                            $itemShiftNum = str_contains(strtolower($itemShiftName), 'malam') ? 2 : 1;
+
+                            if ($sessDate && $itemWorkDate !== $sessDate) {
+                                return false;
+                            }
+                            if ($sessShiftNum && (int) $itemShiftNum !== (int) $sessShiftNum) {
+                                return false;
+                            }
+                        }
+                    }
+
+                    return true;
                 })
                 ->values()
                 ->map(fn ($hambatan) => $this->pendingItemData($hambatan));
@@ -120,7 +161,7 @@ class HambatanJalurController extends Controller
         ];
     }
 
-    public function sign($id, Request $request)
+    public function sign(int $id, Request $request)
     {
         $item = HambatanJalur::findOrFail($id);
 
@@ -160,7 +201,7 @@ class HambatanJalurController extends Controller
         return redirect()->route('hambatan-jalur.show', $item->id);
     }
 
-    public function leaderSign($id, Request $request)
+    public function leaderSign(int $id, Request $request)
     {
         $item = HambatanJalur::findOrFail($id);
 
@@ -184,7 +225,7 @@ class HambatanJalurController extends Controller
         ]);
 
         // Mark all HambatanJalurSigned notifications for this hambatan as read
-        auth()->user()->unreadNotifications()
+        Auth::user()->unreadNotifications()
             ->where('type', \App\Notifications\HambatanJalurSigned::class)
             ->where('data->hambatan_id', $item->id)
             ->get()->each->markAsRead();
@@ -195,7 +236,7 @@ class HambatanJalurController extends Controller
         return redirect()->route('hambatan-jalur.show', $item->id)->with('success', 'Tanda tangan leader berhasil. Laporan menunggu tanda tangan foreman (FRM).');
     }
 
-    public function foremanSign($id, Request $request)
+    public function foremanSign(int $id, Request $request)
     {
         $item = HambatanJalur::findOrFail($id);
 
@@ -218,7 +259,7 @@ class HambatanJalurController extends Controller
             'foreman_signed_by' => Auth::id(),
         ]);
 
-        auth()->user()->unreadNotifications()
+        Auth::user()->unreadNotifications()
             ->where('type', \App\Notifications\HambatanJalurSigned::class)
             ->where('data->hambatan_id', $item->id)
             ->get()->each->markAsRead();
@@ -261,9 +302,38 @@ class HambatanJalurController extends Controller
             return false;
         }
 
+        $cleanLine = SignatureScopeNormalizer::standardLine((string) $hambatan->line_name);
         $letter = trim(str_ireplace('press', '', $hambatan->line_name));
         $roleName = 'leader ' . strtolower($letter);
 
+        // Identifikasi Tanggal Kerja dan Shift Ke-berapa dari event hambatan
+        $eventTime = $hambatan->waktu ?? $hambatan->signed_at ?? $hambatan->created_at ?? now();
+        $carbonEvent = \Carbon\Carbon::parse($eventTime);
+        $workDate = ProductionMetricsService::currentProductionDate($carbonEvent);
+        $shiftName = ProductionMetricsService::currentProductionShift($carbonEvent);
+        $shiftNum = str_contains(strtolower($shiftName), 'malam') ? 2 : 1;
+
+        // 1. Cek apakah ada Leader yang sedang mengunci sesi pada Line, Tanggal, dan Shift ini
+        $cacheKey = 'active_leader_' . str_replace(' ', '_', strtolower($cleanLine)) . '_' . $workDate . '_' . $shiftNum;
+        $activeLeaderId = Cache::get($cacheKey);
+
+        if ($activeLeaderId) {
+            $activeLeader = User::find($activeLeaderId);
+            if ($activeLeader) {
+                $activeLeader->notify(new HambatanJalurSigned($hambatan));
+                Log::info('notifyLineLeader: sent to session-locked active leader', [
+                    'leader_id'    => $activeLeader->id,
+                    'leader_name'  => $activeLeader->name,
+                    'line'         => $cleanLine,
+                    'work_date'    => $workDate,
+                    'shift_number' => $shiftNum,
+                    'hambatan_id'  => $hambatan->id,
+                ]);
+                return true;
+            }
+        }
+
+        // 2. Fallback: kirim ke semua leader dengan role line yang bersangkutan jika belum ada leader yang lock session
         $leaders = User::where('role', $roleName)->get();
 
         if ($leaders->isNotEmpty()) {
@@ -273,7 +343,7 @@ class HambatanJalurController extends Controller
             return true;
         }
 
-        // Fallback to foreman
+        // 3. Fallback to foreman
         $foremen = User::where('role', 'foreman')->get();
         if ($foremen->isNotEmpty()) {
             foreach ($foremen as $foreman) {

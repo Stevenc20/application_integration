@@ -2,12 +2,48 @@
     $pendingSignRole = strtolower(auth()->user()->role ?? '');
     $pendingSignItems = collect();
     if (str_starts_with($pendingSignRole, 'leader')) {
-        $pendingSignItems = \App\Models\HambatanJalur::where('status', 'pic_signed')
+        $sessLine = session('active_leader_line');
+        $sessDate = session('active_leader_date');
+        $sessShiftNum = session('active_leader_shift_number');
+
+        $pendingSignItems = \App\Models\HambatanJalur::with('downtime')
+            ->where('status', 'pic_signed')
             ->orderByDesc('signed_at')
             ->get()
-            ->filter(function ($h1) use ($pendingSignRole) {
-                $letter = trim(str_ireplace('press', '', (string) $h1->line_name));
-                return ('leader ' . strtolower($letter)) === $pendingSignRole;
+            ->filter(function ($h1) use ($pendingSignRole, $sessLine, $sessDate, $sessShiftNum) {
+                $rawLine = (string) $h1->line_name;
+                $letter = trim(str_ireplace('press', '', $rawLine));
+                $isMatchRole = ('leader ' . strtolower($letter)) === $pendingSignRole;
+                if (!$isMatchRole) {
+                    return false;
+                }
+
+                if ($sessLine || $sessDate || $sessShiftNum) {
+                    if ($sessLine) {
+                        $stdHambatanLine = \App\Support\SignatureScopeNormalizer::standardLine($rawLine);
+                        $stdSessLine = \App\Support\SignatureScopeNormalizer::standardLine((string) $sessLine);
+                        if ($stdHambatanLine !== $stdSessLine) {
+                            return false;
+                        }
+                    }
+
+                    $eventTime = $h1->waktu ?? $h1->signed_at ?? $h1->created_at;
+                    if ($eventTime) {
+                        $carbonEvent = \Carbon\Carbon::parse($eventTime);
+                        $itemWorkDate = \App\Services\ProductionMetricsService::currentProductionDate($carbonEvent);
+                        $itemShiftName = \App\Services\ProductionMetricsService::currentProductionShift($carbonEvent);
+                        $itemShiftNum = str_contains(strtolower($itemShiftName), 'malam') ? 2 : 1;
+
+                        if ($sessDate && $itemWorkDate !== $sessDate) {
+                            return false;
+                        }
+                        if ($sessShiftNum && (int) $itemShiftNum !== (int) $sessShiftNum) {
+                            return false;
+                        }
+                    }
+                }
+
+                return true;
             })
             ->values();
     } elseif ($pendingSignRole === 'foreman') {

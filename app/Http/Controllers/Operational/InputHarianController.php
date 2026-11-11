@@ -13,6 +13,7 @@ use App\Models\LineMaster;
 use App\Models\ProductionLog;
 use App\Models\ShiftSubmission;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
@@ -135,6 +136,26 @@ class InputHarianController extends Controller
 
         // SYNC: Pastikan JobMaster terupdate dari Jadwal
         $this->syncPlanToJobMaster($date, $currentShift);
+
+        // LOCK & TRACKING SESSION LEADER: Simpan sesi kerja aktif (Line, Tanggal, Shift ke-berapa)
+        if (Auth::check()) {
+            $uRole = strtolower(Auth::user()->role ?? '');
+            if (str_starts_with($uRole, 'leader') || in_array($uRole, ['leader', 'teamleader', 'group leader'])) {
+                $shiftNum = (str_contains(strtolower((string) $currentShift), 'malam') || $currentShift === '2' || $currentShift === 'Shift 2') ? 2 : 1;
+                $cleanLine = \App\Support\SignatureScopeNormalizer::standardLine($lineFilter ?? '');
+
+                session([
+                    'active_leader_line'         => $cleanLine,
+                    'active_leader_date'         => $date,
+                    'active_leader_shift_number' => $shiftNum,
+                    'active_leader_shift_name'   => $currentShift,
+                ]);
+
+                // Kunci cache sesi leader aktif selama 18 jam
+                $cacheKey = 'active_leader_' . str_replace(' ', '_', strtolower($cleanLine)) . '_' . $date . '_' . $shiftNum;
+                Cache::put($cacheKey, Auth::id(), now()->addHours(18));
+            }
+        }
 
         // RECONCILE: Pastikan sesi shift sebelumnya yang masih running/paused di-transisikan secara aman
         // (job shift lampau yang melewati cutoff shift otomatis dihentikan/ditutup agar line bersih untuk shift baru)
