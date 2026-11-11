@@ -2037,13 +2037,14 @@ explicitTargetQty) {
             `;
             // Populate from blade data instead of fetch — instant, no lag
             const currentJob = window.jobMasterData && window.jobMasterData[id];
-            const currentLine = currentJob ? (currentJob.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '') : '';
+            const cleanLineStr = str => (str || '').toString().toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(LINE|PRESS)/, '');
+            const currentLine = currentJob ? cleanLineStr(currentJob.line) : cleanLineStr(window.ProductionConfig?.currentLine);
             const allJobs = window._pendingJobsData || [];
             const filtered = allJobs.filter(j => {
                 if (j.id == id) return false;
                 if (!currentLine) return true;
-                const jobLine = (j.line || '').toUpperCase().replace('LINE ', '').replace('PRESS ', '');
-                return jobLine === currentLine;
+                const jobLine = cleanLineStr(j.line);
+                return jobLine === currentLine || (currentLine && jobLine.includes(currentLine)) || (jobLine && currentLine.includes(jobLine));
             });
             filtered.forEach(j => {
                 const opt = document.createElement('option');
@@ -2540,29 +2541,54 @@ window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
 window.dtSelectedPartFile = null;
 window.dtSelectedToolingFile = null;
 
-window.previewDtCategoryFoto = function(event, category) {
+window.previewDtCategoryFoto = async function(event, category) {
     const file = event.target.files?.[0];
     if (!file) return;
-
-    if (category === 'part') {
-        window.dtSelectedPartFile = file;
-    } else {
-        window.dtSelectedToolingFile = file;
-    }
 
     const catCap = category === 'part' ? 'Part' : 'Tooling';
     const previewContainer = document.getElementById(`dtFoto${catCap}PreviewContainer`);
     const previewImg = document.getElementById(`dtFoto${catCap}PreviewImg`);
     const label = document.getElementById(`dtFoto${catCap}Label`);
 
-    if (previewImg) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            previewImg.src = e.target.result;
-            if (previewContainer) previewContainer.classList.remove('hidden');
-            if (label) label.textContent = 'Ganti File';
-        };
-        reader.readAsDataURL(file);
+    if (label) label.textContent = 'Mengompres...';
+
+    try {
+        let finalFile = file;
+        if (typeof window.compressAndConvertToWebP === 'function') {
+            finalFile = await window.compressAndConvertToWebP(file, `dt_${category}`);
+        }
+
+        if (category === 'part') {
+            window.dtSelectedPartFile = finalFile;
+        } else {
+            window.dtSelectedToolingFile = finalFile;
+        }
+
+        if (previewImg) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                if (previewContainer) previewContainer.classList.remove('hidden');
+                if (label) label.textContent = 'Ganti File';
+            };
+            reader.readAsDataURL(finalFile);
+        }
+    } catch (err) {
+        console.warn('Kompresi foto downtime gagal, memakai file asli:', err);
+        if (category === 'part') {
+            window.dtSelectedPartFile = file;
+        } else {
+            window.dtSelectedToolingFile = file;
+        }
+        if (previewImg) {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImg.src = e.target.result;
+                if (previewContainer) previewContainer.classList.remove('hidden');
+                if (label) label.textContent = 'Ganti File';
+            };
+            reader.readAsDataURL(file);
+        }
     }
 };
 
