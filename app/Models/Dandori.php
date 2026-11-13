@@ -31,4 +31,9 @@ class Dandori extends Model
     {
         return $this->belongsTo(JobMaster::class, 'previous_job_id');
     }
+
+    public function creator()
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
 }

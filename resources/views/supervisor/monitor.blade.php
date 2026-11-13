@@ -1058,17 +1058,28 @@ function getClasses(desc, k){
     if(desc==='GSPH'){
         const planVal = parseFloat(k.plan);
         const actVal = parseFloat(k.actual);
+        // Indikator GSPH ACTUAL:
+        // Hijau jika GSPH ACTUAL >= TARGET GSPH dari PPC.
+        // Merah jika GSPH ACTUAL < TARGET GSPH dari PPC.
         if(!isNaN(actVal) && !isNaN(planVal) && planVal>0){
-            const pct = (actVal/planVal)*100;
-            act = pct>=100?'bg-green':'bg-red';
-        } else if(actVal>0) act = 'bg-green';
+            act = actVal >= planVal ? 'bg-green' : 'bg-red';
+        } else if(actVal>0) {
+            act = 'bg-green';
+        }
         
+        // Indikator GSPH CURR:
+        // Standar acuan: GSPH/ITEM (CT) PPC dari item yang sedang berjalan (k.currTarget).
+        // Fallback: target GSPH PPC shift (planVal).
+        // Hijau jika GSPH CURR >= GSPH/ITEM PPC.
+        // Merah blink jika GSPH CURR < GSPH/ITEM PPC.
         if(k.current && k.current!=='-'){
             const currVal = parseFloat(k.current);
-            if(!isNaN(currVal) && !isNaN(planVal) && planVal>0){
-                const currPct = (currVal/planVal)*100;
-                curr = currPct>=100?'bg-green':'bg-red-blink';
-            } else if(currVal>0) curr = 'bg-green';
+            const currTarget = (k.currTarget && parseFloat(k.currTarget) > 0) ? parseFloat(k.currTarget) : planVal;
+            if(!isNaN(currVal) && !isNaN(currTarget) && currTarget>0){
+                curr = currVal >= currTarget ? 'bg-green' : 'bg-red-blink';
+            } else if(currVal>0) {
+                curr = 'bg-green';
+            }
         }
     }else if(desc==='REPAIR'||desc==='REJECT'){
         // Fixed semantic colors are applied by #row-REPAIR / #row-REJECT CSS so

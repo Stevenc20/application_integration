@@ -463,21 +463,17 @@ class DashboardRealtimeService
                 $dur = $this->downtimeDurationSeconds($dt) / 60;
                 $currItemAllDtMinutes += $dur;
 
-                // Hanya hitung ke kolom CURR jika downtime tersebut SEDANG AKTIF (belum selesai/finish_time kosong)
-                $isActiveDt = empty($dt->finish_time) && ! empty($dt->start_time);
-                if ($isActiveDt) {
-                    $currDtTotal += $dur;
-                    if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
-                        $currDtMach += $dur;
-                    } elseif (str_contains($type, 'DIES')) {
-                        $currDtDies += $dur;
-                    } elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) {
-                        $currDtMat += $dur;
-                    } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
-                        $currDtLog += $dur;
-                    } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
-                        $currDtProd += $dur;
-                    }
+                $currDtTotal += $dur;
+                if (str_contains($type, 'MACHINE') || str_contains($type, 'MACH') || str_contains($type, 'MESIN')) {
+                    $currDtMach += $dur;
+                } elseif (str_contains($type, 'DIES')) {
+                    $currDtDies += $dur;
+                } elseif (str_contains($type, 'MATERIAL') || str_contains($type, 'MAT')) {
+                    $currDtMat += $dur;
+                } elseif (str_contains($type, 'LOGISTIC') || str_contains($type, 'LOG')) {
+                    $currDtLog += $dur;
+                } elseif (str_contains($type, 'PRODUCTION') || str_contains($type, 'PROD')) {
+                    $currDtProd += $dur;
                 }
             }
             $currDtTotal = round($currDtTotal, 1);
@@ -742,53 +738,24 @@ class DashboardRealtimeService
         $dandoriTotalMinutes = round($dandoriTotalMinutes, 1);
         $currDandoriMinutes = round($currDandoriMinutes, 1);
 
-        // Determine cumulative set up to and including running item (item belum mulai dikecualikan)
+        // GSPH ACTUAL: Hanya memasukkan item/job yang sudah selesai diproduksi (status completed/finished/closed/done)
+        // Item yang sedang berjalan (running/paused) atau belum mulai (pending) tidak dihitung ke GSPH ACTUAL.
+        $finishedStatuses = ['completed', 'complete', 'finished', 'closed', 'done'];
         $includedJobIds = [];
         $runningJobId = null;
         if ($runningRecord && $runningRecord->jobMaster) {
             $runningJobId = $runningRecord->job_master_id;
         }
 
-        // Build ordered list by sequence
-        $ordered = $dailyRecords->filter(function ($dp) {
-            return $dp->jobMaster !== null;
-        })->sortBy(function ($dp) {
-            $seq = $dp->jobMaster->sequence_no ?? 9999;
-
-            return $seq;
-        })->values();
-
-        foreach ($ordered as $dp) {
+        foreach ($dailyRecords as $dp) {
             $jm = $dp->jobMaster;
-            $isRunningJob = $runningJobId && $dp->job_master_id == $runningJobId;
-            $hasStarted = ! empty($jm->started_at) || in_array(strtolower((string) $jm->status), ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed'], true);
-            $hasProgress = ((int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject) > 0;
-            // Include if processed up to running: include all before running that are processed or started; include running if it exists
-            if ($isRunningJob) {
-                // include running even if just started with 0 qty? but qty item berjalan is used for current; for actual cumulative include if processed up to running
-                if ($hasStarted || $hasProgress || true) { // include running
-                    $includedJobIds[] = $dp->job_master_id;
-                }
-                break; // up to and including running
+            if (! $jm) {
+                continue;
             }
-            if ($hasStarted || $hasProgress) {
+            $jmStatus = strtolower((string) $jm->status);
+            // Sesuai requirement: Item yang sedang berjalan jangan dihitung dahulu. Setelah selesai, baru masukkan hasilnya.
+            if (in_array($jmStatus, $finishedStatuses, true)) {
                 $includedJobIds[] = $dp->job_master_id;
-            }
-            // if not started and no progress, exclude
-        }
-
-        // If no running found or cutoff logic didn't include running properly, fallback: include all except those with no start and no progress
-        if (empty($includedJobIds)) {
-            foreach ($ordered as $dp) {
-                $jm = $dp->jobMaster;
-                $hasStarted = ! empty($jm->started_at) || in_array(strtolower((string) $jm->status), ['running', 'paused', 'completed', 'complete', 'finished', 'done', 'closed'], true);
-                $hasProgress = ((int) $dp->actual_ok + (int) $dp->actual_repair + (int) $dp->actual_reject) > 0;
-                if ($hasStarted || $hasProgress) {
-                    $includedJobIds[] = $dp->job_master_id;
-                }
-            }
-            if (empty($includedJobIds) && $runningJobId) {
-                $includedJobIds[] = $runningJobId;
             }
         }
 
@@ -893,17 +860,42 @@ class DashboardRealtimeService
             ? (int) round(($okCum / $actualTptMinutes) * 60)
             : 0;
 
+        $jobName = '-';
+        $currItemTargetGsph = 0;
+        if ($hasRunning && $runningRecord?->jobMaster) {
+            $jmObj = $runningRecord->jobMaster;
+            $matchedPlan = $plansByIdentifier[$jmObj->job_number ?? ''] ?? null;
+            if (! $matchedPlan) {
+                // Cari dari canonical atau rootPlan
+                foreach ($plans as $pCandidate) {
+                    if ($pCandidate->canonicalJobNumber($plans) === ($jmObj->job_number ?? '')) {
+                        $matchedPlan = $pCandidate;
+                        break;
+                    }
+                }
+            }
+            if ($matchedPlan && ! empty(trim($matchedPlan->job_no ?? ''))) {
+                $jobName = trim($matchedPlan->job_no);
+            } else {
+                $raw = $jmObj->job_name ?? $jmObj->job_number ?? '';
+                $jobName = $shortJob($raw);
+            }
+            if ($matchedPlan) {
+                $currItemTargetGsph = (int) round((float) ($matchedPlan->gsph_item ?? 0));
+            }
+        }
+
+        // GSPH CURRENT:
+        // Berdasarkan akumulasi input GOOD dari leader di Input Harian (actual_ok).
+        // Tidak terus berubah/turun hanya karena waktu berjalan jika tidak ada penambahan progress.
+        // Jika belum ada output sama sekali (currOk = 0), CURR = 0 atau '-' jika tidak ada running.
+        // Standar pembanding CURR adalah GSPH/ITEM (CT) PPC dari item yang sedang berjalan.
         $currRuntimeMinutes = round($currRuntime / 60, 1);
-        // GSPH CURRENT = (Qty item berjalan / (Press Time item berjalan + Dandori item berjalan + 1st Check item berjalan + Downtime item berjalan)) × 60
         $currGsph = 0;
         if ($hasRunning && $runningRecord && $runningRecord->jobMaster) {
             $currQtyRunning = (int) $currOk;
-            if ($currQtyRunning <= 0) {
-                // if no qty yet, still follow formula; if denominator zero -> 0
-                $currQtyRunning = 0;
-            }
             $currPressTime = (float) $currRuntimeMinutes;
-            $currDandori = (float) $currDandoriMinutes; // includes dandori + 1st check
+            $currDandori = (float) $currDandoriMinutes;
             $currDowntime = (float) ($currItemAllDtMinutes ?? $currDtTotal);
             $currDenom = $currPressTime + $currDandori + $currDowntime;
             if ($currQtyRunning > 0 && $currDenom > 0 && is_finite($currDenom)) {
@@ -913,8 +905,16 @@ class DashboardRealtimeService
             }
         }
 
-        $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
-        $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
+        // TARGET GSPH PPC:
+        // Ambil target GSPH shift/press dari total plan qty / (total plan tpt / 60)
+        // atau fallback max gsph_item dari plans
+        $totalPlanTptMinutes = (float) $rootPlans->sum(fn ($p) => $p->effectiveTptMinutes($plans));
+        if ($planQty > 0 && $totalPlanTptMinutes > 0) {
+            $gsphPlan = ProductionMetricsService::shiftPlanGsph($planQty, $totalPlanTptMinutes);
+        } else {
+            $planGsphItem = (int) round($plans->max('gsph_item') ?: 0);
+            $gsphPlan = $planGsphItem > 0 ? $planGsphItem : ProductionMetricsService::gsph($planQty, max($runtimeMinutes, 30));
+        }
 
         $dtProdLabel = round($dtProdMinutes, 1).' m';
         $dtTotalLabel = round($dtTotalMinutes, 1).' m';
@@ -925,7 +925,7 @@ class DashboardRealtimeService
 
         $kpi = [
             ['desc' => 'QTY',      'plan' => (string) $planQty,           'actual' => (string) $ok,         'actualLink' => true, 'current' => $hasRunning ? (string) $currOk : '-'],
-            ['desc' => 'GSPH',     'plan' => (string) $gsphPlan,          'actual' => (string) $gsph,       'current' => $hasRunning ? (string) $currGsph : '-'],
+            ['desc' => 'GSPH',     'plan' => (string) $gsphPlan,          'actual' => (string) $gsph,       'current' => $hasRunning ? (string) $currGsph : '-', 'currTarget' => $hasRunning ? (string) $currItemTargetGsph : '0'],
             ['desc' => 'PROD_T',   'plan' => '0 m',                      'actual' => $dtProdLabel,        'current' => $hasRunning ? $currDtProd.' m' : '-', 'popup' => true],
             ['desc' => 'TOTAL_DT', 'plan' => '0 m',                      'actual' => $dtTotalLabel,       'current' => $hasRunning ? $currDtTotal.' m' : '-', 'popup' => true, 'danger' => $dtTotalMinutes > 0],
             ['desc' => 'MACH_T',   'plan' => '0 m',                      'actual' => $dtMachLabel,        'current' => $hasRunning ? $currDtMach.' m' : '-', 'popup' => true],
@@ -950,48 +950,53 @@ class DashboardRealtimeService
             'REJECT' => ['type' => 'quality',    $lineName => ['rows' => $rejectRows, 'total' => (string) $reject]],
         ];
 
-        $jobName = '-';
-        if ($hasRunning && $runningRecord?->jobMaster) {
-            $jmObj = $runningRecord->jobMaster;
-            $matchedPlan = $plansByIdentifier[$jmObj->job_number ?? ''] ?? null;
-            if ($matchedPlan && ! empty(trim($matchedPlan->job_no ?? ''))) {
-                $jobName = trim($matchedPlan->job_no);
-            } else {
-                $raw = $jmObj->job_name ?? $jmObj->job_number ?? '';
-                $jobName = $shortJob($raw);
-            }
-        }
-
         $uniqueBasePlans = $plans->filter(fn ($p) => empty($p->parent_job_id));
         $totalJobs = $uniqueBasePlans->count();
 
-        // Finished jobs: count unique base plans whose parent or child jobs are finished
+        // Finished jobs: count unique base plans that are actually completed
+        // (Status completed/complete/finished/closed/done, dan TIDAK sedang running/paused)
         $finishedStatuses = ['finished', 'complete', 'completed', 'closed', 'done'];
         $finishedBaseCount = 0;
         foreach ($uniqueBasePlans as $bp) {
-            $bjn = trim($bp->job_no ?? '');
-            $bjm = trim($bp->job_master ?? '');
-            $bIdent = $bjn ? ($bjn.'-'.$bp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($bjm).'-'.$bp->id);
-            $bJob = $jobMasters->get($bIdent);
-            $isBaseFinished = ($bJob && in_array(strtolower((string) $bJob->status), $finishedStatuses, true))
-                || in_array(strtolower((string) $bp->status), $finishedStatuses, true);
+            $rootIdent = $bp->canonicalJobNumber($plans);
+            $bJob = $jobMasters->get($rootIdent);
+            if (! $bJob) {
+                $bjn = trim($bp->job_no ?? '');
+                $bjm = trim($bp->job_master ?? '');
+                $legacyIdent = $bjn ? ($bjn.'-'.$bp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($bjm).'-'.$bp->id);
+                $bJob = $jobMasters->get($legacyIdent);
+            }
 
-            if (! $isBaseFinished) {
-                $childPlans = $plans->filter(fn ($cp) => ! empty($cp->parent_job_id) && (int) $cp->parent_job_id === (int) $bp->id);
-                foreach ($childPlans as $cp) {
+            // Status dari JobMaster atau ProductionPlan
+            $jmStatus = strtolower((string) ($bJob?->status ?? $bp->status ?? ''));
+
+            // Child slices check
+            $childPlans = $plans->filter(fn ($cp) => ! empty($cp->parent_job_id) && (int) $cp->parent_job_id === (int) $bp->id);
+            $hasChildRunning = false;
+            $hasChildFinished = false;
+            foreach ($childPlans as $cp) {
+                $cIdent = $cp->canonicalJobNumber($plans);
+                $cJob = $jobMasters->get($cIdent);
+                if (! $cJob) {
                     $cjn = trim($cp->job_no ?? '');
                     $cjm = trim($cp->job_master ?? '');
-                    $cIdent = $cjn ? ($cjn.'-'.$cp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$cp->id);
-                    $cJob = $jobMasters->get($cIdent);
-                    if (($cJob && in_array(strtolower((string) $cJob->status), $finishedStatuses, true))
-                        || in_array(strtolower((string) $cp->status), $finishedStatuses, true)) {
-                        $isBaseFinished = true;
-                        break;
-                    }
+                    $cLegacyIdent = $cjn ? ($cjn.'-'.$cp->id) : ('AUTO-'.\Illuminate\Support\Str::slug($cjm).'-'.$cp->id);
+                    $cJob = $jobMasters->get($cLegacyIdent);
+                }
+                $cStatus = strtolower((string) ($cJob?->status ?? $cp->status ?? ''));
+                if (in_array($cStatus, ['running', 'paused'], true)) {
+                    $hasChildRunning = true;
+                }
+                if (in_array($cStatus, $finishedStatuses, true)) {
+                    $hasChildFinished = true;
                 }
             }
 
-            if ($isBaseFinished) {
+            // Jangan hitung sebagai finished jika root atau child-nya sedang aktif running / paused
+            $isActive = in_array($jmStatus, ['running', 'paused'], true) || $hasChildRunning;
+            $isFinished = ! $isActive && (in_array($jmStatus, $finishedStatuses, true) || $hasChildFinished);
+
+            if ($isFinished) {
                 $finishedBaseCount++;
             }
         }

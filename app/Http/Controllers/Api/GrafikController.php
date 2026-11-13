@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\DailyProduction;
+use App\Models\Dandori;
 use App\Models\Downtime;
 use App\Models\Machine;
 use App\Models\MachineLog;
@@ -11,6 +12,7 @@ use App\Models\JobMaster;
 use App\Models\LineMaster;
 use App\Models\ProductionPlan;
 use App\Services\DashboardRealtimeService;
+use App\Services\ProductionMetricsService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -340,37 +342,318 @@ class GrafikController extends Controller
         ]);
     }
 
-    public function gsph(Request $request)
+    public function dandoriMonitoring(Request $request)
+    {
+        try {
+            $month = $request->input('month') ?: Carbon::now()->format('Y-m');
+            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->format('Y-m-d');
+            $endDate = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->format('Y-m-d');
+        } catch (\Throwable $e) {
+            $month = Carbon::now()->format('Y-m');
+            $startDate = Carbon::now()->startOfMonth()->format('Y-m-d');
+            $endDate = Carbon::now()->endOfMonth()->format('Y-m-d');
+        }
+
+        $query = Dandori::with(['nextJob', 'creator'])
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween(DB::raw('COALESCE(work_date, DATE(start_time))'), [$startDate, $endDate]);
+            });
+
+        if ($line = $request->input('line')) {
+            $query->where('line', $line);
+        }
+
+        if ($shift = $request->input('shift')) {
+            $query->where('shift', 'like', "%{$shift}%");
+        }
+
+        $records = $query->orderBy('start_time', 'asc')->get();
+
+        $totalMinutes = 0.0;
+        $dandoriMinutes = 0.0;
+        $dandoriCount = 0;
+        $firstCheckMinutes = 0.0;
+        $firstCheckCount = 0;
+
+        $dailyStats = [];
+        $lineStats = [];
+        $items = [];
+
+        // Pre-fill days of month for trend
+        $startDay = Carbon::parse($startDate);
+        $endDay = Carbon::parse($endDate);
+        for ($d = $startDay->copy(); $d->lte($endDay); $d->addDay()) {
+            $dayKey = $d->format('Y-m-d');
+            $dailyStats[$dayKey] = [
+                'date' => $dayKey,
+                'dandori' => 0.0,
+                'first_check' => 0.0,
+                'total' => 0.0,
+            ];
+        }
+
+        foreach ($records as $r) {
+            $dur = (float) ($r->duration_minutes ?? 0);
+            if ($dur <= 0 && $r->start_time) {
+                $fn = $r->finish_time ?: Carbon::now();
+                $dur = round(abs(Carbon::parse($fn)->diffInSeconds(Carbon::parse($r->start_time))) / 60, 2);
+            }
+
+            $isFirstCheck = strtolower((string) $r->jenis_dandori) === '1st_check' 
+                || strtoupper((string) $r->activity) === '1ST CHECK';
+
+            $totalMinutes += $dur;
+            if ($isFirstCheck) {
+                $firstCheckMinutes += $dur;
+                $firstCheckCount++;
+            } else {
+                $dandoriMinutes += $dur;
+                $dandoriCount++;
+            }
+
+            // Daily trend grouping
+            $recDate = $r->work_date ? Carbon::parse($r->work_date)->format('Y-m-d') : ($r->start_time ? Carbon::parse($r->start_time)->format('Y-m-d') : null);
+            if ($recDate && isset($dailyStats[$recDate])) {
+                if ($isFirstCheck) {
+                    $dailyStats[$recDate]['first_check'] += $dur;
+                } else {
+                    $dailyStats[$recDate]['dandori'] += $dur;
+                }
+                $dailyStats[$recDate]['total'] += $dur;
+            }
+
+            // Line grouping
+            $recLine = trim((string) $r->line) ?: 'Unknown Line';
+            if (!isset($lineStats[$recLine])) {
+                $lineStats[$recLine] = [
+                    'line' => $recLine,
+                    'total_minutes' => 0.0,
+                    'dandori_minutes' => 0.0,
+                    'first_check_minutes' => 0.0,
+                    'count' => 0,
+                ];
+            }
+            $lineStats[$recLine]['total_minutes'] += $dur;
+            if ($isFirstCheck) {
+                $lineStats[$recLine]['first_check_minutes'] += $dur;
+            } else {
+                $lineStats[$recLine]['dandori_minutes'] += $dur;
+            }
+            $lineStats[$recLine]['count']++;
+
+            $items[] = [
+                'id' => $r->id,
+                'date' => $recDate ?: '-',
+                'line' => $r->line ?: '-',
+                'shift' => $r->shift ?: '-',
+                'job_number' => $r->nextJob?->job_number ?? '-',
+                'job_name' => $r->nextJob?->job_name ?? '-',
+                'start_time' => $r->start_time ? Carbon::parse($r->start_time)->format('H:i') : '-',
+                'finish_time' => $r->finish_time ? Carbon::parse($r->finish_time)->format('H:i') : 'Berjalan',
+                'activity' => $isFirstCheck ? '1st Check' : 'Dandori / Dies Change',
+                'jenis_dandori' => $isFirstCheck ? '1st_check' : 'dandori',
+                'is_first_check' => $isFirstCheck,
+                'duration_minutes' => round($dur, 1),
+                'pic' => $r->creator?->name ?? 'Operator',
+            ];
+        }
+
+        // Sort items latest first for table view
+        $items = array_reverse($items);
+
+        $totalEvents = count($records);
+        $avgMinutes = $totalEvents > 0 ? round($totalMinutes / $totalEvents, 1) : 0.0;
+
+        // Daily trend data format for Chart.js
+        $trendLabels = array_keys($dailyStats);
+        $trendDandori = array_map(fn($d) => round($d['dandori'], 1), array_values($dailyStats));
+        $trendFirstCheck = array_map(fn($d) => round($d['first_check'], 1), array_values($dailyStats));
+
+        // Line breakdown sorted descending
+        uasort($lineStats, fn($a, $b) => $b['total_minutes'] <=> $a['total_minutes']);
+
+        return response()->json([
+            'month' => $month,
+            'summary' => [
+                'totalMinutes' => round($totalMinutes, 1),
+                'totalEvents' => $totalEvents,
+                'avgMinutes' => $avgMinutes,
+                'dandoriMinutes' => round($dandoriMinutes, 1),
+                'dandoriCount' => $dandoriCount,
+                'firstCheckMinutes' => round($firstCheckMinutes, 1),
+                'firstCheckCount' => $firstCheckCount,
+            ],
+            'trend' => [
+                'labels' => array_map(fn($dt) => Carbon::parse($dt)->format('d M'), $trendLabels),
+                'dandori' => $trendDandori,
+                'first_check' => $trendFirstCheck,
+            ],
+            'composition' => [
+                'labels' => ['Ganti Dies / Setup', '1st Check'],
+                'data' => [round($dandoriMinutes, 1), round($firstCheckMinutes, 1)],
+                'counts' => [$dandoriCount, $firstCheckCount],
+            ],
+            'lineBreakdown' => array_values($lineStats),
+            'items' => $items,
+        ]);
+    }
+
+    public function gsphMonitoring(Request $request)
     {
         $date = $request->input('date');
         $shift = (int) $request->input('shift', 1);
+        if ($shift <= 0) $shift = 1;
 
-        // Default: pakai tanggal schedule terakhir yang punya job, bukan hardcode hari ini
-        if (! $date) {
+        if (!$date) {
             $latestPlanDate = ProductionPlan::activePpcRevision()->where('row_type', 'job')->max('plan_date');
-            $date = $latestPlanDate
-                ? Carbon::parse($latestPlanDate)->toDateString()
-                : Carbon::now()->toDateString();
+            $date = $latestPlanDate ? Carbon::parse($latestPlanDate)->toDateString() : Carbon::now()->toDateString();
         }
 
-        $lines = LineMaster::where('status', 'active')
+        $allLines = LineMaster::where('status', 'active')
             ->select('line_name')->distinct()->pluck('line_name')->toArray();
+
+        if ($filterLine = $request->input('line')) {
+            $lines = array_values(array_filter($allLines, fn($l) => strcasecmp($l, $filterLine) === 0 || str_contains(strtolower($l), strtolower($filterLine))));
+            if (empty($lines)) {
+                $lines = [$filterLine];
+            }
+        } else {
+            $lines = $allLines;
+        }
 
         $dashService = app(DashboardRealtimeService::class);
 
-        $labels = [];
-        $plan = [];
-        $actual = [];
+        $lineMetricsList = [];
+        $jobRows = [];
+
+        $totalPlanGsphSum = 0;
+        $totalActGsphSum = 0;
+        $activeLineCount = 0;
 
         foreach ($lines as $lineName) {
             $metrics = $dashService->getLineMetrics($lineName, $date, $shift);
-            $gsphEntry = collect($metrics['kpi'])->firstWhere('desc', 'GSPH');
+            $kpiGsph = collect($metrics['kpi'])->firstWhere('desc', 'GSPH');
+            $kpiQty = collect($metrics['kpi'])->firstWhere('desc', 'QTY');
 
-            $labels[] = $lineName;
-            $plan[] = $gsphEntry ? (float) $gsphEntry['plan'] : 0;
-            $actual[] = $gsphEntry ? (float) $gsphEntry['actual'] : 0;
+            $pGsph = $kpiGsph ? (float) ($kpiGsph['plan'] ?? 0) : 0.0;
+            $aGsph = $kpiGsph ? (float) ($kpiGsph['actual'] ?? 0) : 0.0;
+            $cGsph = $kpiGsph ? ($kpiGsph['current'] ?? '-') : '-';
+
+            $pQty = $kpiQty ? (int) ($kpiQty['plan'] ?? 0) : 0;
+            $aQty = $kpiQty ? (int) ($kpiQty['actual'] ?? 0) : 0;
+
+            $achievePct = $pGsph > 0 ? round(($aGsph / $pGsph) * 100, 1) : 0.0;
+
+            if ($pGsph > 0 || $aGsph > 0 || $pQty > 0 || $aQty > 0) {
+                $totalPlanGsphSum += $pGsph;
+                $totalActGsphSum += $aGsph;
+                $activeLineCount++;
+            }
+
+            $lineMetricsList[] = [
+                'line' => $lineName,
+                'plan_gsph' => (int) round($pGsph),
+                'actual_gsph' => (int) round($aGsph),
+                'current_gsph' => $cGsph,
+                'plan_qty' => $pQty,
+                'actual_qty' => $aQty,
+                'achievement_pct' => $achievePct,
+                'status' => $achievePct >= 100 ? 'Target Tercapai' : ($achievePct >= 85 ? 'Mendekati' : ($pGsph > 0 ? 'Under Plan' : 'Standby')),
+            ];
+
+            // Detail per job for this line
+            $isMorning = ($shift === 1);
+            $plans = $dashService->getPlansForDateAndShift($date, $isMorning)
+                ->filter(fn($p) => $dashService->pressMatches($p, $lineName))
+                ->values();
+
+            foreach ($plans as $p) {
+                if ($p->isChildSlice()) continue;
+                $pQtyItem = (int) ($p->plan ?? 0);
+                $pGsphItem = (int) round((float) ($p->gsph_item ?? 0));
+
+                // Find associated job and daily production
+                $job = JobMaster::where('job_number', 'like', "%{$p->id}%")->first();
+                $dp = $job ? DailyProduction::where('job_master_id', $job->id)->whereDate('work_date', $date)->first() : null;
+
+                $actQty = (int) ($dp?->actual_ok ?? 0);
+                
+                // Actual TPT calculation consistent with Input Harian
+                $pressTime = $dp ? ((float) $dp->runtime_seconds / 60.0) : 0.0;
+                $dandoriTime = 0.0;
+                $downtimeTime = 0.0;
+                if ($job) {
+                    $dandoris = Dandori::where('next_job_id', $job->id)
+                        ->where(function($q) use ($date) {
+                            $q->whereDate('work_date', $date)
+                              ->orWhereDate('start_time', $date);
+                        })->get();
+                    $dandoriTime = (float) $dandoris->sum('duration_minutes');
+
+                    $dts = Downtime::where('job_master_id', $job->id)
+                        ->whereBetween('start_time', [Carbon::parse($date)->startOfDay(), Carbon::parse($date)->endOfDay()])
+                        ->whereNotIn('jenis_downtime', ['break time', 'break', 'dandori', 'idle', 'idle time'])
+                        ->get();
+                    $downtimeTime = round((float) $dts->sum('duration_seconds') / 60.0, 1);
+                }
+
+                $actTpt = ProductionMetricsService::actualTpt($pressTime, $dandoriTime, $downtimeTime);
+                $actGsph = ProductionMetricsService::gsph($actQty, $actTpt);
+
+                $itemAchieve = $pGsphItem > 0 ? round(($actGsph / $pGsphItem) * 100, 1) : 0.0;
+
+                $jobRows[] = [
+                    'line' => $lineName,
+                    'job_number' => $p->job_no ?: '-',
+                    'job_name' => $p->job_master ?: ($p->job_no ?: '-'),
+                    'target_qty' => $pQtyItem,
+                    'actual_qty' => $actQty,
+                    'press_time' => round($pressTime, 1),
+                    'dandori_time' => round($dandoriTime, 1),
+                    'downtime_time' => round($downtimeTime, 1),
+                    'actual_tpt' => round($actTpt, 1),
+                    'plan_gsph' => $pGsphItem,
+                    'actual_gsph' => $actGsph,
+                    'achievement_pct' => $itemAchieve,
+                    'status' => $itemAchieve >= 100 ? 'Tercapai' : ($itemAchieve >= 85 ? 'Mendekati' : ($pGsphItem > 0 ? 'Under' : '-')),
+                ];
+            }
         }
 
-        return response()->json(compact('labels', 'plan', 'actual') + ['date' => $date]);
+        $avgPlanGsph = $activeLineCount > 0 ? (int) round($totalPlanGsphSum / $activeLineCount) : 0;
+        $avgActualGsph = $activeLineCount > 0 ? (int) round($totalActGsphSum / $activeLineCount) : 0;
+        $overallAchieve = $avgPlanGsph > 0 ? round(($avgActualGsph / $avgPlanGsph) * 100, 1) : 0.0;
+
+        // Determine top and bottom lines
+        $validLinePerf = array_filter($lineMetricsList, fn($l) => $l['plan_gsph'] > 0 || $l['actual_gsph'] > 0);
+        usort($validLinePerf, fn($a, $b) => $b['actual_gsph'] <=> $a['actual_gsph']);
+        $topLine = !empty($validLinePerf) ? $validLinePerf[0]['line'] . ' (' . $validLinePerf[0]['actual_gsph'] . ')' : '-';
+        $bottomLine = !empty($validLinePerf) ? end($validLinePerf)['line'] . ' (' . end($validLinePerf)['actual_gsph'] . ')' : '-';
+
+        return response()->json([
+            'date' => $date,
+            'shift' => $shift,
+            'summary' => [
+                'avgActualGsph' => $avgActualGsph,
+                'avgPlanGsph' => $avgPlanGsph,
+                'overallAchievement' => $overallAchieve,
+                'topLine' => $topLine,
+                'bottomLine' => $bottomLine,
+                'activeLines' => $activeLineCount,
+            ],
+            'chart' => [
+                'labels' => array_column($lineMetricsList, 'line'),
+                'plan' => array_column($lineMetricsList, 'plan_gsph'),
+                'actual' => array_column($lineMetricsList, 'actual_gsph'),
+                'achievement' => array_column($lineMetricsList, 'achievement_pct'),
+            ],
+            'lines' => $lineMetricsList,
+            'jobs' => $jobRows,
+        ]);
+    }
+
+    public function gsph(Request $request)
+    {
+        return $this->gsphMonitoring($request);
     }
 }

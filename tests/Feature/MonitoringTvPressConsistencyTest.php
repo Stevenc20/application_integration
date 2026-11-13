@@ -452,8 +452,8 @@ it('ensures Press D is 100% consistent between Input Harian and Monitoring TV ac
         ->and($kpiByDesc['MACH_T']['actual'])->toBe('6 m')
         // GSPH Current for GD-4002: 120 / (12m press + 7m dandori + 3m qcheck + 6m dt = 28m) * 60 = 257
         ->and($kpiByDesc['GSPH']['current'])->toBe('257')
-        // GSPH Actual cumulative (GD-4001 + GD-4002): 420 / ((30+12)m press + (8+2+7+3)m dandori/qcheck + 6m dt = 68m) * 60 = 371
-        ->and($kpiByDesc['GSPH']['actual'])->toBe('371')
+        // GSPH Actual hanya untuk item selesai (GD-4001): 300 ok / (30m press + 8m dandori + 2m qcheck = 40m) * 60 = 450 (GD-4002 running dikecualikan hingga selesai)
+        ->and($kpiByDesc['GSPH']['actual'])->toBe('450')
         // Status for Line D must be DOWNTIME (normalized from 'PRESS D' to 'Line D')
         ->and($statuses['Line D']['label'])->toBe('DOWNTIME');
 
@@ -473,7 +473,7 @@ it('ensures Press D is 100% consistent between Input Harian and Monitoring TV ac
         ->and($detail[0]['actual_finish'])->toBe('13:50')
         ->and($detail[0]['gsph_actual'])->toBe(450)
         ->and($detail[1]['job_number'])->toBe('GD-4002')
-        ->and($detail[1]['is_running'])->toBeTrue()
+        ->and($detail[1]['is_running'])->toBeTrue()  
         ->and($detail[1]['plan_qty'])->toBe(250)
         ->and($detail[1]['good'])->toBe(120)
         ->and($detail[1]['repair'])->toBe(2)

@@ -251,12 +251,32 @@ class MonitoringTvFormulaConsistencyTest extends TestCase
         // CURRENT GSPH:
         // Item berjalan: 100 qty / (15m press + 5m dandori + 0m dt) * 60 = (100 / 20) * 60 = 300
         $this->assertEquals('300', $kpiByDesc['GSPH']['current']);
+        $this->assertEquals('300', $kpiByDesc['GSPH']['currTarget']);
 
         // ACTUAL GSPH:
-        // Total kumulatif qty up to running item: 400 + 100 = 500 ok
-        // Total kumulatif duration: Item 1 (40+10+10 = 60m) + Item 2 (15+5 = 20m) = 80m
+        // Sesuai requirement baru: Item 2 masih running -> JANGAN dimasukkan dahulu ke Actual GSPH!
+        // Hanya item selesai (Item 1) yang dihitung: 400 ok / (40m press + 10m dandori + 10m dt = 60m) * 60 = 400
+        $this->assertEquals('400', $kpiByDesc['GSPH']['actual']);
+
+        // ACTUAL JOB COUNTER:
+        // Item 1 selesai (1), Item 2 running (belum selesai) -> 1/2 selesai
+        $this->assertEquals('1/2', $realtime['meta']['jobActual']);
+
+        // Sekarang selesaikan Item 2 dan verifikasi masuk ke Actual GSPH
+        $job2->update(['status' => 'completed']);
+        $plan2->update(['status' => 'completed']);
+        DashboardRealtimeService::flushCache();
+
+        $realtimeAfterFinish = app(DashboardRealtimeService::class)->getLineMetrics('Line A', $date, 1);
+        $kpiAfter = collect($realtimeAfterFinish['kpi'])->keyBy('desc');
+
+        // Setelah Item 2 selesai:
+        // Total kumulatif qty: 400 + 100 = 500 ok
+        // Total kumulatif duration: Item 1 (60m) + Item 2 (20m) = 80m
         // Actual GSPH = (500 / 80) * 60 = 375
-        $this->assertEquals('375', $kpiByDesc['GSPH']['actual']);
+        $this->assertEquals('375', $kpiAfter['GSPH']['actual']);
+        // Counter bertambah menjadi 2/2
+        $this->assertEquals('2/2', $realtimeAfterFinish['meta']['jobActual']);
 
         Carbon::setTestNow();
     }
