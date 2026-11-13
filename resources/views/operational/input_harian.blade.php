@@ -592,11 +592,13 @@ window.jobMasterData = {
         plan_end: {{ $job->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->finish_time)->timestamp * 1000 : (\Carbon\Carbon::parse($jd->plan_end ?: $activeDate . ' 10:40')->timestamp * 1000) }},
         @php
             $firstDanDt = $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first();
+            $firstDanRec = $jd->dandoris->filter(fn($d) => in_array(strtolower(trim($d->jenis_dandori ?? '')), ['dandori', 'setup', '']) || strtolower(trim($d->activity ?? '')) === 'dandori')->sortBy('start_time')->first();
+            $dandoriCandidateStart = $firstDanDt ? \Carbon\Carbon::parse($firstDanDt->start_time)->timestamp * 1000 : ($firstDanRec ? \Carbon\Carbon::parse($firstDanRec->start_time)->timestamp * 1000 : null);
             $effectiveStartTs = (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->start_time)
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->start_time)->timestamp * 1000
                 : ($jd->started_at
                     ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000
-                    : ($firstDanDt ? \Carbon\Carbon::parse($firstDanDt->start_time)->timestamp * 1000 : ($isJobDone && $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : 'null')));
+                    : ($dandoriCandidateStart ?: ($isJobDone && $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : 'null')));
             $effectiveFinishedTs = (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time)
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->finish_time)->timestamp * 1000
                 : ($jd->finished_at
@@ -604,6 +606,7 @@ window.jobMasterData = {
                     : ($isJobDone
                         ? ($jd->updated_at ? \Carbon\Carbon::parse($jd->updated_at)->timestamp * 1000 : ($job->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->finish_time)->timestamp * 1000 : 'null'))
                         : 'null'));
+            $firstDandoriStartVal = $dandoriCandidateStart ?: 'null';
         @endphp
         started_at: {{ $effectiveStartTs }},
         prod_start: {{ $jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : ($isJobDone && $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : 'null') }},
@@ -613,8 +616,8 @@ window.jobMasterData = {
         actual_ok: {{ $actualOkVal }},
         actual_repair: {{ $actualRepairVal }},
         actual_reject: {{ $actualRejectVal }},
-        dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
-        first_dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
+        dandori_start: {{ $firstDanDt && empty($firstDanDt->finish_time) ? \Carbon\Carbon::parse($firstDanDt->start_time)->timestamp * 1000 : ($firstDanRec && empty($firstDanRec->finish_time) ? \Carbon\Carbon::parse($firstDanRec->start_time)->timestamp * 1000 : 'null') }},
+        first_dandori_start: {{ $firstDandoriStartVal }},
         tpt: {{ (float)(($job->tpt ?? 0) > 0 ? $job->tpt : (($job->start_time && $job->finish_time) ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time)) : 0)) }},
         line: "{{ $job->press_name ?? '' }}"
     },
@@ -675,20 +678,20 @@ window.jobDowntimeHistory = {
                 'problem' => $dt->problem
             ];
         })->toArray(),
-        $jd->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check')->map(function($d) use ($jd) {
+        $jd->dandoris->map(function($d) use ($jd) {
             $endTs = $d->finish_time ? \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000 : null;
             if (!$endTs) {
-                // If 1st check was paused by an active non-dandori downtime, anchor end to downtime start or now
                 $openDt = $jd->downtimes->whereNull('finish_time')->where('jenis_downtime', '!=', 'dandori')->first();
                 if ($openDt && $openDt->start_time) {
                     $endTs = \Carbon\Carbon::parse($openDt->start_time)->timestamp * 1000;
                 }
             }
+            $isFc = ($d->jenis_dandori ?? '') === '1st_check' || strtolower(trim($d->activity ?? '')) === '1st check';
             return [
-                'id' => 'fc_'.$d->id,
+                'id' => ($isFc ? 'fc_' : 'dan_').$d->id,
                 'start' => \Carbon\Carbon::parse($d->start_time)->timestamp * 1000,
                 'end' => $endTs,
-                'type' => '1st_check',
+                'type' => $isFc ? '1st_check' : 'dandori',
                 'problem' => null
             ];
         })->filter(fn($item) => $item['end'] !== null)->values()->toArray()
@@ -707,7 +710,7 @@ window.jobDowntimeHistory = {
                 'problem' => $dt->problem
             ];
         })->toArray(),
-        $activeJob->dandoris->filter(fn($d) => ($d->jenis_dandori ?? '') === '1st_check')->map(function($d) use ($activeJob) {
+        $activeJob->dandoris->map(function($d) use ($activeJob) {
             $endTs = $d->finish_time ? \Carbon\Carbon::parse($d->finish_time)->timestamp * 1000 : null;
             if (!$endTs) {
                 $openDt = $activeJob->downtimes->whereNull('finish_time')->where('jenis_downtime', '!=', 'dandori')->first();
@@ -715,11 +718,12 @@ window.jobDowntimeHistory = {
                     $endTs = \Carbon\Carbon::parse($openDt->start_time)->timestamp * 1000;
                 }
             }
+            $isFc = ($d->jenis_dandori ?? '') === '1st_check' || strtolower(trim($d->activity ?? '')) === '1st check';
             return [
-                'id' => 'fc_'.$d->id,
+                'id' => ($isFc ? 'fc_' : 'dan_').$d->id,
                 'start' => \Carbon\Carbon::parse($d->start_time)->timestamp * 1000,
                 'end' => $endTs,
-                'type' => '1st_check',
+                'type' => $isFc ? '1st_check' : 'dandori',
                 'problem' => null
             ];
         })->filter(fn($item) => $item['end'] !== null)->values()->toArray()

@@ -424,6 +424,11 @@ class InputHarianController extends Controller
                     || (($plan->plan ?? 0) > 0 && $totActual >= $plan->plan);
                 if ($isPlanDone && !in_array(strtolower((string) $plan->job_data->status), ['complete', 'completed', 'finished', 'closed', 'done'], true)) {
                     $plan->job_data->status = 'complete';
+                    try {
+                        \App\Models\JobMaster::where('id', $plan->job_data->id)->update(['status' => 'complete']);
+                    } catch (\Throwable $e) {
+                        // ignore DB sync fail on read
+                    }
                 }
             }
 
@@ -760,7 +765,30 @@ class InputHarianController extends Controller
 
         $pendingJobs = JobMaster::whereIn(DB::raw('LOWER(status)'), ['pending', 'running', 'paused'])
             ->whereIn('job_number', $rootScheduledJobNumbers)
+            ->with(['dailyProduction' => fn($q) => $q->whereDate('work_date', $date)])
             ->get()
+            ->filter(function($job) use ($plans) {
+                // Jangan masukkan job yang targetnya sudah selesai/tercapai ke dalam dropdown antrean standby
+                $dp = $job->dailyProduction;
+                $tot = $dp ? (($dp->actual_ok ?? 0) + ($dp->actual_repair ?? 0) + ($dp->actual_reject ?? 0)) : 0;
+                $matchingPlan = $plans->first(function($p) use ($job) {
+                    $jn = trim($p->job_no ?? '');
+                    $jm = trim($p->job_master ?? '');
+                    $ident = $jn ? ($jn . '-' . $p->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $p->id);
+                    return $ident === $job->job_number;
+                });
+                if ($matchingPlan) {
+                    $tot = max($tot, (int)(($matchingPlan->ok ?? 0) + ($matchingPlan->repair ?? 0) + ($matchingPlan->reject ?? 0)));
+                    if (in_array(strtolower((string)$matchingPlan->status), ['complete', 'completed', 'finished', 'closed', 'done'], true)) {
+                        return false;
+                    }
+                }
+                $targ = $job->effectiveTargetQty() ?: ($matchingPlan?->plan ?? $job->target_qty ?? 0);
+                if ($targ > 0 && $tot >= $targ) {
+                    return false;
+                }
+                return true;
+            })
             ->each(function($job) {
                 $eff = $job->effectiveTargetQty();
                 if ($eff > 0) {

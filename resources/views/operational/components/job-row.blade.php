@@ -41,8 +41,12 @@
     $firstDan = $job->job_data?->downtimes
         ?->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')
         ?->sortBy('start_time')->first();
-    if ($firstDan) {
-        $actStartDerived = \Carbon\Carbon::parse($firstDan->start_time);
+    $firstDanRecord = $job->job_data?->dandoris
+        ?->filter(fn($d) => in_array(strtolower(trim($d->jenis_dandori ?? '')), ['dandori', 'setup', '']) || strtolower(trim($d->activity ?? '')) === 'dandori')
+        ?->sortBy('start_time')->first();
+    $danCandidate = $firstDan?->start_time ?? $firstDanRecord?->start_time ?? null;
+    if ($danCandidate) {
+        $actStartDerived = \Carbon\Carbon::parse($danCandidate);
         if ($isCompleted) {
             $finishTs = $job->job_data?->finished_at ?? $job->job_data?->updated_at;
             if ($finishTs) {

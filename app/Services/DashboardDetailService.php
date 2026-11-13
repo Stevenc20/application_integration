@@ -158,10 +158,6 @@ class DashboardDetailService
         $downtimeItems = [];
         foreach ($downtimeData as $dt) {
             $typeUpper = strtoupper(trim($dt->jenis_downtime ?? ''));
-            if (ProductionMetricsService::isExcludedDowntimeType($typeUpper)) {
-                continue;
-            }
-
             $durSeconds = 0.0;
             if (! empty($dt->duration_seconds)) {
                 $durSeconds = (float) $dt->duration_seconds;
@@ -172,6 +168,22 @@ class DashboardDetailService
             }
 
             if ($durSeconds <= 0) {
+                continue;
+            }
+
+            // Jika downtime tercatat sebagai dandori di tabel downtimes, masukkan ke bucket dandoriMinutes
+            if (str_contains($typeUpper, 'DANDORI') || str_contains($typeUpper, 'SETUP')) {
+                $dandoriMinutes[$dt->job_master_id] = ($dandoriMinutes[$dt->job_master_id] ?? 0) + ($durSeconds / 60);
+                continue;
+            }
+
+            // Jika downtime tercatat sebagai 1st check di tabel downtimes, masukkan ke bucket firstCheckMinutes
+            if (str_contains($typeUpper, '1ST_CHECK') || str_contains($typeUpper, '1ST CHECK') || str_contains($typeUpper, 'FIRST_CHECK') || str_contains($typeUpper, 'QCHECK') || str_contains($typeUpper, 'Q CHECK') || str_contains($typeUpper, 'QUALITY')) {
+                $firstCheckMinutes[$dt->job_master_id] = ($firstCheckMinutes[$dt->job_master_id] ?? 0) + ($durSeconds / 60);
+                continue;
+            }
+
+            if (ProductionMetricsService::isExcludedDowntimeType($typeUpper)) {
                 continue;
             }
 
