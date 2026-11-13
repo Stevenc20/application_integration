@@ -370,9 +370,20 @@ class DashboardDetailService
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
             
+            // Cek apakah item benar-benar sudah mulai berjalan (running, paused, completed, ada log daily/waktu mulai)
+            $isJobStarted = $hasAnyDailyInGroup
+                || $isRunning
+                || (bool) $latestFinishedAt
+                || ($job && in_array(strtolower((string) $job->status), ['running', 'paused', 'completed', 'complete', 'finish', 'finished'], true))
+                || ($job && $job->started_at)
+                || ! empty($plan->act_start)
+                || $dandori > 0
+                || $iqCheck > 0
+                || $downtime > 0;
+
             // Hitung Press Time: Bar biru produksi (Input Harian & LKH)
             $bluePressTime = 0.0;
-            if ($job && ($job->started_at || $plan->act_start || $latestFinishedAt)) {
+            if ($isJobStarted && $job && ($job->started_at || $plan->act_start || $latestFinishedAt)) {
                 $pStart = $plan->start_time ? Carbon::parse($date.' '.$plan->start_time) : null;
                 $pFinish = $plan->finish_time ? Carbon::parse($date.' '.$plan->finish_time) : null;
                 $actS = $plan->act_start ? Carbon::parse($date.' '.$plan->act_start) : ($job->started_at ? Carbon::parse($job->started_at) : null);
@@ -390,22 +401,26 @@ class DashboardDetailService
                 );
             }
 
-            if ($bluePressTime > 0) {
-                $pressTime = round($bluePressTime, 1);
-            } elseif ($runtimeSeconds > 0) {
-                // Jika runtimeSeconds mencakup total waktu berjalan, kurangi dandori, 1st check, dan downtime
-                // agar press time murni merefleksikan bar biru produksi tanpa dobel hitung di TPT
-                $netRuntime = max(0.0, $runtimeSeconds - (($dandori + $iqCheck + $downtime) * 60));
-                $pressTime = round(($netRuntime > 0 ? $netRuntime : $runtimeSeconds) / 60, 1);
-            } elseif ($ctDetik > 0) {
-                $pressTime = round(($actualQty * $ctDetik) / 60, 1);
+            if (! $isJobStarted) {
+                // Item belum berjalan di Input Harian: Press Time, TPT, dan GSPH Actual tetap 0 (tidak menampilkan data bayangan)
+                $pressTime = 0.0;
+                $tpt = 0.0;
+                $gsphActual = 0;
             } else {
-                $pressTime = 0;
-            }
-            $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
+                if ($runtimeSeconds > 0) {
+                    $pressTime = round($runtimeSeconds / 60, 1);
+                } elseif ($bluePressTime > 0) {
+                    $pressTime = round($bluePressTime, 1);
+                } elseif ($ctDetik > 0 && $actualQty > 0) {
+                    $pressTime = round(($actualQty * $ctDetik) / 60, 1);
+                } else {
+                    $pressTime = 0.0;
+                }
+                $tpt = round($pressTime + $dandori + $iqCheck + $downtime, 1);
 
-            // GSPH Actual: Total QTY Good / TPT * 60
-            $gsphActual = $tpt > 0 ? (int) round(($actualOk / $tpt) * 60) : 0;
+                // GSPH Actual: Total QTY Good / TPT * 60
+                $gsphActual = $tpt > 0 ? (int) round(($actualOk / $tpt) * 60) : 0;
+            }
 
             // Plan Finish: Ambil jam selesai efektif dari root plan (termasuk interval setelah istirahat)
             $planFinish = $plan->effectiveFinishTime($plans) ?: $plan->finish_time;
