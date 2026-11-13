@@ -59,12 +59,14 @@ class DashboardRealtimeService
             }
         }
 
-        $jobNumbers = $plans->map(function ($p) {
+        $jobNumbers = $plans->flatMap(function ($p) use ($plans) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
+            $legacy = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
+            $canonical = $p->canonicalJobNumber($plans);
 
-            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
-        })->toArray();
+            return array_values(array_unique(array_filter([$legacy, $canonical])));
+        })->unique()->values()->toArray();
 
         $plansByIdentifier = [];
         foreach ($plans as $p) {
@@ -72,6 +74,7 @@ class DashboardRealtimeService
             $jm = trim($p->job_master ?? '');
             $identifier = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
             $plansByIdentifier[$identifier] = $p;
+            $plansByIdentifier[$p->canonicalJobNumber($plans)] = $p;
         }
 
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
@@ -954,7 +957,8 @@ class DashboardRealtimeService
         $totalJobs = $uniqueBasePlans->count();
 
         // Finished jobs: count unique base plans that are actually completed
-        // (Status completed/complete/finished/closed/done, dan TIDAK sedang running/paused)
+        // (Status completed/complete/finished/closed/done, act_finish terisi, atau finished_at terisi,
+        //  dan TIDAK sedang aktif running / paused)
         $finishedStatuses = ['finished', 'complete', 'completed', 'closed', 'done'];
         $finishedBaseCount = 0;
         foreach ($uniqueBasePlans as $bp) {
@@ -969,6 +973,9 @@ class DashboardRealtimeService
 
             // Status dari JobMaster atau ProductionPlan
             $jmStatus = strtolower((string) ($bJob?->status ?? $bp->status ?? ''));
+            $rootFinished = in_array($jmStatus, $finishedStatuses, true)
+                || ! empty($bJob?->finished_at)
+                || ! empty($bp->act_finish);
 
             // Child slices check
             $childPlans = $plans->filter(fn ($cp) => ! empty($cp->parent_job_id) && (int) $cp->parent_job_id === (int) $bp->id);
@@ -987,14 +994,14 @@ class DashboardRealtimeService
                 if (in_array($cStatus, ['running', 'paused'], true)) {
                     $hasChildRunning = true;
                 }
-                if (in_array($cStatus, $finishedStatuses, true)) {
+                if (in_array($cStatus, $finishedStatuses, true) || ! empty($cJob?->finished_at) || ! empty($cp->act_finish)) {
                     $hasChildFinished = true;
                 }
             }
 
             // Jangan hitung sebagai finished jika root atau child-nya sedang aktif running / paused
             $isActive = in_array($jmStatus, ['running', 'paused'], true) || $hasChildRunning;
-            $isFinished = ! $isActive && (in_array($jmStatus, $finishedStatuses, true) || $hasChildFinished);
+            $isFinished = ! $isActive && ($rootFinished || $hasChildFinished);
 
             if ($isFinished) {
                 $finishedBaseCount++;

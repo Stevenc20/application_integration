@@ -95,6 +95,66 @@ class BreakTimelineValidator
     }
 
     /**
+     * Drop break rows that overlap a running job unless the schedule resumes
+     * exactly when the break ends (the Excel "carved out" break pattern).
+     *
+     * @param Collection<ProductionPlan> $plans
+     * @return Collection<ProductionPlan>
+     */
+    public function filterOverlappingBreaks(Collection $plans): Collection
+    {
+        $jobs = $plans
+            ->filter(fn ($p) => ($p->row_type ?? 'job') === 'job')
+            ->map(function ($job) {
+                if (empty($job->start_time) || empty($job->finish_time)) {
+                    return null;
+                }
+
+                $start = $this->timeToMinutes($job->start_time);
+                $finish = $this->finishToMinutes($job->start_time, $job->finish_time);
+
+                return $finish > $start
+                    ? ['start' => $start, 'finish' => $finish]
+                    : null;
+            })
+            ->filter()
+            ->values();
+
+        if ($jobs->isEmpty()) {
+            return $plans->values();
+        }
+
+        $jobStarts = $jobs->pluck('start')->all();
+
+        return $plans->filter(function ($plan) use ($jobs, $jobStarts) {
+            if (($plan->row_type ?? 'job') !== 'break') {
+                return true;
+            }
+
+            if (empty($plan->start_time) || empty($plan->finish_time)) {
+                return false;
+            }
+
+            $breakStart = $this->timeToMinutes($plan->start_time);
+            $breakFinish = $this->finishToMinutes($plan->start_time, $plan->finish_time);
+
+            if ($breakFinish <= $breakStart) {
+                return false;
+            }
+
+            $overlapsJob = $jobs->contains(
+                fn ($job) => $breakStart < $job['finish'] && $breakFinish > $job['start']
+            );
+
+            if (! $overlapsJob) {
+                return true;
+            }
+
+            return in_array($breakFinish, $jobStarts, true);
+        })->values();
+    }
+
+    /**
      * Convert time to minutes with consistent midnight-crossover handling.
      * All times within a batch are normalized against a reference hour.
      * If a time follows a midnight-crossover pattern (hours < 7 after hours >= 12),

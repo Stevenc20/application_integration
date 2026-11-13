@@ -46,12 +46,14 @@ class DashboardDetailService
             }
         }
 
-        $jobNumbers = $plans->map(function ($p) {
+        $jobNumbers = $plans->flatMap(function ($p) use ($plans) {
             $jn = trim($p->job_no ?? '');
             $jm = trim($p->job_master ?? '');
+            $legacy = $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
+            $canonical = $p->canonicalJobNumber($plans);
 
-            return $jn ? ($jn.'-'.$p->id) : ('AUTO-'.\Illuminate\Support\Str::slug($jm).'-'.$p->id);
-        })->toArray();
+            return array_values(array_unique(array_filter([$legacy, $canonical])));
+        })->unique()->values()->toArray();
 
         $jobMasters = JobMaster::whereIn('job_number', $jobNumbers)
             ->get()

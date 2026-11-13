@@ -920,9 +920,25 @@ foreach ($breakWindows as $idx => $b) {
             return;
         }
 
+        $jobsQuery = ProductionPlan::whereDate('plan_date', $date)
+            ->activePpcRevision()
+            ->where('shift_name', $shiftName)
+            ->where('row_type', 'job');
+        $this->applyPressFilter($jobsQuery, $pressName);
+        $jobs = $jobsQuery->get();
+
+        $jobSpan = $this->jobSpanMinutes($jobs, $shiftName);
+        if ($jobSpan === null) {
+            return;
+        }
+
         foreach ($breakWindows as $b) {
+            if (! $this->breakOverlapsSpan($b, $jobSpan)) {
+                continue;
+            }
+
             $label = strtoupper(trim($b['label']));
-            
+
             // Check if there is already a break row with this label or start time
             $existsQuery = ProductionPlan::whereDate('plan_date', $date)
                 ->where('shift_name', $shiftName)
@@ -937,18 +953,80 @@ foreach ($breakWindows as $idx => $b) {
 
             if (!$exists) {
                 // Determine a good row_no for this break based on its start time
-                $jobsQuery = ProductionPlan::whereDate('plan_date', $date)
-                    ->activePpcRevision()
-                    ->where('shift_name', $shiftName)
-                    ->where('row_type', 'job');
-                $this->applyPressFilter($jobsQuery, $pressName);
-                $jobs = $jobsQuery->get();
-
                 $rowNo = $this->breakRowNoAfter($jobs, $b['start']);
-                
+
                 $this->insertBreakRow($date, $shiftName, $pressName, $lineMasterId, $hari, $b, $rowNo);
             }
         }
+    }
+
+    /**
+     * @param Collection<int, ProductionPlan> $jobs
+     * @return array{start: int, finish: int}|null
+     */
+    private function jobSpanMinutes(Collection $jobs, string $shiftName): ?array
+    {
+        $overnight = $this->isOvernightShift($shiftName);
+        $start = null;
+        $finish = null;
+
+        foreach ($jobs as $job) {
+            if (empty($job->start_time) || empty($job->finish_time)) {
+                continue;
+            }
+
+            $jobStart = MasterBreakTime::timeToMinutes($job->start_time);
+            $jobFinish = MasterBreakTime::timeToMinutes($job->finish_time);
+
+            if ($overnight) {
+                if ($jobStart < 7 * 60) {
+                    $jobStart += 24 * 60;
+                }
+                if ($jobFinish < 7 * 60) {
+                    $jobFinish += 24 * 60;
+                }
+            }
+
+            if ($jobFinish <= $jobStart) {
+                $jobFinish += 24 * 60;
+            }
+
+            $start = $start === null ? $jobStart : min($start, $jobStart);
+            $finish = $finish === null ? $jobFinish : max($finish, $jobFinish);
+        }
+
+        return $start === null || $finish === null ? null : ['start' => $start, 'finish' => $finish];
+    }
+
+    private function isOvernightShift(string $shiftName): bool
+    {
+        return str_contains(strtolower($shiftName), 'malam');
+    }
+
+    /**
+     * @param array{start: string, finish: string} $break
+     * @param array{start: int, finish: int} $span
+     */
+    private function breakOverlapsSpan(array $break, array $span): bool
+    {
+        $rawStart = MasterBreakTime::timeToMinutes($break['start']);
+        $rawFinish = MasterBreakTime::timeToMinutes($break['finish']);
+        $duration = $rawFinish - $rawStart;
+
+        if ($duration <= 0) {
+            $duration += 24 * 60;
+        }
+
+        foreach ([0, 24 * 60] as $offset) {
+            $breakStart = $rawStart + $offset;
+            $breakFinish = $breakStart + $duration;
+
+            if ($breakStart < $span['finish'] && $breakFinish > $span['start']) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
 

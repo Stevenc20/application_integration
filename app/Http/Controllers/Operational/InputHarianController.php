@@ -239,6 +239,17 @@ class InputHarianController extends Controller
 
         $plans = $plans->filter(fn ($p) => !$p->parent_job_id)->values();
 
+        // Hide phantom breaks that overlap a running job or sit outside the
+        // schedule span. Group per press+shift so one section cannot leak into another.
+        $breakValidator = app(\App\Services\BreakTimelineValidator::class);
+        $keptPlanIds = $plans
+            ->groupBy(fn ($p) => (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? ''))
+            ->flatMap(fn ($group) => $breakValidator->filterOverlappingBreaks(
+                $breakValidator->filterValidPlans($group)
+            ))
+            ->pluck('id');
+        $plans = $plans->filter(fn ($p) => $keptPlanIds->contains($p->id))->values();
+
         // Identifier PPC: gabungkan parent + child (split istirahat) lalu urutkan
         // berdasarkan row_no PPC agar antrean sama persis dengan timeline PPC.
         $scheduledJobNumbers = $plans->concat($childPlans->flatten(1))
@@ -1456,8 +1467,21 @@ class InputHarianController extends Controller
             $normalizedLine = strtoupper(trim(str_replace(['Line ', 'LINE ', 'Press ', 'PRESS '], '', $lineFilter)));
         }
 
-        // Cari JobMaster yang sedang running atau paused di line ini
-        $jmQuery = JobMaster::whereIn(DB::raw('LOWER(status)'), ['running', 'paused']);
+        // Cari JobMaster yang sedang running, atau paused karena break/dandori.
+        // Paused tanpa aktivitas aktif bukan job yang sedang berjalan.
+        $jmQuery = JobMaster::where(function ($q) {
+            $q->where(DB::raw('LOWER(status)'), 'running')
+              ->orWhere(function ($paused) {
+                  $paused->where(DB::raw('LOWER(status)'), 'paused')
+                      ->whereExists(function ($sub) {
+                          $sub->select(DB::raw(1))
+                              ->from('downtimes')
+                              ->whereColumn('downtimes.job_master_id', 'job_masters.id')
+                              ->whereIn(DB::raw('LOWER(TRIM(COALESCE(downtimes.jenis_downtime, "")))'), ['break time', 'break', 'istirahat', 'dandori'])
+                              ->whereNull('downtimes.finish_time');
+                      });
+              });
+        });
         if ($normalizedLine) {
             $jmQuery->where(function($q) use ($normalizedLine, $lineFilter) {
                 $q->whereRaw("UPPER(TRIM(line)) = ?", [strtoupper(trim($lineFilter))])

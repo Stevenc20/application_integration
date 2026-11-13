@@ -125,7 +125,14 @@ class ReportController extends Controller
         $plans = $planQuery->orderBy('press_name')->orderBy('row_no', 'asc')->get();
 
         // Validate and filter out invalid/orphan/duplicate breaks in memory using BreakTimelineValidator
-        $plans = app(\App\Services\BreakTimelineValidator::class)->filterValidPlans($plans);
+        $breakValidator = app(\App\Services\BreakTimelineValidator::class);
+        $keptPlanIds = $plans
+            ->groupBy(fn ($p) => (string) ($p->press_name ?? '') . '|' . (string) ($p->shift_name ?? ''))
+            ->flatMap(fn ($group) => $breakValidator->filterOverlappingBreaks(
+                $breakValidator->filterValidPlans($group)
+            ))
+            ->pluck('id');
+        $plans = $plans->filter(fn ($p) => $keptPlanIds->contains($p->id))->values();
 
         // LKH mirrors production_plans (PPC master) — no separate timeline engine
         $plans = $plans->sortBy(fn ($p) => [strtolower((string) ($p->press_name ?? '')), $p->row_no ?? PHP_INT_MAX])->values();
