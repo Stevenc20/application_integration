@@ -14,7 +14,7 @@ class RepairRejectHistoryShiftFilterTest extends TestCase
 {
     use RefreshDatabase;
 
-    public function test_history_filters_repair_reject_logs_by_work_date_and_shift_window(): void
+    public function test_history_shift_filter_matches_rows_shown_on_selected_calendar_date(): void
     {
         $user = User::create([
             'name' => 'Supervisor Shift',
@@ -34,7 +34,7 @@ class RepairRejectHistoryShiftFilterTest extends TestCase
         $this->createLog($job, $user, '2026-11-04 08:00:00', 'Pagi Defect');
         $this->createLog($job, $user, '2026-11-04 22:00:00', 'Malam Defect');
         $this->createLog($job, $user, '2026-11-05 02:00:00', 'Malam After Midnight');
-        $this->createLog($job, $user, '2026-11-05 08:00:00', 'Next Pagi Defect');
+        $this->createLog($job, $user, '2026-11-05 08:00:00', 'Following Morning Defect');
 
         $pagi = $this->actingAs($user)->get(route('operational.repair_reject.index', [
             'date' => '2026-11-04',
@@ -45,7 +45,7 @@ class RepairRejectHistoryShiftFilterTest extends TestCase
             ->assertSee('Pagi Defect')
             ->assertDontSee('Malam Defect')
             ->assertDontSee('Malam After Midnight')
-            ->assertDontSee('Next Pagi Defect');
+            ->assertDontSee('Following Morning Defect');
 
         $malam = $this->actingAs($user)->get(route('operational.repair_reject.index', [
             'date' => '2026-11-04',
@@ -54,9 +54,41 @@ class RepairRejectHistoryShiftFilterTest extends TestCase
 
         $malam->assertOk()
             ->assertSee('Malam Defect')
-            ->assertSee('Malam After Midnight')
+            ->assertDontSee('Malam After Midnight')
             ->assertDontSee('Pagi Defect')
-            ->assertDontSee('Next Pagi Defect');
+            ->assertDontSee('Following Morning Defect');
+
+        $allNextDate = $this->actingAs($user)->get(route('operational.repair_reject.index', [
+            'date' => '2026-11-05',
+        ]));
+
+        $allNextDate->assertOk()
+            ->assertSee('Malam After Midnight')
+            ->assertSee('Following Morning Defect')
+            ->assertDontSee('Pagi Defect')
+            ->assertDontSee('Malam Defect');
+
+        $malamNextDate = $this->actingAs($user)->get(route('operational.repair_reject.index', [
+            'date' => '2026-11-05',
+            'shift' => 'malam',
+        ]));
+
+        $malamNextDate->assertOk()
+            ->assertSee('Malam After Midnight')
+            ->assertDontSee('Following Morning Defect')
+            ->assertDontSee('Pagi Defect')
+            ->assertDontSee('Malam Defect');
+
+        $pagiNextDate = $this->actingAs($user)->get(route('operational.repair_reject.index', [
+            'date' => '2026-11-05',
+            'shift' => 'pagi',
+        ]));
+
+        $pagiNextDate->assertOk()
+            ->assertSee('Following Morning Defect')
+            ->assertDontSee('Malam After Midnight')
+            ->assertDontSee('Pagi Defect')
+            ->assertDontSee('Malam Defect');
     }
 
     private function createLog(JobMaster $job, User $user, string $createdAt, string $defect): RepairRejectLog

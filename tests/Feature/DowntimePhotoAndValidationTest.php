@@ -9,6 +9,7 @@ use App\Models\ProductionPlan;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Tests\TestCase;
 
 class DowntimePhotoAndValidationTest extends TestCase
@@ -310,7 +311,13 @@ class DowntimePhotoAndValidationTest extends TestCase
 
         $response = $this->get('/storage/downtime/test_serve.txt');
         $response->assertStatus(200);
-        $this->assertEquals('valid-media-test-content', file_get_contents($response->baseResponse->getFile()->getPathname()));
+
+        $baseResponse = $response->baseResponse;
+        if ($baseResponse instanceof BinaryFileResponse) {
+            $this->assertEquals('valid-media-test-content', file_get_contents($baseResponse->getFile()->getPathname()));
+        } else {
+            $this->fail('Expected a binary file response.');
+        }
 
         @unlink($testFilePath);
     }

@@ -161,7 +161,7 @@ class LineStatusService
         $statuses = [];
         foreach ($activeLines as $line) {
             $normLine = self::normalizeLineKey($line);
-            $lineJobs = $jobsByNormalizedLine->get($normLine, collect());
+            $lineJobs = $jobsByNormalizedLine->get($normLine) ?: collect();
             $lineJobIds = $lineJobs->pluck('id')->toArray();
 
             // 1. DOWNTIME (machine/process issue)

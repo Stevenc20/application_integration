@@ -10,18 +10,19 @@ use PhpOffice\PhpSpreadsheet\Style\Fill;
 use PhpOffice\PhpSpreadsheet\Style\Font;
 use Illuminate\Support\Collection;
 use Carbon\Carbon;
+use PhpOffice\PhpSpreadsheet\Worksheet\Worksheet;
 
 class LkhActualExport
 {
     protected array $jobsData;
-    protected $totals;
-    protected $summary;
+    protected array $totals;
+    protected array $summary;
     protected string $lineName;
     protected string $shiftName;
     protected string $date;
     protected array $signatureStatus;
-    protected $shiftDisplayStart;
-    protected $shiftDisplayEnd;
+    protected string $shiftDisplayStart;
+    protected string $shiftDisplayEnd;
 
     const COLUMNS = 35;
     const RED = 'FF991B1B';
@@ -33,14 +34,14 @@ class LkhActualExport
 
     public function __construct(
         array $jobsData,
-        $totals,
-        $summary,
+        array $totals,
+        array $summary,
         string $lineName,
         string $shiftName,
         string $date,
         array $signatureStatus,
-        $shiftDisplayStart = '07:00',
-        $shiftDisplayEnd = '21:00'
+        string $shiftDisplayStart = '07:00',
+        string $shiftDisplayEnd = '21:00'
     ) {
         $this->jobsData = $jobsData;
         $this->totals = $totals;
@@ -79,7 +80,7 @@ class LkhActualExport
         ])->deleteFileAfterSend(true);
     }
 
-    protected function buildHeader($sheet): void
+    protected function buildHeader(Worksheet $sheet): void
     {
         $lastCol = $this->colLetter(self::COLUMNS);
 
@@ -115,7 +116,7 @@ class LkhActualExport
         $sheet->getRowDimension(4)->setRowHeight(6);
     }
 
-    protected function buildTableHeaders($sheet): void
+    protected function buildTableHeaders(Worksheet $sheet): void
     {
         // Row 5: Group headers (merged)
         $groupHeaders = [
@@ -209,7 +210,7 @@ class LkhActualExport
         $sheet->freezePane('A7');
     }
 
-    protected function buildDataRows($sheet): int
+    protected function buildDataRows(Worksheet $sheet): int
     {
         $row = 7;
         $jobRows = collect($this->jobsData)->where('row_type', '!=', 'break')->values();
@@ -333,7 +334,7 @@ class LkhActualExport
         return $row; // next row after data
     }
 
-    protected function buildTotalRow($sheet, int $dataStartRow): int
+    protected function buildTotalRow(Worksheet $sheet, int $dataStartRow): int
     {
         $actRows = collect($this->jobsData)->where('row_type', 'job');
         $tActGood = $actRows->sum('actual_good');
@@ -417,7 +418,7 @@ class LkhActualExport
         return $row + 1;
     }
 
-    protected function buildSignatureSection($sheet, int $startRow): void
+    protected function buildSignatureSection(Worksheet $sheet, int $startRow): void
     {
         $lastCol = $this->colLetter(self::COLUMNS);
 
@@ -526,7 +527,7 @@ class LkhActualExport
         ]);
     }
 
-    protected function applyColumnWidths($sheet): void
+    protected function applyColumnWidths(Worksheet $sheet): void
     {
         // Default widths for all columns
         $widths = [

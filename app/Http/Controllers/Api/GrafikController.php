@@ -129,37 +129,109 @@ class GrafikController extends Controller
         $startDate = Carbon::parse($month . '-01')->startOfMonth();
         $endDate = (clone $startDate)->endOfMonth();
 
+        // 7 kategori aktual dari Input Harian
+        $validCategories = ['mesin', 'dies', 'material', 'logistic', 'try out', 'produksi', 'others'];
+
         $types = Downtime::whereNotNull('jenis_downtime')
             ->whereNotNull('start_time')
             ->whereBetween('start_time', [$startDate, $endDate])
+            ->whereNotIn(DB::raw('LOWER(TRIM(jenis_downtime))'), ['dandori', 'idle', 'idle time', 'break time', 'break_time'])
             ->selectRaw("
-                jenis_downtime,
+                LOWER(TRIM(jenis_downtime)) as category_clean,
                 COALESCE(SUM(duration_seconds), 0) as total_seconds,
                 COUNT(*) as count
             ")
-            ->groupBy('jenis_downtime')
+            ->groupBy(DB::raw('LOWER(TRIM(jenis_downtime))'))
             ->orderByDesc('total_seconds')
-            ->get();
+            ->get()
+            ->filter(function ($r) use ($validCategories) {
+                return in_array($r->category_clean, $validCategories, true);
+            })
+            ->values();
 
-        $labels = $types->pluck('jenis_downtime');
-        $totalSeconds = $types->sum('total_seconds');
-        $data = $types->map(fn($r) => round($r->total_seconds / 60, 1));
-        $percentages = $types->map(fn($r) => $totalSeconds > 0 ? round(($r->total_seconds / $totalSeconds) * 100, 1) : 0);
-        $counts = $types->pluck('count');
+        $totalSeconds = (float) $types->sum('total_seconds');
+        $totalMinutes = round($totalSeconds / 60, 1);
+        $totalEvents = (int) $types->sum('count');
 
-        $colors = ['#3b82f6', '#ef4444', '#eab308', '#22c55e', '#a855f7', '#f97316', '#06b6d4'];
+        $labels = [];
+        $data = [];
+        $cumulative = [];
+        $percentages = [];
+        $counts = [];
+        $topCategories = [];
+        $items = [];
+        $runningSumSeconds = 0;
+
+        foreach ($types as $item) {
+            $seconds = (float) $item->total_seconds;
+            $minutes = round($seconds / 60, 1);
+            $prevCumPct = $totalSeconds > 0 ? round(($runningSumSeconds / $totalSeconds) * 100, 1) : 0.0;
+            $runningSumSeconds += $seconds;
+
+            $pct = $totalSeconds > 0 ? round(($seconds / $totalSeconds) * 100, 1) : 0.0;
+            $cumPct = $totalSeconds > 0 ? round(($runningSumSeconds / $totalSeconds) * 100, 1) : 0.0;
+            if ($cumPct > 100) $cumPct = 100.0;
+
+            // Format label menjadi Title Case konsisten dengan Input Harian
+            $label = ucwords($item->category_clean);
+
+            // Kategori Pareto 80/20: kategori yang menyumbang hingga batas kumulatif 80% (Vital Few)
+            $inPareto80 = ($prevCumPct < 80.0 || empty($topCategories));
+            if ($inPareto80) {
+                $topCategories[] = $label;
+            }
+
+            $labels[] = $label;
+            $data[] = $minutes;
+            $percentages[] = $pct;
+            $cumulative[] = $cumPct;
+            $counts[] = (int) $item->count;
+
+            $items[] = [
+                'category' => $label,
+                'minutes' => $minutes,
+                'percentage' => $pct,
+                'cumulative' => $cumPct,
+                'count' => (int) $item->count,
+                'in_pareto_80' => $inPareto80,
+            ];
+        }
+
+        // Kategori dominan (terbesar)
+        $topCategory = !empty($labels) ? $labels[0] : '-';
 
         return response()->json([
             'labels' => $labels,
             'datasets' => [
                 [
+                    'label' => 'Total Durasi (Menit)',
                     'data' => $data,
-                    'backgroundColor' => array_slice($colors, 0, count($labels)),
+                    'backgroundColor' => array_map(fn($p) => $p >= 20 ? '#dc2626' : ($p >= 10 ? '#f59e0b' : '#2563eb'), $percentages),
+                    'borderRadius' => 6,
+                    'yAxisID' => 'y',
+                ],
+                [
+                    'label' => 'Kumulatif (%)',
+                    'data' => $cumulative,
+                    'type' => 'line',
+                    'borderColor' => '#1e293b',
+                    'backgroundColor' => '#1e293b',
+                    'borderWidth' => 2,
+                    'pointRadius' => 4,
+                    'pointBackgroundColor' => '#1e293b',
+                    'tension' => 0.25,
+                    'yAxisID' => 'y1',
                 ],
             ],
+            'items' => $items,
+            'data' => $data,
+            'cumulative' => $cumulative,
             'percentages' => $percentages,
             'counts' => $counts,
-            'totalMinutes' => round($totalSeconds / 60, 1),
+            'top_categories' => $topCategories,
+            'topCategory' => $topCategory,
+            'totalMinutes' => $totalMinutes,
+            'totalEvents' => $totalEvents,
             'month' => $month,
         ]);
     }

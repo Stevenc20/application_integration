@@ -94,12 +94,16 @@ class RepairRejectController extends Controller
         }
 
         if ($filterDate) {
-            if ($filterShift) {
-                [$shiftStart, $shiftEnd] = \App\Services\ProductionMetricsService::shiftWindow($filterDate, $filterShift);
-                $query->where('created_at', '>=', $shiftStart)
-                    ->where('created_at', '<', $shiftEnd);
-            } else {
-                $query->whereDate('created_at', $filterDate);
+            $query->whereDate('created_at', $filterDate);
+
+            if ($filterShift === 'pagi') {
+                $query->whereTime('created_at', '>=', '07:30:00')
+                    ->whereTime('created_at', '<', '21:00:00');
+            } elseif ($filterShift === 'malam') {
+                $query->where(function ($q) {
+                    $q->whereTime('created_at', '>=', '21:00:00')
+                        ->orWhereTime('created_at', '<', '07:30:00');
+                });
             }
         }
 

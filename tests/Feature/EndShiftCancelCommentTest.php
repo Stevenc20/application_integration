@@ -19,6 +19,9 @@ class EndShiftCancelCommentTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected User $user;
+    protected User $user2;
+
     protected function setUp(): void
     {
         parent::setUp();

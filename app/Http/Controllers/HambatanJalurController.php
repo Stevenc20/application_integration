@@ -225,7 +225,9 @@ class HambatanJalurController extends Controller
         ]);
 
         // Mark all HambatanJalurSigned notifications for this hambatan as read
-        Auth::user()->unreadNotifications()
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $user->unreadNotifications()
             ->where('type', \App\Notifications\HambatanJalurSigned::class)
             ->where('data->hambatan_id', $item->id)
             ->get()->each->markAsRead();
@@ -259,7 +261,9 @@ class HambatanJalurController extends Controller
             'foreman_signed_by' => Auth::id(),
         ]);
 
-        Auth::user()->unreadNotifications()
+        /** @var \App\Models\User $user */
+        $user = Auth::user();
+        $user->unreadNotifications()
             ->where('type', \App\Notifications\HambatanJalurSigned::class)
             ->where('data->hambatan_id', $item->id)
             ->get()->each->markAsRead();
