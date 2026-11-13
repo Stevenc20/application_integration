@@ -407,11 +407,14 @@ class DashboardDetailService
                 $tpt = 0.0;
                 $gsphActual = 0;
             } else {
-                if ($runtimeSeconds > 0) {
-                    $pressTime = round($runtimeSeconds / 60, 1);
-                } elseif ($bluePressTime > 0) {
+                if ($bluePressTime > 0) {
                     $pressTime = round($bluePressTime, 1);
-                } elseif ($ctDetik > 0 && $actualQty > 0) {
+                } elseif ($runtimeSeconds > 0) {
+                    // Jika runtimeSeconds mencakup total waktu berjalan, kurangi dandori, 1st check, dan downtime
+                    // agar press time murni merefleksikan bar biru produksi tanpa dobel hitung di TPT
+                    $netRuntime = max(0.0, $runtimeSeconds - (($dandori + $iqCheck + $downtime) * 60));
+                    $pressTime = round(($netRuntime > 0 ? $netRuntime : $runtimeSeconds) / 60, 1);
+                } elseif ($ctDetik > 0) {
                     $pressTime = round(($actualQty * $ctDetik) / 60, 1);
                 } else {
                     $pressTime = 0.0;
