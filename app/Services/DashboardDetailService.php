@@ -370,14 +370,13 @@ class DashboardDetailService
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
             
-            // Hitung Press Time: Bar biru produksi (Input Harian & LKH) atau fallback runtimeSeconds
-            if ($runtimeSeconds > 0) {
-                $pressTime = round($runtimeSeconds / 60, 1);
-            } elseif ($job && ($job->started_at || $plan->act_start)) {
+            // Hitung Press Time: Bar biru produksi (Input Harian & LKH)
+            $bluePressTime = 0.0;
+            if ($job && ($job->started_at || $plan->act_start || $latestFinishedAt)) {
                 $pStart = $plan->start_time ? Carbon::parse($date.' '.$plan->start_time) : null;
                 $pFinish = $plan->finish_time ? Carbon::parse($date.' '.$plan->finish_time) : null;
                 $actS = $plan->act_start ? Carbon::parse($date.' '.$plan->act_start) : ($job->started_at ? Carbon::parse($job->started_at) : null);
-                $actF = $job->finished_at ? Carbon::parse($job->finished_at) : ($plan->act_finish ? Carbon::parse($date.' '.$plan->act_finish) : null);
+                $actF = $job->finished_at ? Carbon::parse($job->finished_at) : ($latestFinishedAt ?: ($plan->act_finish ? Carbon::parse($date.' '.$plan->act_finish) : null));
 
                 $bluePressTime = BlueBarPressTimeService::calculate(
                     jobData: $job,
@@ -389,7 +388,15 @@ class DashboardDetailService
                     planCt: $ctDetik,
                     totalStroke: $actualQty
                 );
+            }
+
+            if ($bluePressTime > 0) {
                 $pressTime = round($bluePressTime, 1);
+            } elseif ($runtimeSeconds > 0) {
+                // Jika runtimeSeconds mencakup total waktu berjalan, kurangi dandori, 1st check, dan downtime
+                // agar press time murni merefleksikan bar biru produksi tanpa dobel hitung di TPT
+                $netRuntime = max(0.0, $runtimeSeconds - (($dandori + $iqCheck + $downtime) * 60));
+                $pressTime = round(($netRuntime > 0 ? $netRuntime : $runtimeSeconds) / 60, 1);
             } elseif ($ctDetik > 0) {
                 $pressTime = round(($actualQty * $ctDetik) / 60, 1);
             } else {
