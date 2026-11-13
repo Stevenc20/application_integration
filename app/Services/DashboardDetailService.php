@@ -369,8 +369,27 @@ class DashboardDetailService
             }
 
             $ctDetik = (float) ($plan->ct_detik ?? 0);
+            
+            // Hitung Press Time: Bar biru produksi (Input Harian & LKH) atau fallback runtimeSeconds
             if ($runtimeSeconds > 0) {
                 $pressTime = round($runtimeSeconds / 60, 1);
+            } elseif ($job && ($job->started_at || $plan->act_start)) {
+                $pStart = $plan->start_time ? Carbon::parse($date.' '.$plan->start_time) : null;
+                $pFinish = $plan->finish_time ? Carbon::parse($date.' '.$plan->finish_time) : null;
+                $actS = $plan->act_start ? Carbon::parse($date.' '.$plan->act_start) : ($job->started_at ? Carbon::parse($job->started_at) : null);
+                $actF = $job->finished_at ? Carbon::parse($job->finished_at) : ($plan->act_finish ? Carbon::parse($date.' '.$plan->act_finish) : null);
+
+                $bluePressTime = BlueBarPressTimeService::calculate(
+                    jobData: $job,
+                    actStart: $actS,
+                    actFinish: $actF,
+                    planStart: $pStart,
+                    planFinish: $pFinish,
+                    history: $allDtList,
+                    planCt: $ctDetik,
+                    totalStroke: $actualQty
+                );
+                $pressTime = round($bluePressTime, 1);
             } elseif ($ctDetik > 0) {
                 $pressTime = round(($actualQty * $ctDetik) / 60, 1);
             } else {
