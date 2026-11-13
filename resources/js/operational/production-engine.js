@@ -158,9 +158,17 @@ function formatSeconds(sec) {
 }
 
 function isJobComplete(job) {
-    if (!job || !job.status) return false;
-    const s = String(job.status).toLowerCase();
-    return s === 'complete' || s === 'finished' || s === 'completed' || s === 'closed' || s === 'done';
+    if (!job) return false;
+    const s = String(job.status || '').toLowerCase();
+    if (s === 'complete' || s === 'finished' || s === 'completed' || s === 'closed' || s === 'done') {
+        return true;
+    }
+    const actTotal = (parseInt(job.actual_ok) || 0) + (parseInt(job.actual_repair) || 0) + (parseInt(job.actual_reject) || 0);
+    const target = parseInt(job.target_qty) || 0;
+    if (target > 0 && actTotal >= target) {
+        return true;
+    }
+    return false;
 }
 
 function updateTimers() {
@@ -1242,11 +1250,13 @@ function renderSegmentedTimeline(containerId, jobId, anchor, tD, jS, endTime, fi
         const stableAnchorMs = job._prodStart ? new Date(job._prodStart).getTime() : null;
         const actualStartMs = stableAnchorMs || (jS ? (jS instanceof Date ? jS.getTime() : new Date(jS).getTime()) : null);
 
+        const isCompletedJob = isComplete || (job.target_qty > 0 && ((parseInt(job.actual_ok) || 0) + (parseInt(job.actual_repair) || 0) + (parseInt(job.actual_reject) || 0)) >= job.target_qty);
+
         const effectiveActualStart = actualStartMs ||
             (hasDandori ? (firstDandori instanceof Date ? firstDandori.getTime() : new Date(firstDandori).getTime()) : null) ||
-            (['running', 'complete', 'finished'].includes(s) ? anchor : null);
+            (['running', 'complete', 'finished'].includes(s) || isCompletedJob ? anchor : null);
 
-        if (!effectiveActualStart && !hasDandori && normalizedHistory.length === 0) {
+        if (!effectiveActualStart && !hasDandori && normalizedHistory.length === 0 && !isCompletedJob) {
             container.innerHTML = '';
             return;
         }

@@ -570,11 +570,23 @@ window.runningDowntimes = {
 
 window.jobMasterData = {
     @foreach($jobs as $job)
-    @php $jd = $job->job_data; @endphp
+    @php
+        $jd = $job->job_data;
+        $planStatus = strtolower(trim((string) ($job->status ?? '')));
+        $jmStatus = strtolower(trim((string) ($jd?->status ?? '')));
+        $dp = $jd?->dailyProduction;
+        $actualOkVal = $dp ? (int) ($dp->actual_ok ?? 0) : (int) ($job->ok ?? 0);
+        $actualRepairVal = $dp ? (int) ($dp->actual_repair ?? 0) : (int) ($job->repair ?? 0);
+        $actualRejectVal = $dp ? (int) ($dp->actual_reject ?? 0) : (int) ($job->reject ?? 0);
+        $totalActualVal = $actualOkVal + $actualRepairVal + $actualRejectVal;
+        $isJobDone = in_array($jmStatus, ['complete', 'completed', 'finished', 'closed', 'done'], true)
+            || in_array($planStatus, ['complete', 'completed', 'finished', 'closed', 'done'], true)
+            || (($job->plan ?? 0) > 0 && $totalActualVal >= $job->plan);
+    @endphp
     @if($jd)
     "{{ $jd->id }}": {
         id: {{ $jd->id }},
-        status: "{{ $jd->status }}",
+        status: "{{ $isJobDone ? 'complete' : $jd->status }}",
         @php $activeDate = request('date', now()->toDateString()); @endphp
         plan_start: {{ $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : (\Carbon\Carbon::parse($jd->plan_start ?: $activeDate . ' 07:40')->timestamp * 1000) }},
         plan_end: {{ $job->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->finish_time)->timestamp * 1000 : (\Carbon\Carbon::parse($jd->plan_end ?: $activeDate . ' 10:40')->timestamp * 1000) }},
@@ -584,20 +596,23 @@ window.jobMasterData = {
                 ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->start_time)->timestamp * 1000
                 : ($jd->started_at
                     ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000
-                    : ($firstDanDt ? \Carbon\Carbon::parse($firstDanDt->start_time)->timestamp * 1000 : 'null'));
+                    : ($firstDanDt ? \Carbon\Carbon::parse($firstDanDt->start_time)->timestamp * 1000 : ($isJobDone && $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : 'null')));
+            $effectiveFinishedTs = (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time)
+                ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->finish_time)->timestamp * 1000
+                : ($jd->finished_at
+                    ? \Carbon\Carbon::parse($jd->finished_at)->timestamp * 1000
+                    : ($isJobDone
+                        ? ($jd->updated_at ? \Carbon\Carbon::parse($jd->updated_at)->timestamp * 1000 : ($job->finish_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->finish_time)->timestamp * 1000 : 'null'))
+                        : 'null'));
         @endphp
         started_at: {{ $effectiveStartTs }},
-        prod_start: {{ $jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : 'null' }},
-        finished_at: {{ 
-            (isset($sessionMap) && $sessionMap->has($jd->id) && $sessionMap->get($jd->id)?->finish_time) 
-                ? \Carbon\Carbon::parse($sessionMap->get($jd->id)->finish_time)->timestamp * 1000 
-                : ($jd->finished_at ? \Carbon\Carbon::parse($jd->finished_at)->timestamp * 1000 : (in_array(strtolower($jd->status), ['complete', 'completed', 'finished', 'closed', 'done']) && $jd->updated_at ? \Carbon\Carbon::parse($jd->updated_at)->timestamp * 1000 : 'null')) 
-        }},
+        prod_start: {{ $jd->started_at ? \Carbon\Carbon::parse($jd->started_at)->timestamp * 1000 : ($isJobDone && $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : 'null') }},
+        finished_at: {{ $effectiveFinishedTs }},
         base_seconds: {{ $jd->dailyProduction ? (int)$jd->dailyProduction->runtime_seconds : 0 }},
         target_qty: {{ $job->plan ?? 0 }},
-        actual_ok: {{ $jd->dailyProduction?->actual_ok ?? 0 }},
-        actual_repair: {{ $jd->dailyProduction?->actual_repair ?? 0 }},
-        actual_reject: {{ $jd->dailyProduction?->actual_reject ?? 0 }},
+        actual_ok: {{ $actualOkVal }},
+        actual_repair: {{ $actualRepairVal }},
+        actual_reject: {{ $actualRejectVal }},
         dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->whereNull('finish_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         first_dandori_start: {{ $jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first() ? \Carbon\Carbon::parse($jd->downtimes->filter(fn($d) => strtolower($d->jenis_downtime) === 'dandori')->sortBy('start_time')->first()->start_time)->timestamp * 1000 : 'null' }},
         tpt: {{ (float)(($job->tpt ?? 0) > 0 ? $job->tpt : (($job->start_time && $job->finish_time) ? \Carbon\Carbon::parse($job->start_time)->diffInMinutes(\Carbon\Carbon::parse($job->finish_time)) : 0)) }},

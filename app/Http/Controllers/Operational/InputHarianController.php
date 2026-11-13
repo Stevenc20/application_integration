@@ -415,6 +415,18 @@ class InputHarianController extends Controller
             $jm = trim($plan->job_master ?? '');
             $identifier = $jn ? ($jn . '-' . $plan->id) : ('AUTO-' . \Illuminate\Support\Str::slug($jm) . '-' . $plan->id);
             $plan->job_data = $jobMasters->get($identifier);
+
+            // Auto-heal status jika plan atau dailyProduction sudah selesai / target tercapai
+            if ($plan->job_data) {
+                $dp = $plan->job_data->dailyProduction;
+                $totActual = $dp ? (($dp->actual_ok ?? 0) + ($dp->actual_repair ?? 0) + ($dp->actual_reject ?? 0)) : (($plan->ok ?? 0) + ($plan->repair ?? 0) + ($plan->reject ?? 0));
+                $isPlanDone = in_array(strtolower((string) $plan->status), ['complete', 'completed', 'finished', 'closed', 'done'], true)
+                    || (($plan->plan ?? 0) > 0 && $totActual >= $plan->plan);
+                if ($isPlanDone && !in_array(strtolower((string) $plan->job_data->status), ['complete', 'completed', 'finished', 'closed', 'done'], true)) {
+                    $plan->job_data->status = 'complete';
+                }
+            }
+
             return $plan;
         });
 

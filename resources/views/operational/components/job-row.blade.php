@@ -1,8 +1,6 @@
 @php
-    $status = $job->job_data->status ?? 'pending';
-    $rawStatus = strtolower($job->job_data->status ?? 'pending');
-    $isCompleted = in_array($rawStatus, ['complete', 'completed', 'finished', 'closed', 'done']);
-    $status = $isCompleted ? 'completed' : ($rawStatus === 'running' || $rawStatus === 'paused' ? 'running' : 'pending');
+    $planStatus = strtolower(trim((string) ($job->status ?? '')));
+    $jmStatus = strtolower(trim((string) ($job->job_data?->status ?? '')));
     $jobId = $job->job_data->id ?? 0;
 
     // Prioritas sumber data kuantitas:
@@ -27,6 +25,13 @@
         $efficiency = ($job->plan > 0) ? round(($actualOk / $job->plan) * 100, 1) : 0;
         $runtime = (int) ($dp->runtime_seconds ?? 0);
     }
+
+    $isCompleted = in_array($jmStatus, ['complete', 'completed', 'finished', 'closed', 'done'], true)
+        || in_array($planStatus, ['complete', 'completed', 'finished', 'closed', 'done'], true)
+        || ($job->plan > 0 && $actualQty >= $job->plan);
+
+    $rawStatus = $jmStatus ?: ($planStatus ?: 'pending');
+    $status = $isCompleted ? 'completed' : ($rawStatus === 'running' || $rawStatus === 'paused' ? 'running' : 'pending');
     
     $firstPending = isset($pendingJobs) ? $pendingJobs->first() : null;
     $isFirstPending = $firstPending && $firstPending->id === $jobId;
