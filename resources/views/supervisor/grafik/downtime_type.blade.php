@@ -157,9 +157,16 @@ async function loadData() {
     const barsContainer = document.getElementById('percentageBars');
     const tbody = document.getElementById('detailTableBody');
 
+    // Loading state
+    barsContainer.innerHTML = '<div class="flex items-center justify-center h-32 text-gray-400 text-sm font-medium animate-pulse">Memuat data...</div>';
+    tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-400 text-sm font-medium animate-pulse">Memuat data analisis Pareto...</td></tr>';
+
     try {
         const res = await fetch("{{ route('supervisor.api.grafik.downtime_type') }}?" + params);
-        if (!res.ok) throw new Error('Network response not ok');
+        if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            throw new Error(`HTTP ${res.status}: ${res.statusText || 'Server Error'}`);
+        }
         const data = await res.json();
 
         const items = data.items || [];
@@ -184,7 +191,7 @@ async function loadData() {
         if (!hasData) {
             canvas.classList.add('hidden');
             noDataMsg.classList.remove('hidden');
-            barsContainer.innerHTML = '<div class="flex items-center justify-center h-48 text-gray-400 text-sm font-medium">Tidak ada data</div>';
+            barsContainer.innerHTML = '<div class="flex items-center justify-center h-48 text-gray-400 text-sm font-medium">Tidak ada data downtime untuk periode ini</div>';
             tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-gray-400 text-sm">Tidak ada data downtime untuk periode ini</td></tr>';
             return;
         }
@@ -341,8 +348,23 @@ async function loadData() {
         });
     } catch (err) {
         console.error('Failed to load downtime Pareto data:', err);
-        barsContainer.innerHTML = '<div class="p-4 text-center text-red-500 text-sm">Gagal memuat data downtime.</div>';
-        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-red-500 text-sm">Terjadi kesalahan saat memuat data.</td></tr>';
+        if (chartInstance) {
+            chartInstance.destroy();
+            chartInstance = null;
+        }
+        canvas.classList.add('hidden');
+        noDataMsg.classList.add('hidden');
+
+        totalMinutesEl.textContent = '-';
+        totalEventsEl.textContent = '-';
+        topCategoryEl.textContent = 'Error';
+        topCategoryPctEl.innerHTML = '<span class="text-red-500 font-semibold">Gagal memuat API</span>';
+        topCategoriesTextEl.textContent = 'Gagal memuat';
+        topCategoriesCountEl.textContent = 'Periksa server';
+        categoryCountBadgeEl.textContent = 'Error';
+
+        barsContainer.innerHTML = '<div class="p-4 text-center text-red-500 text-sm font-medium">Gagal memuat data downtime dari server.<br><span class="text-xs text-gray-400 mt-1 block">Silakan coba lagi atau periksa koneksi backend.</span></div>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-red-500 text-sm font-medium">Terjadi kesalahan saat memuat data dari server. Silakan refresh halaman.</td></tr>';
     }
 }
 

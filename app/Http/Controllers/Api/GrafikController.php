@@ -13,6 +13,7 @@ use App\Models\ProductionPlan;
 use App\Services\DashboardRealtimeService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class GrafikController extends Controller
 {
@@ -125,33 +126,96 @@ class GrafikController extends Controller
 
     public function downtimeType(Request $request)
     {
-        $month = $request->input('month', Carbon::now()->format('Y-m'));
-        $startDate = Carbon::parse($month . '-01')->startOfMonth();
-        $endDate = (clone $startDate)->endOfMonth();
+        try {
+            $month = $request->input('month') ?: Carbon::now()->format('Y-m');
+            $startDate = Carbon::createFromFormat('Y-m', $month)->startOfMonth()->format('Y-m-d 00:00:00');
+            $endDate = Carbon::createFromFormat('Y-m', $month)->endOfMonth()->format('Y-m-d 23:59:59');
+        } catch (\Throwable $e) {
+            $month = Carbon::now()->format('Y-m');
+            $startDate = Carbon::now()->startOfMonth()->format('Y-m-d 00:00:00');
+            $endDate = Carbon::now()->endOfMonth()->format('Y-m-d 23:59:59');
+        }
 
-        // 7 kategori aktual dari Input Harian
-        $validCategories = ['mesin', 'dies', 'material', 'logistic', 'try out', 'produksi', 'others'];
+        // Canonical mapping to 7 valid operational categories from Input Harian
+        $categoryMap = [
+            'mesin' => 'Mesin',
+            'dies' => 'Dies',
+            'material' => 'Material',
+            'logistic' => 'Logistic',
+            'logistik' => 'Logistic',
+            'try out' => 'Try Out',
+            'tryout' => 'Try Out',
+            'trial' => 'Try Out',
+            'produksi' => 'Produksi',
+            'others' => 'Others',
+            'other' => 'Others',
+            'lainnya' => 'Others',
+        ];
 
-        $types = Downtime::whereNotNull('jenis_downtime')
-            ->whereNotNull('start_time')
-            ->whereBetween('start_time', [$startDate, $endDate])
-            ->whereNotIn(DB::raw('LOWER(TRIM(jenis_downtime))'), ['dandori', 'idle', 'idle time', 'break time', 'break_time'])
-            ->selectRaw("
-                LOWER(TRIM(jenis_downtime)) as category_clean,
-                COALESCE(SUM(duration_seconds), 0) as total_seconds,
-                COUNT(*) as count
-            ")
-            ->groupBy(DB::raw('LOWER(TRIM(jenis_downtime))'))
-            ->orderByDesc('total_seconds')
-            ->get()
-            ->filter(function ($r) use ($validCategories) {
-                return in_array($r->category_clean, $validCategories, true);
+        $excludedActivities = [
+            'dandori',
+            'idle',
+            'idle time',
+            'break time',
+            'break_time',
+            'break',
+            'istirahat',
+            'pray',
+            'sholat',
+        ];
+
+        // Query raw downtime records in the period with safe timestamp & duration fallbacks
+        $rawRecords = Downtime::whereNotNull('jenis_downtime')
+            ->where(function ($q) use ($startDate, $endDate) {
+                $q->whereBetween(DB::raw('COALESCE(start_time, created_at)'), [$startDate, $endDate]);
             })
-            ->values();
+            ->whereNotIn(DB::raw('LOWER(TRIM(jenis_downtime))'), $excludedActivities)
+            ->select('id', 'jenis_downtime', 'duration_seconds', 'start_time', 'finish_time', 'created_at')
+            ->get();
 
-        $totalSeconds = (float) $types->sum('total_seconds');
+        // Aggregate by canonical categories
+        $grouped = [];
+        foreach ($rawRecords as $rec) {
+            $rawType = strtolower(trim((string) $rec->jenis_downtime));
+            if (!isset($categoryMap[$rawType])) {
+                $canonical = 'Others';
+            } else {
+                $canonical = $categoryMap[$rawType];
+            }
+
+            // Compute duration in seconds (handle open/uncalculated downtime safely)
+            $calcSeconds = (float) ($rec->duration_seconds ?? 0);
+            if ($calcSeconds <= 0) {
+                $st = $rec->start_time ?: $rec->created_at;
+                $fn = $rec->finish_time ?: Carbon::now();
+                if ($st) {
+                    $calcSeconds = (float) max(0, abs(Carbon::parse($fn)->diffInSeconds(Carbon::parse($st))));
+                }
+            }
+
+            if (!isset($grouped[$canonical])) {
+                $grouped[$canonical] = [
+                    'category' => $canonical,
+                    'total_seconds' => 0.0,
+                    'count' => 0,
+                ];
+            }
+
+            $grouped[$canonical]['total_seconds'] += $calcSeconds;
+            $grouped[$canonical]['count'] += 1;
+        }
+
+        // Sort descending by total duration (standard Pareto requirement)
+        uasort($grouped, function ($a, $b) {
+            if ($b['total_seconds'] === $a['total_seconds']) {
+                return $b['count'] <=> $a['count'];
+            }
+            return $b['total_seconds'] <=> $a['total_seconds'];
+        });
+
+        $totalSeconds = array_sum(array_column($grouped, 'total_seconds'));
         $totalMinutes = round($totalSeconds / 60, 1);
-        $totalEvents = (int) $types->sum('count');
+        $totalEvents = array_sum(array_column($grouped, 'count'));
 
         $labels = [];
         $data = [];
@@ -162,8 +226,8 @@ class GrafikController extends Controller
         $items = [];
         $runningSumSeconds = 0;
 
-        foreach ($types as $item) {
-            $seconds = (float) $item->total_seconds;
+        foreach ($grouped as $item) {
+            $seconds = (float) $item['total_seconds'];
             $minutes = round($seconds / 60, 1);
             $prevCumPct = $totalSeconds > 0 ? round(($runningSumSeconds / $totalSeconds) * 100, 1) : 0.0;
             $runningSumSeconds += $seconds;
@@ -172,8 +236,7 @@ class GrafikController extends Controller
             $cumPct = $totalSeconds > 0 ? round(($runningSumSeconds / $totalSeconds) * 100, 1) : 0.0;
             if ($cumPct > 100) $cumPct = 100.0;
 
-            // Format label menjadi Title Case konsisten dengan Input Harian
-            $label = ucwords($item->category_clean);
+            $label = $item['category'];
 
             // Kategori Pareto 80/20: kategori yang menyumbang hingga batas kumulatif 80% (Vital Few)
             $inPareto80 = ($prevCumPct < 80.0 || empty($topCategories));
@@ -185,14 +248,14 @@ class GrafikController extends Controller
             $data[] = $minutes;
             $percentages[] = $pct;
             $cumulative[] = $cumPct;
-            $counts[] = (int) $item->count;
+            $counts[] = (int) $item['count'];
 
             $items[] = [
                 'category' => $label,
                 'minutes' => $minutes,
                 'percentage' => $pct,
                 'cumulative' => $cumPct,
-                'count' => (int) $item->count,
+                'count' => (int) $item['count'],
                 'in_pareto_80' => $inPareto80,
             ];
         }
