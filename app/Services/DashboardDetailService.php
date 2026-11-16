@@ -210,15 +210,21 @@ class DashboardDetailService
                 continue;
             }
 
-            // Jika downtime tercatat sebagai dandori di tabel downtimes, masukkan ke bucket dandoriMinutes
+            // Jika downtime tercatat sebagai dandori di tabel downtimes:
+            // HANYA tambahkan jika job ini BELUM memiliki catatan dandori di tabel dandoris (mencegah double-counting)
             if (str_contains($typeUpper, 'DANDORI') || str_contains($typeUpper, 'SETUP')) {
-                $dandoriMinutes[$dt->job_master_id] = ($dandoriMinutes[$dt->job_master_id] ?? 0) + ($durSeconds / 60);
+                if (! isset($dandoriMinutes[$dt->job_master_id]) || $dandoriMinutes[$dt->job_master_id] <= 0) {
+                    $dandoriMinutes[$dt->job_master_id] = ($durSeconds / 60);
+                }
                 continue;
             }
 
-            // Jika downtime tercatat sebagai 1st check di tabel downtimes, masukkan ke bucket firstCheckMinutes
+            // Jika downtime tercatat sebagai 1st check di tabel downtimes:
+            // HANYA tambahkan jika job ini BELUM memiliki catatan 1st check di tabel dandoris / q_checks (mencegah double-counting)
             if (str_contains($typeUpper, '1ST_CHECK') || str_contains($typeUpper, '1ST CHECK') || str_contains($typeUpper, 'FIRST_CHECK') || str_contains($typeUpper, 'QCHECK') || str_contains($typeUpper, 'Q CHECK') || str_contains($typeUpper, 'QUALITY')) {
-                $firstCheckMinutes[$dt->job_master_id] = ($firstCheckMinutes[$dt->job_master_id] ?? 0) + ($durSeconds / 60);
+                if (! isset($firstCheckMinutes[$dt->job_master_id]) || $firstCheckMinutes[$dt->job_master_id] <= 0) {
+                    $firstCheckMinutes[$dt->job_master_id] = ($durSeconds / 60);
+                }
                 continue;
             }
 
