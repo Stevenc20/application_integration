@@ -704,17 +704,6 @@ class DashboardRealtimeService
             })
             ->get();
 
-        $qcheckByJob = [];
-        if (\Illuminate\Support\Facades\Schema::hasTable('q_checks')) {
-            $qcheckModels = \App\Models\QCheck::whereIn('job_master_id', $jobIds)
-                ->whereNotNull('start_time')
-                ->whereNotNull('finish_time')
-                ->get();
-            foreach ($qcheckModels as $qc) {
-                $qcheckByJob[$qc->job_master_id] = ($qcheckByJob[$qc->job_master_id] ?? 0.0) + (float) ($qc->duration ?? 0);
-            }
-        }
-
         $runningGroupJobIds = ($runningRecord && $runningRecord->job_master_id)
             ? ($rootToGroupJobIds[$runningRecord->job_master_id] ?? [$runningRecord->job_master_id])
             : [];
@@ -722,41 +711,156 @@ class DashboardRealtimeService
         $jobMastersById = $jobMasters->keyBy('id');
         $dailyRecordsByJobId = $dailyRecords->keyBy('job_master_id');
 
-        $dandoriTotalMinutes = 0.0;
-        $currDandoriMinutes = 0.0;
-        foreach ($dandoriModels as $d) {
-            $dur = (float) ($d->duration_minutes ?? 0);
-            if ($dur <= 0 && $d->start_time) {
-                if ($d->finish_time) {
-                    $end = Carbon::parse($d->finish_time);
-                } else {
-                    $relJob = $jobMastersById->get($d->next_job_id);
-                    $hasOutput = false;
-                    if ($dailyRecordsByJobId->has($d->next_job_id)) {
-                        $hasOutput = ((int) $dailyRecordsByJobId->get($d->next_job_id)->actual_ok) > 0;
-                    }
-                    $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
-                    $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+        // Segment-based collection for Dandori and 1st Check matching Input Harian
+        $realtimeDandoriSegsByJob = [];
 
-                    if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
-                        $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
-                    } elseif ($isRunning && $relJob?->started_at) {
-                        $end = Carbon::parse($relJob->started_at);
-                    } else {
-                        $end = now();
-                    }
-                }
-                $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
+        foreach ($dandoriModels as $d) {
+            $jId = (int) $d->next_job_id;
+            $start = $d->start_time ? Carbon::parse($d->start_time) : null;
+            if (! $start) {
+                continue;
             }
-            $dandoriTotalMinutes += $dur;
-            if ($runningRecord && in_array((int) $d->next_job_id, $runningGroupJobIds, true)) {
-                $currDandoriMinutes += $dur;
+
+            if ($d->finish_time) {
+                $end = Carbon::parse($d->finish_time);
+            } else {
+                $relJob = $jobMastersById->get($d->next_job_id);
+                $hasOutput = false;
+                if ($dailyRecordsByJobId->has($d->next_job_id)) {
+                    $hasOutput = ((int) $dailyRecordsByJobId->get($d->next_job_id)->actual_ok) > 0;
+                }
+                $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                    $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                } elseif ($isRunning && $relJob?->started_at && Carbon::parse($relJob->started_at)->gte($start)) {
+                    $end = Carbon::parse($relJob->started_at);
+                } elseif ($isRunning && $relJob?->started_at) {
+                    $end = Carbon::parse($relJob->started_at);
+                } else {
+                    $end = now();
+                }
+            }
+
+            if ($end->lt($start)) {
+                $end = clone $start;
+            }
+            $durSec = (float) abs($end->diffInSeconds($start));
+            if ($durSec <= 0 && ! empty($d->duration_minutes)) {
+                $durSec = (float) $d->duration_minutes * 60;
+                $end = (clone $start)->addSeconds((int) $durSec);
+            }
+
+            $realtimeDandoriSegsByJob[$jId][] = [
+                'start' => $start->timestamp,
+                'end'   => $end->timestamp,
+                'dur_sec' => $durSec,
+            ];
+        }
+
+        if (\Illuminate\Support\Facades\Schema::hasTable('q_checks')) {
+            $qcheckModels = \App\Models\QCheck::whereIn('job_master_id', $jobIds)
+                ->whereNotNull('start_time')
+                ->whereNotNull('finish_time')
+                ->get();
+            foreach ($qcheckModels as $qc) {
+                $qStart = Carbon::parse($qc->start_time);
+                $qEnd = Carbon::parse($qc->finish_time);
+                $durSec = (float) abs($qEnd->diffInSeconds($qStart));
+                if ($durSec <= 0 && ! empty($qc->duration)) {
+                    $durSec = (float) $qc->duration * 60;
+                    $qEnd = (clone $qStart)->addSeconds((int) $durSec);
+                }
+                $realtimeDandoriSegsByJob[(int) $qc->job_master_id][] = [
+                    'start' => $qStart->timestamp,
+                    'end'   => $qEnd->timestamp,
+                    'dur_sec' => $durSec,
+                ];
             }
         }
-        foreach ($qcheckByJob as $qcJobId => $qcDur) {
-            $dandoriTotalMinutes += $qcDur;
-            if ($runningRecord && in_array((int) $qcJobId, $runningGroupJobIds, true)) {
-                $currDandoriMinutes += $qcDur;
+
+        // Incorporate dandori & 1st check segments from downtimes table without duplication
+        foreach ($allDowntimes as $dt) {
+            $typeUpper = strtoupper(trim($dt->jenis_downtime ?? ''));
+            $isDanType = str_contains($typeUpper, 'DANDORI') || str_contains($typeUpper, 'SETUP')
+                || str_contains($typeUpper, '1ST_CHECK') || str_contains($typeUpper, '1ST CHECK')
+                || str_contains($typeUpper, 'FIRST_CHECK') || str_contains($typeUpper, 'QCHECK')
+                || str_contains($typeUpper, 'Q CHECK') || str_contains($typeUpper, 'QUALITY');
+
+            if (! $isDanType) {
+                continue;
+            }
+
+            $dtStart = $dt->start_time ? Carbon::parse($dt->start_time) : null;
+            if (! $dtStart) {
+                continue;
+            }
+
+            $durSeconds = 0.0;
+            $dtEnd = null;
+            if (! empty($dt->duration_seconds)) {
+                $durSeconds = (float) $dt->duration_seconds;
+                $dtEnd = (clone $dtStart)->addSeconds((int) $durSeconds);
+            } elseif ($dt->finish_time) {
+                $dtEnd = Carbon::parse($dt->finish_time);
+                $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
+            } else {
+                $relJob = $jobMastersById->get($dt->job_master_id);
+                $hasOutput = false;
+                if ($dailyRecordsByJobId->has($dt->job_master_id)) {
+                    $hasOutput = ((int) $dailyRecordsByJobId->get($dt->job_master_id)->actual_ok) > 0;
+                }
+                $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                    $dtEnd = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                    $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
+                } elseif ($isRunning && $relJob?->started_at) {
+                    $dtEnd = Carbon::parse($relJob->started_at);
+                    $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
+                } else {
+                    $dtEnd = Carbon::now();
+                    $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
+                }
+            }
+
+            if ($durSeconds <= 0) {
+                continue;
+            }
+
+            $startTs = $dtStart->timestamp;
+            $endTs = $dtEnd ? $dtEnd->timestamp : ($startTs + (int) $durSeconds);
+            $dtJobId = (int) $dt->job_master_id;
+
+            $alreadyExists = false;
+            if (isset($realtimeDandoriSegsByJob[$dtJobId])) {
+                foreach ($realtimeDandoriSegsByJob[$dtJobId] as $seg) {
+                    $overlap = min($endTs, $seg['end']) - max($startTs, $seg['start']);
+                    if ($overlap > 10) {
+                        $alreadyExists = true;
+                        break;
+                    }
+                }
+            }
+
+            if (! $alreadyExists) {
+                $realtimeDandoriSegsByJob[$dtJobId][] = [
+                    'start' => $startTs,
+                    'end'   => $endTs,
+                    'dur_sec' => $durSeconds,
+                ];
+            }
+        }
+
+        $dandoriTotalMinutes = 0.0;
+        $currDandoriMinutes = 0.0;
+        foreach ($realtimeDandoriSegsByJob as $jId => $segs) {
+            $jobDur = array_sum(array_column($segs, 'dur_sec')) / 60.0;
+            $dandoriTotalMinutes += $jobDur;
+            if ($runningRecord && in_array((int) $jId, $runningGroupJobIds, true)) {
+                $currDandoriMinutes += $jobDur;
             }
         }
         $dandoriTotalMinutes = round($dandoriTotalMinutes, 1);
@@ -838,39 +942,10 @@ class DashboardRealtimeService
 
         // Dandori + 1st check for included jobs
         $dandoriCumMinutes = 0.0;
-        foreach ($dandoriModels as $d) {
-            if ($d->next_job_id && in_array((int) $d->next_job_id, $expandedIncludedJobIds, true)) {
-                $dur = (float) ($d->duration_minutes ?? 0);
-                if ($dur <= 0 && $d->start_time) {
-                    if ($d->finish_time) {
-                        $end = Carbon::parse($d->finish_time);
-                    } else {
-                        $relJob = $jobMastersById->get($d->next_job_id);
-                        $hasOutput = false;
-                        if ($dailyRecordsByJobId->has($d->next_job_id)) {
-                            $hasOutput = ((int) $dailyRecordsByJobId->get($d->next_job_id)->actual_ok) > 0;
-                        }
-                        $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
-                        $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
-
-                        if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
-                            $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
-                        } elseif ($isRunning && $relJob?->started_at) {
-                            $end = Carbon::parse($relJob->started_at);
-                        } else {
-                            $end = now();
-                        }
-                    }
-                    $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
-                }
-                if ($dur > 0) {
-                    $dandoriCumMinutes += $dur;
-                }
-            }
-        }
-        foreach ($qcheckByJob as $qcJobId => $qcDur) {
-            if (in_array((int) $qcJobId, $expandedIncludedJobIds, true) && $qcDur > 0) {
-                $dandoriCumMinutes += $qcDur;
+        foreach ($realtimeDandoriSegsByJob as $jId => $segs) {
+            if (in_array((int) $jId, $expandedIncludedJobIds, true)) {
+                $jobDur = array_sum(array_column($segs, 'dur_sec')) / 60.0;
+                $dandoriCumMinutes += $jobDur;
             }
         }
         $dandoriCumMinutes = round($dandoriCumMinutes, 1);

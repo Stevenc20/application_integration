@@ -122,43 +122,64 @@ class DashboardDetailService
         $dandoriModels = Dandori::whereIn('next_job_id', $jobIds)->get();
         $jobMastersById = $jobMasters->keyBy('id');
 
-        $dandoriMinutes = [];
-        $firstCheckMinutes = [];
+        // Segment-based collection for Dandori and 1st Check to match Input Harian timeline accurately
+        $dandoriSegmentsByJob = [];
+        $firstCheckSegmentsByJob = [];
+
         foreach ($dandoriModels as $d) {
             $jId = $d->next_job_id;
-            $dur = (float) ($d->duration_minutes ?? 0);
-            if ($dur <= 0 && $d->start_time) {
-                if ($d->finish_time) {
-                    $end = Carbon::parse($d->finish_time);
-                } else {
-                    // Cek apakah job terkait sudah mulai produksi atau selesai
-                    $relJob = $jobMastersById->get($jId);
-                    $hasOutput = false;
-                    if ($dailyRecordsByJobId->has($jId)) {
-                        $hasOutput = $dailyRecordsByJobId->get($jId)->sum('actual_ok') > 0;
-                    }
-                    $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
-                    $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
-
-                    if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
-                        $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
-                    } elseif ($isRunning && $relJob?->started_at && Carbon::parse($relJob->started_at)->gte(Carbon::parse($d->start_time))) {
-                        $end = Carbon::parse($relJob->started_at);
-                    } elseif ($isRunning && $relJob?->started_at) {
-                        $end = Carbon::parse($relJob->started_at);
-                    } else {
-                        $end = now();
-                    }
-                }
-                $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
+            $start = $d->start_time ? Carbon::parse($d->start_time) : null;
+            if (! $start) {
+                continue;
             }
+
+            $end = null;
+            if ($d->finish_time) {
+                $end = Carbon::parse($d->finish_time);
+            } else {
+                $relJob = $jobMastersById->get($jId);
+                $hasOutput = false;
+                if ($dailyRecordsByJobId->has($jId)) {
+                    $hasOutput = $dailyRecordsByJobId->get($jId)->sum('actual_ok') > 0;
+                }
+                $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                    $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                } elseif ($isRunning && $relJob?->started_at && Carbon::parse($relJob->started_at)->gte($start)) {
+                    $end = Carbon::parse($relJob->started_at);
+                } elseif ($isRunning && $relJob?->started_at) {
+                    $end = Carbon::parse($relJob->started_at);
+                } else {
+                    $end = now();
+                }
+            }
+
+            if ($end->lt($start)) {
+                $end = clone $start;
+            }
+            $durSec = (float) abs($end->diffInSeconds($start));
+            if ($durSec <= 0 && ! empty($d->duration_minutes)) {
+                $durSec = (float) $d->duration_minutes * 60;
+                $end = (clone $start)->addSeconds((int) $durSec);
+            }
+
             $jenis = strtolower(trim($d->jenis_dandori ?? ''));
             $act = strtoupper(trim($d->activity ?? ''));
 
             if ($jenis === '1st_check' || $jenis === '1st check' || $act === '1ST CHECK') {
-                $firstCheckMinutes[$jId] = ($firstCheckMinutes[$jId] ?? 0) + $dur;
+                $firstCheckSegmentsByJob[$jId][] = [
+                    'start' => $start->timestamp,
+                    'end'   => $end->timestamp,
+                    'dur_sec' => $durSec,
+                ];
             } else {
-                $dandoriMinutes[$jId] = ($dandoriMinutes[$jId] ?? 0) + $dur;
+                $dandoriSegmentsByJob[$jId][] = [
+                    'start' => $start->timestamp,
+                    'end'   => $end->timestamp,
+                    'dur_sec' => $durSec,
+                ];
             }
         }
 
@@ -169,7 +190,18 @@ class DashboardDetailService
                 ->get();
 
             foreach ($qcheckModels as $qc) {
-                $firstCheckMinutes[$qc->job_master_id] = ($firstCheckMinutes[$qc->job_master_id] ?? 0) + $qc->duration;
+                $qStart = Carbon::parse($qc->start_time);
+                $qEnd = Carbon::parse($qc->finish_time);
+                $durSec = (float) abs($qEnd->diffInSeconds($qStart));
+                if ($durSec <= 0 && ! empty($qc->duration)) {
+                    $durSec = (float) $qc->duration * 60;
+                    $qEnd = (clone $qStart)->addSeconds((int) $durSec);
+                }
+                $firstCheckSegmentsByJob[$qc->job_master_id][] = [
+                    'start' => $qStart->timestamp,
+                    'end'   => $qEnd->timestamp,
+                    'dur_sec' => $durSec,
+                ];
             }
         }
 
@@ -181,11 +213,18 @@ class DashboardDetailService
         foreach ($downtimeData as $dt) {
             $typeUpper = strtoupper(trim($dt->jenis_downtime ?? ''));
             $durSeconds = 0.0;
+            $dtStart = $dt->start_time ? Carbon::parse($dt->start_time) : null;
+            $dtEnd = null;
+
             if (! empty($dt->duration_seconds)) {
                 $durSeconds = (float) $dt->duration_seconds;
-            } elseif ($dt->finish_time && $dt->start_time) {
-                $durSeconds = (float) abs(Carbon::parse($dt->finish_time)->diffInSeconds(Carbon::parse($dt->start_time)));
-            } elseif ($dt->start_time) {
+                if ($dtStart) {
+                    $dtEnd = (clone $dtStart)->addSeconds((int) $durSeconds);
+                }
+            } elseif ($dt->finish_time && $dtStart) {
+                $dtEnd = Carbon::parse($dt->finish_time);
+                $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
+            } elseif ($dtStart) {
                 $isDandoriDt = str_contains($typeUpper, 'DANDORI') || str_contains($typeUpper, 'SETUP') || str_contains($typeUpper, '1ST_CHECK') || str_contains($typeUpper, '1ST CHECK');
                 $relJob = $jobMastersById->get($dt->job_master_id);
                 $hasOutput = false;
@@ -196,13 +235,14 @@ class DashboardDetailService
                 $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
 
                 if ($isDandoriDt && $isFinished && ($relJob->finished_at || $relJob->started_at)) {
-                    $endDt = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
-                    $durSeconds = (float) abs($endDt->diffInSeconds(Carbon::parse($dt->start_time)));
+                    $dtEnd = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                    $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
                 } elseif ($isDandoriDt && $isRunning && $relJob?->started_at) {
-                    $endDt = Carbon::parse($relJob->started_at);
-                    $durSeconds = (float) abs($endDt->diffInSeconds(Carbon::parse($dt->start_time)));
+                    $dtEnd = Carbon::parse($relJob->started_at);
+                    $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
                 } else {
-                    $durSeconds = (float) abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
+                    $dtEnd = Carbon::now();
+                    $durSeconds = (float) abs($dtEnd->diffInSeconds($dtStart));
                 }
             }
 
@@ -211,19 +251,54 @@ class DashboardDetailService
             }
 
             // Jika downtime tercatat sebagai dandori di tabel downtimes:
-            // HANYA tambahkan jika job ini BELUM memiliki catatan dandori di tabel dandoris (mencegah double-counting)
             if (str_contains($typeUpper, 'DANDORI') || str_contains($typeUpper, 'SETUP')) {
-                if (! isset($dandoriMinutes[$dt->job_master_id]) || $dandoriMinutes[$dt->job_master_id] <= 0) {
-                    $dandoriMinutes[$dt->job_master_id] = ($durSeconds / 60);
+                $startTs = $dtStart ? $dtStart->timestamp : null;
+                $endTs = $dtEnd ? $dtEnd->timestamp : ($startTs ? $startTs + (int) $durSeconds : null);
+
+                // Cek apakah segmen downtime ini sudah terwakili di dandoriModels (berdasarkan irisan waktu)
+                $alreadyExists = false;
+                if ($startTs !== null && isset($dandoriSegmentsByJob[$dt->job_master_id])) {
+                    foreach ($dandoriSegmentsByJob[$dt->job_master_id] as $seg) {
+                        $overlap = min($endTs, $seg['end']) - max($startTs, $seg['start']);
+                        if ($overlap > 10) { // Toleransi 10 detik overlap
+                            $alreadyExists = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (! $alreadyExists) {
+                    $dandoriSegmentsByJob[$dt->job_master_id][] = [
+                        'start' => $startTs ?: time(),
+                        'end'   => $endTs ?: time() + (int) $durSeconds,
+                        'dur_sec' => $durSeconds,
+                    ];
                 }
                 continue;
             }
 
             // Jika downtime tercatat sebagai 1st check di tabel downtimes:
-            // HANYA tambahkan jika job ini BELUM memiliki catatan 1st check di tabel dandoris / q_checks (mencegah double-counting)
             if (str_contains($typeUpper, '1ST_CHECK') || str_contains($typeUpper, '1ST CHECK') || str_contains($typeUpper, 'FIRST_CHECK') || str_contains($typeUpper, 'QCHECK') || str_contains($typeUpper, 'Q CHECK') || str_contains($typeUpper, 'QUALITY')) {
-                if (! isset($firstCheckMinutes[$dt->job_master_id]) || $firstCheckMinutes[$dt->job_master_id] <= 0) {
-                    $firstCheckMinutes[$dt->job_master_id] = ($durSeconds / 60);
+                $startTs = $dtStart ? $dtStart->timestamp : null;
+                $endTs = $dtEnd ? $dtEnd->timestamp : ($startTs ? $startTs + (int) $durSeconds : null);
+
+                $alreadyExists = false;
+                if ($startTs !== null && isset($firstCheckSegmentsByJob[$dt->job_master_id])) {
+                    foreach ($firstCheckSegmentsByJob[$dt->job_master_id] as $seg) {
+                        $overlap = min($endTs, $seg['end']) - max($startTs, $seg['start']);
+                        if ($overlap > 10) {
+                            $alreadyExists = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (! $alreadyExists) {
+                    $firstCheckSegmentsByJob[$dt->job_master_id][] = [
+                        'start' => $startTs ?: time(),
+                        'end'   => $endTs ?: time() + (int) $durSeconds,
+                        'dur_sec' => $durSeconds,
+                    ];
                 }
                 continue;
             }
@@ -256,6 +331,19 @@ class DashboardDetailService
                 'lhj_id' => $dt->hambatanJalur?->id,
                 'lhj_status' => $dt->hambatanJalur?->status,
             ];
+        }
+
+        // Sum dandoriMinutes and firstCheckMinutes from gathered segments per job
+        $dandoriMinutes = [];
+        foreach ($dandoriSegmentsByJob as $jId => $segs) {
+            $totalSec = array_sum(array_column($segs, 'dur_sec'));
+            $dandoriMinutes[$jId] = $totalSec / 60.0;
+        }
+
+        $firstCheckMinutes = [];
+        foreach ($firstCheckSegmentsByJob as $jId => $segs) {
+            $totalSec = array_sum(array_column($segs, 'dur_sec'));
+            $firstCheckMinutes[$jId] = $totalSec / 60.0;
         }
 
         // ── REPAIR & REJECT LOGS ──
