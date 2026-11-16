@@ -483,6 +483,35 @@ class ProductionService
                 ->whereNull('finish_time')
                 ->first();
 
+            // Auto-close any open preparation dandoris so duration stops when 1st check begins
+            $openDandoris = Dandori::where('next_job_id', $jobId)
+                ->whereNull('finish_time')
+                ->where(function ($q) {
+                    $q->whereNull('jenis_dandori')
+                      ->orWhere('jenis_dandori', '!=', '1st_check')
+                      ->orWhere('activity', '!=', '1ST CHECK');
+                })
+                ->get();
+            foreach ($openDandoris as $od) {
+                $dDur = abs($now->diffInSeconds(Carbon::parse($od->start_time))) / 60;
+                $od->update([
+                    'finish_time' => $now,
+                    'duration_minutes' => round($dDur, 2)
+                ]);
+            }
+
+            // Also close open downtime of type dandori
+            $openDandoriDts = Downtime::where('job_master_id', $jobId)
+                ->where('jenis_downtime', 'dandori')
+                ->whereNull('finish_time')
+                ->get();
+            foreach ($openDandoriDts as $odt) {
+                $odt->update([
+                    'finish_time' => $now,
+                    'duration_seconds' => abs($now->diffInSeconds(Carbon::parse($odt->start_time)))
+                ]);
+            }
+
             if ($existing) {
                 return $existing;
             }
@@ -559,6 +588,29 @@ class ProductionService
                 'repair_qty' => $data['repair_qty'] ?? 0,
                 'reject_qty' => $data['reject_qty'] ?? 0,
             ]);
+
+            // Auto-close any orphaned open dandoris / 1st check when production output is logged
+            $nowClose = now();
+            $orphanedDandoris = Dandori::where('next_job_id', $jobId)->whereNull('finish_time')->get();
+            foreach ($orphanedDandoris as $od) {
+                $closeAt = $job?->started_at ? Carbon::parse($job->started_at) : $nowClose;
+                $dDur = abs($closeAt->diffInSeconds(Carbon::parse($od->start_time))) / 60;
+                $od->update([
+                    'finish_time' => $closeAt,
+                    'duration_minutes' => round($dDur, 2)
+                ]);
+            }
+            $orphanedDandoriDts = Downtime::where('job_master_id', $jobId)
+                ->whereIn('jenis_downtime', ['dandori', '1st_check', '1st check'])
+                ->whereNull('finish_time')
+                ->get();
+            foreach ($orphanedDandoriDts as $odt) {
+                $closeAt = $job?->started_at ? Carbon::parse($job->started_at) : $nowClose;
+                $odt->update([
+                    'finish_time' => $closeAt,
+                    'duration_seconds' => abs($closeAt->diffInSeconds(Carbon::parse($odt->start_time)))
+                ]);
+            }
 
             $daily = DailyProduction::firstOrCreate([
                 'job_master_id' => $jobId,

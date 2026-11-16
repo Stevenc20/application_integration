@@ -120,6 +120,7 @@ class DashboardDetailService
             ->keyBy('job_master_id');
 
         $dandoriModels = Dandori::whereIn('next_job_id', $jobIds)->get();
+        $jobMastersById = $jobMasters->keyBy('id');
 
         $dandoriMinutes = [];
         $firstCheckMinutes = [];
@@ -127,7 +128,28 @@ class DashboardDetailService
             $jId = $d->next_job_id;
             $dur = (float) ($d->duration_minutes ?? 0);
             if ($dur <= 0 && $d->start_time) {
-                $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+                if ($d->finish_time) {
+                    $end = Carbon::parse($d->finish_time);
+                } else {
+                    // Cek apakah job terkait sudah mulai produksi atau selesai
+                    $relJob = $jobMastersById->get($jId);
+                    $hasOutput = false;
+                    if ($dailyRecordsByJobId->has($jId)) {
+                        $hasOutput = $dailyRecordsByJobId->get($jId)->sum('actual_ok') > 0;
+                    }
+                    $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                    $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                    if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                        $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                    } elseif ($isRunning && $relJob?->started_at && Carbon::parse($relJob->started_at)->gte(Carbon::parse($d->start_time))) {
+                        $end = Carbon::parse($relJob->started_at);
+                    } elseif ($isRunning && $relJob?->started_at) {
+                        $end = Carbon::parse($relJob->started_at);
+                    } else {
+                        $end = now();
+                    }
+                }
                 $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
             }
             $jenis = strtolower(trim($d->jenis_dandori ?? ''));
@@ -164,7 +186,24 @@ class DashboardDetailService
             } elseif ($dt->finish_time && $dt->start_time) {
                 $durSeconds = (float) abs(Carbon::parse($dt->finish_time)->diffInSeconds(Carbon::parse($dt->start_time)));
             } elseif ($dt->start_time) {
-                $durSeconds = (float) abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
+                $isDandoriDt = str_contains($typeUpper, 'DANDORI') || str_contains($typeUpper, 'SETUP') || str_contains($typeUpper, '1ST_CHECK') || str_contains($typeUpper, '1ST CHECK');
+                $relJob = $jobMastersById->get($dt->job_master_id);
+                $hasOutput = false;
+                if ($dailyRecordsByJobId->has($dt->job_master_id)) {
+                    $hasOutput = $dailyRecordsByJobId->get($dt->job_master_id)->sum('actual_ok') > 0;
+                }
+                $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                if ($isDandoriDt && $isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                    $endDt = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                    $durSeconds = (float) abs($endDt->diffInSeconds(Carbon::parse($dt->start_time)));
+                } elseif ($isDandoriDt && $isRunning && $relJob?->started_at) {
+                    $endDt = Carbon::parse($relJob->started_at);
+                    $durSeconds = (float) abs($endDt->diffInSeconds(Carbon::parse($dt->start_time)));
+                } else {
+                    $durSeconds = (float) abs(Carbon::now()->diffInSeconds(Carbon::parse($dt->start_time)));
+                }
             }
 
             if ($durSeconds <= 0) {

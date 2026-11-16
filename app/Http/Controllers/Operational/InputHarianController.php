@@ -687,17 +687,32 @@ class InputHarianController extends Controller
 
                 // Self-healing jika job aktif ternyata sudah produksi namun ada dandori gantung
                 if ($activeJob && $hasProductionProgress($activeJob)) {
+                    $closeTime = $activeJob->started_at ?: now();
+
                     $openDandoris = \App\Models\Downtime::where('job_master_id', $activeJob->id)
-                        ->where('jenis_downtime', 'dandori')
+                        ->whereIn('jenis_downtime', ['dandori', '1st_check', '1st check'])
                         ->whereNull('finish_time')
                         ->get();
                     if ($openDandoris->isNotEmpty()) {
-                        $closeTime = $activeJob->started_at ?: now();
                         foreach ($openDandoris as $odt) {
                             $diffSec = abs(\Carbon\Carbon::parse($closeTime)->diffInSeconds(\Carbon\Carbon::parse($odt->start_time)));
                             $odt->update([
                                 'finish_time' => $closeTime,
                                 'duration_seconds' => $diffSec,
+                            ]);
+                        }
+                    }
+
+                    // Pastikan record di tabel dandoris juga ikut ditutup
+                    $openDandoriModels = \App\Models\Dandori::where('next_job_id', $activeJob->id)
+                        ->whereNull('finish_time')
+                        ->get();
+                    if ($openDandoriModels->isNotEmpty()) {
+                        foreach ($openDandoriModels as $odm) {
+                            $diffMin = abs(\Carbon\Carbon::parse($closeTime)->diffInSeconds(\Carbon\Carbon::parse($odm->start_time))) / 60;
+                            $odm->update([
+                                'finish_time' => $closeTime,
+                                'duration_minutes' => round($diffMin, 2),
                             ]);
                         }
                     }

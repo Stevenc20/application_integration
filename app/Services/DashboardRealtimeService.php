@@ -719,12 +719,33 @@ class DashboardRealtimeService
             ? ($rootToGroupJobIds[$runningRecord->job_master_id] ?? [$runningRecord->job_master_id])
             : [];
 
+        $jobMastersById = $jobMasters->keyBy('id');
+        $dailyRecordsByJobId = $dailyRecords->keyBy('job_master_id');
+
         $dandoriTotalMinutes = 0.0;
         $currDandoriMinutes = 0.0;
         foreach ($dandoriModels as $d) {
             $dur = (float) ($d->duration_minutes ?? 0);
             if ($dur <= 0 && $d->start_time) {
-                $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+                if ($d->finish_time) {
+                    $end = Carbon::parse($d->finish_time);
+                } else {
+                    $relJob = $jobMastersById->get($d->next_job_id);
+                    $hasOutput = false;
+                    if ($dailyRecordsByJobId->has($d->next_job_id)) {
+                        $hasOutput = ((int) $dailyRecordsByJobId->get($d->next_job_id)->actual_ok) > 0;
+                    }
+                    $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                    $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                    if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                        $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                    } elseif ($isRunning && $relJob?->started_at) {
+                        $end = Carbon::parse($relJob->started_at);
+                    } else {
+                        $end = now();
+                    }
+                }
                 $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
             }
             $dandoriTotalMinutes += $dur;
@@ -821,7 +842,25 @@ class DashboardRealtimeService
             if ($d->next_job_id && in_array((int) $d->next_job_id, $expandedIncludedJobIds, true)) {
                 $dur = (float) ($d->duration_minutes ?? 0);
                 if ($dur <= 0 && $d->start_time) {
-                    $end = $d->finish_time ? Carbon::parse($d->finish_time) : now();
+                    if ($d->finish_time) {
+                        $end = Carbon::parse($d->finish_time);
+                    } else {
+                        $relJob = $jobMastersById->get($d->next_job_id);
+                        $hasOutput = false;
+                        if ($dailyRecordsByJobId->has($d->next_job_id)) {
+                            $hasOutput = ((int) $dailyRecordsByJobId->get($d->next_job_id)->actual_ok) > 0;
+                        }
+                        $isFinished = $relJob && in_array(strtolower((string) $relJob->status), ['completed', 'complete', 'finished', 'closed', 'done'], true);
+                        $isRunning = $relJob && (strtolower((string) $relJob->status) === 'running' || $hasOutput);
+
+                        if ($isFinished && ($relJob->finished_at || $relJob->started_at)) {
+                            $end = Carbon::parse($relJob->started_at ?: $relJob->finished_at);
+                        } elseif ($isRunning && $relJob?->started_at) {
+                            $end = Carbon::parse($relJob->started_at);
+                        } else {
+                            $end = now();
+                        }
+                    }
                     $dur = round(abs($end->diffInSeconds(Carbon::parse($d->start_time))) / 60, 2);
                 }
                 if ($dur > 0) {
