@@ -475,7 +475,7 @@ class PpcScheduleMergeService
 
                         $lockState = $this->scheduleLockState($matchedPlan);
                         $allowActiveMetadata = $lockState === 'running'
-                            && ! empty($options['allow_active_metadata_update']);
+                            && (! empty($options['allow_active_metadata_update']) || $isRevSheet);
 
                         if ($lockState !== null && ! $allowActiveMetadata) {
                             foreach (['plan', 'start_time', 'finish_time'] as $field) {
@@ -533,7 +533,7 @@ class PpcScheduleMergeService
                             $jobsByPlanId,
                             $parsedDate,
                             null,
-                            ! empty($options['allow_active_metadata_update'])
+                            ! empty($options['allow_active_metadata_update']) || $isRevSheet
                         );
                     } else {
                         $newPlan = ProductionPlan::create(array_merge($rowAttributes, ['status' => 'pending']));
@@ -562,7 +562,7 @@ class PpcScheduleMergeService
                     $sectionRetainedPlans,
                     $jobsByPlanId,
                     $parsedDate,
-                    ! empty($options['allow_active_metadata_update'])
+                    ! empty($options['allow_active_metadata_update']) || $isRevSheet
                 );
             }
 
@@ -1408,7 +1408,7 @@ class PpcScheduleMergeService
 
             if (count($slices) > 1) {
                 $totalPlanQty = collect($slices)->sum(fn (ProductionPlan $s) => (float) ($s->plan ?? 0));
-                if (! $rootLocked || empty($root->original_plan)) {
+                if (! $rootLocked || empty($root->original_plan) || $allowActiveMetadataUpdate) {
                     $root->original_plan = $totalPlanQty;
                 }
                 $root->session_no = 1;
@@ -1416,12 +1416,12 @@ class PpcScheduleMergeService
                 $root->save();
 
                 foreach ($slices as $slice) {
-                    if ((int) $slice->id !== (int) $root->id && empty($slice->original_plan)) {
+                    if ((int) $slice->id !== (int) $root->id && (empty($slice->original_plan) || $allowActiveMetadataUpdate)) {
                         $slice->original_plan = $slice->plan;
                         $slice->save();
                     }
                 }
-            } elseif (! $rootLocked && $root->original_plan !== null && (float) $root->original_plan !== (float) $root->plan) {
+            } elseif ((! $rootLocked || $allowActiveMetadataUpdate) && $root->original_plan !== null && (float) $root->original_plan !== (float) $root->plan) {
                 $root->original_plan = $root->plan;
                 $root->save();
             }
