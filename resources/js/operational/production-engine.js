@@ -2443,16 +2443,23 @@ function resetDowntimeButtons(jobId) {
 window.openDowntimeReport = function openDowntimeReport(jobId, dt) {
     try {
         window.currentDtJobId = jobId;
-        const row = document.getElementById('row-' + jobId);
+        const row = document.getElementById('row-' + jobId) || document.querySelector(`tr[data-job-master-id="${jobId}"]`);
+        const activeCard = document.getElementById('active-job-card');
         const dtJobNumber = document.getElementById('dtJobNumber');
         if (dtJobNumber) {
             if (row) {
                 const jn = row.getAttribute('data-job-number') || '';
                 const jm = row.getAttribute('data-job-master') || '';
                 dtJobNumber.innerText = jm ? (jm + (jn ? ' (' + jn + ')' : '')) : (jn || '-');
-            } else if (window.jobMasterData?.[jobId]) {
+            } else if (window.jobMasterData?.[jobId] && (window.jobMasterData[jobId].job_name || window.jobMasterData[jobId].job_number)) {
                 const j = window.jobMasterData[jobId];
                 dtJobNumber.innerText = j.job_name ? (j.job_name + (j.job_number ? ' (' + j.job_number + ')' : '')) : (j.job_number || '-');
+            } else if (activeCard && activeCard.getAttribute('data-active-job-id') == jobId) {
+                const ajn = activeCard.getAttribute('data-active-job-number') || '';
+                const ajm = activeCard.getAttribute('data-active-job-name') || '';
+                dtJobNumber.innerText = ajm ? (ajm + (ajn ? ' (' + ajn + ')' : '')) : (ajn || '-');
+            } else if (window.ProductionConfig?.currentActiveId == jobId && window.ProductionConfig?.currentJobNumber) {
+                dtJobNumber.innerText = window.ProductionConfig.currentJobNumber;
             } else {
                 dtJobNumber.innerText = '-';
             }
@@ -3167,34 +3174,10 @@ function submitDowntimeLater() {
     });
 }
 
-function closeDowntimeModal() {
+function closeDowntimeModal(forceClose = false) {
     try {
-        let id = document.getElementById('dtEditId')?.value;
-        const jenis = (document.getElementById('dtJenis')?.value || '').trim();
-
-        // Cari calon downtime jika id tidak ada tapi list memiliki downtime yang belum lengkap
-        if (!id && window.currentDowntimesList && window.currentDowntimesList.length > 0) {
-            const candidate = window.currentDowntimesList.find(dt => 
-                !dt.problem || dt.problem === '-' || dt.problem.includes('(Shortcut)') || 
-                !dt.jenis_downtime || dt.jenis_downtime.toLowerCase() === 'downtime'
-            );
-            if (candidate) {
-                id = candidate.id;
-            }
-        }
-
-        // Jika ada id atau ada jenis yang sedang dipilih
-        if (id || jenis) {
-            if (!jenis) {
-                showDtJenisError('Wajib memilih Jenis Downtime terlebih dahulu sebelum menutup.');
-                showToast('Wajib memilih Jenis Downtime terlebih dahulu sebelum menutup.', 'warning');
-                return;
-            }
-            clearDtJenisError();
-            // Foto bersifat opsional, simpan perubahan via submitDowntimeLater
-            submitDowntimeLater();
-            return;
-        }
+        clearDtJenisError();
+        cancelDowntimeEdit();
 
         const modal = document.getElementById('downtimeModal');
         if (modal) {

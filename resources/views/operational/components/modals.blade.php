@@ -147,14 +147,14 @@
 </div>
 
 {{-- DOWNTIME MODAL --}}
-<div id="downtimeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-[9999] items-center justify-center p-4">
-    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]">
+<div id="downtimeModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden z-[9999] items-center justify-center p-4" onclick="if(event.target === this) closeDowntimeModal()">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-4xl border border-gray-100 overflow-hidden flex flex-col max-h-[90vh]" onclick="event.stopPropagation()">
         <div class="border-b border-gray-100 px-6 py-4 flex items-center justify-between bg-red-50">
             <div>
                 <h3 class="font-bold text-red-800 text-lg">Laporan Downtime / Try Out</h3>
                 <p class="text-sm text-red-600 mt-0.5">Lengkapi data untuk Job: <span id="dtJobNumber" class="font-bold uppercase tracking-widest">-</span></p>
             </div>
-            <button onclick="closeDowntimeModal()" class="w-8 h-8 rounded-lg bg-white border border-red-200 text-red-400 hover:text-red-600 flex items-center justify-center transition-colors">
+            <button type="button" onclick="closeDowntimeModal()" class="w-8 h-8 rounded-lg bg-white border border-red-200 text-red-400 hover:text-red-600 flex items-center justify-center transition-colors">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>

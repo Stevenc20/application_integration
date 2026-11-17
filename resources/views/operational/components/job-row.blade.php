@@ -117,7 +117,7 @@
     </td>
 </tr>
 @else
-<tr id="row-{{ $job->id }}" data-job-number="{{ $job->job_no }}" data-job-master="{{ $job->job_master }}" class="hover:bg-slate-50 transition-colors">
+<tr id="row-{{ $job->id }}" data-job-master-id="{{ $jobId }}" data-job-number="{{ $job->job_no }}" data-job-master="{{ $job->job_master }}" class="hover:bg-slate-50 transition-colors">
     {{-- 1. ITEM SPEC --}}
     <td class="px-6 py-5 align-top">
         <div class="flex flex-col gap-1">

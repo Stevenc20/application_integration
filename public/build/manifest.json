@@ -4,7 +4,7 @@
     "name": "assets/polyfills-legacy-Btx3lKOh.js"
   },
   "resources/css/app.css": {
-    "file": "assets/app-B5SEmRbJ.css",
+    "file": "assets/app-gYx9Ho7m.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +13,7 @@
     ]
   },
   "resources/css/supervisor.css": {
-    "file": "assets/supervisor-D3WTGpMb.css",
+    "file": "assets/supervisor-D8mSAF6P.css",
     "src": "resources/css/supervisor.css",
     "isEntry": true,
     "name": "supervisor",
@@ -28,7 +28,7 @@
     "isEntry": true
   },
   "resources/js/operational/production-engine.js": {
-    "file": "assets/production-engine-eCdzy7eu.js",
+    "file": "assets/production-engine-DjKgzB3L.js",
     "name": "production-engine",
     "src": "resources/js/operational/production-engine.js",
     "isEntry": true

@@ -586,6 +586,8 @@ window.jobMasterData = {
     @if($jd)
     "{{ $jd->id }}": {
         id: {{ $jd->id }},
+        job_number: "{{ addslashes($jd->job_number ?? $job->job_no ?? '') }}",
+        job_name: "{{ addslashes($jd->job_name ?? $job->job_master ?? '') }}",
         status: "{{ $isJobDone ? 'complete' : $jd->status }}",
         @php $activeDate = request('date', now()->toDateString()); @endphp
         plan_start: {{ $job->start_time ? \Carbon\Carbon::parse($activeDate . ' ' . $job->start_time)->timestamp * 1000 : (\Carbon\Carbon::parse($jd->plan_start ?: $activeDate . ' 07:40')->timestamp * 1000) }},
@@ -628,6 +630,8 @@ window.jobMasterData = {
     @if(isset($activeJob) && !(is_object($jobs) && method_exists($jobs, 'getCollection') ? $jobs->getCollection() : $jobs)->pluck('job_data.id')->contains($activeJob->id))
     "{{ $activeJob->id }}": {
         id: {{ $activeJob->id }},
+        job_number: "{{ addslashes($activeJob->job_number ?? '') }}",
+        job_name: "{{ addslashes($activeJob->job_name ?? '') }}",
         status: "{{ $activeJob->status }}",
         @php $activeDate = request('date', now()->toDateString()); @endphp
         @php 

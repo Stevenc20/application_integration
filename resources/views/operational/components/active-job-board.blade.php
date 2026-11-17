@@ -52,7 +52,7 @@
         </button>
     </div>
     @endif
-    <div id="active-job-card" class="bg-slate-50 rounded-3xl p-6 shadow-lg shadow-red-900/5 border border-slate-200 text-slate-800 relative overflow-hidden">
+    <div id="active-job-card" data-active-job-id="{{ $activeJob->id }}" data-active-job-number="{{ $activeJob->job_number }}" data-active-job-name="{{ $activeJob->job_name }}" class="bg-slate-50 rounded-3xl p-6 shadow-lg shadow-red-900/5 border border-slate-200 text-slate-800 relative overflow-hidden">
         <!-- Visual Accents -->
         <div class="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-red-500 via-red-400 to-transparent"></div>
         <div class="absolute top-0 right-0 w-1/3 h-full bg-gradient-to-l from-red-500/3 to-transparent"></div>
