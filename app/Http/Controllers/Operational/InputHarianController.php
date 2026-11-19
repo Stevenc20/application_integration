@@ -611,7 +611,7 @@ class InputHarianController extends Controller
                                     ->from('production_plans')
                                     ->whereColumn('production_plans.job_no', 'job_masters.job_number')
                                     ->whereDate('production_plans.plan_date', $date)
-                                    ->where('production_plans.shift_name', $latestShiftName);
+                                    ->where('production_plans.shift_name', 'like', "{$latestShiftName}%");
                             });
 
                             if (DB::connection()->getDriverName() === 'mysql') {
@@ -619,8 +619,8 @@ class InputHarianController extends Controller
                                     SELECT 1 FROM production_plans pp
                                     WHERE pp.id = CAST(SUBSTRING_INDEX(job_masters.job_number, '-', -1) AS UNSIGNED)
                                       AND pp.plan_date = ?
-                                      AND pp.shift_name = ?
-                                )", [$date, $latestShiftName]);
+                                      AND pp.shift_name LIKE ?
+                                )", [$date, "{$latestShiftName}%"]);
                             }
                         });
 
@@ -642,7 +642,30 @@ class InputHarianController extends Controller
                             ->get();
                     }
 
-                    // Jika belum ketemu juga, ambil running/paused job yang ada di line ini
+                    // Prioritas 2: Jika belum ketemu, cari job yang memiliki ProductionSession aktif pada tanggal/work_date hari ini
+                    if ($activeJobs->isEmpty()) {
+                        $activeJobs = (clone $fallbackQuery)
+                            ->whereHas('productionSessions', function($sq) use ($date) {
+                                $sq->whereDate('work_date', $date);
+                            })
+                            ->orderByRaw("CASE 
+                                WHEN EXISTS (
+                                    SELECT 1 FROM downtimes 
+                                    WHERE downtimes.job_master_id = job_masters.id 
+                                      AND downtimes.jenis_downtime = 'dandori' 
+                                      AND downtimes.finish_time IS NULL
+                                ) AND NOT EXISTS (
+                                    SELECT 1 FROM daily_productions 
+                                    WHERE daily_productions.job_master_id = job_masters.id 
+                                      AND daily_productions.work_date = '{$date}' 
+                                      AND (daily_productions.actual_ok > 0 OR daily_productions.actual_repair > 0 OR daily_productions.actual_reject > 0)
+                                ) AND job_masters.started_at IS NULL THEN 0 ELSE 1 END")
+                            ->orderByDesc('updated_at')
+                            ->orderByDesc('id')
+                            ->get();
+                    }
+
+                    // Prioritas 3: Jika belum ketemu juga, ambil running/paused job yang ada di line ini
                     if ($activeJobs->isEmpty()) {
                         $activeJobs = $fallbackQuery
                             ->orderByRaw("CASE 

@@ -57,22 +57,28 @@ class ProductionShiftTransitionService
             $isSameShift = ($planShift === null) || ($planShift === $this->normalizeShiftName($activeShift));
 
             // SAFEGUARD: Jangan pernah menandai job sebagai stale jika:
-            // 1. Job baru saja distart/diupdate kurang dari 30 menit yang lalu (mencegah auto-kill pada job yang baru dimulai).
-            // 2. Job start time berada di dalam window shift aktif saat ini.
+            // 1. Job baru saja distart/diupdate atau memiliki open session/downtime baru (< 60 menit lalu).
+            // 2. Job start time atau session start time berada di dalam window shift aktif saat ini.
+            // 3. Job memiliki production session aktif di tanggal produksi aktif saat ini.
             $jobStartTime = $job->started_at ? Carbon::parse($job->started_at) : null;
             $jobUpdateTime = $job->updated_at ? Carbon::parse($job->updated_at) : null;
             $isRecentlyActive = false;
-            if ($jobStartTime && $jobStartTime->diffInMinutes($now) < 30) {
+            if ($jobStartTime && $jobStartTime->diffInMinutes($now) < 60) {
                 $isRecentlyActive = true;
             }
-            if ($jobUpdateTime && $jobUpdateTime->diffInMinutes($now) < 15) {
+            if ($jobUpdateTime && $jobUpdateTime->diffInMinutes($now) < 30) {
                 $isRecentlyActive = true;
             }
 
             [$shiftStart, $shiftEnd] = ProductionMetricsService::shiftWindow($activeDate, $activeShift);
             $startedInActiveShift = $jobStartTime && $jobStartTime->betweenIncluded($shiftStart, $shiftEnd);
 
-            if ($startedInActiveShift || $isRecentlyActive) {
+            // Cek juga session aktif di work_date saat ini
+            $hasActiveSessionInWorkDate = $job->productionSessions->contains(function ($s) use ($activeDate) {
+                return $s->work_date === $activeDate;
+            });
+
+            if ($startedInActiveShift || $isRecentlyActive || $hasActiveSessionInWorkDate) {
                 $isSameShift = true;
             }
 
@@ -243,7 +249,22 @@ class ProductionShiftTransitionService
             }
         }
 
-        return ProductionPlan::where('job_no', $job->job_number)->first();
+        $base = ProductionPlan::where('job_no', $job->job_number)->first();
+        if ($base) {
+            return $base;
+        }
+
+        // Fallback: match by prefix or job_master in active production plans
+        $jobPrefix = count($parts) > 1 ? implode('-', array_slice($parts, 0, -1)) : $job->job_number;
+        return ProductionPlan::where('row_type', 'job')
+            ->where(function ($q) use ($jobPrefix, $job) {
+                $q->where('job_no', $jobPrefix)
+                  ->orWhere('job_no', $job->job_number)
+                  ->orWhere('job_master', $job->job_name);
+            })
+            ->orderByDesc('plan_date')
+            ->orderByDesc('id')
+            ->first();
     }
 
     private function normalizeShiftName(?string $shift): string
